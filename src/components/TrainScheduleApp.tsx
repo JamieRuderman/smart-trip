@@ -1,6 +1,5 @@
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
-import { AppHeader } from "./AppHeader";
-import { RouteSelector } from "./RouteSelector";
+import { StickyHeader } from "./StickyHeader";
 import { ServiceAlert } from "./ServiceAlert";
 import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
@@ -27,23 +26,21 @@ export function TrainScheduleApp() {
 
   return (
     <div className="min-h-[100dvh] bg-card md:bg-background">
-      <AppHeader />
+      <StickyHeader
+        fromStation={fromStation}
+        toStation={toStation}
+        scheduleType={scheduleType}
+        onFromStationChange={setFromStation}
+        onToStationChange={setToStation}
+        onScheduleTypeChange={setScheduleType}
+        onSwapStations={swapStations}
+      />
 
       <main
         className="container mx-auto px-4 py-4 md:py-6 space-y-4"
         role="main"
         aria-label="Train schedule planning interface"
       >
-        {/* Route Selector */}
-        <RouteSelector
-          fromStation={fromStation}
-          toStation={toStation}
-          scheduleType={scheduleType}
-          onFromStationChange={setFromStation}
-          onToStationChange={setToStation}
-          onScheduleTypeChange={setScheduleType}
-          onSwapStations={swapStations}
-        />
 
         {/* Service Alerts */}
         <ServiceAlert

@@ -154,12 +154,24 @@ All colors MUST be HSL.
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Eliminate 300ms click delay on mobile devices */
@@ -197,4 +209,23 @@ All colors MUST be HSL.
 /* Ensure it looks good in both light and dark modes */
 .dark .fixed.inset-0.z-50 {
   background-color: hsl(var(--background) / 0.5) !important;
+}
+
+body.keyboard-visible {
+  transition: padding-bottom 0.2s ease;
+  padding-bottom: 0;
+}
+
+body.keyboard-visible .pb-safe {
+  padding-bottom: 0 !important;
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 2rem);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
 }

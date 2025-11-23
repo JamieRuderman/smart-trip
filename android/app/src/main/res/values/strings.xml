@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SMART Train Schedule</string>
+    <string name="title_activity_main">SMART Train Schedule</string>
+    <string name="package_name">smart.trains.schedule</string>
+    <string name="custom_url_scheme">smart.trains.schedule</string>
+</resources>

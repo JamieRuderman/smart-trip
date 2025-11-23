@@ -3,7 +3,7 @@ import smartLogo from "@/assets/smart-logo.svg";
 export function AppHeader() {
   return (
     <header
-      className="container mx-auto px-4 pt-4 pb-36 flex flex-col items-center bg-smart-train-green xl:rounded-b-2xl"
+      className="container max-w-screen-xl mx-auto px-4 pt-safe pb-36 flex flex-col items-center bg-smart-train-green xl:rounded-b-[2rem]"
       role="banner"
     >
       <img

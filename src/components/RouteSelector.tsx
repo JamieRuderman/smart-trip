@@ -3,7 +3,13 @@ import type React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpDown, MapPin, Calendar, Circle, Ship } from "lucide-react";
+import {
+  ArrowUpDown,
+  MapPin,
+  Calendar,
+  CornerDownRight,
+  Ship,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -97,8 +103,8 @@ export const RouteSelector = memo(function RouteSelector({
           <div className="flex flex-col items-center">
             <MapPin className="h-5 w-5 text-primary fill" />
             <div className="w-px h-6 border-l border-dotted border-muted-foreground my-2"></div>
-            <Circle
-              className="h-3 w-3 text-primary"
+            <CornerDownRight
+              className="h-3 w-3 text-primary ml-2"
               style={{ strokeWidth: 3 }}
             />
           </div>

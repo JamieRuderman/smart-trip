@@ -6,6 +6,7 @@ import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
 import { NoTripsFound } from "./NoTripsFound";
+import { EmptyState } from "./EmptyState";
 
 export function TrainScheduleApp() {
   const {
@@ -25,7 +26,7 @@ export function TrainScheduleApp() {
   } = useTrainScheduleState();
 
   return (
-    <div className="min-h-screen bg-card md:bg-background">
+    <div className="min-h-[100dvh] bg-card md:bg-background">
       <AppHeader />
 
       <main
@@ -49,6 +50,9 @@ export function TrainScheduleApp() {
           showServiceAlert={showServiceAlert}
           onToggleServiceAlert={toggleServiceAlert}
         />
+
+        {/* Empty State - No stations selected */}
+        {(!fromStation || !toStation) && <EmptyState />}
 
         {/* Schedule Results */}
         {filteredTrips.length > 0 && fromStation && toStation && (

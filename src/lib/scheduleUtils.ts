@@ -1,5 +1,5 @@
 import stations from "@/data/stations";
-import trainSchedules, { type ScheduleType } from "@/data/trainSchedules";
+import { trainSchedules, type ScheduleType } from "@/data/trainSchedules";
 import {
   weekdayFerries,
   weekendFerries,
@@ -66,6 +66,15 @@ stations.forEach((fromStation, fromIndex) => {
 function processScheduleData(): ScheduleCache {
   const cache: ScheduleCache = {};
 
+  // Validate that train schedules data is loaded
+  if (!trainSchedules || !trainSchedules.weekday || !trainSchedules.weekend) {
+    console.error(
+      "[ScheduleUtils] trainSchedules data is not loaded correctly:",
+      trainSchedules
+    );
+    return cache;
+  }
+
   /**
    * Finds the next available outbound ferry after a train arrival
    */
@@ -105,11 +114,7 @@ function processScheduleData(): ScheduleCache {
     });
   };
 
-  const getTimeForStation = (
-    times: string[],
-    station: Station,
-    direction: "southbound" | "northbound"
-  ): string => {
+  const getTimeForStation = (times: string[], station: Station): string => {
     const stationIndex = stationIndexMap[station];
     if (stationIndex === undefined) return "~~";
 
@@ -128,80 +133,64 @@ function processScheduleData(): ScheduleCache {
     outboundFerries: FerryConnection[],
     inboundFerries: FerryConnection[]
   ) => {
-    (Object.entries(scheduleData) as [keyof TrainSchedule, TrainTrip[]][]).forEach(
-      ([direction, trips]) => {
-        trips.forEach((trip) => {
-          // Pre-calculate validity for all possible station combinations
-          stations.forEach((fromStation, fromIndex) => {
-            stations.forEach((toStation, toIndex) => {
-              if (fromIndex !== toIndex) {
-                // Get the correct direction for this station pair
-                const pairKey = `${fromStation}-${toStation}`;
-                const stationPair = stationPairs[pairKey];
+    (
+      Object.entries(scheduleData) as [keyof TrainSchedule, TrainTrip[]][]
+    ).forEach(([direction, trips]) => {
+      trips.forEach((trip) => {
+        // Pre-calculate validity for all possible station combinations
+        stations.forEach((fromStation, fromIndex) => {
+          stations.forEach((toStation, toIndex) => {
+            if (fromIndex !== toIndex) {
+              // Get the correct direction for this station pair
+              const pairKey = `${fromStation}-${toStation}`;
+              const stationPair = stationPairs[pairKey];
 
-                // Only include trips that match the correct direction for this station pair
-                if (
-                  stationPair &&
-                  stationPair.direction === direction
-                ) {
-                  const departureTime = getTimeForStation(
+              // Only include trips that match the correct direction for this station pair
+              if (stationPair && stationPair.direction === direction) {
+                const departureTime = getTimeForStation(
+                  trip.times,
+                  fromStation
+                );
+                const arrivalTime = getTimeForStation(trip.times, toStation);
+                const isValid =
+                  !departureTime.includes("~~") && !arrivalTime.includes("~~");
+
+                if (isValid) {
+                  const key = `${fromStation}-${toStation}-${scheduleType}`;
+                  if (!cache[key]) cache[key] = [];
+
+                  const larkspurTime = getTimeForStation(
                     trip.times,
+                    FERRY_CONSTANTS.FERRY_STATION
+                  );
+                  const hasLarkspurTime = !larkspurTime.includes("~~");
+
+                  cache[key].push({
+                    trip: trip.trip,
+                    times: trip.times,
+                    outboundFerry:
+                      toStation === FERRY_CONSTANTS.FERRY_STATION &&
+                      hasLarkspurTime
+                        ? findOutboundFerry(larkspurTime, outboundFerries)
+                        : undefined,
+                    inboundFerry:
+                      fromStation === FERRY_CONSTANTS.FERRY_STATION &&
+                      hasLarkspurTime
+                        ? findInboundFerry(larkspurTime, inboundFerries)
+                        : undefined,
+                    departureTime,
+                    arrivalTime,
                     fromStation,
-                    direction
-                  );
-                  const arrivalTime = getTimeForStation(
-                    trip.times,
                     toStation,
-                    direction
-                  );
-                  const isValid =
-                    !departureTime.includes("~~") &&
-                    !arrivalTime.includes("~~");
-
-                  if (isValid) {
-                    const key = `${fromStation}-${toStation}-${scheduleType}`;
-                    if (!cache[key]) cache[key] = [];
-
-                    const larkspurTime = getTimeForStation(
-                      trip.times,
-                      FERRY_CONSTANTS.FERRY_STATION,
-                      direction
-                    );
-                    const hasLarkspurTime = !larkspurTime.includes("~~");
-
-                    cache[key].push({
-                      trip: trip.trip,
-                      times: trip.times,
-                      outboundFerry:
-                        toStation === FERRY_CONSTANTS.FERRY_STATION &&
-                        hasLarkspurTime
-                          ? findOutboundFerry(
-                              larkspurTime,
-                              outboundFerries
-                            )
-                          : undefined,
-                      inboundFerry:
-                        fromStation === FERRY_CONSTANTS.FERRY_STATION &&
-                        hasLarkspurTime
-                          ? findInboundFerry(
-                              larkspurTime,
-                              inboundFerries
-                            )
-                          : undefined,
-                      departureTime,
-                      arrivalTime,
-                      fromStation,
-                      toStation,
-                      isValid: true,
-                    });
-                  }
+                    isValid: true,
+                  });
                 }
               }
-            });
+            }
           });
         });
-      }
-    );
+      });
+    });
   };
 
   // Process both schedule types
@@ -222,7 +211,13 @@ function processScheduleData(): ScheduleCache {
 }
 
 // Pre-processed schedule cache
-const scheduleCache = processScheduleData();
+let scheduleCache: ScheduleCache;
+try {
+  scheduleCache = processScheduleData();
+} catch (error) {
+  console.error("[ScheduleUtils] Error processing schedule data:", error);
+  scheduleCache = {};
+}
 
 // Fast lookup functions
 // Station index function is now exported from stationUtils

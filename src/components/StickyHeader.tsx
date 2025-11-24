@@ -109,16 +109,14 @@ export const StickyHeader = memo(function StickyHeader({
         </ShrinkingContainer>
       </header>
 
-      {/* Route Selector - with gradient bisecting background */}
-      <div
-        className="container mx-auto px-4"
-        style={{
-          background:
-            "linear-gradient(to bottom, hsl(var(--smart-train-green)) 0%, hsl(var(--smart-train-green)) 50%, transparent 50%)",
-        }}
-      >
+      {/* Route Selector with layered background */}
+      <div className="container mx-auto px-4 max-w-screen-xl relative">
+        <div
+          className="absolute inset-x-0 top-0 h-[50%] bg-smart-train-green xl:rounded-b-[2rem] pointer-events-none"
+          aria-hidden="true"
+        />
         {/* Single Route Selector */}
-        <Card className="max-w-4xl mx-auto">
+        <Card className="max-w-4xl mx-auto relative z-1 shadow-md">
           <CardHeader className="px-5 py-2">
             <ShrinkingContainer
               height={titleHeight}

@@ -2,6 +2,7 @@ import { memo, useRef } from "react";
 import smartLogo from "@/assets/smart-logo.svg";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowUpDown,
@@ -9,6 +10,7 @@ import {
   Calendar,
   CornerDownRight,
   Ship,
+  HeartHandshake,
 } from "lucide-react";
 import {
   Select,
@@ -133,9 +135,26 @@ export const StickyHeader = memo(function StickyHeader({
             >
               <CardTitle
                 id="route-planning-title"
-                className="flex items-center gap-2 my-2"
+                className="flex flex-wrap items-center justify-between my-2"
               >
                 Plan Your Journey
+                <a
+                  href="https://github.com/JamieRuderman/smart-train-schedule"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Community app on GitHub"
+                >
+                  <Badge
+                    variant="subtle"
+                    className="gap-1 tracking-normal font-normal text-foreground/70 hover:bg-muted/70"
+                  >
+                    <HeartHandshake
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
+                    Community App
+                  </Badge>
+                </a>
               </CardTitle>
             </ShrinkingContainer>
           </CardHeader>

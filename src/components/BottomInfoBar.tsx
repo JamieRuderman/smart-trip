@@ -4,7 +4,7 @@ import { ThemeToggle } from "./ThemeToggle";
 export function BottomInfoBar() {
   return (
     <div className="container max-w-4xl mx-auto px-3 md:px-0 pb-safe space-y-3">
-      <div className="pt-8 md:px-8 md:py-4 text-sm text-muted-foreground border-t md:border-t-0">
+      <div className="pt-12 mt-6 md:px-8 md:py-4 text-sm text-muted-foreground border-t md:border-t-0">
         <div className="flex items-start justify-between gap-3">
           <Bell
             aria-hidden
@@ -38,7 +38,8 @@ export function BottomInfoBar() {
           >
             511.org
           </a>
-          .
+          . This is an open-source community project and is not an official
+          SMART app.
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 # SMART Train Schedule
 
 A modern, responsive web application for viewing Sonoma-Marin Area Rail Transit (SMART) train schedules and ferry connections.
+This is an open-source community project and is not an official SMART app.
 
 ## 🚆 Features
 

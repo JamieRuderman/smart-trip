@@ -1,7 +1,7 @@
 {
-  "name": "SMART Train Schedule",
-  "short_name": "SMART Trains",
-  "description": "View SMART train schedules and ferry connections for Sonoma-Marin Area Rail Transit",
+  "name": "SMART Train Schedule (Community)",
+  "short_name": "SMART Community",
+  "description": "Community-built SMART train schedules and ferry connections; not affiliated with SMART.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

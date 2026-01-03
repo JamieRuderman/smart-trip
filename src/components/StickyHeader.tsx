@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useRef } from "react";
 import smartLogo from "@/assets/smart-logo.svg";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,16 +90,24 @@ export const StickyHeader = memo(function StickyHeader({
   onSwapStations,
 }: StickyHeaderProps) {
   const stations = getAllStations();
-  const { titleHeight, logoHeight, tabsHeight } = useStickyHeaderCollapse();
+  const headerRef = useRef<HTMLDivElement>(null);
+  useStickyHeaderCollapse(headerRef);
 
   return (
-    <div className="sticky top-0 z-50">
+    <div
+      className="sticky top-0 z-50"
+      ref={headerRef}
+      style={{ overflowAnchor: "none" }}
+    >
       {/* Logo Header */}
       <header
         className="bg-smart-train-green container max-w-screen-xl mx-auto px-4 pt-safe flex flex-col items-center"
         role="banner"
       >
-        <ShrinkingContainer height={logoHeight} maxHeight={HEADER_HEIGHTS.logo}>
+        <ShrinkingContainer
+          heightVar="--header-logo-height"
+          maxHeight={HEADER_HEIGHTS.logo}
+        >
           <img
             src={smartLogo}
             alt="Sonoma-Marin Area Rail Transit Logo"
@@ -119,7 +127,7 @@ export const StickyHeader = memo(function StickyHeader({
         <Card className="max-w-4xl mx-auto relative z-1 shadow-md">
           <CardHeader className="px-5 py-2">
             <ShrinkingContainer
-              height={titleHeight}
+              heightVar="--header-title-height"
               maxHeight={HEADER_HEIGHTS.title}
             >
               <CardTitle
@@ -234,7 +242,7 @@ export const StickyHeader = memo(function StickyHeader({
 
             {/* Schedule Type Tabs */}
             <ShrinkingContainer
-              height={tabsHeight}
+              heightVar="--header-tabs-height"
               maxHeight={HEADER_HEIGHTS.tabs}
             >
               <Tabs

@@ -40,6 +40,7 @@ export function TrainScheduleApp() {
         className="container mx-auto px-4 py-4 md:py-6 space-y-4"
         role="main"
         aria-label="Train schedule planning interface"
+        style={{ overflowAnchor: "none" }}
       >
 
         {/* Service Alerts */}

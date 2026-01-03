@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import type { RefObject } from "react";
+import { useEffect, useRef } from "react";
 
 // Configuration - adjust these to match actual rendered heights
 export const HEADER_HEIGHTS = {
@@ -11,11 +12,43 @@ const SCROLL_START = 0; // Start shrinking immediately
 const TOTAL_DISTANCE =
   HEADER_HEIGHTS.title + HEADER_HEIGHTS.logo + HEADER_HEIGHTS.tabs;
 
-export function useStickyHeaderCollapse() {
-  const [scrollProgress, setScrollProgress] = useState(0); // 0 = fully expanded, 1 = fully collapsed
+const setHeaderHeights = (
+  container: HTMLElement,
+  scrolledPixels: number
+) => {
+  // Sequential shrinking: Title → Logo → Tabs
+  const titleHeight = Math.max(
+    0,
+    Math.round(HEADER_HEIGHTS.title - scrolledPixels)
+  );
+  const logoHeight = Math.max(
+    0,
+    Math.round(
+      HEADER_HEIGHTS.logo - Math.max(0, scrolledPixels - HEADER_HEIGHTS.title)
+    )
+  );
+  const tabsHeight = Math.max(
+    0,
+    Math.round(
+      HEADER_HEIGHTS.tabs -
+        Math.max(0, scrolledPixels - HEADER_HEIGHTS.title - HEADER_HEIGHTS.logo)
+    )
+  );
+
+  container.style.setProperty("--header-title-height", `${titleHeight}px`);
+  container.style.setProperty("--header-logo-height", `${logoHeight}px`);
+  container.style.setProperty("--header-tabs-height", `${tabsHeight}px`);
+};
+
+export function useStickyHeaderCollapse(
+  containerRef: RefObject<HTMLElement>
+) {
   const ticking = useRef(false);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const updateScrollState = () => {
       const currentScrollY = window.scrollY;
 
@@ -32,12 +65,8 @@ export function useStickyHeaderCollapse() {
         // In between - interpolate
         progress = (currentScrollY - SCROLL_START) / TOTAL_DISTANCE;
       }
-
-      setScrollProgress((prev) => {
-        // Avoid extra renders when progress hasn't meaningfully changed
-        if (Math.abs(prev - progress) < 0.001) return prev;
-        return progress;
-      });
+      const scrolledPixels = progress * TOTAL_DISTANCE;
+      setHeaderHeights(container, scrolledPixels);
     };
 
     const handleScroll = () => {
@@ -59,32 +88,5 @@ export function useStickyHeaderCollapse() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, []);
-
-  // Calculate scrolled pixels from progress
-  const scrolledPixels = scrollProgress * TOTAL_DISTANCE;
-
-  // Sequential shrinking: Title → Logo → Tabs
-
-  // 1. Title shrinks first (0 → TITLE_HEIGHT)
-  const titleHeight = Math.max(0, HEADER_HEIGHTS.title - scrolledPixels);
-
-  // 2. Logo shrinks second (TITLE_HEIGHT → TITLE_HEIGHT + LOGO_HEIGHT)
-  const logoHeight = Math.max(
-    0,
-    HEADER_HEIGHTS.logo - Math.max(0, scrolledPixels - HEADER_HEIGHTS.title)
-  );
-
-  // 3. Tabs shrink last (TITLE_HEIGHT + LOGO_HEIGHT → TOTAL_DISTANCE)
-  const tabsHeight = Math.max(
-    0,
-    HEADER_HEIGHTS.tabs -
-      Math.max(0, scrolledPixels - HEADER_HEIGHTS.title - HEADER_HEIGHTS.logo)
-  );
-
-  return {
-    titleHeight,
-    logoHeight,
-    tabsHeight,
-  };
+  }, [containerRef]);
 }

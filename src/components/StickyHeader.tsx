@@ -1,4 +1,4 @@
-import { memo, useRef } from "react";
+import { memo } from "react";
 import smartLogo from "@/assets/smart-logo.svg";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,20 +22,20 @@ import {
 import { getAllStations, hasFerryConnection } from "@/lib/stationUtils";
 import type { Station } from "@/types/smartSchedule";
 import {
-  useResponsiveHeaderHeights,
-  useStickyHeaderCollapse,
+  type HeaderHeights,
 } from "@/hooks/useHeaderHeights";
 import { ShrinkingContainer } from "./ShrinkingContainer";
 
-interface StickyHeaderProps {
+export type StickyHeaderProps = {
   fromStation: Station | "";
   toStation: Station | "";
   scheduleType: "weekday" | "weekend";
+  headerHeights: HeaderHeights;
   onFromStationChange: (station: Station) => void;
   onToStationChange: (station: Station) => void;
   onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   onSwapStations: () => void;
-}
+};
 
 // Reusable component for displaying station name with ferry icon
 const StationWithFerry = ({
@@ -86,20 +86,17 @@ export const StickyHeader = memo(function StickyHeader({
   fromStation,
   toStation,
   scheduleType,
+  headerHeights,
   onFromStationChange,
   onToStationChange,
   onScheduleTypeChange,
   onSwapStations,
 }: StickyHeaderProps) {
   const stations = getAllStations();
-  const headerRef = useRef<HTMLDivElement>(null);
-  const headerHeights = useResponsiveHeaderHeights();
-  useStickyHeaderCollapse(headerRef, headerHeights);
 
   return (
     <div
-      className="sticky top-0 z-50"
-      ref={headerRef}
+      className="fixed inset-x-0 top-0 z-50"
       style={{ overflowAnchor: "none" }}
     >
       {/* Logo Header */}

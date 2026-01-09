@@ -3,18 +3,30 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // Configuration - adjust these to match actual rendered heights
 export const HEADER_HEIGHTS = {
-  title: 40, // Height of "Plan Your Journey" title
+  title: 40, // Height of "Plan Your Trip" title
   logo: {
     small: 88,
     large: 130,
   },
   tabs: 56, // Height of Weekday/Weekend tabs
+  fixed: 150, // Height of fixed elements
+};
+export const HEADER_MAX_HEIGHTS = {
+  small:
+    HEADER_HEIGHTS.title +
+    HEADER_HEIGHTS.logo.small +
+    HEADER_HEIGHTS.tabs +
+    HEADER_HEIGHTS.fixed,
+  large:
+    HEADER_HEIGHTS.title +
+    HEADER_HEIGHTS.logo.large +
+    HEADER_HEIGHTS.tabs +
+    HEADER_HEIGHTS.fixed,
 };
 
 const SCROLL_START = 0; // Start shrinking immediately
-const LOGO_MEDIA_QUERY = "(min-width: 640px)";
 
-type HeaderHeights = {
+export type HeaderHeights = {
   title: number;
   logo: number;
   tabs: number;
@@ -27,21 +39,15 @@ const setHeaderHeights = (
   scrolledPixels: number
 ) => {
   // Sequential shrinking: Title → Logo → Tabs
-  const titleHeight = Math.max(
-    0,
-    Math.round(heights.title - scrolledPixels)
-  );
+  const titleHeight = Math.max(0, Math.round(heights.title - scrolledPixels));
   const logoHeight = Math.max(
     0,
-    Math.round(
-      heights.logo - Math.max(0, scrolledPixels - heights.title)
-    )
+    Math.round(heights.logo - Math.max(0, scrolledPixels - heights.title))
   );
   const tabsHeight = Math.max(
     0,
     Math.round(
-      heights.tabs -
-        Math.max(0, scrolledPixels - heights.title - heights.logo)
+      heights.tabs - Math.max(0, scrolledPixels - heights.title - heights.logo)
     )
   );
 
@@ -54,7 +60,7 @@ export function useResponsiveHeaderHeights(): HeaderHeights {
   const [isLargeLogo, setIsLargeLogo] = useState(false);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia(LOGO_MEDIA_QUERY);
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
     const updateMatch = () => setIsLargeLogo(mediaQuery.matches);
 
     updateMatch();

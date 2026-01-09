@@ -1,4 +1,12 @@
+import { useRef } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
+import { useScheduleData } from "@/hooks/useScheduleData";
+import {
+  HEADER_HEIGHTS,
+  HEADER_MAX_HEIGHTS,
+  useResponsiveHeaderHeights,
+  useStickyHeaderCollapse,
+} from "@/hooks/useHeaderHeights";
 import { StickyHeader } from "./StickyHeader";
 import { ServiceAlert } from "./ServiceAlert";
 import { ScheduleResults } from "./ScheduleResults";
@@ -8,6 +16,14 @@ import { NoTripsFound } from "./NoTripsFound";
 import { EmptyState } from "./EmptyState";
 
 export function TrainScheduleApp() {
+  const { version: scheduleDataVersion } = useScheduleData();
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const headerHeights = useResponsiveHeaderHeights();
+  useStickyHeaderCollapse(headerContainerRef, headerHeights);
+  const maxHeaderHeight =
+    headerHeights.logo === HEADER_HEIGHTS.logo.large
+      ? HEADER_MAX_HEIGHTS.large
+      : HEADER_MAX_HEIGHTS.small;
   const {
     fromStation,
     toStation,
@@ -22,14 +38,18 @@ export function TrainScheduleApp() {
     toggleShowAllTrips,
     toggleServiceAlert,
     swapStations,
-  } = useTrainScheduleState();
+  } = useTrainScheduleState(scheduleDataVersion);
 
   return (
-    <div className="min-h-[100dvh] bg-card md:bg-background">
+    <div
+      className="min-h-[100dvh] bg-card md:bg-background relative"
+      ref={headerContainerRef}
+    >
       <StickyHeader
         fromStation={fromStation}
         toStation={toStation}
         scheduleType={scheduleType}
+        headerHeights={headerHeights}
         onFromStationChange={setFromStation}
         onToStationChange={setToStation}
         onScheduleTypeChange={setScheduleType}
@@ -37,12 +57,14 @@ export function TrainScheduleApp() {
       />
 
       <main
-        className="container mx-auto px-4 py-4 md:py-6 space-y-4"
+        className="container mx-auto px-4 pb-4 md:pb-6 space-y-4"
         role="main"
         aria-label="Train schedule planning interface"
-        style={{ overflowAnchor: "none" }}
+        style={{
+          overflowAnchor: "none",
+          paddingTop: `calc(${maxHeaderHeight}px + 1rem)`,
+        }}
       >
-
         {/* Service Alerts */}
         <ServiceAlert
           showServiceAlert={showServiceAlert}

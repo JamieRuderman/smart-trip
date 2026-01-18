@@ -1,6 +1,6 @@
 {
   "name": "SMART Train Schedule (Community)",
-  "short_name": "SMART Community",
+  "short_name": "SMART trip",
   "description": "Community-built SMART train schedules and ferry connections; not affiliated with SMART.",
   "start_url": "/",
   "display": "standalone",

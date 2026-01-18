@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "smart.trains.schedule",
-  appName: "SMART Train Schedule",
+  appName: "SMART trip",
   webDir: "dist",
   plugins: {
     Keyboard: {

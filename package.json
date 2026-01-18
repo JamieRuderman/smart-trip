@@ -24,8 +24,9 @@
     "preview": "vite preview",
     "update-build": "npm run update-transit && npm run build",
     "update-transit": "tsx scripts/updateTransitFeeds.ts",
-    "sync": "npm run build && npx cap sync",
+    "sync": "npm run build && CAPACITOR_LIVE_RELOAD_URL= npx cap sync",
     "sync:live": "CAPACITOR_LIVE_RELOAD_URL=http://$(ipconfig getifaddr en0):3210 npx cap sync",
+    "assets": "npx @capacitor/assets generate --iconBackgroundColor '#11ab75' --splashBackgroundColor '#11ab75' --splashBackgroundColorDark '#11ab75'",
     "open:android": "npx cap open android",
     "open:ios": "npx cap open ios"
   },
@@ -34,6 +35,7 @@
     "@capacitor/core": "^6.1.2",
     "@capacitor/haptics": "^6.0.2",
     "@capacitor/keyboard": "^6.0.3",
+    "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.2",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -74,6 +76,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/ios": "^6.1.2",
     "@eslint/js": "^9.9.0",

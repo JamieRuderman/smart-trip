@@ -115,6 +115,7 @@ Train schedule data is organized by:
 - `npm run lint` - Run ESLint
 - `npm run sync` - Build and sync to native iOS/Android projects (production)
 - `npm run sync:live` - Sync with live reload for native development
+- `npm run assets` - Generate app icons and splash screens from source images
 - `npm run open:ios` - Open iOS project in Xcode
 - `npm run open:android` - Open Android project in Android Studio
 
@@ -170,6 +171,19 @@ For faster development iteration with live reload on device/simulator:
 3. Open and run from Xcode or Android Studio. Changes to the web code will appear instantly.
 
 **Note**: `sync:live` auto-detects your Mac's WiFi IP address. Your device/simulator must be on the same network.
+
+### Generating App Icons and Splash Screens
+
+1. Place your source images in the `resources/` folder:
+   - `icon.png` (1024x1024) - App icon
+   - `splash.png` (2732x2732) - Splash screen
+
+2. Generate all sizes:
+   ```bash
+   npm run assets
+   ```
+
+See `resources/README.md` for more details.
 
 ## ♿ Accessibility
 

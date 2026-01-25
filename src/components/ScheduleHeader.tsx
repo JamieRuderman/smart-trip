@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
@@ -19,13 +20,17 @@ export function ScheduleHeader({
   showAllTrips,
   onToggleShowAllTrips,
 }: ScheduleHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <CardHeader className="p-3 md:p-6">
       <CardTitle
         id="schedule-results-title"
         className="flex items-center gap-2"
       >
-        {direction === "southbound" ? "Southbound" : "Northbound"} Schedule
+        {direction === "southbound"
+          ? t("schedule.southboundSchedule")
+          : t("schedule.northboundSchedule")}
         <div className="flex-grow flex justify-end items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
           {currentTime.toLocaleTimeString([], {
             hour: "numeric",
@@ -44,9 +49,9 @@ export function ScheduleHeader({
           size="sm"
           className="!mt-6"
           onClick={onToggleShowAllTrips}
-          aria-label="Show earlier trains"
+          aria-label={t("schedule.showEarlierTrains")}
         >
-          Show earlier trains
+          {t("schedule.showEarlierTrains")}
         </Button>
       )}
       {showAllTrips && (
@@ -55,9 +60,9 @@ export function ScheduleHeader({
           size="sm"
           className="!mt-6"
           onClick={onToggleShowAllTrips}
-          aria-label="Hide earlier trains that have already departed"
+          aria-label={t("schedule.hideEarlierTrains")}
         >
-          Hide earlier trains
+          {t("schedule.hideEarlierTrains")}
         </Button>
       )}
     </CardHeader>

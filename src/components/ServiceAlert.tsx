@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, X, ChevronDown } from "lucide-react";
 import serviceAlerts from "@/data/serviceAlerts";
 import type { ServiceAlertData } from "@/types/smartSchedule";
+import { useTranslation } from "react-i18next";
 
 interface ServiceAlertProps {
   showServiceAlert: boolean;
@@ -13,6 +14,7 @@ export function ServiceAlert({
   showServiceAlert,
   onToggleServiceAlert,
 }: ServiceAlertProps) {
+  const { t } = useTranslation();
   const now = new Date();
 
   const isAlertActive = (alert: ServiceAlertData) => {
@@ -36,7 +38,7 @@ export function ServiceAlert({
             size="sm"
             className="absolute top-2 right-2 h-8 w-8 p-0 hover:bg-smart-gold/10"
             onClick={onToggleServiceAlert}
-            aria-label="Hide service alert"
+            aria-label={t("serviceAlert.hideServiceAlert")}
           >
             <X className="h-4 w-4 text-smart-gold" />
           </Button>
@@ -45,7 +47,7 @@ export function ServiceAlert({
               <AlertCircle className="h-4 w-4 text-smart-gold mt-1 flex-shrink-0" />
               <div>
                 <p className="font-medium text-smart-gold">
-                  {alert.title ?? "Service Alert"}
+                  {alert.title ?? t("serviceAlert.serviceAlert")}
                 </p>
                 <p className="text-sm text-muted-foreground">{alert.message}</p>
               </div>
@@ -65,7 +67,7 @@ export function ServiceAlert({
         onClick={onToggleServiceAlert}
       >
         <AlertCircle className="h-6 w-6 text-smart-gold flex-shrink-0" />
-        Service Alert
+        {t("serviceAlert.serviceAlert")}
         <ChevronDown className="h-4 w-4 text-smart-gold ml-auto" />
       </Button>
     </div>

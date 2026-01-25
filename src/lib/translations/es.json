@@ -1,0 +1,97 @@
+{
+  "common": {
+    "free": "Gratis",
+    "zone": "zona",
+    "zones": "zonas",
+    "oneWay": "Solo ida"
+  },
+  "header": {
+    "planYourTrip": "Planifica Tu Viaje",
+    "communityApp": "App Comunitaria",
+    "yourLocation": "Tu ubicación",
+    "destination": "Destino",
+    "selectDepartureStation": "Estación de salida",
+    "selectArrivalStation": "Estación de llegada",
+    "swapStations": "Intercambiar estaciones",
+    "weekday": "Día laboral",
+    "weekend": "Fin de semana",
+    "selectScheduleType": "Tipo de horario",
+    "weekdaySchedule": "Horario de día laboral",
+    "weekendSchedule": "Fin de semana y festivos",
+    "availableStations": "Estaciones disponibles"
+  },
+  "emptyState": {
+    "selectYourRoute": "Selecciona Tu Ruta",
+    "chooseStations": "Elige tus estaciones de salida y destino arriba para ver los horarios de trenes disponibles."
+  },
+  "noTripsFound": {
+    "noTrainsFound": "No se encontraron trenes para esta ruta."
+  },
+  "serviceAlert": {
+    "serviceAlert": "Alerta de Servicio",
+    "hideServiceAlert": "Ocultar alerta de servicio"
+  },
+  "schedule": {
+    "southboundSchedule": "Horario Hacia el Sur",
+    "northboundSchedule": "Horario Hacia el Norte",
+    "showEarlierTrains": "Mostrar trenes anteriores",
+    "hideEarlierTrains": "Ocultar trenes anteriores"
+  },
+  "fare": {
+    "fareInformation": "Tarifas",
+    "selectYourFare": "Elige tarifa",
+    "showAllFares": "Ver todas las tarifas",
+    "adult": "Adulto (19-64)",
+    "youth": "Joven (0-18) - Gratis",
+    "senior": "Adulto Mayor (65+) - Gratis",
+    "disabled": "Discapacitado/Medicare -50%",
+    "clipperStart": "Clipper START -50%",
+    "faresZoneBased": "Las tarifas se basan en zonas (${{price}} por zona para adultos)",
+    "youthSeniorsFree": "Jóvenes (0-18) y adultos mayores (65+) viajan gratis",
+    "discountsAvailable": "Descuentos para discapacitados/Medicare y bajos ingresos",
+    "paymentOptions": "Para pago y pases, visita"
+  },
+  "bottomInfo": {
+    "receiveAlerts": "Recibe Alertas enviando por texto la palabra <strong>SMART</strong> a <strong>888777</strong> o <link>haz clic aquí</link> para registrarte.",
+    "dataProvidedBy": "Datos proporcionados por",
+    "communityProject": "Proyecto comunitario de código abierto. No es una app oficial de SMART."
+  },
+  "quickConnection": {
+    "quickTransferWarning": "Advertencia de Transferencia",
+    "message": "Esta conexión ajustada <strong>no se recomienda</strong> para pasajeros que caminan entre la estación y la Terminal del Ferry. Considera tomar {{trainOption}} para una transferencia más cómoda.",
+    "laterTrain": "un tren posterior",
+    "earlierTrain": "un tren anterior"
+  },
+  "notFound": {
+    "title": "404",
+    "pageNotFound": "¡Ups! Página no encontrada",
+    "returnHome": "Volver al Inicio"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema",
+    "toggleTheme": "Cambiar tema"
+  },
+  "language": {
+    "english": "English",
+    "spanish": "Español",
+    "toggle": "Cambiar idioma"
+  },
+  "ferry": {
+    "arrives": "llega",
+    "departs": "sale",
+    "minTransfer": "min de transferencia",
+    "inbound": "Entrada",
+    "outbound": "Salida"
+  },
+  "tripCard": {
+    "nextTrain": "Próximo tren",
+    "departed": "Salido",
+    "tapForTransferWarning": "Toca para advertencia"
+  },
+  "noMoreTrains": {
+    "noMoreTrainsToday": "No hay más trenes hoy",
+    "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "common": {
+    "free": "Free",
+    "zone": "zone",
+    "zones": "zones",
+    "oneWay": "One-way"
+  },
+  "header": {
+    "planYourTrip": "Plan Your Trip",
+    "communityApp": "Community App",
+    "yourLocation": "Your location",
+    "destination": "Destination",
+    "selectDepartureStation": "Select departure station",
+    "selectArrivalStation": "Select arrival station",
+    "swapStations": "Swap departure and arrival stations",
+    "weekday": "Weekday",
+    "weekend": "Weekend",
+    "selectScheduleType": "Select schedule type",
+    "weekdaySchedule": "Weekday schedule",
+    "weekendSchedule": "Weekend and holiday schedule",
+    "availableStations": "Available stations"
+  },
+  "emptyState": {
+    "selectYourRoute": "Select Your Route",
+    "chooseStations": "Choose your departure and destination stations above to see available train schedules."
+  },
+  "noTripsFound": {
+    "noTrainsFound": "No trains found for this route."
+  },
+  "serviceAlert": {
+    "serviceAlert": "Service Alert",
+    "hideServiceAlert": "Hide service alert"
+  },
+  "schedule": {
+    "southboundSchedule": "Southbound Schedule",
+    "northboundSchedule": "Northbound Schedule",
+    "showEarlierTrains": "Show earlier trains",
+    "hideEarlierTrains": "Hide earlier trains that have already departed"
+  },
+  "fare": {
+    "fareInformation": "Fare Information",
+    "selectYourFare": "Select your fare",
+    "showAllFares": "Show all fares",
+    "adult": "Adult (19-64)",
+    "youth": "Youth (0-18) - Free",
+    "senior": "Senior (65+) - Free",
+    "disabled": "Disabled/Medicare - 50% off",
+    "clipperStart": "Clipper START - 50% off",
+    "faresZoneBased": "Fares are zone-based (${{price}} per zone for adults)",
+    "youthSeniorsFree": "Youth (0-18) and seniors (65+) ride free",
+    "discountsAvailable": "Discounts for disabled / Medicare and low-income riders",
+    "paymentOptions": "For payment options and passes, visit"
+  },
+  "bottomInfo": {
+    "receiveAlerts": "Receive Service Alerts by texting the word <strong>SMART</strong> to <strong>888777</strong> or <link>click here</link> to sign-up.",
+    "dataProvidedBy": "Data provided by",
+    "communityProject": "This is an open-source community project and is not an official SMART app."
+  },
+  "quickConnection": {
+    "quickTransferWarning": "Quick Transfer Warning",
+    "message": "This tight connection is <strong>not recommended</strong> for passengers walking between the train station and Ferry Terminal. Consider taking {{trainOption}} for a more comfortable transfer.",
+    "laterTrain": "a later train",
+    "earlierTrain": "an earlier train"
+  },
+  "notFound": {
+    "title": "404",
+    "pageNotFound": "Oops! Page not found",
+    "returnHome": "Return to Home"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggleTheme": "Toggle theme"
+  },
+  "language": {
+    "english": "English",
+    "spanish": "Español",
+    "toggle": "Toggle language"
+  },
+  "ferry": {
+    "arrives": "arrives",
+    "departs": "departs",
+    "minTransfer": "min transfer",
+    "inbound": "Inbound",
+    "outbound": "Outbound"
+  },
+  "tripCard": {
+    "nextTrain": "Next train",
+    "departed": "Departed",
+    "tapForTransferWarning": "Tap for transfer warning"
+  },
+  "noMoreTrains": {
+    "noMoreTrainsToday": "No more trains today",
+    "allTrainsDeparted": "All scheduled trains for today have departed"
+  }
+}

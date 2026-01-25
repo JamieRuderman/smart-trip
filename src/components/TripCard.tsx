@@ -8,6 +8,7 @@ import { TrainBadge, NextTrainBadge } from "./TrainBadge";
 import { FerryConnection } from "./FerryConnection";
 import { QuickConnectionModal } from "./QuickConnectionModal";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTranslation } from "react-i18next";
 
 interface TripCardProps {
   trip: ProcessedTrip;
@@ -26,6 +27,7 @@ export const TripCard = memo(function TripCard({
   showFerry,
   timeFormat,
 }: TripCardProps) {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const departureTime = trip.departureTime;
   const arrivalTime = trip.arrivalTime;
@@ -64,9 +66,9 @@ export const TripCard = memo(function TripCard({
         aria-label={`Train ${
           trip.trip
         }, departs ${departureTime}, arrives ${arrivalTime}${
-          isNextTrip ? " - Next train" : ""
-        }${isPastTrip ? " - Departed" : ""}${
-          hasQuickConnection ? " - Tap for transfer warning" : ""
+          isNextTrip ? ` - ${t("tripCard.nextTrain")}` : ""
+        }${isPastTrip ? ` - ${t("tripCard.departed")}` : ""}${
+          hasQuickConnection ? ` - ${t("tripCard.tapForTransferWarning")}` : ""
         }`}
         tabIndex={0}
         onClick={hasQuickConnection ? () => setIsModalOpen(true) : undefined}

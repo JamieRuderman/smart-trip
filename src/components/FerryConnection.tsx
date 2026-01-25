@@ -3,6 +3,7 @@ import { TimeDisplay } from "./TimeDisplay";
 import { APP_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
 import { Ship, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface FerryConnectionProps {
   ferry: FerryConnectionType;
@@ -21,6 +22,8 @@ export function FerryConnection({
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
 }: FerryConnectionProps) {
+  const { t } = useTranslation();
+
   // Calculate transfer time in minutes
   const calculateDelta = (a: string, b: string): number => {
     const clean = (t: string) => t.replace(/[*~]/g, "");
@@ -47,7 +50,7 @@ export function FerryConnection({
   const isShortConnection =
     transferTime < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
 
-  const displayLabel = inbound ? "arrives" : "departs";
+  const displayLabel = inbound ? t("ferry.arrives") : t("ferry.departs");
   const displayTime = inbound ? ferry.arrive : ferry.depart;
 
   return (
@@ -73,7 +76,7 @@ export function FerryConnection({
           ) : (
             <Clock className="h-3 w-3" />
           )}
-          {transferTime} min transfer
+          {transferTime} {t("ferry.minTransfer")}
         </div>
       </div>
       <div
@@ -84,7 +87,7 @@ export function FerryConnection({
       >
         <Ship className="h-5 w-5" />
         <span className="text-[10px] uppercase">
-          {inbound ? "Inbound" : "Outbound"}
+          {inbound ? t("ferry.inbound") : t("ferry.outbound")}
         </span>
       </div>
     </div>

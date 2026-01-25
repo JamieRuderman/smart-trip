@@ -25,6 +25,7 @@ import {
   type HeaderHeights,
 } from "@/hooks/useHeaderHeights";
 import { ShrinkingContainer } from "./ShrinkingContainer";
+import { useTranslation } from "react-i18next";
 
 export type StickyHeaderProps = {
   fromStation: Station | "";
@@ -92,6 +93,7 @@ export const StickyHeader = memo(function StickyHeader({
   onScheduleTypeChange,
   onSwapStations,
 }: StickyHeaderProps) {
+  const { t } = useTranslation();
   const stations = getAllStations();
 
   return (
@@ -134,7 +136,7 @@ export const StickyHeader = memo(function StickyHeader({
                 id="route-planning-title"
                 className="flex flex-wrap items-center justify-between my-2"
               >
-                Plan Your Trip
+                {t("header.planYourTrip")}
                 <a
                   href="https://github.com/JamieRuderman/smart-train-schedule"
                   target="_blank"
@@ -149,7 +151,7 @@ export const StickyHeader = memo(function StickyHeader({
                       className="h-3.5 w-3.5"
                       aria-hidden="true"
                     />
-                    Community App
+                    {t("header.communityApp")}
                   </Badge>
                 </a>
               </CardTitle>
@@ -177,7 +179,7 @@ export const StickyHeader = memo(function StickyHeader({
                     >
                       <SelectTrigger
                         className="h-11"
-                        aria-label="Select departure station"
+                        aria-label={t("header.selectDepartureStation")}
                       >
                         {fromStation ? (
                           <StationWithFerry
@@ -185,12 +187,12 @@ export const StickyHeader = memo(function StickyHeader({
                             direction="southbound"
                           />
                         ) : (
-                          <SelectValue placeholder="Your location" />
+                          <SelectValue placeholder={t("header.yourLocation")} />
                         )}
                       </SelectTrigger>
                       <SelectContent
                         role="listbox"
-                        aria-label="Available stations"
+                        aria-label={t("header.availableStations")}
                       >
                         {stations.map((station) => (
                           <StationSelectItem
@@ -211,7 +213,7 @@ export const StickyHeader = memo(function StickyHeader({
                     <Select value={toStation} onValueChange={onToStationChange}>
                       <SelectTrigger
                         className="h-11"
-                        aria-label="Select arrival station"
+                        aria-label={t("header.selectArrivalStation")}
                       >
                         {toStation ? (
                           <StationWithFerry
@@ -219,12 +221,12 @@ export const StickyHeader = memo(function StickyHeader({
                             direction="northbound"
                           />
                         ) : (
-                          <SelectValue placeholder="Destination" />
+                          <SelectValue placeholder={t("header.destination")} />
                         )}
                       </SelectTrigger>
                       <SelectContent
                         role="listbox"
-                        aria-label="Available stations"
+                        aria-label={t("header.availableStations")}
                       >
                         {stations
                           .filter((station) => station !== fromStation)
@@ -250,8 +252,8 @@ export const StickyHeader = memo(function StickyHeader({
                 onClick={onSwapStations}
                 className="shrink-0"
                 disabled={!fromStation || !toStation}
-                aria-label="Swap departure and arrival stations"
-                title="Swap departure and arrival stations"
+                aria-label={t("header.swapStations")}
+                title={t("header.swapStations")}
               >
                 <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -265,25 +267,25 @@ export const StickyHeader = memo(function StickyHeader({
               <Tabs
                 value={scheduleType}
                 onValueChange={onScheduleTypeChange}
-                aria-label="Select schedule type"
+                aria-label={t("header.selectScheduleType")}
                 className="py-2"
               >
                 <TabsList className="grid grid-cols-2 w-full" role="tablist">
                   <TabsTrigger
                     value="weekday"
                     className="flex items-center gap-2"
-                    aria-label="Weekday schedule"
+                    aria-label={t("header.weekdaySchedule")}
                   >
                     <Calendar className="h-4 w-4" aria-hidden="true" />
-                    Weekday
+                    {t("header.weekday")}
                   </TabsTrigger>
                   <TabsTrigger
                     value="weekend"
                     className="flex items-center gap-2"
-                    aria-label="Weekend and holiday schedule"
+                    aria-label={t("header.weekendSchedule")}
                   >
                     <Calendar className="h-4 w-4" aria-hidden="true" />
-                    Weekend
+                    {t("header.weekend")}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>

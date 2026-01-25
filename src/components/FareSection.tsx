@@ -4,6 +4,7 @@ import { calculateFare, getAllFareOptions } from "@/lib/scheduleUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { FARE_CONSTANTS } from "@/lib/fareConstants";
 import type { Station, FareType } from "@/types/smartSchedule";
+import { useTranslation } from "react-i18next";
 
 interface FareSectionProps {
   fromStation: Station | "";
@@ -12,7 +13,19 @@ interface FareSectionProps {
 
 export function FareSection({ fromStation, toStation }: FareSectionProps) {
   const { preferences, updateSelectedFareType } = useUserPreferences();
+  const { t } = useTranslation();
   const selectedFareType = preferences.selectedFareType;
+
+  const getFareDescription = (fareType: FareType): string => {
+    const keyMap: Record<FareType, string> = {
+      adult: "fare.adult",
+      youth: "fare.youth",
+      senior: "fare.senior",
+      disabled: "fare.disabled",
+      "clipper-start": "fare.clipperStart",
+    };
+    return t(keyMap[fareType]);
+  };
 
   // Don't render if stations aren't selected
   if (!fromStation || !toStation) {
@@ -37,10 +50,10 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
     <Card className="border-0 shadow-none md:border md:shadow-sm max-w-4xl mx-auto w-full">
       <CardHeader className="p-3 md:p-6 pb-0 md:pb-0">
         <CardTitle className="flex items-center justify-between gap-2">
-          Fare Information
+          {t("fare.fareInformation")}
           {selectedFareType === "none" && (
             <span className="text-sm font-medium text-muted-foreground">
-              Select your fare
+              {t("fare.selectYourFare")}
             </span>
           )}
         </CardTitle>
@@ -53,20 +66,24 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
             <div className="bg-primary/5 border border-primary p-4 rounded-lg">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <p className="font-medium">{currentFare.description}</p>
+                  <p className="font-medium">{getFareDescription(selectedFareType)}</p>
                   <p className="text-sm text-muted-foreground">
-                    {currentFare.zones} zone
-                    {currentFare.zones !== 1 ? "s" : ""} • {fromStation} →{" "}
-                    {toStation}
+                    {currentFare.zones}{" "}
+                    {currentFare.zones === 1
+                      ? t("common.zone")
+                      : t("common.zones")}{" "}
+                    • {fromStation} → {toStation}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-primary">
                     {currentFare.price === 0
-                      ? "Free"
+                      ? t("common.free")
                       : `$${currentFare.price.toFixed(2)}`}
                   </p>
-                  <p className="text-xs text-muted-foreground">One-way</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("common.oneWay")}
+                  </p>
                 </div>
               </div>
             </div>
@@ -77,7 +94,7 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
               onClick={handleClearFare}
               className="mt-2 w-full"
             >
-              Show all fares
+              {t("fare.showAllFares")}
             </Button>
           </div>
         ) : (
@@ -91,10 +108,12 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
                 className="flex justify-between items-center p-4 h-auto rounded-lg border border-border hover:border-primary hover:bg-primary/10 hover:shadow-sm transition-all duration-200 text-left w-full group"
               >
                 <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                  {option.description}
+                  {getFareDescription(option.fareType)}
                 </span>
                 <span className="font-semibold text-lg group-hover:text-primary transition-colors">
-                  {option.price === 0 ? "Free" : `$${option.price.toFixed(2)}`}
+                  {option.price === 0
+                    ? t("common.free")
+                    : `$${option.price.toFixed(2)}`}
                 </span>
               </Button>
             ))}
@@ -104,13 +123,15 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
         {/* Additional Info */}
         <div className="text-xs text-muted-foreground py-2">
           <p>
-            • Fares are zone-based ($
-            {FARE_CONSTANTS.ADULT_FARE_PER_ZONE.toFixed(2)} per zone for adults)
+            •{" "}
+            {t("fare.faresZoneBased", {
+              price: FARE_CONSTANTS.ADULT_FARE_PER_ZONE.toFixed(2),
+            })}
           </p>
-          <p>• Youth (0-18) and seniors (65+) ride free</p>
-          <p>• Discounts for disabled / Medicare and low-income riders</p>
+          <p>• {t("fare.youthSeniorsFree")}</p>
+          <p>• {t("fare.discountsAvailable")}</p>
           <p>
-            • For payment options and passes, visit{" "}
+            • {t("fare.paymentOptions")}{" "}
             <a
               href="https://sonomamarintrain.org"
               target="_blank"

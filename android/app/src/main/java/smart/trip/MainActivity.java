@@ -1,4 +1,4 @@
-package smart.trains.schedule;
+package smart.trip;
 
 import android.os.Bundle;
 import androidx.core.view.WindowCompat;

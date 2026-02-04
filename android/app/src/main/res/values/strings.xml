@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">SMART trip</string>
     <string name="title_activity_main">SMART trip</string>
-    <string name="package_name">smart.trains.schedule</string>
-    <string name="custom_url_scheme">smart.trains.schedule</string>
+    <string name="package_name">smart.trip</string>
+    <string name="custom_url_scheme">smart.trip</string>
 </resources>

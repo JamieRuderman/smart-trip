@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "smart.trains.schedule"
+    namespace "smart.trip"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "smart.trains.schedule"
+        applicationId "smart.trip"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 3

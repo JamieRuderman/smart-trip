@@ -31,25 +31,16 @@ export function ThemeToggle() {
             setTheme(value as "light" | "dark" | "system")
           }
         >
-          <DropdownMenuRadioItem
-            value="system"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="system">
             <Monitor className="mr-2 h-4 w-4" />
             <span>{t("theme.system")}</span>
           </DropdownMenuRadioItem>
           <DropdownMenuSeparator />
-          <DropdownMenuRadioItem
-            value="light"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="light">
             <Sun className="mr-2 h-4 w-4" />
             <span>{t("theme.light")}</span>
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            value="dark"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="dark">
             <Moon className="mr-2 h-4 w-4" />
             <span>{t("theme.dark")}</span>
           </DropdownMenuRadioItem>

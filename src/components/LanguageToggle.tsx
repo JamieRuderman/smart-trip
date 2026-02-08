@@ -52,23 +52,14 @@ export function LanguageToggle() {
             i18n.changeLanguage(normalizedLang);
           }}
         >
-          <DropdownMenuRadioItem
-            value="system"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="system">
             <span>{t("language.system")}</span>
           </DropdownMenuRadioItem>
           <DropdownMenuSeparator />
-          <DropdownMenuRadioItem
-            value="en"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="en">
             <span>{t("language.english")}</span>
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            value="es"
-            className="data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
-          >
+          <DropdownMenuRadioItem value="es">
             <span>{t("language.spanish")}</span>
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>

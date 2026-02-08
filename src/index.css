@@ -41,7 +41,7 @@ All colors MUST be HSL.
     /* SMART Train brand colors - from official logo SVG */
     --smart-green: 143 72% 14%; /* #114533 from logo - kept for logo only */
     --smart-train-green: 157 82% 37%; /* #11ab75 - real train green for UI */
-    --smart-gold: 27 85% 53%; /* #E48E25 from logo */
+    --smart-gold: 36 69% 54%; /* rgb(216, 146, 63) */
     /* Removed --smart-light-gold - now using direct HSL values for accent */
     --smart-dark-green: 143 72% 10%; /* Darker green for depth */
     --smart-light-green: 143 72% 20%; /* Lighter green for accents */
@@ -220,6 +220,32 @@ body.keyboard-visible {
 
 body.keyboard-visible .pb-safe {
   padding-bottom: 0 !important;
+}
+
+@layer components {
+  /* Dropdown menu item base styles */
+  .dropdown-item-base {
+    @apply relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors;
+  }
+
+  /* Interactive states for both dropdown and select items */
+  .dropdown-item-interactive:focus,
+  .dropdown-item-interactive:hover,
+  .dropdown-item-interactive[data-highlighted],
+  .dropdown-item-interactive[data-state="checked"],
+  .select-item-interactive:focus,
+  .select-item-interactive:hover,
+  .select-item-interactive[data-highlighted],
+  .select-item-interactive[data-state="checked"] {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .dropdown-item-interactive[data-disabled],
+  .select-item-interactive[data-disabled] {
+    pointer-events: none;
+    opacity: 0.5;
+  }
 }
 
 @layer utilities {

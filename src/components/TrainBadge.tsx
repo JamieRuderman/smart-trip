@@ -29,11 +29,3 @@ export function TrainBadge({
     </div>
   );
 }
-
-export function NextTrainBadge() {
-  return (
-    <div className="text-xs bg-primary text-white px-2 py-1 rounded-md font-medium whitespace-nowrap">
-      Next Train
-    </div>
-  );
-}

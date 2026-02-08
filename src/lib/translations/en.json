@@ -18,7 +18,9 @@
     "selectScheduleType": "Select schedule type",
     "weekdaySchedule": "Weekday schedule",
     "weekendSchedule": "Weekend and holiday schedule",
-    "availableStations": "Available stations"
+    "availableStations": "Available stations",
+    "startStation": "Departing",
+    "endStation": "Arriving"
   },
   "emptyState": {
     "selectYourRoute": "Select Your Route",

@@ -4,7 +4,8 @@ import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { TimeDisplay } from "./TimeDisplay";
-import { TrainBadge, NextTrainBadge } from "./TrainBadge";
+import { TrainBadge } from "./TrainBadge";
+import { PillBadge } from "./PillBadge";
 import { FerryConnection } from "./FerryConnection";
 import { QuickConnectionModal } from "./QuickConnectionModal";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -123,7 +124,7 @@ export const TripCard = memo(function TripCard({
                 format={timeFormat}
               />
             </div>
-            {isNextTrip && <NextTrainBadge />}
+            {isNextTrip && <PillBadge label={t("tripCard.nextTrain")} color="green" />}
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}

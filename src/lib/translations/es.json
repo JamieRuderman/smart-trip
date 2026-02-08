@@ -18,7 +18,9 @@
     "selectScheduleType": "Tipo de horario",
     "weekdaySchedule": "Horario de día laboral",
     "weekendSchedule": "Fin de semana y festivos",
-    "availableStations": "Estaciones disponibles"
+    "availableStations": "Estaciones disponibles",
+    "startStation": "Salida",
+    "endStation": "Llegada"
   },
   "emptyState": {
     "selectYourRoute": "Selecciona Tu Ruta",

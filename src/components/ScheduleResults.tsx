@@ -5,6 +5,7 @@ import { NoMoreTrainsAlert } from "./NoMoreTrainsAlert";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isTimeInPast, getNextTripIndex } from "@/lib/scheduleUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
+import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { Station } from "@/types/smartSchedule";
 
@@ -28,6 +29,7 @@ export function ScheduleResults({
   timeFormat,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
+  const realtimeStatusMap = useTripRealtimeStatusMap(fromStation, toStation);
 
   const nextTripIndex =
     filteredTrips.length > 0
@@ -77,6 +79,7 @@ export function ScheduleResults({
                 showAllTrips={showAllTrips}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
+                realtimeStatus={realtimeStatusMap.get(trip.departureTime)}
               />
             );
           })}

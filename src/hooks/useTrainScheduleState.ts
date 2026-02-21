@@ -10,7 +10,6 @@ export interface TrainScheduleState {
   scheduleType: "weekday" | "weekend";
   showAllTrips: boolean;
   currentTime: Date;
-  showServiceAlert: boolean;
 }
 
 export function useTrainScheduleState(scheduleDataVersion?: string) {
@@ -23,7 +22,6 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     scheduleType: isWeekend() ? "weekend" : "weekday",
     showAllTrips: false,
     currentTime: new Date(),
-    showServiceAlert: true,
   });
 
   // Initialize state from user preferences once loaded
@@ -80,10 +78,6 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     setState((prev) => ({ ...prev, showAllTrips: !prev.showAllTrips }));
   }, []);
 
-  const toggleServiceAlert = useCallback(() => {
-    setState((prev) => ({ ...prev, showServiceAlert: !prev.showServiceAlert }));
-  }, []);
-
   const swapStations = useCallback(() => {
     const newFrom = state.toStation;
     const newTo = state.fromStation;
@@ -106,7 +100,6 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     setToStation,
     setScheduleType,
     toggleShowAllTrips,
-    toggleServiceAlert,
     swapStations,
   };
 }

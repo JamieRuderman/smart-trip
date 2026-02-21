@@ -1,18 +1,21 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, X, ChevronDown } from "lucide-react";
-import serviceAlerts from "@/data/serviceAlerts";
+import staticServiceAlerts from "@/data/serviceAlerts";
 import type { ServiceAlertData } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 
 interface ServiceAlertProps {
   showServiceAlert: boolean;
   onToggleServiceAlert: () => void;
+  /** Live alerts from GTFS-RT. Falls back to static data when not provided. */
+  alerts?: ServiceAlertData[];
 }
 
 export function ServiceAlert({
   showServiceAlert,
   onToggleServiceAlert,
+  alerts,
 }: ServiceAlertProps) {
   const { t } = useTranslation();
   const now = new Date();
@@ -24,7 +27,9 @@ export function ServiceAlert({
     return startsOk && endsOk && (alert.active ?? true);
   };
 
-  const activeAlerts = serviceAlerts.filter(isAlertActive);
+  // Use live alerts when provided; fall back to static data
+  const sourceAlerts = alerts ?? staticServiceAlerts;
+  const activeAlerts = sourceAlerts.filter(isAlertActive);
   if (activeAlerts.length === 0) {
     return null;
   }

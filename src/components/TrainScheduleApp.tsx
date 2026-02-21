@@ -1,6 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState, useCallback } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
+import { useServiceAlerts } from "@/hooks/useServiceAlerts";
+import { useNotifications } from "@/hooks/useNotifications";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -8,10 +10,11 @@ import {
   useStickyHeaderCollapse,
 } from "@/hooks/useHeaderHeights";
 import { StickyHeader } from "./StickyHeader";
-import { ServiceAlert } from "./ServiceAlert";
 import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
+import { ServiceAlert } from "./ServiceAlert";
+import { NotificationPanel } from "./NotificationPanel";
 import { NoTripsFound } from "./NoTripsFound";
 import { EmptyState } from "./EmptyState";
 
@@ -30,15 +33,29 @@ export function TrainScheduleApp() {
     scheduleType,
     showAllTrips,
     currentTime,
-    showServiceAlert,
     filteredTrips,
     setFromStation,
     setToStation,
     setScheduleType,
     toggleShowAllTrips,
-    toggleServiceAlert,
     swapStations,
   } = useTrainScheduleState(scheduleDataVersion);
+
+  const { alerts: liveAlerts } = useServiceAlerts();
+  const { notifications, unreadCount, readIds, isLoading, markAllRead } =
+    useNotifications();
+
+  const [showServiceAlert, setShowServiceAlert] = useState(true);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+
+  const handleOpenNotifications = useCallback(() => {
+    setIsNotificationPanelOpen(true);
+  }, []);
+
+  const handleCloseNotifications = useCallback(() => {
+    setIsNotificationPanelOpen(false);
+    markAllRead();
+  }, [markAllRead]);
 
   return (
     <div
@@ -65,14 +82,15 @@ export function TrainScheduleApp() {
           paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
+        {/* Empty State - No stations selected */}
+        {(!fromStation || !toStation) && <EmptyState />}
+
         {/* Service Alerts */}
         <ServiceAlert
           showServiceAlert={showServiceAlert}
-          onToggleServiceAlert={toggleServiceAlert}
+          onToggleServiceAlert={() => setShowServiceAlert((v) => !v)}
+          alerts={liveAlerts.length > 0 ? liveAlerts : undefined}
         />
-
-        {/* Empty State - No stations selected */}
-        {(!fromStation || !toStation) && <EmptyState />}
 
         {/* Schedule Results */}
         {filteredTrips.length > 0 && fromStation && toStation && (
@@ -95,9 +113,22 @@ export function TrainScheduleApp() {
           <FareSection fromStation={fromStation} toStation={toStation} />
         )}
 
-        {/* Theme Toggle and Service Alerts */}
-        <BottomInfoBar />
+        {/* Bottom bar */}
+        <BottomInfoBar
+          unreadCount={unreadCount}
+          onOpenNotifications={handleOpenNotifications}
+        />
       </main>
+
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={handleCloseNotifications}
+        notifications={notifications}
+        readIds={readIds}
+        unreadCount={unreadCount}
+        isLoading={isLoading}
+        onMarkAllRead={markAllRead}
+      />
     </div>
   );
 }

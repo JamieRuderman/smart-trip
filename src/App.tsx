@@ -10,7 +10,14 @@ import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => {
   const isNative = Capacitor.isNativePlatform();

@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 3210,
+    // Proxy /api calls to vercel dev during local development
+    proxy: mode === "development" ? { "/api": "http://localhost:3000" } : undefined,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(
     Boolean

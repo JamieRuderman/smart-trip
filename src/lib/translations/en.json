@@ -54,9 +54,19 @@
     "paymentOptions": "For payment options and passes, visit"
   },
   "bottomInfo": {
-    "receiveAlerts": "Receive Service Alerts by texting the word <strong>SMART</strong> to <strong>888777</strong> or <link>click here</link> to sign-up.",
     "dataProvidedBy": "Data provided by",
     "communityProject": "This is an open-source community project and is not an official SMART app."
+  },
+  "notifications": {
+    "title": "Service Alerts",
+    "markAllRead": "Mark all read",
+    "noAlerts": "No active service alerts",
+    "close": "Close notifications",
+    "open": "Service alerts",
+    "openWithCount": "Service alerts - {{count}} unread",
+    "serviceAlerts": "Service alerts",
+    "alertsUnread": "{{count}} service alert",
+    "alertsUnread_other": "{{count}} service alerts"
   },
   "quickConnection": {
     "quickTransferWarning": "Quick Transfer Warning",
@@ -91,7 +101,10 @@
   "tripCard": {
     "nextTrain": "Next train",
     "departed": "Departed",
-    "tapForTransferWarning": "Tap for transfer warning"
+    "tapForTransferWarning": "Tap for transfer warning",
+    "canceled": "Canceled",
+    "delayed": "+{{minutes}} min",
+    "stopSkipped": "Stop skipped"
   },
   "noMoreTrains": {
     "noMoreTrainsToday": "No more trains today",

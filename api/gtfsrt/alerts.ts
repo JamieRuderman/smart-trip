@@ -1,15 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { transit_realtime } from "gtfs-realtime-bindings";
-import { fetchGtfsRt, getTranslation } from "../_gtfsrt";
+import { fetchGtfsRt, getTranslation, transit_realtime } from "../_gtfsrt";
 
 const { Alert } = transit_realtime;
 
-function mapEffect(effect: transit_realtime.Alert.Effect | null | undefined): string {
+function mapEffect(effect: number | null | undefined): string {
   if (effect == null) return "UNKNOWN_EFFECT";
   return Alert.Effect[effect] ?? "UNKNOWN_EFFECT";
 }
 
-function mapCause(cause: transit_realtime.Alert.Cause | null | undefined): string {
+function mapCause(cause: number | null | undefined): string {
   if (cause == null) return "UNKNOWN_CAUSE";
   return Alert.Cause[cause] ?? "UNKNOWN_CAUSE";
 }

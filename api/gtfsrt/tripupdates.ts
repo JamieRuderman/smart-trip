@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { transit_realtime } from "gtfs-realtime-bindings";
-import { fetchGtfsRt } from "../_gtfsrt";
+import { fetchGtfsRt, transit_realtime } from "../_gtfsrt";
 
 const { TripDescriptor, TripUpdate } = transit_realtime;
 

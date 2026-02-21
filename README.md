@@ -37,7 +37,7 @@ This is an open-source community project and is not an official SMART app.
 
 - Node.js (version 18 or higher)
 - npm or yarn package manager
-- [Vercel CLI](https://vercel.com/docs/cli) (`npm i -g vercel`) for local real-time API development
+- Vercel CLI for local real-time API development (`npm i -g vercel` or use via `npx`)
 
 ### Installation
 
@@ -61,7 +61,7 @@ npm install
 1. Start the development server alongside the Vercel API routes:
 
    ```bash
-   vercel dev
+   npx vercel dev
    ```
 
    Or, for static-only development without real-time data:

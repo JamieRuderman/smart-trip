@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 .env
 public/data/schedules.json
+.vercel
+.env*.local

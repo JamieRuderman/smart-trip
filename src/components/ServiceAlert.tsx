@@ -20,16 +20,16 @@ export function ServiceAlert({
   const { t } = useTranslation();
   const now = new Date();
 
-  const isAlertActive = (alert: ServiceAlertData) => {
+  // For static fallback data only — live alerts are pre-filtered by useServiceAlerts
+  const isStaticAlertActive = (alert: ServiceAlertData) => {
     if (alert.active === false) return false;
     const startsOk = alert.startsAt ? new Date(alert.startsAt) <= now : true;
     const endsOk = alert.endsAt ? now <= new Date(alert.endsAt) : true;
-    return startsOk && endsOk && (alert.active ?? true);
+    return startsOk && endsOk;
   };
 
-  // Use live alerts when provided; fall back to static data
-  const sourceAlerts = alerts ?? staticServiceAlerts;
-  const activeAlerts = sourceAlerts.filter(isAlertActive);
+  // Live alerts are already filtered; static data needs the active check
+  const activeAlerts = alerts ?? staticServiceAlerts.filter(isStaticAlertActive);
   if (activeAlerts.length === 0) {
     return null;
   }
@@ -54,7 +54,19 @@ export function ServiceAlert({
                 <p className="font-medium text-smart-gold">
                   {alert.title ?? t("serviceAlert.serviceAlert")}
                 </p>
-                <p className="text-sm text-muted-foreground">{alert.message}</p>
+                {alert.message && (
+                  <p className="text-sm text-muted-foreground">{alert.message}</p>
+                )}
+                {alert.startsAt && (
+                  <p className="text-xs text-muted-foreground/60 mt-1">
+                    {t("serviceAlert.issuedAt", {
+                      time: new Date(alert.startsAt).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      }),
+                    })}
+                  </p>
+                )}
               </div>
             </div>
           ))}

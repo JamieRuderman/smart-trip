@@ -11,6 +11,13 @@ async function fetchAlerts(): Promise<GtfsRtAlertsResponse> {
   return res.json() as Promise<GtfsRtAlertsResponse>;
 }
 
+/** Convert ALL-CAPS agency text to sentence case for readability. */
+function humanize(text: string): string {
+  if (!text) return text;
+  if (text !== text.toUpperCase()) return text; // already mixed case
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
 function mapEffectToSeverity(
   effect?: string
 ): "info" | "warning" | "critical" {
@@ -32,20 +39,27 @@ function mapAlertToServiceAlertData(
   const activePeriod =
     alert.activePeriods.find(
       (p) =>
-        (p.start == null || p.start <= nowSec) &&
-        (p.end == null || p.end >= nowSec)
+        (!p.start || p.start <= nowSec) &&
+        (!p.end || p.end >= nowSec)
     ) ?? alert.activePeriods[0];
+
+  const title = humanize(alert.headerText || "Service Alert");
+  const rawMessage = alert.descriptionText
+    ? humanize(alert.descriptionText)
+    : undefined;
+  // Suppress message when it's identical to the title (SMART often duplicates them)
+  const message = rawMessage && rawMessage !== title ? rawMessage : undefined;
 
   return {
     id: alert.id,
-    title: alert.headerText || "Service Alert",
-    message: alert.descriptionText,
+    title,
+    message,
     severity: mapEffectToSeverity(alert.effect),
     startsAt: activePeriod?.start
       ? new Date(activePeriod.start * 1000).toISOString()
       : undefined,
     endsAt: activePeriod?.end
-      ? new Date(activePeriod.end * 1000).toISOString()
+      ? new Date(activePeriod.end * 1000).toISOString() // 0 is falsy, won't produce a bogus 1970 date
       : undefined,
     active: true,
   };
@@ -69,8 +83,8 @@ export function useServiceAlerts() {
         if (alert.activePeriods.length === 0) return true;
         return alert.activePeriods.some(
           (p) =>
-            (p.start == null || p.start <= nowSec) &&
-            (p.end == null || p.end >= nowSec)
+            (!p.start || p.start <= nowSec) &&
+            (!p.end || p.end >= nowSec)
         );
       })
       .map((alert) => mapAlertToServiceAlertData(alert, nowSec)) ?? [];

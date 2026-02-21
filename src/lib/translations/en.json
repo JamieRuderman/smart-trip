@@ -31,7 +31,8 @@
   },
   "serviceAlert": {
     "serviceAlert": "Service Alert",
-    "hideServiceAlert": "Hide service alert"
+    "hideServiceAlert": "Hide service alert",
+    "issuedAt": "Issued at {{time}}"
   },
   "schedule": {
     "southboundSchedule": "Southbound Schedule",

@@ -31,7 +31,8 @@
   },
   "serviceAlert": {
     "serviceAlert": "Alerta de Servicio",
-    "hideServiceAlert": "Ocultar alerta de servicio"
+    "hideServiceAlert": "Ocultar alerta de servicio",
+    "issuedAt": "Emitido a las {{time}}"
   },
   "schedule": {
     "southboundSchedule": "Horario Hacia el Sur",

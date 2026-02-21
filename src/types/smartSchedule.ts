@@ -67,7 +67,7 @@ export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface ServiceAlertData {
   id: string;
-  message: string;
+  message?: string;
   title?: string;
   severity?: AlertSeverity;
   startsAt?: string; // ISO date string (YYYY-MM-DD or full ISO)

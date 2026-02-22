@@ -1,8 +1,7 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
-import { useNotifications } from "@/hooks/useNotifications";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -14,7 +13,6 @@ import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
-import { NotificationPanel } from "./NotificationPanel";
 import { NoTripsFound } from "./NoTripsFound";
 import { EmptyState } from "./EmptyState";
 
@@ -41,21 +39,8 @@ export function TrainScheduleApp() {
     swapStations,
   } = useTrainScheduleState(scheduleDataVersion);
 
-  const { alerts: liveAlerts } = useServiceAlerts();
-  const { notifications, unreadCount, readIds, isLoading, markAllRead } =
-    useNotifications();
-
+  const { alerts } = useServiceAlerts();
   const [showServiceAlert, setShowServiceAlert] = useState(true);
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-
-  const handleOpenNotifications = useCallback(() => {
-    setIsNotificationPanelOpen(true);
-  }, []);
-
-  const handleCloseNotifications = useCallback(() => {
-    setIsNotificationPanelOpen(false);
-    markAllRead();
-  }, [markAllRead]);
 
   return (
     <div
@@ -89,7 +74,7 @@ export function TrainScheduleApp() {
         <ServiceAlert
           showServiceAlert={showServiceAlert}
           onToggleServiceAlert={() => setShowServiceAlert((v) => !v)}
-          alerts={liveAlerts.length > 0 ? liveAlerts : undefined}
+          alerts={alerts}
         />
 
         {/* Schedule Results */}
@@ -114,21 +99,8 @@ export function TrainScheduleApp() {
         )}
 
         {/* Bottom bar */}
-        <BottomInfoBar
-          unreadCount={unreadCount}
-          onOpenNotifications={handleOpenNotifications}
-        />
+        <BottomInfoBar />
       </main>
-
-      <NotificationPanel
-        isOpen={isNotificationPanelOpen}
-        onClose={handleCloseNotifications}
-        notifications={notifications}
-        readIds={readIds}
-        unreadCount={unreadCount}
-        isLoading={isLoading}
-        onMarkAllRead={markAllRead}
-      />
     </div>
   );
 }

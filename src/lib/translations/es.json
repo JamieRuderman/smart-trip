@@ -30,7 +30,7 @@
     "noTrainsFound": "No se encontraron trenes para esta ruta."
   },
   "serviceAlert": {
-    "serviceAlert": "Alerta de Servicio",
+    "serviceAlert": "Show service alerts",
     "hideServiceAlert": "Ocultar alerta de servicio",
     "issuedAt": "Emitido a las {{time}}"
   },
@@ -56,7 +56,11 @@
   },
   "bottomInfo": {
     "dataProvidedBy": "Datos proporcionados por",
-    "communityProject": "Proyecto comunitario de código abierto. No es una app oficial de SMART."
+    "communityProject": "Proyecto comunitario de código abierto. No es una app oficial de SMART.",
+    "alertSignupText": "Recibe alertas de servicio enviando un mensaje de texto con la palabra",
+    "alertSignupTo": "al",
+    "alertSignupOr": "o",
+    "alertSignupLink": "regístrate en línea"
   },
   "notifications": {
     "title": "Alertas de Servicio",

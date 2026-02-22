@@ -41,7 +41,17 @@ function deriveStatus(
   toStation: Station
 ): { scheduledDeparture: string | null; status: TripRealtimeStatus } {
   if (update.scheduleRelationship === "CANCELED") {
-    // CANCELED trips have no stop_time_updates — can't match by departure time
+    // Some feeds include stop_time_updates with scheduled times even for CANCELED trips.
+    // Use those to key by scheduled departure so the canceled badge shows for any station pair.
+    const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation);
+    if (fromUpdate?.departureTime) {
+      const scheduledDeparture = unixToTimeString(fromUpdate.departureTime);
+      return { scheduledDeparture, status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
+    }
+    // Fallback: match by startTime — only works when fromStation is the trip origin
+    if (update.startTime) {
+      return { scheduledDeparture: update.startTime.slice(0, 5), status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
+    }
     return { scheduledDeparture: null, status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
   }
 

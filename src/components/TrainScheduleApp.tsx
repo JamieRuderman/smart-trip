@@ -39,7 +39,7 @@ export function TrainScheduleApp() {
     swapStations,
   } = useTrainScheduleState(scheduleDataVersion);
 
-  const { alerts } = useServiceAlerts();
+  const { alerts } = useServiceAlerts(fromStation, toStation);
   const [showServiceAlert, setShowServiceAlert] = useState(true);
 
   return (

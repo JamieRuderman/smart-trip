@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiBaseUrl } from "@/lib/env";
-import type { GtfsRtAlertsResponse, GtfsRtAlert } from "@/types/gtfsRt";
-import type { ServiceAlertData } from "@/types/smartSchedule";
+import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
+import type { GtfsRtAlertsResponse, GtfsRtAlert, GtfsRtInformedEntity } from "@/types/gtfsRt";
+import type { ServiceAlertData, Station } from "@/types/smartSchedule";
 
 const ALERTS_POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -30,6 +31,47 @@ function mapEffectToSeverity(
   )
     return "warning";
   return "info";
+}
+
+/**
+ * Returns true if a single informed entity matches the user's context.
+ * Per GTFS-RT spec, fields within one entity act as AND; multiple entities act as OR.
+ */
+function entityMatchesContext(
+  entity: GtfsRtInformedEntity,
+  fromStation: Station | "",
+  toStation: Station | ""
+): boolean {
+  // Stop-specific: only show if the user has that stop's station selected
+  if (entity.stopId) {
+    // No stations selected → show all stop-targeted alerts (avoid hiding important info)
+    if (!fromStation && !toStation) return true;
+    const station = GTFS_STOP_ID_TO_STATION[entity.stopId];
+    // Unknown stop ID → show conservatively rather than silently suppress
+    if (!station) return true;
+    return station === fromStation || station === toStation;
+  }
+
+  // Trip-specific: trip IDs are per-service-date and can't be correlated to the user's
+  // selected route client-side, so show conservatively to avoid missing critical alerts
+  if (entity.tripId) return true;
+
+  // Route-only or agency-only → systemwide, always show
+  return true;
+}
+
+/** Returns true if the alert is relevant for the user's currently selected stations. */
+function isAlertRelevant(
+  alert: GtfsRtAlert,
+  fromStation: Station | "",
+  toStation: Station | ""
+): boolean {
+  // No informed entities = broadcast to all riders
+  if (alert.informedEntities.length === 0) return true;
+  // Alert is relevant if ANY entity matches (OR across entities)
+  return alert.informedEntities.some((entity) =>
+    entityMatchesContext(entity, fromStation, toStation)
+  );
 }
 
 function mapAlertToServiceAlertData(
@@ -65,7 +107,10 @@ function mapAlertToServiceAlertData(
   };
 }
 
-export function useServiceAlerts() {
+export function useServiceAlerts(
+  fromStation: Station | "" = "",
+  toStation: Station | "" = ""
+) {
   const query = useQuery({
     queryKey: ["gtfsrt", "alerts"],
     queryFn: fetchAlerts,
@@ -87,6 +132,7 @@ export function useServiceAlerts() {
             (!p.end || p.end >= nowSec)
         );
       })
+      .filter((alert) => isAlertRelevant(alert, fromStation, toStation))
       .map((alert) => mapAlertToServiceAlertData(alert, nowSec)) ?? [];
 
   return {

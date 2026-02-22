@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchGtfsRt, transit_realtime } from "../_gtfsrt";
+import { fetchGtfsRt, transit_realtime } from "../_gtfsrt.js";
 
 const { TripDescriptor, TripUpdate } = transit_realtime;
 
@@ -17,15 +17,15 @@ const STOP_SCHEDULE_RELATIONSHIP: Record<number, string> = {
   [TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA]: "NO_DATA",
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(_req: VercelRequest, res: VercelResponse) {
   try {
     const feed = await fetchGtfsRt("tripupdates");
 
     const timestamp = Number(feed.header?.timestamp ?? 0);
 
     const updates = (feed.entity ?? [])
-      .filter((e) => e.tripUpdate)
-      .map((e) => {
+      .filter((e: any) => e.tripUpdate)
+      .map((e: any) => {
         const tu = e.tripUpdate!;
         const trip = tu.trip ?? {};
         const schedRel = trip.scheduleRelationship ?? 0;
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? `${baseTripId}_${trip.startTime}`
             : baseTripId;
 
-        const stopTimeUpdates = (tu.stopTimeUpdate ?? []).map((stu) => {
+        const stopTimeUpdates = (tu.stopTimeUpdate ?? []).map((stu: any) => {
           const stopSchedRel = stu.scheduleRelationship ?? 0;
           // Use departure.time per SMART's specification — they manually adjust these
           // when holds/delays occur that the prediction algorithm can't capture

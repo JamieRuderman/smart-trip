@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchGtfsRt, getTranslation, transit_realtime } from "../_gtfsrt";
+import { fetchGtfsRt, getTranslation, transit_realtime } from "../_gtfsrt.js";
 
 const { Alert } = transit_realtime;
 
@@ -13,23 +13,23 @@ function mapCause(cause: number | null | undefined): string {
   return Alert.Cause[cause] ?? "UNKNOWN_CAUSE";
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(_req: VercelRequest, res: VercelResponse) {
   try {
     const feed = await fetchGtfsRt("servicealerts");
 
     const timestamp = Number(feed.header?.timestamp ?? 0);
 
     const alerts = (feed.entity ?? [])
-      .filter((e) => e.alert)
-      .map((e) => {
+      .filter((e: any) => e.alert)
+      .map((e: any) => {
         const a = e.alert!;
         return {
           id: e.id,
-          activePeriods: (a.activePeriod ?? []).map((p) => ({
+          activePeriods: (a.activePeriod ?? []).map((p: any) => ({
             start: p.start ? Number(p.start) : undefined,
             end: p.end ? Number(p.end) : undefined,
           })),
-          informedEntities: (a.informedEntity ?? []).map((ie) => ({
+          informedEntities: (a.informedEntity ?? []).map((ie: any) => ({
             agencyId: ie.agencyId ?? undefined,
             routeId: ie.routeId ?? undefined,
             tripId: ie.trip?.tripId ?? undefined,

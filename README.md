@@ -61,7 +61,7 @@ npm install
 1. Start the development server alongside the Vercel API routes:
 
    ```bash
-   npx vercel dev
+   npm run dev:vercel
    ```
 
    Or, for static-only development without real-time data:
@@ -147,7 +147,7 @@ For Vercel production, set `TRANSIT_511_API_KEY` as a server-side environment va
 ### Available Scripts
 
 - `npm run dev` - Start Vite development server (static schedule only, no real-time)
-- `vercel dev` - Start dev server with real-time API routes on port 3000, Vite proxied on top
+- `npm run dev:vercel` - Start Vercel dev server with real-time API routes on port 3210
 - `npm run build` - Build for production web (includes generating `public/data/schedules.json`)
 - `npm run build:native` - Build for native iOS/Android (bakes in `VITE_API_BASE_URL` from `.env.native`)
 - `npm run update-build` - Refresh from 511.org, then build

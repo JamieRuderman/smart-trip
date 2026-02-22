@@ -20,8 +20,9 @@
   "scripts": {
     "prebuild": "tsx scripts/publishScheduleData.ts",
     "build": "tsc --noEmit && vite build",
-    "build:native": "tsc --noEmit && vite build --mode native",
+    "build-native": "tsc --noEmit && vite build --mode native",
     "dev": "vite",
+    "dev-vercel": "npx vercel dev --listen 3210",
     "lint": "eslint .",
     "preview": "vite preview",
     "update-build": "npm run update-transit && npm run build",

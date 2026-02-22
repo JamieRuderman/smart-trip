@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 // check (which would fail because the package's CJS exports aren't statically
 // detectable). We re-export transit_realtime so consuming files can use enum
 // values without importing from gtfs-realtime-bindings directly.
-const _require = createRequire(process.cwd() + "/");
+const _require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const transit_realtime = (_require("gtfs-realtime-bindings") as any).transit_realtime as any;
 

@@ -41,6 +41,7 @@ export interface GtfsRtStopTimeUpdate {
   arrivalTime?: number; // Unix timestamp
   departureTime?: number; // Unix timestamp — use this per SMART spec
   scheduleRelationship: StopScheduleRelationship;
+  arrivalDelay?: number; // seconds
   departureDelay?: number; // seconds
 }
 
@@ -67,6 +68,8 @@ export interface TripRealtimeStatus {
   isCanceled: boolean;
   /** Live departure time as "HH:MM" string, derived from departure.time Unix timestamp */
   liveDepartureTime?: string;
+  /** Live arrival time as "HH:MM" string at the destination station */
+  liveArrivalTime?: string;
   /** How many minutes late (positive = late) — only set when > 0 */
   delayMinutes?: number;
   isOriginSkipped: boolean;

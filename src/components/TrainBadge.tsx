@@ -6,6 +6,8 @@ interface TrainBadgeProps {
   isNextTrip?: boolean;
   isPastTrip?: boolean;
   showAllTrips?: boolean;
+  isCanceled?: boolean;
+  isDelayed?: boolean;
 }
 
 export function TrainBadge({
@@ -13,12 +15,14 @@ export function TrainBadge({
   isNextTrip = false,
   isPastTrip = false,
   showAllTrips = false,
+  isCanceled = false,
+  isDelayed = false,
 }: TrainBadgeProps) {
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 w-[5rem]",
-        isNextTrip && "text-smart-train-green",
+        isCanceled ? "text-destructive" : isDelayed ? "text-smart-gold" : isNextTrip && "text-smart-train-green",
         isPastTrip && showAllTrips && "text-muted-foreground/60"
       )}
     >

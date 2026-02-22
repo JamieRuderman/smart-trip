@@ -38,7 +38,7 @@
     "southboundSchedule": "Horario Hacia el Sur",
     "northboundSchedule": "Horario Hacia el Norte",
     "showEarlierTrains": "Mostrar trenes anteriores",
-    "hideEarlierTrains": "Ocultar trenes anteriores"
+    "hideEarlierTrains": "Ocultar trenes previos"
   },
   "fare": {
     "fareInformation": "Tarifas",
@@ -108,7 +108,7 @@
     "departed": "Salido",
     "tapForTransferWarning": "Toca para advertencia",
     "canceled": "Cancelado",
-    "delayed": "+{{minutes}} min",
+    "delayed": "{{minutes}} min de demora",
     "stopSkipped": "Parada omitida"
   },
   "noMoreTrains": {

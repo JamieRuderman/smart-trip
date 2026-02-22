@@ -38,7 +38,7 @@
     "southboundSchedule": "Southbound Schedule",
     "northboundSchedule": "Northbound Schedule",
     "showEarlierTrains": "Show earlier trains",
-    "hideEarlierTrains": "Hide earlier trains that have already departed"
+    "hideEarlierTrains": "Hide earlier trains"
   },
   "fare": {
     "fareInformation": "Fare Information",
@@ -108,7 +108,7 @@
     "departed": "Departed",
     "tapForTransferWarning": "Tap for transfer warning",
     "canceled": "Canceled",
-    "delayed": "+{{minutes}} min",
+    "delayed": "{{minutes}} min delay",
     "stopSkipped": "Stop skipped"
   },
   "noMoreTrains": {

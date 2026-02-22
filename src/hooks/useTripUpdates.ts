@@ -46,13 +46,34 @@ function deriveStatus(
     const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation);
     if (fromUpdate?.departureTime) {
       const scheduledDeparture = unixToTimeString(fromUpdate.departureTime);
-      return { scheduledDeparture, status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
+      return {
+        scheduledDeparture,
+        status: {
+          isCanceled: true,
+          isOriginSkipped: false,
+          isDestinationSkipped: false,
+        },
+      };
     }
     // Fallback: match by startTime — only works when fromStation is the trip origin
     if (update.startTime) {
-      return { scheduledDeparture: update.startTime.slice(0, 5), status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
+      return {
+        scheduledDeparture: update.startTime.slice(0, 5),
+        status: {
+          isCanceled: true,
+          isOriginSkipped: false,
+          isDestinationSkipped: false,
+        },
+      };
     }
-    return { scheduledDeparture: null, status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false } };
+    return {
+      scheduledDeparture: null,
+      status: {
+        isCanceled: true,
+        isOriginSkipped: false,
+        isDestinationSkipped: false,
+      },
+    };
   }
 
   const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation);
@@ -60,7 +81,14 @@ function deriveStatus(
 
   if (!fromUpdate?.departureTime) {
     // No data for this station pair in this update
-    return { scheduledDeparture: null, status: { isCanceled: false, isOriginSkipped: false, isDestinationSkipped: false } };
+    return {
+      scheduledDeparture: null,
+      status: {
+        isCanceled: false,
+        isOriginSkipped: false,
+        isDestinationSkipped: false,
+      },
+    };
   }
 
   const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
@@ -74,15 +102,25 @@ function deriveStatus(
   const scheduledUnix = fromUpdate.departureTime - delaySeconds;
   const scheduledDeparture = unixToTimeString(scheduledUnix);
 
-  // Delay badge only when > 2 minutes (suppress noise)
+  // Delay badge only when > 1 minute (suppress noise)
   const delayMinutes =
-    delaySeconds > 120 ? Math.round(delaySeconds / 60) : undefined;
+    delaySeconds > 60 ? Math.round(delaySeconds / 60) : undefined;
+
+  // Live arrival time at destination, if the feed provides it
+  let liveArrivalTime: string | undefined;
+  if (toUpdate?.arrivalTime) {
+    const arrivalDelaySeconds = toUpdate.arrivalDelay ?? toUpdate.departureDelay ?? 0;
+    if (arrivalDelaySeconds > 60) {
+      liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+    }
+  }
 
   return {
     scheduledDeparture,
     status: {
       isCanceled: false,
       liveDepartureTime: delayMinutes != null ? liveDepartureTime : undefined,
+      liveArrivalTime,
       delayMinutes,
       isOriginSkipped,
       isDestinationSkipped,

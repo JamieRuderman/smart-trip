@@ -1,13 +1,10 @@
-import { createRequire } from "node:module";
-
 // gtfs-realtime-bindings is a CommonJS module (module.exports = $root).
-// We load it via createRequire so Node.js never tries a static ESM named-import
-// check (which would fail because the package's CJS exports aren't statically
-// detectable). We re-export transit_realtime so consuming files can use enum
-// values without importing from gtfs-realtime-bindings directly.
-const _require = createRequire(import.meta.url);
+// A default ESM import gives us the $root object; we re-export transit_realtime
+// so consuming files can use enum values without importing the package directly.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const transit_realtime = (_require("gtfs-realtime-bindings") as any).transit_realtime as any;
+import GtfsRealtimeBindings from "gtfs-realtime-bindings";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const transit_realtime = (GtfsRealtimeBindings as any).transit_realtime as any;
 
 const BASE = "http://api.511.org/transit";
 

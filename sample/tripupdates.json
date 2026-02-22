@@ -1,0 +1,511 @@
+{
+    "timestamp": 1771639094,
+    "updates": [
+        {
+            "tripId": "t_6108157_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "16:57:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 9,
+                    "stopId": "71062",
+                    "arrivalTime": 1771639318,
+                    "departureTime": 1771639318,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 10,
+                    "stopId": "71052",
+                    "arrivalTime": 1771639439,
+                    "departureTime": 1771639439,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 11,
+                    "stopId": "71042",
+                    "arrivalTime": 1771639752,
+                    "departureTime": 1771639752,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 12,
+                    "stopId": "71032",
+                    "arrivalTime": 1771640060,
+                    "departureTime": 1771640060,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 13,
+                    "stopId": "71022",
+                    "arrivalTime": 1771640316,
+                    "departureTime": 1771640316,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 14,
+                    "stopId": "71012",
+                    "arrivalTime": 1771640602,
+                    "scheduleRelationship": "SCHEDULED"
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108158_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "19:05:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 1,
+                    "stopId": "71142",
+                    "departureTime": 1771643115,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 2,
+                    "stopId": "71132",
+                    "arrivalTime": 1771643480,
+                    "departureTime": 1771643480,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108160_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "18:01:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 1,
+                    "stopId": "71142",
+                    "departureTime": 1771639473,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 2,
+                    "stopId": "71132",
+                    "arrivalTime": 1771639679,
+                    "departureTime": 1771639679,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 3,
+                    "stopId": "71122",
+                    "arrivalTime": 1771640035,
+                    "departureTime": 1771640035,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 4,
+                    "stopId": "71112",
+                    "arrivalTime": 1771640205,
+                    "departureTime": 1771640205,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 5,
+                    "stopId": "71102",
+                    "arrivalTime": 1771640753,
+                    "departureTime": 1771640753,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 6,
+                    "stopId": "71092",
+                    "arrivalTime": 1771640915,
+                    "departureTime": 1771640915,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 7,
+                    "stopId": "71082",
+                    "arrivalTime": 1771641410,
+                    "departureTime": 1771641450,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 8,
+                    "stopId": "71072",
+                    "arrivalTime": 1771641691,
+                    "departureTime": 1771641750,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 9,
+                    "stopId": "71062",
+                    "arrivalTime": 1771642461,
+                    "departureTime": 1771642470,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 10,
+                    "stopId": "71052",
+                    "arrivalTime": 1771642604,
+                    "departureTime": 1771642650,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 11,
+                    "stopId": "71042",
+                    "arrivalTime": 1771643029,
+                    "departureTime": 1771643130,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 12,
+                    "stopId": "71032",
+                    "arrivalTime": 1771643421,
+                    "departureTime": 1771643490,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108167_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "17:28:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 6,
+                    "stopId": "71092",
+                    "arrivalTime": 1771639085,
+                    "departureTime": 1771639085,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 7,
+                    "stopId": "71082",
+                    "arrivalTime": 1771639530,
+                    "departureTime": 1771639530,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 8,
+                    "stopId": "71072",
+                    "arrivalTime": 1771639775,
+                    "departureTime": 1771639775,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 9,
+                    "stopId": "71062",
+                    "arrivalTime": 1771640534,
+                    "departureTime": 1771640534,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 10,
+                    "stopId": "71052",
+                    "arrivalTime": 1771640654,
+                    "departureTime": 1771640670,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 11,
+                    "stopId": "71042",
+                    "arrivalTime": 1771640989,
+                    "departureTime": 1771641150,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 12,
+                    "stopId": "71032",
+                    "arrivalTime": 1771641484,
+                    "departureTime": 1771641510,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 13,
+                    "stopId": "71022",
+                    "arrivalTime": 1771641781,
+                    "departureTime": 1771641870,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 14,
+                    "stopId": "71012",
+                    "arrivalTime": 1771642225,
+                    "scheduleRelationship": "SCHEDULED"
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108170_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "19:11:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 1,
+                    "stopId": "71011",
+                    "departureTime": 1771643475,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108173_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "17:03:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 8,
+                    "stopId": "71081",
+                    "arrivalTime": 1771639113,
+                    "departureTime": 1771639113,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 9,
+                    "stopId": "71091",
+                    "arrivalTime": 1771639544,
+                    "departureTime": 1771639544,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 10,
+                    "stopId": "71101",
+                    "arrivalTime": 1771639671,
+                    "departureTime": 1771639671,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 11,
+                    "stopId": "71111",
+                    "arrivalTime": 1771640664,
+                    "departureTime": 1771640664,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 12,
+                    "stopId": "71121",
+                    "arrivalTime": 1771640830,
+                    "departureTime": 1771640830,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 13,
+                    "stopId": "71131",
+                    "arrivalTime": 1771641126,
+                    "departureTime": 1771641126,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 14,
+                    "stopId": "71141",
+                    "arrivalTime": 1771641374,
+                    "scheduleRelationship": "SCHEDULED"
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108174_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "17:35:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 5,
+                    "stopId": "71051",
+                    "arrivalTime": 1771639316,
+                    "departureTime": 1771639316,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 6,
+                    "stopId": "71061",
+                    "arrivalTime": 1771639423,
+                    "departureTime": 1771639423,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 7,
+                    "stopId": "71071",
+                    "arrivalTime": 1771640148,
+                    "departureTime": 1771640148,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 8,
+                    "stopId": "71081",
+                    "arrivalTime": 1771640419,
+                    "departureTime": 1771640430,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 9,
+                    "stopId": "71091",
+                    "arrivalTime": 1771640910,
+                    "departureTime": 1771640910,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 10,
+                    "stopId": "71101",
+                    "arrivalTime": 1771641099,
+                    "departureTime": 1771641150,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 11,
+                    "stopId": "71111",
+                    "arrivalTime": 1771642246,
+                    "departureTime": 1771642246,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 12,
+                    "stopId": "71121",
+                    "arrivalTime": 1771642418,
+                    "departureTime": 1771642418,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 13,
+                    "stopId": "71131",
+                    "arrivalTime": 1771642713,
+                    "departureTime": 1771642713,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 14,
+                    "stopId": "71141",
+                    "arrivalTime": 1771642970,
+                    "scheduleRelationship": "SCHEDULED"
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108175_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "18:39:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 1,
+                    "stopId": "71011",
+                    "departureTime": 1771641555,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 2,
+                    "stopId": "71021",
+                    "arrivalTime": 1771641911,
+                    "departureTime": 1771641990,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 3,
+                    "stopId": "71031",
+                    "arrivalTime": 1771642280,
+                    "departureTime": 1771642290,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 4,
+                    "stopId": "71041",
+                    "arrivalTime": 1771642660,
+                    "departureTime": 1771642660,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 5,
+                    "stopId": "71051",
+                    "arrivalTime": 1771643065,
+                    "departureTime": 1771643065,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 6,
+                    "stopId": "71061",
+                    "arrivalTime": 1771643171,
+                    "departureTime": 1771643190,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                }
+            ]
+        },
+        {
+            "tripId": "t_6108179_b_86130_tn_0",
+            "routeId": "SMART",
+            "startDate": "20260220",
+            "startTime": "16:31:15",
+            "scheduleRelationship": "SCHEDULED",
+            "stopTimeUpdates": [
+                {
+                    "stopSequence": 13,
+                    "stopId": "71131",
+                    "departureTime": 1771639074,
+                    "scheduleRelationship": "SCHEDULED",
+                    "departureDelay": 0
+                },
+                {
+                    "stopSequence": 14,
+                    "stopId": "71141",
+                    "arrivalTime": 1771639322,
+                    "scheduleRelationship": "SCHEDULED"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,25 @@
+{
+    "timestamp": 1771638998,
+    "alerts": [
+        {
+            "id": "SA_f95b9e5a-8f0a-470b-a4eb-3f82f976ba05",
+            "activePeriods": [
+                {
+                    "start": 1771635060,
+                    "end": 0
+                }
+            ],
+            "informedEntities": [
+                {
+                    "agencyId": "SA",
+                    "routeId": "SMART",
+                    "stopId": ""
+                }
+            ],
+            "cause": "OTHER_CAUSE",
+            "effect": "OTHER_EFFECT",
+            "headerText": "TRIP #30 NB AND TRIP #35 SB ARE DELAYED UP TO 10 MINUTES",
+            "descriptionText": "TRIP #30 NB AND TRIP #35 SB ARE DELAYED UP TO 10 MINUTES"
+        }
+    ]
+}

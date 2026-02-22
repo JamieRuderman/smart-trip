@@ -1,25 +1,35 @@
 {
-    "timestamp": 1771638998,
+    "timestamp": 1771724100,
     "alerts": [
         {
-            "id": "SA_f95b9e5a-8f0a-470b-a4eb-3f82f976ba05",
-            "activePeriods": [
-                {
-                    "start": 1771635060,
-                    "end": 0
-                }
-            ],
-            "informedEntities": [
-                {
-                    "agencyId": "SA",
-                    "routeId": "SMART",
-                    "stopId": ""
-                }
-            ],
+            "_comment": "SCENARIO A: Systemwide alert (routeId: SMART). Should show to ALL users regardless of selected stations.",
+            "id": "SA_test_systemwide",
+            "activePeriods": [{ "start": 1771720000, "end": 0 }],
+            "informedEntities": [{ "agencyId": "SA", "routeId": "SMART" }],
             "cause": "OTHER_CAUSE",
-            "effect": "OTHER_EFFECT",
-            "headerText": "TRIP #30 NB AND TRIP #35 SB ARE DELAYED UP TO 10 MINUTES",
-            "descriptionText": "TRIP #30 NB AND TRIP #35 SB ARE DELAYED UP TO 10 MINUTES"
+            "effect": "SIGNIFICANT_DELAYS",
+            "headerText": "TRIP #30 NB AND TRIP #34 NB ARE DELAYED UP TO 15 MINUTES",
+            "descriptionText": "Trains are holding at Petaluma Downtown due to a mechanical issue."
+        },
+        {
+            "_comment": "SCENARIO B: Stop-specific alert for Larkspur (stopId: 71011). Should show ONLY when the user has Larkspur selected as from or to station.",
+            "id": "SA_test_stop_larkspur",
+            "activePeriods": [{ "start": 1771720000, "end": 0 }],
+            "informedEntities": [{ "agencyId": "SA", "routeId": "SMART", "stopId": "71011" }],
+            "cause": "MAINTENANCE",
+            "effect": "MODIFIED_SERVICE",
+            "headerText": "LARKSPUR STATION: ELEVATOR OUT OF SERVICE",
+            "descriptionText": "The elevator at Larkspur station is temporarily out of service. Passengers requiring accessibility assistance should contact station staff."
+        },
+        {
+            "_comment": "SCENARIO C: Trip-specific alert (tripId). Per GTFS-RT spec this should target only passengers on that trip. Since trip IDs are per-service-date and can't be correlated client-side, we show this to all users conservatively.",
+            "id": "SA_test_trip_specific",
+            "activePeriods": [{ "start": 1771720000, "end": 0 }],
+            "informedEntities": [{ "tripId": "t_test_trip37_sb" }],
+            "cause": "TECHNICAL_PROBLEM",
+            "effect": "NO_SERVICE",
+            "headerText": "TRIP #37 SB CANCELED",
+            "descriptionText": "Trip #37 southbound has been canceled due to a mechanical issue. The next available southbound service is Trip #39 departing Windsor at 18:01."
         }
     ]
 }

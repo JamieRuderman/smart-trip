@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { fetchGtfsRt, transit_realtime } from "../_gtfsrt.js";
 
@@ -19,6 +21,13 @@ const STOP_SCHEDULE_RELATIONSHIP: Record<number, string> = {
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   try {
+    if (process.env.USE_SAMPLE_DATA === "true") {
+      const samplePath = resolve(process.cwd(), "sample/tripupdates.json");
+      const sample = JSON.parse(readFileSync(samplePath, "utf-8"));
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(sample);
+    }
+
     const feed = await fetchGtfsRt("tripupdates");
 
     const timestamp = Number(feed.header?.timestamp ?? 0);

@@ -139,10 +139,23 @@ Trip updates are matched to static schedule entries by scheduled departure time 
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `TRANSIT_511_API_KEY` | `.env` (gitignored) | 511.org API key for GTFS static + RT feeds |
+| `TRANSIT_511_API_KEY` | `.env.local` (gitignored) | 511.org API key for GTFS static + RT feeds |
+| `USE_SAMPLE_DATA` | `.env.local` (gitignored) | Set to `true` to serve `sample/` JSON instead of the live 511 API |
 | `VITE_API_BASE_URL` | `.env.native` (committed) | Absolute API base URL for native Capacitor builds |
 
 For Vercel production, set `TRANSIT_511_API_KEY` as a server-side environment variable in the Vercel dashboard (no `VITE_` prefix — it must never be exposed to the client).
+
+### Sample / Mock Data
+
+`sample/tripupdates.json` and `sample/alert.json` contain test fixtures covering all GTFS-RT scenarios: on-time, delayed, cancelled, origin/destination skipped, duplicated trips, and service alerts with different `EntitySelector` scopes.
+
+To use them during development, add to `.env.local`:
+
+```
+USE_SAMPLE_DATA=true
+```
+
+When this flag is set, `npm run dev` intercepts `/api/gtfsrt/*` requests directly in the Vite dev server (no Vercel CLI needed) and returns the local JSON files. Remove the flag (or set it to `false`) to proxy API calls to a local `vercel dev` instance hitting the live 511 API.
 
 ### Available Scripts
 

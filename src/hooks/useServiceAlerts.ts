@@ -19,6 +19,21 @@ function humanize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
+/**
+ * Keep alert copy predictable/safe:
+ * - remove non-letter characters except periods and whitespace
+ * - collapse repeated whitespace
+ * - trim outer whitespace
+ */
+function sanitizeAlertText(text?: string): string | undefined {
+  if (!text) return undefined;
+  const sanitized = text
+    .replace(/[^a-zA-Z.\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return sanitized || undefined;
+}
+
 function mapEffectToSeverity(
   effect?: string
 ): "info" | "warning" | "critical" {
@@ -85,10 +100,10 @@ function mapAlertToServiceAlertData(
         (!p.end || p.end >= nowSec)
     ) ?? alert.activePeriods[0];
 
-  const title = humanize(alert.headerText || "Service Alert");
-  const rawMessage = alert.descriptionText
-    ? humanize(alert.descriptionText)
-    : undefined;
+  const sanitizedTitle = sanitizeAlertText(alert.headerText);
+  const sanitizedMessage = sanitizeAlertText(alert.descriptionText);
+  const title = humanize(sanitizedTitle ?? "Service Alert");
+  const rawMessage = sanitizedMessage ? humanize(sanitizedMessage) : undefined;
   // Suppress message when it's identical to the title (SMART often duplicates them)
   const message = rawMessage && rawMessage !== title ? rawMessage : undefined;
 

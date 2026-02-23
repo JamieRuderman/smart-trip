@@ -22,7 +22,11 @@ export function TrainBadge({
     <div
       className={cn(
         "flex items-center gap-1.5 w-[5rem]",
-        isCanceled ? "text-destructive" : isDelayed ? "text-smart-gold" : isNextTrip && "text-smart-train-green",
+        isCanceled
+          ? "text-destructive"
+          : isNextTrip
+          ? "text-smart-train-green"
+          : isDelayed && "text-smart-gold",
         isPastTrip && showAllTrips && "text-muted-foreground/60"
       )}
     >

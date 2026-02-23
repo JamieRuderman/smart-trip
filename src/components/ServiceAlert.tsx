@@ -63,22 +63,22 @@ export function ServiceAlert({
           {activeAlerts.map((alert) => (
             <Alert key={alert.id} variant="warning">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>
-                {alert.title ?? t("serviceAlert.sectionTitle")}
-              </AlertTitle>
-              {(alert.message || alert.startsAt) && (
+              <div className="mb-1 flex items-start justify-between gap-2">
+                <AlertTitle className="mb-0">
+                  {alert.title ?? t("serviceAlert.sectionTitle")}
+                </AlertTitle>
+                {alert.startsAt && (
+                  <p className="shrink-0 text-right text-xs text-smart-gold/60">
+                    {new Date(alert.startsAt).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
+              </div>
+              {alert.message && (
                 <AlertDescription className="text-smart-gold/80 space-y-0.5">
-                  {alert.message && <p>{alert.message}</p>}
-                  {alert.startsAt && (
-                    <p className="text-xs text-smart-gold/60">
-                      {t("serviceAlert.issuedAt", {
-                        time: new Date(alert.startsAt).toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        }),
-                      })}
-                    </p>
-                  )}
+                  <p>{alert.message}</p>
                 </AlertDescription>
               )}
             </Alert>

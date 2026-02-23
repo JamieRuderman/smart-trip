@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiBaseUrl } from "@/lib/env";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
+import { buildAlertFingerprint } from "@/lib/alertFingerprint";
 import type { GtfsRtAlertsResponse, GtfsRtAlert, GtfsRtInformedEntity } from "@/types/gtfsRt";
 import type { ServiceAlertData, Station } from "@/types/smartSchedule";
 
@@ -91,7 +92,8 @@ function isAlertRelevant(
 
 function mapAlertToServiceAlertData(
   alert: GtfsRtAlert,
-  nowSec: number
+  nowSec: number,
+  sourceTimestampSec?: number
 ): ServiceAlertData {
   const activePeriod =
     alert.activePeriods.find(
@@ -106,18 +108,32 @@ function mapAlertToServiceAlertData(
   const rawMessage = sanitizedMessage ? humanize(sanitizedMessage) : undefined;
   // Suppress message when it's identical to the title (SMART often duplicates them)
   const message = rawMessage && rawMessage !== title ? rawMessage : undefined;
-
-  return {
+  const startsAt = activePeriod?.start
+    ? new Date(activePeriod.start * 1000).toISOString()
+    : undefined;
+  const endsAt = activePeriod?.end
+    ? new Date(activePeriod.end * 1000).toISOString() // 0 is falsy, won't produce a bogus 1970 date
+    : undefined;
+  const fingerprint = buildAlertFingerprint({
     id: alert.id,
     title,
     message,
+    startsAt,
+    endsAt,
+  });
+
+  return {
+    id: alert.id,
+    fingerprint,
+    title,
+    message,
     severity: mapEffectToSeverity(alert.effect),
-    startsAt: activePeriod?.start
-      ? new Date(activePeriod.start * 1000).toISOString()
-      : undefined,
-    endsAt: activePeriod?.end
-      ? new Date(activePeriod.end * 1000).toISOString() // 0 is falsy, won't produce a bogus 1970 date
-      : undefined,
+    startsAt,
+    endsAt,
+    sourceUpdatedAt:
+      typeof sourceTimestampSec === "number"
+        ? new Date(sourceTimestampSec * 1000).toISOString()
+        : undefined,
     active: true,
   };
 }
@@ -148,7 +164,9 @@ export function useServiceAlerts(
         );
       })
       .filter((alert) => isAlertRelevant(alert, fromStation, toStation))
-      .map((alert) => mapAlertToServiceAlertData(alert, nowSec)) ?? [];
+      .map((alert) =>
+        mapAlertToServiceAlertData(alert, nowSec, query.data?.timestamp)
+      ) ?? [];
 
   return {
     alerts,

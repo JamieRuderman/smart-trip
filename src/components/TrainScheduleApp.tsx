@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
@@ -40,7 +40,6 @@ export function TrainScheduleApp() {
   } = useTrainScheduleState(scheduleDataVersion);
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
-  const [showServiceAlert, setShowServiceAlert] = useState(true);
 
   return (
     <div
@@ -71,11 +70,7 @@ export function TrainScheduleApp() {
         {(!fromStation || !toStation) && <EmptyState />}
 
         {/* Service Alerts */}
-        <ServiceAlert
-          showServiceAlert={showServiceAlert}
-          onToggleServiceAlert={() => setShowServiceAlert((v) => !v)}
-          alerts={alerts}
-        />
+        <ServiceAlert alerts={alerts} />
 
         {/* Schedule Results */}
         {filteredTrips.length > 0 && fromStation && toStation && (

@@ -31,11 +31,11 @@
   },
   "serviceAlert": {
     "sectionTitle": "Alertas de servicio",
-    "serviceAlert_one": "Mostrar alerta de servicio",
-    "serviceAlert_other": "Mostrar alertas de servicio",
-    "hideServiceAlert_one": "Ocultar alerta de servicio",
-    "hideServiceAlert_other": "Ocultar alertas de servicio",
-    "issuedAt": "Emitido a las {{time}}"
+    "issuedAt": "Emitido a las {{time}}",
+    "dismiss": "Descartar alerta",
+    "dismissedNotice_one": "{{count}} alerta de servicio descartada ·",
+    "dismissedNotice_other": "{{count}} alertas de servicio descartadas ·",
+    "restore": "restaurar"
   },
   "schedule": {
     "southboundSchedule": "Horario Hacia el Sur",

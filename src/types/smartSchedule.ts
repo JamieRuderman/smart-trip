@@ -67,10 +67,12 @@ export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface ServiceAlertData {
   id: string;
+  fingerprint: string;
   message?: string;
   title?: string;
   severity?: AlertSeverity;
   startsAt?: string; // ISO date string (YYYY-MM-DD or full ISO)
   endsAt?: string; // ISO date string
+  sourceUpdatedAt?: string; // ISO date string from feed timestamp
   active?: boolean; // explicit switch to enable/disable
 }

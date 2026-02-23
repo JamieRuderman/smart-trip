@@ -12,7 +12,7 @@ const alertVariants = cva(
         destructive:
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
         warning:
-          "bg-smart-gold/10 border-smart-gold/20 text-smart-gold [&>svg]:text-smart-gold",
+          "bg-smart-gold/5 border-smart-gold/30 text-smart-gold [&>svg]:text-smart-gold",
       },
     },
     defaultVariants: {

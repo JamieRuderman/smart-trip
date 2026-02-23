@@ -91,13 +91,13 @@ export const TripCard = memo(function TripCard({
           "flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation",
           "focus:ring-[3px] focus:ring-inset focus:outline-none",
-          hasQuickConnection && !isCanceled && "cursor-pointer hover:bg-amber-50/50",
+          hasQuickConnection && !isCanceled && "cursor-pointer hover:bg-smart-train-green/5",
           isCanceled
-            ? "bg-destructive/5 border-destructive/40 focus:ring-destructive/50"
+            ? "bg-destructive/5 border-destructive/30 focus:ring-destructive/50"
             : isDelayed
-            ? "bg-smart-gold/5 border-smart-gold/50 focus:ring-smart-gold/60"
+            ? "bg-smart-gold/5 border-smart-gold/30 focus:ring-smart-gold/60"
             : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/50 focus:ring-smart-train-green/60"
+            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:ring-smart-train-green/60"
             : "bg-gradient-card focus:ring-black/20"
         )}
         role="listitem"

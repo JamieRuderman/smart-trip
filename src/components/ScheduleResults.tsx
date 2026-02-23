@@ -1,4 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { TripCard } from "./TripCard";
 import { ScheduleHeader } from "./ScheduleHeader";
 import { NoMoreTrainsAlert } from "./NoMoreTrainsAlert";
@@ -43,7 +44,7 @@ export function ScheduleResults({
   if (!direction) return null;
 
   return (
-    <Card className="border-0 shadow-none md:border md:shadow-sm max-w-4xl mx-auto w-full">
+    <SectionCard>
       <ScheduleHeader
         direction={direction.direction}
         currentTime={currentTime}
@@ -85,6 +86,6 @@ export function ScheduleResults({
           })}
         </div>
       </CardContent>
-    </Card>
+    </SectionCard>
   );
 }

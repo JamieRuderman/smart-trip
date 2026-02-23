@@ -1,4 +1,5 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { Button } from "@/components/ui/button";
 import { calculateFare, getAllFareOptions } from "@/lib/scheduleUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -47,7 +48,7 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
   };
 
   return (
-    <Card className="border-0 shadow-none md:border md:shadow-sm max-w-4xl mx-auto w-full">
+    <SectionCard>
       <CardHeader className="p-3 md:p-6 pb-0 md:pb-0">
         <CardTitle className="flex items-center justify-between gap-2">
           {t("fare.fareInformation")}
@@ -63,7 +64,7 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
         {/* Selected Fare Display */}
         {selectedFareType !== "none" && currentFare ? (
           <div className="space-y-4">
-            <div className="bg-primary/5 border border-primary p-4 rounded-lg">
+            <div className="status-box-primary">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{getFareDescription(selectedFareType)}</p>
@@ -143,6 +144,6 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
           </p>
         </div>
       </CardContent>
-    </Card>
+    </SectionCard>
   );
 }

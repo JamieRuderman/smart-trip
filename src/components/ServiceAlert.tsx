@@ -2,7 +2,8 @@ import staticServiceAlerts from "@/data/serviceAlerts";
 import type { ServiceAlertData } from "@/types/smartSchedule";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +38,7 @@ export function ServiceAlert({
   }
 
   return (
-    <Card className="border-0 shadow-none md:border md:shadow-sm max-w-4xl mx-auto w-full">
+    <SectionCard>
       <CardHeader className="p-3 md:p-6">
         <CardTitle className="flex items-center gap-2">
           <span>{t("serviceAlert.sectionTitle")}</span>
@@ -84,6 +85,6 @@ export function ServiceAlert({
           ))}
         </CardContent>
       )}
-    </Card>
+    </SectionCard>
   );
 }

@@ -223,6 +223,21 @@ body.keyboard-visible .pb-safe {
 }
 
 @layer components {
+  /*
+   * Status box: colored highlight container used for selected items, alerts, etc.
+   * Convention: bg at 5% opacity, border at 50% opacity.
+   * Always use one of these classes — never hardcode the opacities inline.
+   */
+  .status-box-primary {
+    @apply bg-primary/5 border border-primary/30 rounded-lg p-4;
+  }
+  .status-box-gold {
+    @apply bg-smart-gold/5 border border-smart-gold/30 rounded-lg p-4;
+  }
+  .status-box-destructive {
+    @apply bg-destructive/5 border border-destructive/30 rounded-lg p-4;
+  }
+
   /* Dropdown menu item base styles */
   .dropdown-item-base {
     @apply relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors;

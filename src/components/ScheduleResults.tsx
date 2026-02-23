@@ -30,7 +30,7 @@ export function ScheduleResults({
   timeFormat,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
-  const realtimeStatusMap = useTripRealtimeStatusMap(fromStation, toStation);
+  const { statusMap: realtimeStatusMap, canceledByStartTime } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
     filteredTrips.length > 0
@@ -42,6 +42,23 @@ export function ScheduleResults({
     : filteredTrips.slice(nextTripIndex >= 0 ? nextTripIndex : 0);
 
   if (!direction) return null;
+
+  /**
+   * Two-level realtime status lookup:
+   * 1. Primary: match by fromStation scheduled departure time (normal case).
+   * 2. Secondary: for CANCELED trips where the RT feed omitted stop_time_updates,
+   *    scan trip.times for any time matching a canceledByStartTime key (origin time).
+   */
+  const getRealtimeStatus = (trip: { departureTime: string; times: string[] }) => {
+    const primary = realtimeStatusMap.get(trip.departureTime);
+    if (primary) return primary;
+    if (canceledByStartTime.size === 0) return undefined;
+    for (const t of trip.times) {
+      const secondary = canceledByStartTime.get(t);
+      if (secondary) return secondary;
+    }
+    return undefined;
+  };
 
   return (
     <SectionCard>
@@ -62,11 +79,21 @@ export function ScheduleResults({
         >
           {displayedTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
-            // Find the next trip using the same time logic as isPastTrip
+            const realtimeStatus = getRealtimeStatus(trip);
+            const isTripCanceled = realtimeStatus?.isCanceled ?? false;
+            const isTripSkipped = realtimeStatus?.isOriginSkipped ?? false;
+            // Skip canceled/skipped trips when finding the next available train
             const isNextTrip =
               !isPastTrip &&
+              !isTripCanceled &&
+              !isTripSkipped &&
               displayedTrips.slice(0, index).every((prevTrip) => {
-                return isTimeInPast(currentTime, prevTrip.departureTime);
+                const prevStatus = getRealtimeStatus(prevTrip);
+                return (
+                  isTimeInPast(currentTime, prevTrip.departureTime) ||
+                  (prevStatus?.isCanceled ?? false) ||
+                  (prevStatus?.isOriginSkipped ?? false)
+                );
               });
             const showFerry =
               trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
@@ -80,7 +107,7 @@ export function ScheduleResults({
                 showAllTrips={showAllTrips}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
-                realtimeStatus={realtimeStatusMap.get(trip.departureTime)}
+                realtimeStatus={realtimeStatus}
               />
             );
           })}

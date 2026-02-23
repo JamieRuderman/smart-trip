@@ -12,6 +12,7 @@ import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
+const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
 
 async function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   const res = await fetch(`${apiBaseUrl}/api/gtfsrt/tripupdates`);
@@ -61,7 +62,9 @@ function deriveStatus(
    * When provided this is used as the map key and to compute real delay,
    * since 511 always sends departureDelay: 0 and only shifts departure.time.
    */
-  scheduledDepartureParam: string | null
+  scheduledDepartureParam: string | null,
+  /** Scheduled arrival at toStation from the static timetable ("HH:MM"). */
+  scheduledArrivalParam: string | null
 ): { scheduledDeparture: string | null; isStartTimeFallback?: boolean; status: TripRealtimeStatus } {
   if (update.scheduleRelationship === "CANCELED") {
     // Prefer the static scheduled departure as the key so the canceled badge
@@ -149,15 +152,23 @@ function deriveStatus(
     scheduledDepartureParam ??
     unixToTimeString(fromUpdate.departureTime - (fromUpdate.departureDelay ?? 0));
 
-  // Show any positive delay in seconds (no minimum threshold)
-  const delayMinutes = delaySeconds > 0 ? Math.round(delaySeconds / 60) : undefined;
+  const isDelayed = delaySeconds >= MIN_DELAY_SECONDS;
+  const delayMinutes = isDelayed ? Math.round(delaySeconds / 60) : undefined;
 
   // Live arrival time at destination: 511 also shifts arrivalTime forward when delayed,
   // but arrivalDelay is always 0 (same issue as departureDelay). Show the live arrival
   // time whenever the train is running late on departure.
   let liveArrivalTime: string | undefined;
-  if (toUpdate?.arrivalTime && delaySeconds > 0) {
+  let arrivalDelayMinutes: number | undefined;
+  if (toUpdate?.arrivalTime && isDelayed) {
     liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+    if (scheduledArrivalParam && update.startDate) {
+      const scheduledArrivalUnix = scheduledHHMMtoUnix(update.startDate, scheduledArrivalParam);
+      const arrivalDelaySeconds = toUpdate.arrivalTime - scheduledArrivalUnix;
+      if (arrivalDelaySeconds >= MIN_DELAY_SECONDS) {
+        arrivalDelayMinutes = Math.round(arrivalDelaySeconds / 60);
+      }
+    }
   }
 
   return {
@@ -167,6 +178,7 @@ function deriveStatus(
       liveDepartureTime: delayMinutes != null ? liveDepartureTime : undefined,
       liveArrivalTime,
       delayMinutes,
+      arrivalDelayMinutes,
       isOriginSkipped,
       isDestinationSkipped,
     },
@@ -219,15 +231,15 @@ export function useTripRealtimeStatusMap(
     const isSouthbound = fromIdx < toIdx;
 
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
-    // departure at fromStation ("HH:MM"). Southbound trips originate at the northernmost
-    // station (times[0]); northbound trips originate at the southernmost (times[last]).
-    const scheduledByOrigin = new Map<string, string>();
+    // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
+    // originate at the northernmost station (times[0]); northbound at the southernmost (times[last]).
+    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string }>();
     for (const trip of trips) {
       const originTime = isSouthbound
         ? trip.times[0]
         : trip.times[trip.times.length - 1];
       if (originTime) {
-        scheduledByOrigin.set(originTime, trip.departureTime);
+        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime });
       }
     }
 
@@ -237,15 +249,16 @@ export function useTripRealtimeStatusMap(
     for (const update of data.updates) {
       // Match this RT update to a static trip via its scheduled origin startTime.
       const originHHMM = update.startTime?.slice(0, 5) ?? null;
-      const scheduledDepartureParam = originHHMM
-        ? (scheduledByOrigin.get(originHHMM) ?? null)
-        : null;
+      const staticTrip = originHHMM ? (scheduledByOrigin.get(originHHMM) ?? null) : null;
+      const scheduledDepartureParam = staticTrip?.departureTime ?? null;
+      const scheduledArrivalParam = staticTrip?.arrivalTime ?? null;
 
       const { scheduledDeparture, isStartTimeFallback, status } = deriveStatus(
         update,
         fromStation,
         toStation,
-        scheduledDepartureParam
+        scheduledDepartureParam,
+        scheduledArrivalParam
       );
       if (scheduledDeparture) {
         if (isStartTimeFallback) {

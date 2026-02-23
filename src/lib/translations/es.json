@@ -31,8 +31,10 @@
   },
   "serviceAlert": {
     "sectionTitle": "Alertas de servicio",
-    "serviceAlert": "Show service alerts",
-    "hideServiceAlert": "Ocultar alerta de servicio",
+    "serviceAlert_one": "Mostrar alerta de servicio",
+    "serviceAlert_other": "Mostrar alertas de servicio",
+    "hideServiceAlert_one": "Ocultar alerta de servicio",
+    "hideServiceAlert_other": "Ocultar alertas de servicio",
     "issuedAt": "Emitido a las {{time}}"
   },
   "schedule": {

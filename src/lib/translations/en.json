@@ -31,8 +31,10 @@
   },
   "serviceAlert": {
     "sectionTitle": "Service Alerts",
-    "serviceAlert": "Show service alerts",
-    "hideServiceAlert": "Hide service alert",
+    "serviceAlert_one": "Show service alert",
+    "serviceAlert_other": "Show service alerts",
+    "hideServiceAlert_one": "Hide service alert",
+    "hideServiceAlert_other": "Hide service alerts",
     "issuedAt": "Issued at {{time}}"
   },
   "schedule": {

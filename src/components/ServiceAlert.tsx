@@ -53,8 +53,8 @@ export function ServiceAlert({
           onClick={onToggleServiceAlert}
         >
           {showServiceAlert
-            ? t("serviceAlert.hideServiceAlert")
-            : t("serviceAlert.serviceAlert")}
+            ? t("serviceAlert.hideServiceAlert", { count: activeAlerts.length })
+            : t("serviceAlert.serviceAlert", { count: activeAlerts.length })}
         </Button>
       </CardHeader>
 

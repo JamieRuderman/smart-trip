@@ -30,6 +30,7 @@
     "noTrainsFound": "No trains found for this route."
   },
   "serviceAlert": {
+    "sectionTitle": "Service Alerts",
     "serviceAlert": "Show service alerts",
     "hideServiceAlert": "Hide service alert",
     "issuedAt": "Issued at {{time}}"

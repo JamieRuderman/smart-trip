@@ -21,14 +21,14 @@ function humanize(text: string): string {
 
 /**
  * Keep alert copy predictable/safe:
- * - remove non-letter characters except periods and whitespace
+ * - trim non-alphanumeric characters only at the beginning/end
  * - collapse repeated whitespace
  * - trim outer whitespace
  */
 function sanitizeAlertText(text?: string): string | undefined {
   if (!text) return undefined;
   const sanitized = text
-    .replace(/[^a-zA-Z.\s]/g, "")
+    .replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
   return sanitized || undefined;

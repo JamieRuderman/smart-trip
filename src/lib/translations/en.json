@@ -31,7 +31,6 @@
   },
   "serviceAlert": {
     "sectionTitle": "Service Alerts",
-    "issuedAt": "Issued at {{time}}",
     "dismiss": "Dismiss alert",
     "dismissedNotice_one": "{{count}} dismissed service alert ·",
     "dismissedNotice_other": "{{count}} dismissed service alerts ·",

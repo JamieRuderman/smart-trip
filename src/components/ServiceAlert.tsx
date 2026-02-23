@@ -44,7 +44,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
   // All dismissed — show a subtle restore hint
   if (visibleAlerts.length === 0) {
     return (
-      <div className="flex items-center gap-1.5 px-1 py-0.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5 px-4 py-0.5 pt-4 md:pt-1 text-xs text-smart-gold max-w-4xl mx-auto w-full">
         <AlertTriangle className="h-3 w-3 shrink-0" />
         <span>
           {t("serviceAlert.dismissedNotice", { count: dismissedActiveCount })}{" "}

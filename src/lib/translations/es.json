@@ -31,7 +31,6 @@
   },
   "serviceAlert": {
     "sectionTitle": "Alertas de servicio",
-    "issuedAt": "Emitido a las {{time}}",
     "dismiss": "Descartar alerta",
     "dismissedNotice_one": "{{count}} alerta de servicio descartada ·",
     "dismissedNotice_other": "{{count}} alertas de servicio descartadas ·",

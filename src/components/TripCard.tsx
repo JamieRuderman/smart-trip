@@ -124,12 +124,12 @@ export const TripCard = memo(function TripCard({
             !isCanceledOrSkipped &&
             "cursor-pointer hover:bg-smart-train-green/5",
           isCanceledOrSkipped
-            ? "bg-destructive/5 border-destructive/30 focus:border-destructive/75 focus:shadow-[inset_0_0_0_2px_hsl(var(--destructive)/0.7)]"
+            ? "bg-destructive/5 border-destructive/30 focus:border-destructive/75 focus:shadow-[0_0_0_1px_hsl(var(--destructive)/0.75)]"
             : isDelayed
-            ? "bg-smart-gold/5 border-smart-gold/30 focus:border-smart-gold/80 focus:shadow-[inset_0_0_0_2px_hsl(var(--smart-gold)/0.75)]"
+            ? "bg-smart-gold/5 border-smart-gold/30 focus:border-smart-gold/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-gold)/0.8)]"
             : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:border-smart-train-green/80 focus:shadow-[inset_0_0_0_2px_hsl(var(--smart-train-green)/0.75)]"
-            : "bg-gradient-card border-border focus:border-foreground/45 focus:shadow-[inset_0_0_0_2px_hsl(var(--foreground)/0.35)]",
+            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:border-smart-train-green/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-train-green)/0.8)]"
+            : "bg-gradient-card border-border focus:border-foreground/45 focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
         )}
         role="listitem"
         aria-label={`Train ${

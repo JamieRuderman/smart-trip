@@ -277,10 +277,12 @@ This application is built with accessibility in mind:
 
 ## 🚧 Future Enhancements
 
-- [ ] Progressive Web App (PWA) capabilities
+- [ ] Auto-locate nearest station
+- [ ] Show time until next train
+- [ ] Show time needed to reach next train (walk/bike/drive/transit)
+- [ ] User preferences and favorite routes
 - [ ] Offline schedule caching
 - [ ] Push notifications for service alerts
-- [ ] User preferences and favorite routes
 
 ## 🤝 Contributing
 

@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
@@ -36,6 +36,7 @@ export const TripCard = memo(function TripCard({
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
+  const cardRef = useRef<HTMLDivElement>(null);
   // Use live departure/arrival times when available, otherwise fall back to static scheduled times
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
@@ -98,23 +99,37 @@ export const TripCard = memo(function TripCard({
     </>
   );
 
+  const handleCardClick = () => {
+    if (hasQuickConnection && !isCanceledOrSkipped) {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    requestAnimationFrame(() => {
+      cardRef.current?.focus({ preventScroll: true });
+    });
+  };
+
   return (
     <>
       <div
+        ref={cardRef}
         className={cn(
-          "flex items-center px-4 py-2 rounded-lg border transition-all",
+          "flex items-center px-4 py-2 rounded-lg border-2 transition-all",
           "touch-manipulation",
-          "focus:ring-[3px] focus:ring-inset focus:outline-none",
+          "focus:outline-none",
           hasQuickConnection &&
             !isCanceledOrSkipped &&
             "cursor-pointer hover:bg-smart-train-green/5",
           isCanceledOrSkipped
-            ? "bg-destructive/5 border-destructive/30 focus:ring-destructive/50"
+            ? "bg-destructive/5 border-destructive/30 focus:border-destructive/75 focus:shadow-[inset_0_0_0_2px_hsl(var(--destructive)/0.7)]"
             : isDelayed
-            ? "bg-smart-gold/5 border-smart-gold/30 focus:ring-smart-gold/60"
+            ? "bg-smart-gold/5 border-smart-gold/30 focus:border-smart-gold/80 focus:shadow-[inset_0_0_0_2px_hsl(var(--smart-gold)/0.75)]"
             : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:ring-smart-train-green/60"
-            : "bg-gradient-card focus:ring-black/20",
+            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:border-smart-train-green/80 focus:shadow-[inset_0_0_0_2px_hsl(var(--smart-train-green)/0.75)]"
+            : "bg-gradient-card border-border focus:border-foreground/45 focus:shadow-[inset_0_0_0_2px_hsl(var(--foreground)/0.35)]",
         )}
         role="listitem"
         aria-label={`Train ${
@@ -127,11 +142,7 @@ export const TripCard = memo(function TripCard({
           hasQuickConnection ? ` - ${t("tripCard.tapForTransferWarning")}` : ""
         }`}
         tabIndex={0}
-        onClick={
-          hasQuickConnection && !isCanceledOrSkipped
-            ? () => setIsModalOpen(true)
-            : undefined
-        }
+        onClick={handleCardClick}
       >
         <TrainBadge
           tripNumber={trip.trip}
@@ -306,7 +317,7 @@ export const TripCard = memo(function TripCard({
       {hasQuickConnection && !isCanceledOrSkipped && (
         <QuickConnectionModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={handleModalClose}
           isInbound={hasInboundQuickConnection}
         />
       )}

@@ -77,6 +77,11 @@ h2 {
   font-size: 1.1rem;
 }
 
+h3 {
+  margin: 18px 0 6px;
+  font-size: 1rem;
+}
+
 p,
 li {
   color: var(--muted);
@@ -92,4 +97,10 @@ a {
   padding-top: 14px;
   border-top: 1px solid var(--line);
   font-size: 0.95rem;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
 }

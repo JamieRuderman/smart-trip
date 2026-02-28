@@ -62,7 +62,10 @@
     "alertSignupText": "Recibe alertas de servicio enviando un mensaje de texto con la palabra",
     "alertSignupTo": "al",
     "alertSignupOr": "o",
-    "alertSignupLink": "regístrate en línea"
+    "alertSignupLink": "regístrate en línea",
+    "linksIntro": "Ayuda y legal:",
+    "supportLink": "Soporte",
+    "privacyHostedLink": "Política de privacidad"
   },
   "notifications": {
     "title": "Alertas de Servicio",

@@ -62,7 +62,10 @@
     "alertSignupText": "Receive service alerts by texting",
     "alertSignupTo": "to",
     "alertSignupOr": "or",
-    "alertSignupLink": "sign up online"
+    "alertSignupLink": "sign up online",
+    "linksIntro": "Help and legal:",
+    "supportLink": "Support",
+    "privacyHostedLink": "Privacy Policy"
   },
   "notifications": {
     "title": "Service Alerts",

@@ -301,6 +301,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Contact
 
 For questions, suggestions, or support:
+- App support page: `https://<your-deployed-domain>/support.html`
+- Support email: [smart-train@proton.me](mailto:smart-train@proton.me)
 - Visit [SMART Train Official Website](https://sonomamarintrain.org/)
 - Follow SMART on social media for service updates
 

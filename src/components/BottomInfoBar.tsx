@@ -47,6 +47,26 @@ export function BottomInfoBar() {
           </a>
           . {t("bottomInfo.communityProject")}
         </p>
+        <p className="ml-6 mt-2 text-xs">
+          {t("bottomInfo.linksIntro")}{" "}
+          <a
+            href="/support.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            {t("bottomInfo.supportLink")}
+          </a>{" "}
+          ·{" "}
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            {t("bottomInfo.privacyHostedLink")}
+          </a>
+        </p>
       </div>
     </div>
   );

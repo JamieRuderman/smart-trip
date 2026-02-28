@@ -3,6 +3,7 @@ import type { Station } from "@/types/smartSchedule";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
 import { useUserPreferences } from "./useUserPreferences";
 import { isWeekend, createMinuteInterval } from "@/lib/utils";
+import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 
 export interface TrainScheduleState {
   fromStation: Station | "";
@@ -14,6 +15,7 @@ export interface TrainScheduleState {
 
 export function useTrainScheduleState(scheduleDataVersion?: string) {
   const { preferences, isLoaded, updateLastSelected } = useUserPreferences();
+  const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
 
   // Initialize state
   const [state, setState] = useState<TrainScheduleState>({
@@ -21,7 +23,7 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     toStation: "",
     scheduleType: isWeekend() ? "weekend" : "weekday",
     showAllTrips: false,
-    currentTime: new Date(),
+    currentTime: debugCurrentTime ?? new Date(),
   });
 
   // Initialize state from user preferences once loaded
@@ -37,10 +39,11 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
 
   // Update current time every minute
   useEffect(() => {
+    if (debugCurrentTime) return;
     return createMinuteInterval(() => {
       setState((prev) => ({ ...prev, currentTime: new Date() }));
     });
-  }, []);
+  }, [debugCurrentTime]);
 
   // Derived values
 

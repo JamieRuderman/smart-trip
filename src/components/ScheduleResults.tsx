@@ -80,21 +80,13 @@ export function ScheduleResults({
           {displayedTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
             const realtimeStatus = getRealtimeStatus(trip);
-            const isTripCanceled = realtimeStatus?.isCanceled ?? false;
-            const isTripSkipped = realtimeStatus?.isOriginSkipped ?? false;
-            // Skip canceled/skipped trips when finding the next available train
             const isNextTrip =
               !isPastTrip &&
-              !isTripCanceled &&
-              !isTripSkipped &&
-              displayedTrips.slice(0, index).every((prevTrip) => {
-                const prevStatus = getRealtimeStatus(prevTrip);
-                return (
-                  isTimeInPast(currentTime, prevTrip.departureTime) ||
-                  (prevStatus?.isCanceled ?? false) ||
-                  (prevStatus?.isOriginSkipped ?? false)
+              displayedTrips
+                .slice(0, index)
+                .every((prevTrip) =>
+                  isTimeInPast(currentTime, prevTrip.departureTime)
                 );
-              });
             const showFerry =
               trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 

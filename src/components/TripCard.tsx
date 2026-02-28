@@ -44,25 +44,29 @@ export const TripCard = memo(function TripCard({
     showFerry &&
     trip.outboundFerry &&
     isQuickConnection(
-      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart)
+      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
     );
 
   const hasInboundQuickConnection =
     trip.inboundFerry &&
     trip.fromStation === FERRY_CONSTANTS.FERRY_STATION &&
     isQuickConnection(
-      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime)
+      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
 
   const hasQuickConnection =
     hasOutboundQuickConnection || hasInboundQuickConnection;
 
-  const isDelayed = !isCanceled && !isOriginSkipped && realtimeStatus?.delayMinutes != null;
+  const isDelayed =
+    !isCanceled && !isOriginSkipped && realtimeStatus?.delayMinutes != null;
+  const nextPillColor =
+    isCanceled || isOriginSkipped || isDelayed ? "neutral" : "green";
   const delayDisplay =
     realtimeStatus?.delayMinutes === 0
       ? "<1"
       : String(realtimeStatus?.delayMinutes ?? "");
-  const arrivalDelayMinutes = realtimeStatus?.arrivalDelayMinutes ?? realtimeStatus?.delayMinutes;
+  const arrivalDelayMinutes =
+    realtimeStatus?.arrivalDelayMinutes ?? realtimeStatus?.delayMinutes;
   const arrivalDelayDisplay =
     arrivalDelayMinutes === 0 ? "<1" : String(arrivalDelayMinutes ?? "");
 
@@ -103,12 +107,12 @@ export const TripCard = memo(function TripCard({
           hasQuickConnection &&
             !isCanceled &&
             "cursor-pointer hover:bg-smart-train-green/5",
-          isCanceled
+          isCanceled || isOriginSkipped
             ? "bg-destructive/5 border-destructive/30 focus:ring-destructive/50"
-            : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:ring-smart-train-green/60"
             : isDelayed
             ? "bg-smart-gold/5 border-smart-gold/30 focus:ring-smart-gold/60"
+            : isNextTrip
+            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:ring-smart-train-green/60"
             : "bg-gradient-card focus:ring-black/20",
         )}
         role="listitem"
@@ -117,7 +121,7 @@ export const TripCard = memo(function TripCard({
         }, departs ${departureTime}, arrives ${arrivalTime}${
           isCanceled ? ` - ${t("tripCard.canceled")}` : ""
         }${isOriginSkipped ? ` - ${t("tripCard.stopSkipped")}` : ""}${
-          isNextTrip && !isCanceled ? ` - ${t("tripCard.nextTrain")}` : ""
+          isNextTrip ? ` - ${t("tripCard.nextTrain")}` : ""
         }${isPastTrip ? ` - ${t("tripCard.departed")}` : ""}${
           hasQuickConnection ? ` - ${t("tripCard.tapForTransferWarning")}` : ""
         }`}
@@ -226,31 +230,53 @@ export const TripCard = memo(function TripCard({
           </div>
         ) : (
           <div className="flex flex-col md:flex-row items-center gap-4 w-full">
-            <div className="flex flex-row gap-2 text-md">
-              <TimeDisplay
-                time={departureTime}
-                isNextTrip={isNextTrip && !isCanceled}
-                format={timeFormat}
-                className={cn(
-                  "text-right min-w-20",
-                  isCanceled && "line-through text-destructive",
-                  realtimeStatus?.liveDepartureTime != null &&
-                    "text-smart-gold",
+            <div className="flex flex-row gap-2 text-md items-start">
+              <div className="flex flex-col min-w-20 items-end">
+                <TimeDisplay
+                  time={departureTime}
+                  isNextTrip={isNextTrip && !isCanceled}
+                  format={timeFormat}
+                  className={cn(
+                    "text-right min-w-20",
+                    isCanceled && "line-through text-destructive",
+                    realtimeStatus?.liveDepartureTime != null &&
+                      "text-smart-gold",
+                  )}
+                />
+                {isDelayed && (
+                  <TimeDisplay
+                    time={trip.departureTime}
+                    format={timeFormat}
+                    className="text-xs line-through text-muted-foreground"
+                  />
                 )}
-              />
+              </div>
               <span className="text-muted-foreground">→</span>
-              <TimeDisplay
-                time={arrivalTime}
-                isNextTrip={isNextTrip && !isCanceled}
-                format={timeFormat}
-                className={cn(
-                  isCanceled && "line-through text-destructive",
-                  realtimeStatus?.liveArrivalTime != null && "text-smart-gold",
+              <div className="flex flex-col">
+                <TimeDisplay
+                  time={arrivalTime}
+                  isNextTrip={isNextTrip && !isCanceled}
+                  format={timeFormat}
+                  className={cn(
+                    isCanceled && "line-through text-destructive",
+                    realtimeStatus?.liveArrivalTime != null &&
+                      "text-smart-gold",
+                  )}
+                />
+                {isDelayed && realtimeStatus?.liveArrivalTime != null && (
+                  <TimeDisplay
+                    time={trip.arrivalTime}
+                    format={timeFormat}
+                    className="text-xs line-through text-muted-foreground"
+                  />
                 )}
-              />
+              </div>
             </div>
-            {isNextTrip && !isCanceled && (
-              <PillBadge label={t("tripCard.nextTrain")} color="green" />
+            {isNextTrip && (
+              <PillBadge
+                label={t("tripCard.nextTrain")}
+                color={nextPillColor}
+              />
             )}
             {realtimeBadges}
             {showFerry && trip.outboundFerry && (

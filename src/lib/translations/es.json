@@ -110,6 +110,7 @@
   },
   "tripCard": {
     "nextTrain": "Próximo tren",
+    "onTime": "A tiempo",
     "departed": "Salido",
     "tapForTransferWarning": "Toca para advertencia",
     "canceled": "Cancelado",

@@ -61,8 +61,6 @@ export const TripCard = memo(function TripCard({
 
   const isDelayed =
     !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
-  const nextPillColor =
-    isCanceledOrSkipped || isDelayed ? "neutral" : "green";
   const delayDisplay =
     realtimeStatus?.delayMinutes === 0
       ? "<1"
@@ -288,10 +286,10 @@ export const TripCard = memo(function TripCard({
               </div>
             </div>
             {realtimeBadges}
-            {isNextTrip && (
+            {isNextTrip && !isCanceledOrSkipped && !isDelayed && (
               <PillBadge
-                label={t("tripCard.nextTrain")}
-                color={nextPillColor}
+                label={t("tripCard.onTime")}
+                color="green"
               />
             )}
             {showFerry && trip.outboundFerry && (

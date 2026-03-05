@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { Capacitor } from "@capacitor/core";
 import NativeUiManager from "@/components/NativeUiManager";
+import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
+import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -21,6 +23,11 @@ const queryClient = new QueryClient({
 
 const App = () => {
   const isNative = Capacitor.isNativePlatform();
+
+  useAppForegroundRefresh(async () => {
+    emitAppRefreshEvent();
+    await queryClient.refetchQueries({ type: "active" });
+  });
 
   return (
     <ErrorBoundary>

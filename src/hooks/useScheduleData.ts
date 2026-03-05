@@ -38,12 +38,12 @@ export function useScheduleData(): { version: string } {
   const mountedRef = useRef(true);
   const inFlightRefreshRef = useRef<Promise<void> | null>(null);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
-    },
-    []
-  );
+    };
+  }, []);
 
   const refreshSchedulePayload = useCallback((): Promise<void> => {
     if (inFlightRefreshRef.current) {

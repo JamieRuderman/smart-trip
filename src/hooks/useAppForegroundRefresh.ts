@@ -16,22 +16,35 @@ export function useAppForegroundRefresh(
   { minIntervalMs = 5000 }: UseAppForegroundRefreshOptions = {}
 ) {
   const onRefreshRef = useRef(onRefresh);
-  const lastRefreshAtRef = useRef(0);
+  const lastSuccessfulRefreshAtRef = useRef(0);
+  const inFlightRefreshRef = useRef<Promise<void> | null>(null);
 
   onRefreshRef.current = onRefresh;
 
   useEffect(() => {
     const triggerRefresh = (reason: string) => {
-      const now = Date.now();
-      if (now - lastRefreshAtRef.current < minIntervalMs) {
+      if (inFlightRefreshRef.current) {
         return;
       }
 
-      lastRefreshAtRef.current = now;
+      const now = Date.now();
+      if (now - lastSuccessfulRefreshAtRef.current < minIntervalMs) {
+        return;
+      }
 
-      Promise.resolve(onRefreshRef.current()).catch((error) => {
-        logger.warn(`Foreground refresh failed (${reason})`, error);
-      });
+      const refreshPromise = Promise.resolve(onRefreshRef.current())
+        .then(() => {
+          // Throttle only after a successful refresh so failed attempts can retry promptly.
+          lastSuccessfulRefreshAtRef.current = Date.now();
+        })
+        .catch((error) => {
+          logger.warn(`Foreground refresh failed (${reason})`, error);
+        })
+        .finally(() => {
+          inFlightRefreshRef.current = null;
+        });
+
+      inFlightRefreshRef.current = refreshPromise;
     };
 
     const onFocus = () => triggerRefresh("window-focus");

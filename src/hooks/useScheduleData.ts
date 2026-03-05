@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bundledSchedulePayload,
   isSchedulePayload,
   type SchedulePayload,
 } from "@/data/scheduleData";
 import { scheduleUrl } from "@/lib/env";
+import { APP_REFRESH_EVENT } from "@/lib/refreshEvents";
 import { setScheduleData } from "@/lib/scheduleUtils";
 
 const STORAGE_KEY = "smart-schedule-payload";
@@ -34,6 +35,39 @@ export function useScheduleData(): { version: string } {
   const [version, setVersion] = useState(
     bundledSchedulePayload.generatedAt ?? "bundled"
   );
+  const mountedRef = useRef(true);
+  const inFlightRefreshRef = useRef<Promise<void> | null>(null);
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
+
+  const refreshSchedulePayload = useCallback((): Promise<void> => {
+    if (inFlightRefreshRef.current) {
+      return inFlightRefreshRef.current;
+    }
+
+    const refreshPromise = fetch(scheduleUrl, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!mountedRef.current || !data || !isSchedulePayload(data)) return;
+        setScheduleData(data);
+        setVersion(data.generatedAt ?? "remote");
+        storeCachedPayload(data);
+      })
+      .catch(() => {
+        // Ignore network errors and keep bundled or cached data.
+      })
+      .finally(() => {
+        inFlightRefreshRef.current = null;
+      });
+
+    inFlightRefreshRef.current = refreshPromise;
+    return refreshPromise;
+  }, []);
 
   useEffect(() => {
     const cached = loadCachedPayload();
@@ -42,24 +76,19 @@ export function useScheduleData(): { version: string } {
       setVersion(cached.generatedAt ?? "cached");
     }
 
-    let cancelled = false;
+    void refreshSchedulePayload();
+  }, [refreshSchedulePayload]);
 
-    fetch(scheduleUrl, { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (cancelled || !data || !isSchedulePayload(data)) return;
-        setScheduleData(data);
-        setVersion(data.generatedAt ?? "remote");
-        storeCachedPayload(data);
-      })
-      .catch(() => {
-        // Ignore network errors and keep bundled or cached data.
-      });
-
-    return () => {
-      cancelled = true;
+  useEffect(() => {
+    const onAppRefresh = () => {
+      void refreshSchedulePayload();
     };
-  }, []);
+
+    window.addEventListener(APP_REFRESH_EVENT, onAppRefresh);
+    return () => {
+      window.removeEventListener(APP_REFRESH_EVENT, onAppRefresh);
+    };
+  }, [refreshSchedulePayload]);
 
   return { version };
 }

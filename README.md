@@ -61,7 +61,7 @@ npm install
 1. Start the development server alongside the Vercel API routes:
 
    ```bash
-   npm run dev:vercel
+   npm run dev-vercel
    ```
 
    Or, for static-only development without real-time data:
@@ -155,12 +155,12 @@ To use them during development, add to `.env.local`:
 USE_SAMPLE_DATA=true
 ```
 
-When this flag is set, `npm run dev` intercepts `/api/gtfsrt/*` requests directly in the Vite dev server (no Vercel CLI needed) and returns the local JSON files. Remove the flag (or set it to `false`) to proxy API calls to a local `vercel dev` instance hitting the live 511 API.
+When this flag is set, `npm run dev` intercepts `/api/gtfsrt/*` requests directly in the Vite dev server (no Vercel CLI needed) and returns the local JSON files. Remove the flag (or set it to `false`) to proxy API calls to a local `vercel dev` instance (default proxy target: `http://localhost:3000`).
 
 ### Available Scripts
 
-- `npm run dev` - Start Vite development server (static schedule only, no real-time)
-- `npm run dev:vercel` - Start Vercel dev server with real-time API routes on port 3210
+- `npm run dev` - Start Vite dev server on port 3210 (real-time works only with `USE_SAMPLE_DATA=true` or a local API proxy target running)
+- `npm run dev-vercel` - Start Vercel dev server with real-time API routes on port 3210
 - `npm run build` - Build for production web (includes generating `public/data/schedules.json`)
 - `npm run build:native` - Build for native iOS/Android (bakes in `VITE_API_BASE_URL` from `.env.native`)
 - `npm run update-build` - Refresh from 511.org, then build
@@ -230,7 +230,7 @@ For faster development iteration with live reload on device/simulator:
 
 1. Start the dev server:
    ```bash
-   npm run dev
+   npm run dev-vercel
    ```
 
 2. In another terminal, sync with live reload:
@@ -240,7 +240,9 @@ For faster development iteration with live reload on device/simulator:
 
 3. Open and run from Xcode or Android Studio. Changes to the web code will appear instantly.
 
-**Note**: `sync-live` auto-detects your Mac's WiFi IP address. Your device/simulator must be on the same network.
+**Notes**:
+- `sync-live` auto-detects your Mac's WiFi IP address. Your device/simulator must be on the same network.
+- If you use `npm run dev` instead of `npm run dev-vercel`, real-time endpoints will only work when `USE_SAMPLE_DATA=true` or when a local API target is running at `http://localhost:3000`.
 
 ### Generating App Icons and Splash Screens
 

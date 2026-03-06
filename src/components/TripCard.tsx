@@ -68,10 +68,6 @@ export const TripCard = memo(function TripCard({
     realtimeStatus?.delayMinutes === 0
       ? "<1"
       : String(realtimeStatus?.delayMinutes ?? "");
-  const arrivalDelayMinutes =
-    realtimeStatus?.arrivalDelayMinutes ?? realtimeStatus?.delayMinutes;
-  const arrivalDelayDisplay =
-    arrivalDelayMinutes === 0 ? "<1" : String(arrivalDelayMinutes ?? "");
 
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
@@ -149,13 +145,12 @@ export const TripCard = memo(function TripCard({
                   className={getTimeToneClass(hasLiveDepartureTime)}
                 />
                 {isDelayed && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="text-xs line-through text-muted-foreground">
                     <TimeDisplay
                       time={trip.departureTime}
                       format={timeFormat}
                       className="text-xs"
                     />
-                    <span>+{delayDisplay} min</span>
                   </div>
                 )}
               </div>
@@ -167,13 +162,12 @@ export const TripCard = memo(function TripCard({
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
                 {isDelayed && realtimeStatus?.liveArrivalTime != null && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="text-xs line-through text-muted-foreground">
                     <TimeDisplay
                       time={trip.arrivalTime}
                       format={timeFormat}
                       className="text-xs"
                     />
-                    <span>+{arrivalDelayDisplay} min</span>
                   </div>
                 )}
               </div>

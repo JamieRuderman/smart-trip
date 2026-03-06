@@ -162,6 +162,8 @@ export const TripCard = memo(function TripCard({
                     isCanceled
                       || isOriginSkipped
                       ? "line-through text-destructive"
+                      : isDelayed
+                      ? "text-smart-gold"
                       : realtimeStatus?.liveDepartureTime != null
                       ? "text-smart-gold"
                       : isNextTrip && "text-smart-train-green",
@@ -187,6 +189,8 @@ export const TripCard = memo(function TripCard({
                     isCanceled
                       || isOriginSkipped
                       ? "line-through text-destructive"
+                      : isDelayed
+                      ? "text-smart-gold"
                       : realtimeStatus?.liveArrivalTime != null
                       ? "text-smart-gold"
                       : isNextTrip && "text-smart-train-green",
@@ -247,11 +251,12 @@ export const TripCard = memo(function TripCard({
               <div className="flex flex-col min-w-20 items-end">
                 <TimeDisplay
                   time={departureTime}
-                  isNextTrip={isNextTrip && !isCanceledOrSkipped}
+                  isNextTrip={isNextTrip && !isCanceledOrSkipped && !isDelayed}
                   format={timeFormat}
                   className={cn(
                     "text-right min-w-20",
                     isCanceledOrSkipped && "line-through text-destructive",
+                    isDelayed && "text-smart-gold",
                     realtimeStatus?.liveDepartureTime != null &&
                       "text-smart-gold",
                   )}
@@ -268,10 +273,11 @@ export const TripCard = memo(function TripCard({
               <div className="flex flex-col">
                 <TimeDisplay
                   time={arrivalTime}
-                  isNextTrip={isNextTrip && !isCanceledOrSkipped}
+                  isNextTrip={isNextTrip && !isCanceledOrSkipped && !isDelayed}
                   format={timeFormat}
                   className={cn(
                     isCanceledOrSkipped && "line-through text-destructive",
+                    isDelayed && "text-smart-gold",
                     realtimeStatus?.liveArrivalTime != null &&
                       "text-smart-gold",
                   )}

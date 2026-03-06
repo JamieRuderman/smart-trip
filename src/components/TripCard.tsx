@@ -6,7 +6,7 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { TimeDisplay } from "./TimeDisplay";
 import { TrainBadge } from "./TrainBadge";
-import { PillBadge } from "./PillBadge";
+import { TripStatusPills } from "./TripStatusPills";
 import { FerryConnection } from "./FerryConnection";
 import { QuickConnectionModal } from "./QuickConnectionModal";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -61,6 +61,9 @@ export const TripCard = memo(function TripCard({
 
   const isDelayed =
     !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
+  const showOnTimeBadge = isNextTrip && !isCanceledOrSkipped && !isDelayed;
+  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
+  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
   const delayDisplay =
     realtimeStatus?.delayMinutes === 0
       ? "<1"
@@ -70,32 +73,14 @@ export const TripCard = memo(function TripCard({
   const arrivalDelayDisplay =
     arrivalDelayMinutes === 0 ? "<1" : String(arrivalDelayMinutes ?? "");
 
-  const realtimeBadges = (
-    <>
-      {isCanceled && (
-        <PillBadge
-          label={t("tripCard.canceled")}
-          color="gold"
-          className="bg-destructive"
-        />
-      )}
-      {isOriginSkipped && !isCanceled && (
-        <PillBadge
-          label={t("tripCard.stopSkipped")}
-          color="gold"
-          className="bg-destructive"
-        />
-      )}
-      {!isCanceled &&
-        !isOriginSkipped &&
-        realtimeStatus?.delayMinutes != null && (
-          <PillBadge
-            label={t("tripCard.delayed", { minutes: delayDisplay })}
-            color="gold"
-          />
-        )}
-    </>
-  );
+  const getTimeToneClass = (hasLiveTime: boolean) =>
+    isCanceledOrSkipped
+      ? "line-through text-destructive"
+      : isDelayed || hasLiveTime
+      ? "text-smart-gold"
+      : isNextTrip
+      ? "text-smart-train-green"
+      : undefined;
 
   const handleCardClick = () => {
     if (hasQuickConnection && !isCanceledOrSkipped) {
@@ -109,6 +94,17 @@ export const TripCard = memo(function TripCard({
       cardRef.current?.focus({ preventScroll: true });
     });
   };
+
+  const ariaParts = [
+    `Train ${trip.trip}`,
+    `departs ${departureTime}`,
+    `arrives ${arrivalTime}`,
+    isCanceled ? t("tripCard.canceled") : null,
+    isOriginSkipped ? t("tripCard.stopSkipped") : null,
+    isNextTrip ? t("tripCard.nextTrain") : null,
+    isPastTrip ? t("tripCard.departed") : null,
+    hasQuickConnection ? t("tripCard.tapForTransferWarning") : null,
+  ].filter(Boolean);
 
   return (
     <>
@@ -130,15 +126,7 @@ export const TripCard = memo(function TripCard({
             : "bg-gradient-card border-border focus:border-foreground/45 focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
         )}
         role="listitem"
-        aria-label={`Train ${
-          trip.trip
-        }, departs ${departureTime}, arrives ${arrivalTime}${
-          isCanceled ? ` - ${t("tripCard.canceled")}` : ""
-        }${isOriginSkipped ? ` - ${t("tripCard.stopSkipped")}` : ""}${
-          isNextTrip ? ` - ${t("tripCard.nextTrain")}` : ""
-        }${isPastTrip ? ` - ${t("tripCard.departed")}` : ""}${
-          hasQuickConnection ? ` - ${t("tripCard.tapForTransferWarning")}` : ""
-        }`}
+        aria-label={ariaParts.join(", ")}
         tabIndex={0}
         onClick={handleCardClick}
       >
@@ -158,16 +146,7 @@ export const TripCard = memo(function TripCard({
                 <TimeDisplay
                   time={departureTime}
                   format={timeFormat}
-                  className={cn(
-                    isCanceled
-                      || isOriginSkipped
-                      ? "line-through text-destructive"
-                      : isDelayed
-                      ? "text-smart-gold"
-                      : realtimeStatus?.liveDepartureTime != null
-                      ? "text-smart-gold"
-                      : isNextTrip && "text-smart-train-green",
-                  )}
+                  className={getTimeToneClass(hasLiveDepartureTime)}
                 />
                 {isDelayed && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -185,16 +164,7 @@ export const TripCard = memo(function TripCard({
                 <TimeDisplay
                   time={arrivalTime}
                   format={timeFormat}
-                  className={cn(
-                    isCanceled
-                      || isOriginSkipped
-                      ? "line-through text-destructive"
-                      : isDelayed
-                      ? "text-smart-gold"
-                      : realtimeStatus?.liveArrivalTime != null
-                      ? "text-smart-gold"
-                      : isNextTrip && "text-smart-train-green",
-                  )}
+                  className={getTimeToneClass(hasLiveArrivalTime)}
                 />
                 {isDelayed && realtimeStatus?.liveArrivalTime != null && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -208,24 +178,15 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            {(isCanceled || isOriginSkipped) && (
-              <div className="flex gap-1 mt-0.5">
-                {isCanceled && (
-                  <PillBadge
-                    label={t("tripCard.canceled")}
-                    color="gold"
-                    className="bg-destructive"
-                  />
-                )}
-                {isOriginSkipped && !isCanceled && (
-                  <PillBadge
-                    label={t("tripCard.stopSkipped")}
-                    color="gold"
-                    className="bg-destructive"
-                  />
-                )}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              <TripStatusPills
+                isCanceled={isCanceled}
+                isOriginSkipped={isOriginSkipped}
+                isDelayed={isDelayed}
+                showOnTimeBadge={showOnTimeBadge}
+                delayDisplay={delayDisplay}
+              />
+            </div>
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}
@@ -251,14 +212,11 @@ export const TripCard = memo(function TripCard({
               <div className="flex flex-col min-w-20 items-end">
                 <TimeDisplay
                   time={departureTime}
-                  isNextTrip={isNextTrip && !isCanceledOrSkipped && !isDelayed}
+                  isNextTrip={false}
                   format={timeFormat}
                   className={cn(
                     "text-right min-w-20",
-                    isCanceledOrSkipped && "line-through text-destructive",
-                    isDelayed && "text-smart-gold",
-                    realtimeStatus?.liveDepartureTime != null &&
-                      "text-smart-gold",
+                    getTimeToneClass(hasLiveDepartureTime),
                   )}
                 />
                 {isDelayed && (
@@ -273,14 +231,9 @@ export const TripCard = memo(function TripCard({
               <div className="flex flex-col">
                 <TimeDisplay
                   time={arrivalTime}
-                  isNextTrip={isNextTrip && !isCanceledOrSkipped && !isDelayed}
+                  isNextTrip={false}
                   format={timeFormat}
-                  className={cn(
-                    isCanceledOrSkipped && "line-through text-destructive",
-                    isDelayed && "text-smart-gold",
-                    realtimeStatus?.liveArrivalTime != null &&
-                      "text-smart-gold",
-                  )}
+                  className={getTimeToneClass(hasLiveArrivalTime)}
                 />
                 {isDelayed && realtimeStatus?.liveArrivalTime != null && (
                   <TimeDisplay
@@ -291,13 +244,13 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            {realtimeBadges}
-            {isNextTrip && !isCanceledOrSkipped && !isDelayed && (
-              <PillBadge
-                label={t("tripCard.onTime")}
-                color="green"
-              />
-            )}
+            <TripStatusPills
+              isCanceled={isCanceled}
+              isOriginSkipped={isOriginSkipped}
+              isDelayed={isDelayed}
+              showOnTimeBadge={showOnTimeBadge}
+              delayDisplay={delayDisplay}
+            />
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}

@@ -144,15 +144,6 @@ export const TripCard = memo(function TripCard({
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveDepartureTime)}
                 />
-                {isDelayed && (
-                  <div className="text-xs line-through text-muted-foreground">
-                    <TimeDisplay
-                      time={trip.departureTime}
-                      format={timeFormat}
-                      className="text-xs"
-                    />
-                  </div>
-                )}
               </div>
               <span className="text-muted-foreground">→</span>
               <div className="flex flex-col">
@@ -161,15 +152,6 @@ export const TripCard = memo(function TripCard({
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
-                {isDelayed && realtimeStatus?.liveArrivalTime != null && (
-                  <div className="text-xs line-through text-muted-foreground">
-                    <TimeDisplay
-                      time={trip.arrivalTime}
-                      format={timeFormat}
-                      className="text-xs"
-                    />
-                  </div>
-                )}
               </div>
             </div>
             <div className="flex flex-wrap gap-1 mt-0.5">
@@ -181,6 +163,23 @@ export const TripCard = memo(function TripCard({
                 delayDisplay={delayDisplay}
               />
             </div>
+            {isDelayed && (
+              <div className="flex flex-row gap-2 items-start text-xs text-muted-foreground whitespace-nowrap mt-2">
+                <TimeDisplay
+                  time={trip.departureTime}
+                  format={timeFormat}
+                  className="text-xs line-through"
+                />
+                <span>→</span>
+                {realtimeStatus?.liveArrivalTime != null && (
+                  <TimeDisplay
+                    time={trip.arrivalTime}
+                    format={timeFormat}
+                    className="text-xs line-through"
+                  />
+                )}
+              </div>
+            )}
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}

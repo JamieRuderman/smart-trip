@@ -170,13 +170,15 @@ export const TripCard = memo(function TripCard({
                   format={timeFormat}
                   className="text-xs line-through"
                 />
-                <span>→</span>
                 {realtimeStatus?.liveArrivalTime != null && (
-                  <TimeDisplay
-                    time={trip.arrivalTime}
-                    format={timeFormat}
-                    className="text-xs line-through"
-                  />
+                  <>
+                    <span>→</span>
+                    <TimeDisplay
+                      time={trip.arrivalTime}
+                      format={timeFormat}
+                      className="text-xs line-through"
+                    />
+                  </>
                 )}
               </div>
             )}

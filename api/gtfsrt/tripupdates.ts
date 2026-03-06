@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { applyCors } from "../_cors.js";
 import { fetchGtfsRt, transit_realtime } from "../_gtfsrt.js";
 
 const { TripDescriptor, TripUpdate } = transit_realtime;
@@ -19,7 +20,9 @@ const STOP_SCHEDULE_RELATIONSHIP: Record<number, string> = {
   [TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA]: "NO_DATA",
 };
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
+
   try {
     if (process.env.USE_SAMPLE_DATA === "true") {
       const samplePath = resolve(process.cwd(), "sample/tripupdates.json");

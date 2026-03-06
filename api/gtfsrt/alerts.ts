@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { applyCors } from "../_cors.js";
 import { fetchGtfsRt, getTranslation, transit_realtime } from "../_gtfsrt.js";
 
 const { Alert } = transit_realtime;
@@ -15,7 +16,9 @@ function mapCause(cause: number | null | undefined): string {
   return Alert.Cause[cause] ?? "UNKNOWN_CAUSE";
 }
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
+
   try {
     if (process.env.USE_SAMPLE_DATA === "true") {
       const samplePath = resolve(process.cwd(), "sample/alert.json");

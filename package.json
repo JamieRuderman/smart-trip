@@ -23,6 +23,7 @@
     "build-native": "tsc --noEmit && vite build --mode native",
     "dev": "vite",
     "dev-vercel": "npx vercel dev --listen 3210",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
     "update-build": "npm run update-transit && npm run build",

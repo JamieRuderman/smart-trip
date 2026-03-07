@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { X, AlertTriangle, Clock, DollarSign, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
@@ -35,57 +36,69 @@ interface TripDetailSheetProps {
   showFerry: boolean;
 }
 
-function useCountdown(departureTimeStr: string, liveDepTime: string | undefined, currentTime: Date) {
+function useCountdown(
+  departureTimeStr: string,
+  liveDepTime: string | undefined,
+  currentTime: Date
+) {
   const [minutesUntil, setMinutesUntil] = useState(() =>
-    computeMinutes(departureTimeStr, liveDepTime)
+    computeMinutes(currentTime, departureTimeStr, liveDepTime)
   );
 
   useEffect(() => {
-    setMinutesUntil(computeMinutes(departureTimeStr, liveDepTime));
+    setMinutesUntil(computeMinutes(currentTime, departureTimeStr, liveDepTime));
     const id = setInterval(() => {
-      setMinutesUntil(computeMinutes(departureTimeStr, liveDepTime));
+      setMinutesUntil(computeMinutes(currentTime, departureTimeStr, liveDepTime));
     }, 10000);
     return () => clearInterval(id);
-  }, [departureTimeStr, liveDepTime]);
+  }, [currentTime, departureTimeStr, liveDepTime]);
 
   useEffect(() => {
-    setMinutesUntil(computeMinutes(departureTimeStr, liveDepTime));
+    setMinutesUntil(computeMinutes(currentTime, departureTimeStr, liveDepTime));
   }, [currentTime, departureTimeStr, liveDepTime]);
 
   return minutesUntil;
 }
 
-function computeMinutes(staticTime: string, liveTime?: string): number {
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+function computeMinutes(
+  currentTime: Date,
+  staticTime: string,
+  liveTime?: string
+): number {
+  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
   const depMinutes = parseTimeToMinutes(liveTime ?? staticTime);
   return depMinutes - nowMinutes;
 }
 
 function CountdownDisplay({ minutesUntil, isCanceled }: { minutesUntil: number; isCanceled: boolean }) {
+  const { t } = useTranslation();
   if (isCanceled) return null;
   if (minutesUntil > 60) {
     const h = Math.floor(minutesUntil / 60);
     const m = minutesUntil % 60;
     return (
       <span className="text-smart-train-green font-medium text-sm">
-        Departs in {h}h {m}m
+        {t("tracker.departsInHoursMinutes", { hours: h, minutes: m })}
       </span>
     );
   }
   if (minutesUntil > 2) {
     return (
       <span className="text-smart-train-green font-medium text-sm">
-        Departs in {minutesUntil} min
+        {t("tracker.departsInMinutes", { minutes: minutesUntil })}
       </span>
     );
   }
   if (minutesUntil >= -2) {
-    return <span className="text-smart-train-green font-semibold text-sm animate-pulse">Now boarding</span>;
+    return (
+      <span className="text-smart-train-green font-semibold text-sm animate-pulse">
+        {t("tracker.nowBoarding")}
+      </span>
+    );
   }
   return (
     <span className="text-muted-foreground text-sm">
-      Departed {Math.abs(minutesUntil)} min ago
+      {t("tracker.departedMinutesAgo", { minutes: Math.abs(minutesUntil) })}
     </span>
   );
 }
@@ -101,7 +114,11 @@ function SheetContent({
   showFerry,
   onClose,
   showCloseButton = true,
-}: Omit<TripDetailSheetProps, "isOpen"> & { showCloseButton?: boolean }) {
+  trackingEnabled = false,
+}: Omit<TripDetailSheetProps, "isOpen"> & {
+  showCloseButton?: boolean;
+  trackingEnabled?: boolean;
+}) {
   const { t } = useTranslation();
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
@@ -117,14 +134,21 @@ function SheetContent({
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
   const minutesUntil = useCountdown(trip.departureTime, realtimeStatus?.liveDepartureTime, currentTime);
+  const { lat, lng } = useGeolocation({
+    watch: trackingEnabled,
+    autoRequestOnNative: false,
+  });
 
   // Trip metadata
   const tripDurationMinutes =
     parseTimeToMinutes(trip.arrivalTime) - parseTimeToMinutes(trip.departureTime);
   const tripDurationLabel =
     tripDurationMinutes >= 60
-      ? `${Math.floor(tripDurationMinutes / 60)}h ${tripDurationMinutes % 60}m`
-      : `${tripDurationMinutes}m`;
+      ? t("tracker.durationHoursMinutes", {
+          hours: Math.floor(tripDurationMinutes / 60),
+          minutes: tripDurationMinutes % 60,
+        })
+      : t("tracker.durationMinutes", { minutes: tripDurationMinutes });
   const zones = calculateZonesBetweenStations(fromStation, toStation);
   const adultFare = (zones * FARE_CONSTANTS.ADULT_FARE_PER_ZONE).toFixed(2);
 
@@ -201,7 +225,7 @@ function SheetContent({
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-muted transition-colors shrink-0"
-            aria-label="Close trip details"
+            aria-label={t("tracker.closeTripDetails")}
           >
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -229,12 +253,12 @@ function SheetContent({
         {stopCount > 0 && (
           <span className="flex items-center gap-1">
             <MapPin className="h-3 w-3" aria-hidden="true" />
-            {stopCount} stop{stopCount !== 1 ? "s" : ""}
+            {t("tracker.stopCount", { count: stopCount })}
           </span>
         )}
         <span className="flex items-center gap-1">
           <DollarSign className="h-3 w-3" aria-hidden="true" />
-          {adultFare} adult
+          {t("tracker.adultFare", { fare: adultFare })}
         </span>
       </div>
 
@@ -266,6 +290,8 @@ function SheetContent({
           currentTime={currentTime}
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
+          currentLat={lat}
+          currentLng={lng}
         />
 
         {/* Ferry connection info */}
@@ -298,6 +324,7 @@ export function TripDetailSheet({
   onClose,
   ...rest
 }: TripDetailSheetProps) {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -381,9 +408,16 @@ export function TripDetailSheet({
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-lg w-[calc(100vw-2rem)] p-0 overflow-hidden max-h-[85vh] flex flex-col [&>button.absolute]:hidden">
-          <DialogTitle className="sr-only">Trip {rest.trip.trip} details</DialogTitle>
+          <DialogTitle className="sr-only">
+            {t("tracker.tripDetailsAria", { trip: rest.trip.trip })}
+          </DialogTitle>
           <div className="flex-1 overflow-hidden">
-            <SheetContent {...rest} onClose={onClose} showCloseButton={true} />
+            <SheetContent
+              {...rest}
+              onClose={onClose}
+              showCloseButton={true}
+              trackingEnabled={isOpen}
+            />
           </div>
         </DialogContent>
       </Dialog>
@@ -407,7 +441,7 @@ export function TripDetailSheet({
       <div
         ref={sheetRef}
         role="dialog"
-        aria-label={`Trip ${rest.trip.trip} details`}
+        aria-label={t("tracker.tripDetailsAria", { trip: rest.trip.trip })}
         aria-modal="true"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50",
@@ -425,7 +459,12 @@ export function TripDetailSheet({
           <div className={cn("w-10 h-1 rounded-full", handleColor)} />
         </div>
 
-        <SheetContent {...rest} onClose={onClose} showCloseButton={false} />
+        <SheetContent
+          {...rest}
+          onClose={onClose}
+          showCloseButton={false}
+          trackingEnabled={isOpen}
+        />
       </div>
     </>,
     document.body

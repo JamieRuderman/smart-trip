@@ -44,7 +44,10 @@ export function TrainScheduleApp() {
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
   // Geolocation for closest station
-  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation();
+  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation({
+    watch: false,
+    autoRequestOnNative: true,
+  });
   const closestStation = lat != null && lng != null ? getClosestStation(lat, lng) : null;
 
   // Auto-select from station if empty when location resolves

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 
 interface GeolocationState {
@@ -6,11 +6,20 @@ interface GeolocationState {
   lng: number | null;
   error: string | null;
   loading: boolean;
-  /** Manually trigger a location request (used by the "Use my location" button on web). */
   requestLocation: () => void;
 }
 
-async function fetchNativeLocation(): Promise<{ lat: number; lng: number }> {
+interface UseGeolocationOptions {
+  watch?: boolean;
+  autoRequestOnNative?: boolean;
+}
+
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+async function fetchNativeLocation(): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
   await Geolocation.requestPermissions();
   const pos = await Geolocation.getCurrentPosition({
@@ -20,7 +29,7 @@ async function fetchNativeLocation(): Promise<{ lat: number; lng: number }> {
   return { lat: pos.coords.latitude, lng: pos.coords.longitude };
 }
 
-function fetchWebLocation(): Promise<{ lat: number; lng: number }> {
+function fetchWebLocation(): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("Geolocation not supported"));
@@ -34,10 +43,15 @@ function fetchWebLocation(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-export function useGeolocation(): GeolocationState {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+export function useGeolocation({
+  watch = false,
+  autoRequestOnNative = true,
+}: UseGeolocationOptions = {}): GeolocationState {
+  const [coords, setCoords] = useState<Coordinates | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const nativeWatchIdRef = useRef<string | null>(null);
+  const webWatchIdRef = useRef<number | null>(null);
 
   const requestLocation = useCallback(async () => {
     setLoading(true);
@@ -54,14 +68,102 @@ export function useGeolocation(): GeolocationState {
     }
   }, []);
 
-  // On native: request automatically — the OS permission dialog is expected by users
-  // On web: wait for explicit user action ("Use my location" button) to avoid
-  //         triggering the browser permission dialog on page load
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
+    if (Capacitor.isNativePlatform() && autoRequestOnNative) {
       void requestLocation();
     }
-  }, [requestLocation]);
+  }, [autoRequestOnNative, requestLocation]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const stopWatchers = async () => {
+      if (webWatchIdRef.current != null && "geolocation" in navigator) {
+        navigator.geolocation.clearWatch(webWatchIdRef.current);
+        webWatchIdRef.current = null;
+      }
+      if (nativeWatchIdRef.current != null) {
+        try {
+          const { Geolocation } = await import("@capacitor/geolocation");
+          await Geolocation.clearWatch({ id: nativeWatchIdRef.current });
+        } catch {
+          // Ignore cleanup failures.
+        }
+        nativeWatchIdRef.current = null;
+      }
+    };
+
+    const startWatching = async () => {
+      if (!watch) {
+        await stopWatchers();
+        return;
+      }
+
+      if (Capacitor.isNativePlatform()) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        await Geolocation.requestPermissions();
+        const watchId = await Geolocation.watchPosition(
+          {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 15000,
+          },
+          (position, watchError) => {
+            if (cancelled) return;
+            if (watchError) {
+              setError(watchError.message ?? "Location unavailable");
+              return;
+            }
+            if (position?.coords) {
+              setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+              setError(null);
+            }
+          }
+        );
+        nativeWatchIdRef.current = watchId;
+        return;
+      }
+
+      if (!("geolocation" in navigator)) {
+        setError("Geolocation not supported");
+        return;
+      }
+
+      webWatchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          if (cancelled) return;
+          setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+          setError(null);
+        },
+        (watchError) => {
+          if (cancelled) return;
+          setError(watchError.message);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 15000,
+        }
+      );
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        void stopWatchers();
+      } else {
+        void startWatching();
+      }
+    };
+
+    void startWatching();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      void stopWatchers();
+    };
+  }, [watch]);
 
   return {
     lat: coords?.lat ?? null,

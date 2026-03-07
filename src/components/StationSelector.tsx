@@ -186,7 +186,7 @@ export function StationSelector({
                         )}
                         {station === closestStation && (
                           <PillBadge
-                            label="Near You"
+                            label={t("header.nearYou")}
                             color="green"
                             className="ml-2"
                           />
@@ -206,8 +206,8 @@ export function StationSelector({
               className="shrink-0 h-11 w-11"
               onClick={onRequestLocation}
               disabled={locationLoading}
-              aria-label="Use my location"
-              title="Use my location"
+              aria-label={t("header.useMyLocation")}
+              title={t("header.useMyLocation")}
             >
               {locationLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -262,7 +262,7 @@ export function StationSelector({
                         )}
                         {station === closestStation && (
                           <PillBadge
-                            label="Near You"
+                            label={t("header.nearYou")}
                             color="green"
                             className="ml-2"
                           />

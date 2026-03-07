@@ -1,11 +1,17 @@
 import { cn } from "@/lib/utils";
-import { stationIndexMap, getAllStations } from "@/lib/stationUtils";
+import {
+  stationIndexMap,
+  getAllStations,
+  getClosestStationWithDistance,
+} from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { TimeDisplay } from "./TimeDisplay";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { MapPin, Circle } from "lucide-react";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
@@ -14,11 +20,19 @@ interface StopTimelineProps {
   currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
+  currentLat?: number | null;
+  currentLng?: number | null;
 }
 
-function nowMinutes(): number {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
+type StopState = "past" | "current" | "future";
+
+const HIGH_CONFIDENCE_DISTANCE_KM = 1.2;
+
+function clampIndex(index: number, length: number): number {
+  if (length === 0) return 0;
+  if (index < 0) return 0;
+  if (index >= length) return length - 1;
+  return index;
 }
 
 export function StopTimeline({
@@ -28,68 +42,88 @@ export function StopTimeline({
   currentTime,
   realtimeStatus,
   timeFormat,
+  currentLat,
+  currentLng,
 }: StopTimelineProps) {
+  const { t } = useTranslation();
   const allStations = getAllStations();
   const fromIdx = stationIndexMap[fromStation];
   const toIdx = stationIndexMap[toStation];
 
   const minIdx = Math.min(fromIdx, toIdx);
   const maxIdx = Math.max(fromIdx, toIdx);
+  const isSouthbound = fromIdx < toIdx;
 
-  // Slice stations and times for this route segment
   const stops = allStations.slice(minIdx, maxIdx + 1);
   const times = trip.times.slice(minIdx, maxIdx + 1);
 
-  // If southbound, stops are in order; if northbound, reverse for display
-  // (station list is Windsor→Larkspur = north→south, so southbound = forward)
-  const isSouthbound = fromIdx < toIdx;
   const displayStops = isSouthbound ? stops : [...stops].reverse();
   const displayTimes = isSouthbound ? times : [...times].reverse();
 
-  const hasRealtimeStopData = realtimeStatus?.hasRealtimeStopData ?? false;
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
-  const now = nowMinutes();
+  const hasRealtimeStopData = realtimeStatus?.hasRealtimeStopData ?? false;
 
-  // Determine past/current using GTFS-RT live departure times when available,
-  // falling back to static schedule times.
-  //
-  // GTFS-RT heuristic:
-  //   - Stop IS in the feed with a past departure time → train has departed that stop
-  //   - Stop IS in the feed with a future departure time → upcoming stop
-  //   - Stop NOT in the feed but we have RT data for this trip → likely already served
-  //   - No RT data at all → fall back to static schedule
-  function getStopStatus(station: string, staticTime: string): "past" | "current" | "future" {
-    const hasValidStaticTime = staticTime && staticTime !== "--" && staticTime !== "";
+  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-    if (hasRealtimeStopData && allStopLiveDepartures) {
-      const liveTime = allStopLiveDepartures[station];
-      if (liveTime) {
-        // Stop is still in the feed — departure time tells us past/future
-        return parseTimeToMinutes(liveTime) <= now ? "past" : "future";
-      } else {
-        // Stop is absent from the RT feed — train has already served it
-        return "past";
+  const inferred = useMemo(() => {
+    const statusByStop = displayStops.map((station, i) => {
+      const staticTime = displayTimes[i] ?? "";
+      const liveTime = allStopLiveDepartures?.[station];
+      const reference = liveTime ?? staticTime;
+      const parsed = reference ? parseTimeToMinutes(reference) : Number.NaN;
+      const isPast = Number.isFinite(parsed) ? parsed <= nowMinutes : false;
+      return {
+        station,
+        staticTime,
+        liveTime,
+        parsed,
+        isPast,
+      };
+    });
+
+    let confidence: "high" | "medium" | "low" = "low";
+    let currentIndex = -1;
+
+    if (currentLat != null && currentLng != null) {
+      const closest = getClosestStationWithDistance(currentLat, currentLng);
+      const idx = displayStops.indexOf(closest.station);
+      if (idx >= 0 && closest.distanceKm <= HIGH_CONFIDENCE_DISTANCE_KM) {
+        confidence = "high";
+        currentIndex = idx;
       }
     }
 
-    // Fallback: static schedule
-    if (!hasValidStaticTime) return "future";
-    return parseTimeToMinutes(staticTime) <= now ? "past" : "future";
-  }
+    if (currentIndex === -1) {
+      let lastPast = -1;
+      for (let i = 0; i < statusByStop.length; i += 1) {
+        if (statusByStop[i].isPast) {
+          lastPast = i;
+        }
+      }
+      currentIndex = clampIndex(lastPast >= 0 ? lastPast : 0, statusByStop.length);
 
-  // Compute statuses for all display stops
-  const stopStatuses = displayStops.map((station, i) =>
-    getStopStatus(station, displayTimes[i] ?? "")
-  );
+      if (hasRealtimeStopData && statusByStop.some((s) => s.liveTime)) {
+        confidence = "medium";
+      }
+    }
 
-  // "Current" = last past stop (the train is between this stop and the next)
-  // The train is AT this stop if it just departed, or approaching the next one
-  let lastPastIdx = -1;
-  for (let i = 0; i < stopStatuses.length; i++) {
-    if (stopStatuses[i] === "past") lastPastIdx = i;
-  }
-  // currentStopDisplayIdx is the last stop the train has departed (or is at)
-  const currentStopDisplayIdx = lastPastIdx;
+    const states: StopState[] = statusByStop.map((stop, index) => {
+      void stop;
+      if (index < currentIndex) return "past";
+      if (index === currentIndex) return "current";
+      return "future";
+    });
+
+    return { statusByStop, states, currentIndex, confidence };
+  }, [
+    currentLat,
+    currentLng,
+    displayStops,
+    displayTimes,
+    allStopLiveDepartures,
+    nowMinutes,
+    hasRealtimeStopData,
+  ]);
 
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isDelayed = !isCanceled && realtimeStatus?.delayMinutes != null;
@@ -99,17 +133,21 @@ export function StopTimeline({
     <div className="flex flex-col">
       {isDelayed && delayMinutes != null && (
         <p className="text-xs text-smart-gold mb-3 px-1">
-          Running approximately {delayMinutes} min late
+          {t("tracker.runningLate", { minutes: delayMinutes })}
         </p>
       )}
       {isCanceled && (
         <p className="text-xs text-destructive mb-3 px-1">
-          This trip has been canceled
+          {t("tracker.tripCanceled")}
         </p>
       )}
-      {hasRealtimeStopData && !isCanceled && (
+      {!isCanceled && (
         <p className="text-xs text-muted-foreground mb-3 px-1">
-          Live position from GTFS-RT
+          {inferred.confidence === "high"
+            ? t("tracker.confidenceHigh")
+            : inferred.confidence === "medium"
+            ? t("tracker.confidenceMedium")
+            : t("tracker.confidenceLow")}
         </p>
       )}
 
@@ -120,32 +158,26 @@ export function StopTimeline({
 
           const isFrom = station === fromStation;
           const isTo = station === toStation;
-          const isPast = currentStopDisplayIdx > i;
-          const isCurrent = currentStopDisplayIdx === i;
+          const state = inferred.states[i];
+          const isPast = state === "past";
+          const isCurrent = state === "current";
           const isFirst = i === 0;
           const isLast = i === displayStops.length - 1;
 
-          // Live time for this stop from GTFS-RT (if available and in the future)
           const liveStopTime = allStopLiveDepartures?.[station];
           const showLiveStopTime =
-            liveStopTime && !isCanceled && hasTime &&
-            liveStopTime !== time; // only show if different from scheduled
+            liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
-          // For the boarding stop: show live departure if delayed
           const showLiveFrom = isFrom && isDelayed && realtimeStatus?.liveDepartureTime;
-          // For the arrival stop: show live arrival if delayed
-          const showLiveTo = isTo && !isFrom && isDelayed && realtimeStatus?.liveArrivalTime;
+          const showLiveTo =
+            isTo && !isFrom && isDelayed && realtimeStatus?.liveArrivalTime;
 
-          // "Boarding" label: only when train hasn't departed yet from this stop
           const isBoardingStop = isFrom && !isPast;
-          // "Departed" label: train has left from stop
           const isDepartedStop = isFrom && isPast;
 
           return (
             <div key={station} className="flex items-start gap-3 relative">
-              {/* Timeline line + icon column */}
               <div className="flex flex-col items-center w-5 shrink-0">
-                {/* Line above */}
                 <div
                   className={cn(
                     "w-px flex-1",
@@ -154,7 +186,6 @@ export function StopTimeline({
                   style={{ minHeight: 8 }}
                 />
 
-                {/* Stop icon */}
                 {isFrom || isTo ? (
                   <MapPin
                     className={cn(
@@ -169,7 +200,6 @@ export function StopTimeline({
                     )}
                   />
                 ) : isCurrent ? (
-                  // Glowing dot = estimated train position
                   <div className="h-3 w-3 rounded-full bg-smart-train-green shadow-[0_0_6px_2px_hsl(var(--smart-train-green)/0.4)] shrink-0" />
                 ) : isPast ? (
                   <Circle className="h-3 w-3 text-muted-foreground/50 fill-muted-foreground/20 shrink-0" />
@@ -177,7 +207,6 @@ export function StopTimeline({
                   <Circle className="h-3 w-3 text-border shrink-0" />
                 )}
 
-                {/* Line below */}
                 <div
                   className={cn(
                     "w-px flex-1",
@@ -187,7 +216,6 @@ export function StopTimeline({
                 />
               </div>
 
-              {/* Station name + time */}
               <div
                 className={cn(
                   "flex items-center justify-between w-full py-1.5 min-h-[36px]",
@@ -212,17 +240,20 @@ export function StopTimeline({
                     {station}
                   </span>
                   {isBoardingStop && (
-                    <span className="text-xs text-smart-train-green/80">Boarding</span>
+                    <span className="text-xs text-smart-train-green/80">
+                      {t("tracker.boarding")}
+                    </span>
                   )}
                   {isDepartedStop && (
-                    <span className="text-xs text-muted-foreground">Departed</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("tracker.departed")}
+                    </span>
                   )}
                   {isTo && !isFrom && (
-                    <span className="text-xs text-primary/80">Arriving</span>
+                    <span className="text-xs text-primary/80">{t("tracker.arriving")}</span>
                   )}
                 </div>
 
-                {/* Times column */}
                 {hasTime && (
                   <div className="flex flex-col items-end shrink-0 ml-2">
                     {showLiveFrom && (
@@ -266,16 +297,17 @@ export function StopTimeline({
                           time={time}
                           format={timeFormat}
                           className={cn(
-                            showLiveStopTime ? "text-xs line-through text-muted-foreground" : "text-sm",
-                            !showLiveStopTime && (
-                              isCanceled
+                            showLiveStopTime
+                              ? "text-xs line-through text-muted-foreground"
+                              : "text-sm",
+                            !showLiveStopTime &&
+                              (isCanceled
                                 ? "line-through text-destructive"
                                 : isFrom && !isPast
                                 ? "text-smart-train-green"
                                 : isPast
                                 ? "text-muted-foreground"
-                                : "text-foreground"
-                            )
+                                : "text-foreground")
                           )}
                         />
                       </>

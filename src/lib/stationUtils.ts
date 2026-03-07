@@ -122,6 +122,13 @@ function haversineKm(
  * Find the closest SMART station to the given coordinates
  */
 export function getClosestStation(lat: number, lng: number): Station {
+  return getClosestStationWithDistance(lat, lng).station;
+}
+
+export function getClosestStationWithDistance(
+  lat: number,
+  lng: number
+): { station: Station; distanceKm: number } {
   let closest: Station = stations[0];
   let minDist = Infinity;
   for (const station of stations) {
@@ -132,5 +139,5 @@ export function getClosestStation(lat: number, lng: number): Station {
       closest = station;
     }
   }
-  return closest;
+  return { station: closest, distanceKm: minDist };
 }

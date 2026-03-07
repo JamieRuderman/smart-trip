@@ -20,7 +20,9 @@
     "weekendSchedule": "Fin de semana y festivos",
     "availableStations": "Estaciones disponibles",
     "startStation": "Salida",
-    "endStation": "Llegada"
+    "endStation": "Llegada",
+    "nearYou": "Cerca de ti",
+    "useMyLocation": "Usar mi ubicación"
   },
   "emptyState": {
     "selectYourRoute": "Selecciona Tu Ruta",
@@ -40,7 +42,11 @@
     "southboundSchedule": "Horario Hacia el Sur",
     "northboundSchedule": "Horario Hacia el Norte",
     "showEarlierTrains": "Mostrar trenes anteriores",
-    "hideEarlierTrains": "Ocultar trenes previos"
+    "hideEarlierTrains": "Ocultar trenes previos",
+    "lastUpdatedLoading": "Cargando actualizaciones…",
+    "updatedJustNow": "Actualizado justo ahora",
+    "updatedMinutesAgo_one": "Actualizado hace {{count}} min",
+    "updatedMinutesAgo_other": "Actualizado hace {{count}} min"
   },
   "fare": {
     "fareInformation": "Tarifas",
@@ -120,5 +126,26 @@
   "noMoreTrains": {
     "noMoreTrainsToday": "No hay más trenes hoy",
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
+  },
+  "tracker": {
+    "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Sale en {{minutes}} min",
+    "nowBoarding": "Abordando ahora",
+    "departedMinutesAgo": "Salió hace {{minutes}} min",
+    "durationHoursMinutes": "{{hours}}h {{minutes}}m",
+    "durationMinutes": "{{minutes}}m",
+    "stopCount_one": "{{count}} parada",
+    "stopCount_other": "{{count}} paradas",
+    "adultFare": "${{fare}} adulto",
+    "closeTripDetails": "Cerrar detalles del viaje",
+    "tripDetailsAria": "Detalles del tren {{trip}}",
+    "runningLate": "Circula aproximadamente con {{minutes}} min de retraso",
+    "tripCanceled": "Este viaje ha sido cancelado",
+    "confidenceHigh": "Confianza: Alta (GPS)",
+    "confidenceMedium": "Confianza: Media (Tiempo real)",
+    "confidenceLow": "Confianza: Baja (Horario)",
+    "boarding": "Abordando",
+    "departed": "Salió",
+    "arriving": "Llegando"
   }
 }

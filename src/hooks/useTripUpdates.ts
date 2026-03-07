@@ -243,10 +243,11 @@ export function useTripRealtimeStatusMap(
   toStation: Station | "",
   trips: ProcessedTrip[]
 ): TripRealtimeStatusMaps {
-  const { data, dataUpdatedAt } = useTripUpdates();
+  const { data } = useTripUpdates();
 
   return useMemo(() => {
-    const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+    const lastUpdated =
+      data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
     const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
     if (!data || !fromStation || !toStation) return empty;
 
@@ -295,5 +296,5 @@ export function useTripRealtimeStatusMap(
       }
     }
     return { statusMap, canceledByStartTime, lastUpdated };
-  }, [data, dataUpdatedAt, fromStation, toStation, trips]);
+  }, [data, fromStation, toStation, trips]);
 }

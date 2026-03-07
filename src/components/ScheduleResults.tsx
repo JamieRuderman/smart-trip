@@ -65,7 +65,6 @@ export function ScheduleResults({
       <ScheduleHeader
         direction={direction.direction}
         currentTime={currentTime}
-        timeFormat={timeFormat}
         nextTripIndex={nextTripIndex}
         showAllTrips={showAllTrips}
         onToggleShowAllTrips={onToggleShowAllTrips}

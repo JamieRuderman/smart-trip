@@ -20,7 +20,9 @@
     "weekendSchedule": "Weekend and holiday schedule",
     "availableStations": "Available stations",
     "startStation": "Departing",
-    "endStation": "Arriving"
+    "endStation": "Arriving",
+    "nearYou": "Near you",
+    "useMyLocation": "Use my location"
   },
   "emptyState": {
     "selectYourRoute": "Select Your Route",
@@ -40,7 +42,11 @@
     "southboundSchedule": "Southbound Schedule",
     "northboundSchedule": "Northbound Schedule",
     "showEarlierTrains": "Show earlier trains",
-    "hideEarlierTrains": "Hide earlier trains"
+    "hideEarlierTrains": "Hide earlier trains",
+    "lastUpdatedLoading": "Loading updates…",
+    "updatedJustNow": "Updated just now",
+    "updatedMinutesAgo_one": "Updated {{count}} min ago",
+    "updatedMinutesAgo_other": "Updated {{count}} min ago"
   },
   "fare": {
     "fareInformation": "Fare Information",
@@ -120,5 +126,26 @@
   "noMoreTrains": {
     "noMoreTrainsToday": "No more trains today",
     "allTrainsDeparted": "All scheduled trains for today have departed"
+  },
+  "tracker": {
+    "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Departs in {{minutes}} min",
+    "nowBoarding": "Now boarding",
+    "departedMinutesAgo": "Departed {{minutes}} min ago",
+    "durationHoursMinutes": "{{hours}}h {{minutes}}m",
+    "durationMinutes": "{{minutes}}m",
+    "stopCount_one": "{{count}} stop",
+    "stopCount_other": "{{count}} stops",
+    "adultFare": "${{fare}} adult",
+    "closeTripDetails": "Close trip details",
+    "tripDetailsAria": "Trip {{trip}} details",
+    "runningLate": "Running approximately {{minutes}} min late",
+    "tripCanceled": "This trip has been canceled",
+    "confidenceHigh": "Confidence: High (GPS)",
+    "confidenceMedium": "Confidence: Medium (Realtime)",
+    "confidenceLow": "Confidence: Low (Schedule)",
+    "boarding": "Boarding",
+    "departed": "Departed",
+    "arriving": "Arriving"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "smart-train-schedule",
+  "name": "smart-train-trip",
   "description": "A modern, responsive web application for viewing SMART train schedules and ferry connections",
   "version": "1.2.1",
   "private": true,
@@ -39,6 +39,7 @@
     "@capacitor/app": "^6.0.2",
     "@capacitor/core": "^6.1.2",
     "@capacitor/device": "^6.0.3",
+    "@capacitor/geolocation": "^6.1.1",
     "@capacitor/haptics": "^6.0.2",
     "@capacitor/keyboard": "^6.0.3",
     "@capacitor/splash-screen": "^6.0.4",

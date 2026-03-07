@@ -30,7 +30,7 @@ export function ScheduleResults({
   timeFormat,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
-  const { statusMap: realtimeStatusMap, canceledByStartTime } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
+  const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
     filteredTrips.length > 0
@@ -69,6 +69,7 @@ export function ScheduleResults({
         nextTripIndex={nextTripIndex}
         showAllTrips={showAllTrips}
         onToggleShowAllTrips={onToggleShowAllTrips}
+        lastUpdated={lastUpdated}
       />
       <CardContent className="p-3 md:p-6 md:pt-0">
         {nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />}
@@ -100,6 +101,9 @@ export function ScheduleResults({
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
+                fromStation={fromStation}
+                toStation={toStation}
+                currentTime={currentTime}
               />
             );
           })}

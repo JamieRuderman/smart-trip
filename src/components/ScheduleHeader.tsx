@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
@@ -10,17 +11,39 @@ interface ScheduleHeaderProps {
   nextTripIndex: number;
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
+  lastUpdated: Date | null;
+}
+
+function useLastUpdatedLabel(lastUpdated: Date | null, currentTime: Date): string {
+  const [label, setLabel] = useState<string>(() => computeLabel(lastUpdated, currentTime));
+
+  useEffect(() => {
+    setLabel(computeLabel(lastUpdated, currentTime));
+  }, [lastUpdated, currentTime]);
+
+  return label;
+}
+
+function computeLabel(lastUpdated: Date | null, currentTime: Date): string {
+  if (!lastUpdated) return "Loading…";
+  const diffMs = currentTime.getTime() - lastUpdated.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "Updated just now";
+  if (diffMin === 1) return "Updated 1 min ago";
+  return `Updated ${diffMin} min ago`;
 }
 
 export function ScheduleHeader({
   direction,
   currentTime,
-  timeFormat,
+  timeFormat: _timeFormat,
   nextTripIndex,
   showAllTrips,
   onToggleShowAllTrips,
+  lastUpdated,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
+  const updatedLabel = useLastUpdatedLabel(lastUpdated, currentTime);
 
   return (
     <CardHeader className="p-3 md:p-6">
@@ -32,13 +55,9 @@ export function ScheduleHeader({
           ? t("schedule.southboundSchedule")
           : t("schedule.northboundSchedule")}
         <div className="flex-grow flex justify-end items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
-          {currentTime.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: timeFormat === "12h",
-          })}
-          <Clock
-            className="inline-block h-5 w-5 text-primary"
+          {updatedLabel}
+          <RefreshCw
+            className="inline-block h-4 w-4 text-primary"
             aria-hidden="true"
           />
         </div>

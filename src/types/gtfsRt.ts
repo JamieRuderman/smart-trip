@@ -76,4 +76,16 @@ export interface TripRealtimeStatus {
   arrivalDelayMinutes?: number;
   isOriginSkipped: boolean;
   isDestinationSkipped: boolean;
+  /**
+   * Live departure times for all known stops on this trip, keyed by station name.
+   * Populated from the full stop_time_updates array. A stop present here with a
+   * past departure time means the train has already left that station. A stop
+   * absent from the feed has likely already been served (or has no RT data).
+   */
+  allStopLiveDepartures?: Partial<Record<string, string>>; // station name → "HH:MM"
+  /**
+   * Whether the GTFS-RT feed has stop_time_updates for this trip (true = we have
+   * real-time position data, false = position is estimated from static schedule).
+   */
+  hasRealtimeStopData?: boolean;
 }

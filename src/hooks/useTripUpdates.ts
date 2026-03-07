@@ -53,6 +53,22 @@ function findStopUpdate(
   );
 }
 
+/** Build a map of station name → live departure "HH:MM" from all stop_time_updates */
+function buildAllStopLiveDepartures(
+  stopTimeUpdates: GtfsRtStopTimeUpdate[]
+): Partial<Record<string, string>> {
+  const result: Partial<Record<string, string>> = {};
+  for (const stu of stopTimeUpdates) {
+    if (!stu.stopId || !stu.departureTime) continue;
+    const station = GTFS_STOP_ID_TO_STATION[stu.stopId];
+    if (station) {
+      // Each station has two platform IDs; last one wins (identical times in practice)
+      result[station] = unixToTimeString(stu.departureTime);
+    }
+  }
+  return result;
+}
+
 function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
@@ -171,6 +187,9 @@ function deriveStatus(
     }
   }
 
+  const allStopLiveDepartures = buildAllStopLiveDepartures(update.stopTimeUpdates);
+  const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
+
   return {
     scheduledDeparture,
     status: {
@@ -181,6 +200,8 @@ function deriveStatus(
       arrivalDelayMinutes,
       isOriginSkipped,
       isDestinationSkipped,
+      allStopLiveDepartures,
+      hasRealtimeStopData,
     },
   };
 }
@@ -204,6 +225,8 @@ export interface TripRealtimeStatusMaps {
    * Callers should scan ProcessedTrip.times for any matching key as a fallback.
    */
   canceledByStartTime: Map<string, TripRealtimeStatus>;
+  /** When the GTFS-RT data was last successfully fetched (null if never). */
+  lastUpdated: Date | null;
 }
 
 /**
@@ -220,10 +243,11 @@ export function useTripRealtimeStatusMap(
   toStation: Station | "",
   trips: ProcessedTrip[]
 ): TripRealtimeStatusMaps {
-  const { data } = useTripUpdates();
+  const { data, dataUpdatedAt } = useTripUpdates();
 
   return useMemo(() => {
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map() };
+    const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
     if (!data || !fromStation || !toStation) return empty;
 
     const fromIdx = stationIndexMap[fromStation] ?? -1;
@@ -270,6 +294,6 @@ export function useTripRealtimeStatusMap(
         }
       }
     }
-    return { statusMap, canceledByStartTime };
-  }, [data, fromStation, toStation, trips]);
+    return { statusMap, canceledByStartTime, lastUpdated };
+  }, [data, dataUpdatedAt, fromStation, toStation, trips]);
 }

@@ -46,7 +46,8 @@
     "lastUpdatedLoading": "Cargando actualizaciones…",
     "updatedJustNow": "Actualizado justo ahora",
     "updatedMinutesAgo_one": "Actualizado hace {{count}} min",
-    "updatedMinutesAgo_other": "Actualizado hace {{count}} min"
+    "updatedMinutesAgo_other": "Actualizado hace {{count}} min",
+    "dataMayBeStale": "Los datos pueden estar desactualizados"
   },
   "fare": {
     "fareInformation": "Tarifas",

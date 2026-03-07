@@ -21,7 +21,11 @@ function computeLabel(
   const diffMs = currentTime.getTime() - lastUpdated.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return t("schedule.updatedJustNow");
-  return t("schedule.updatedMinutesAgo", { count: diffMin });
+  const relative = t("schedule.updatedMinutesAgo", { count: diffMin });
+  if (diffMin >= 10) {
+    return `${relative} · ${t("schedule.dataMayBeStale")}`;
+  }
+  return relative;
 }
 
 export function ScheduleHeader({

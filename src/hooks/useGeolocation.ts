@@ -94,10 +94,7 @@ export function useGeolocation({
     };
 
     const startWatching = async () => {
-      if (!watch) {
-        await stopWatchers();
-        return;
-      }
+      if (!watch) return;
 
       if (Capacitor.isNativePlatform()) {
         const { Geolocation } = await import("@capacitor/geolocation");
@@ -146,6 +143,14 @@ export function useGeolocation({
         }
       );
     };
+
+    if (!watch) {
+      void stopWatchers();
+      return () => {
+        cancelled = true;
+        void stopWatchers();
+      };
+    }
 
     const onVisibilityChange = () => {
       if (document.hidden) {

@@ -272,18 +272,20 @@ export const TripCard = memo(function TripCard({
         )}
       </div>
 
-      <TripDetailSheet
-        isOpen={isDetailOpen}
-        onClose={handleDetailClose}
-        trip={trip}
-        fromStation={fromStation}
-        toStation={toStation}
-        currentTime={currentTime}
-        realtimeStatus={realtimeStatus}
-        timeFormat={timeFormat}
-        isNextTrip={isNextTrip}
-        showFerry={showFerry}
-      />
+      {isDetailOpen && (
+        <TripDetailSheet
+          isOpen={isDetailOpen}
+          onClose={handleDetailClose}
+          trip={trip}
+          fromStation={fromStation}
+          toStation={toStation}
+          currentTime={currentTime}
+          realtimeStatus={realtimeStatus}
+          timeFormat={timeFormat}
+          isNextTrip={isNextTrip}
+          showFerry={showFerry}
+        />
+      )}
     </>
   );
 });

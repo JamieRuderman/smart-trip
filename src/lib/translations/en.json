@@ -46,7 +46,8 @@
     "lastUpdatedLoading": "Loading updates…",
     "updatedJustNow": "Updated just now",
     "updatedMinutesAgo_one": "Updated {{count}} min ago",
-    "updatedMinutesAgo_other": "Updated {{count}} min ago"
+    "updatedMinutesAgo_other": "Updated {{count}} min ago",
+    "dataMayBeStale": "Data may be stale"
   },
   "fare": {
     "fareInformation": "Fare Information",

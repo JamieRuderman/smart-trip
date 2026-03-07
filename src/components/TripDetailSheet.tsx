@@ -354,7 +354,8 @@ export function TripDetailSheet({
   // Swipe-to-dismiss for mobile bottom sheet
   const touchStartY = useRef<number | null>(null);
   const currentTranslateY = useRef(0);
-  const DISMISS_TRANSITION = "transform 300ms cubic-bezier(0.4,0,0.2,1)";
+  const SHEET_TRANSITION_MS = 300;
+  const DISMISS_TRANSITION = `transform ${SHEET_TRANSITION_MS}ms cubic-bezier(0.4,0,0.2,1)`;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -389,7 +390,7 @@ export function TripDetailSheet({
         // Class is now translate-y-full (100%) — close enough, clear inline style
         el.style.transform = "";
         el.style.transition = "";
-      }, 310);
+      }, SHEET_TRANSITION_MS);
     } else {
       // Snap back: animate to 0, then hand control back to CSS class
       el.style.transition = DISMISS_TRANSITION;
@@ -397,7 +398,7 @@ export function TripDetailSheet({
       setTimeout(() => {
         el.style.transform = "";
         el.style.transition = "";
-      }, 310);
+      }, SHEET_TRANSITION_MS);
     }
 
     touchStartY.current = null;

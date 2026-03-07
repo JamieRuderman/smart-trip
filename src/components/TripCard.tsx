@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 
-const SHEET_EXIT_MS = 320;
+const SHEET_TRANSITION_MS = 300;
 
 interface TripCardProps {
   trip: ProcessedTrip;
@@ -90,8 +90,11 @@ export const TripCard = memo(function TripCard({
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
+    // Mount first in closed state, then open on the next frame so enter transition runs.
     setIsDetailMounted(true);
-    setIsDetailOpen(true);
+    requestAnimationFrame(() => {
+      setIsDetailOpen(true);
+    });
   };
 
   const handleDetailClose = () => {
@@ -102,7 +105,7 @@ export const TripCard = memo(function TripCard({
         cardRef.current?.focus({ preventScroll: true });
       });
       closeTimerRef.current = null;
-    }, SHEET_EXIT_MS);
+    }, SHEET_TRANSITION_MS);
   };
 
   useEffect(() => {

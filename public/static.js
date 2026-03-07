@@ -1,6 +1,7 @@
 const header = document.createElement("header");
 header.className = "hero";
 header.innerHTML = `
+  <a class="hero-home-link" href="/" aria-label="Open SMART trip app"></a>
   <svg
     class="hero-icon"
     viewBox="0 0 512 512"
@@ -16,7 +17,9 @@ header.innerHTML = `
       stroke-linejoin="round"
     />
   </svg>
-  <div class="hero-title">SMART trip</div>
+  <div class="hero-title-wrap">
+    <div class="hero-title">SMART trip</div>
+  </div>
   <div class="hero-badge">
     <svg
       class="hero-badge-icon"

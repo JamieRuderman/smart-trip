@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -12,6 +12,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
+
+const SHEET_EXIT_MS = 320;
 
 interface TripCardProps {
   trip: ProcessedTrip;
@@ -44,9 +46,11 @@ export const TripCard = memo(function TripCard({
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
   const cardRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isDetailMounted, setIsDetailMounted] = useState(false);
 
   const hasOutboundQuickConnection =
     showFerry &&
@@ -82,15 +86,32 @@ export const TripCard = memo(function TripCard({
       : undefined;
 
   const handleCardClick = () => {
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsDetailMounted(true);
     setIsDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
-    requestAnimationFrame(() => {
-      cardRef.current?.focus({ preventScroll: true });
-    });
+    closeTimerRef.current = window.setTimeout(() => {
+      setIsDetailMounted(false);
+      requestAnimationFrame(() => {
+        cardRef.current?.focus({ preventScroll: true });
+      });
+      closeTimerRef.current = null;
+    }, SHEET_EXIT_MS);
   };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current != null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   const ariaParts = [
     `Train ${trip.trip}`,
@@ -272,7 +293,7 @@ export const TripCard = memo(function TripCard({
         )}
       </div>
 
-      {isDetailOpen && (
+      {isDetailMounted && (
         <TripDetailSheet
           isOpen={isDetailOpen}
           onClose={handleDetailClose}

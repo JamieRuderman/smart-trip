@@ -1,5 +1,23 @@
 import type { Station, StationZone } from "@/types/smartSchedule";
 
+// Lat/lng coordinates for each SMART station (from SMART GTFS stops.txt)
+export const STATION_COORDINATES: Record<Station, { lat: number; lng: number }> = {
+  "Windsor": { lat: 38.5477, lng: -122.8125 },
+  "Sonoma County Airport": { lat: 38.5044, lng: -122.7426 },
+  "Santa Rosa North": { lat: 38.4594, lng: -122.7286 },
+  "Santa Rosa Downtown": { lat: 38.4407, lng: -122.7178 },
+  "Rohnert Park": { lat: 38.3350, lng: -122.6972 },
+  "Cotati": { lat: 38.3247, lng: -122.7073 },
+  "Petaluma North": { lat: 38.2629, lng: -122.6637 },
+  "Petaluma Downtown": { lat: 38.2318, lng: -122.6437 },
+  "Novato San Marin": { lat: 38.0834, lng: -122.5671 },
+  "Novato Downtown": { lat: 38.1095, lng: -122.5706 },
+  "Novato Hamilton": { lat: 38.0586, lng: -122.5266 },
+  "Marin Civic Center": { lat: 37.9744, lng: -122.5259 },
+  "San Rafael": { lat: 37.9763, lng: -122.5320 },
+  "Larkspur": { lat: 37.9437, lng: -122.5044 },
+};
+
 // Raw station data - this represents what would come from an API
 export const stationZones: StationZone[] = [
   { station: "Windsor", zone: 1 },

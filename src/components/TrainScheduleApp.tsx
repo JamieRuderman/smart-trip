@@ -1,7 +1,9 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { getClosestStation } from "@/lib/stationUtils";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -41,6 +43,19 @@ export function TrainScheduleApp() {
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
+  // Geolocation for closest station
+  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation();
+  const closestStation = lat != null && lng != null ? getClosestStation(lat, lng) : null;
+
+  // Auto-select from station if empty when location resolves
+  const didAutoSelect = useRef(false);
+  useEffect(() => {
+    if (closestStation && !fromStation && !didAutoSelect.current) {
+      didAutoSelect.current = true;
+      setFromStation(closestStation);
+    }
+  }, [closestStation, fromStation, setFromStation]);
+
   return (
     <div
       className="min-h-[100dvh] bg-card md:bg-background relative"
@@ -55,6 +70,9 @@ export function TrainScheduleApp() {
         onToStationChange={setToStation}
         onScheduleTypeChange={setScheduleType}
         onSwapStations={swapStations}
+        closestStation={closestStation}
+        locationLoading={locationLoading}
+        onRequestLocation={requestLocation}
       />
 
       <main

@@ -12,7 +12,10 @@ import {
   CornerDownRight,
   CornerUpRight,
   Ship,
+  LocateFixed,
+  Loader2,
 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { getAllStations, hasFerryConnection } from "@/lib/stationUtils";
 import type { Station } from "@/types/smartSchedule";
 import { PillBadge } from "./PillBadge";
@@ -24,6 +27,9 @@ export type StationSelectorProps = {
   onFromStationChange: (station: Station) => void;
   onToStationChange: (station: Station) => void;
   onSwapStations: () => void;
+  closestStation?: Station | null;
+  locationLoading?: boolean;
+  onRequestLocation?: () => void;
 };
 
 // Reusable component for displaying station name with ferry icon
@@ -87,7 +93,12 @@ export function StationSelector({
   onFromStationChange,
   onToStationChange,
   onSwapStations,
+  closestStation,
+  locationLoading,
+  onRequestLocation,
 }: StationSelectorProps) {
+  // Show location button only on web (native auto-requests on mount)
+  const showLocationButton = !Capacitor.isNativePlatform() && !!onRequestLocation && !closestStation;
   const { t } = useTranslation();
   const stations = getAllStations();
 
@@ -120,7 +131,7 @@ export function StationSelector({
 
       {/* Station Selectors */}
       <div className="flex-1 space-y-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex-1">
             <Select value={fromStation} onValueChange={handleFromStationChange}>
               <SelectTrigger
@@ -165,19 +176,46 @@ export function StationSelector({
                       ) : undefined
                     }
                     badge={
-                      station === toStation ? (
-                        <PillBadge
-                          label={t("header.endStation")}
-                          color="green"
-                          className="ml-2"
-                        />
-                      ) : undefined
+                      <>
+                        {station === toStation && (
+                          <PillBadge
+                            label={t("header.endStation")}
+                            color="green"
+                            className="ml-2"
+                          />
+                        )}
+                        {station === closestStation && (
+                          <PillBadge
+                            label="Near You"
+                            color="green"
+                            className="ml-2"
+                          />
+                        )}
+                      </>
                     }
                   />
                 ))}
               </SelectContent>
             </Select>
           </div>
+          {/* "Use my location" button — web only, hidden once location is known */}
+          {showLocationButton && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0 h-11 w-11"
+              onClick={onRequestLocation}
+              disabled={locationLoading}
+              aria-label="Use my location"
+              title="Use my location"
+            >
+              {locationLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LocateFixed className="h-4 w-4" aria-hidden="true" />
+              )}
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -214,13 +252,22 @@ export function StationSelector({
                       ) : undefined
                     }
                     badge={
-                      station === fromStation ? (
-                        <PillBadge
-                          label={t("header.startStation")}
-                          color="green"
-                          className="ml-2"
-                        />
-                      ) : undefined
+                      <>
+                        {station === fromStation && (
+                          <PillBadge
+                            label={t("header.startStation")}
+                            color="green"
+                            className="ml-2"
+                          />
+                        )}
+                        {station === closestStation && (
+                          <PillBadge
+                            label="Near You"
+                            color="green"
+                            className="ml-2"
+                          />
+                        )}
+                      </>
                     }
                   />
                 ))}

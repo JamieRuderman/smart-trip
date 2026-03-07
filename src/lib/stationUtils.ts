@@ -1,5 +1,5 @@
 import type { Station } from "@/types/smartSchedule";
-import stations, { stationZones } from "@/data/stations";
+import stations, { stationZones, STATION_COORDINATES } from "@/data/stations";
 import { FERRY_CONSTANTS } from "./fareConstants";
 
 /**
@@ -98,4 +98,39 @@ export function calculateZonesBetweenStations(
  */
 export function getAllStations(): Station[] {
   return stations;
+}
+
+/**
+ * Haversine distance in km between two lat/lng points
+ */
+function haversineKm(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Find the closest SMART station to the given coordinates
+ */
+export function getClosestStation(lat: number, lng: number): Station {
+  let closest: Station = stations[0];
+  let minDist = Infinity;
+  for (const station of stations) {
+    const coords = STATION_COORDINATES[station];
+    const dist = haversineKm(lat, lng, coords.lat, coords.lng);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = station;
+    }
+  }
+  return closest;
 }

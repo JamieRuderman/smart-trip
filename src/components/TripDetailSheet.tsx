@@ -8,6 +8,7 @@ import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
 import { calculateZonesBetweenStations, stationIndexMap } from "@/lib/stationUtils";
+import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TrainBadge } from "./TrainBadge";
 import { TimeDisplay } from "./TimeDisplay";
 import { TripStatusPills } from "./TripStatusPills";
@@ -354,8 +355,7 @@ export function TripDetailSheet({
   // Swipe-to-dismiss for mobile bottom sheet
   const touchStartY = useRef<number | null>(null);
   const currentTranslateY = useRef(0);
-  const SHEET_TRANSITION_MS = 300;
-  const DISMISS_TRANSITION = `transform ${SHEET_TRANSITION_MS}ms cubic-bezier(0.4,0,0.2,1)`;
+  const DISMISS_TRANSITION = `transform ${SHEET_TRANSITION_MS}ms ${SHEET_EASING}`;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -431,9 +431,10 @@ export function TripDetailSheet({
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+          "fixed inset-0 z-40 bg-background/40 dark:bg-background/50 backdrop-blur-[8px] transition-opacity",
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
+        style={{ transitionDuration: `${SHEET_TRANSITION_MS}ms` }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -448,9 +449,13 @@ export function TripDetailSheet({
           "fixed inset-x-0 bottom-0 z-50",
           "bg-card rounded-t-2xl shadow-elevated",
           "max-h-[92dvh] flex flex-col",
-          "transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+          "transition-transform",
           isOpen ? "translate-y-0" : "translate-y-full"
         )}
+        style={{
+          transitionDuration: `${SHEET_TRANSITION_MS}ms`,
+          transitionTimingFunction: SHEET_EASING,
+        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

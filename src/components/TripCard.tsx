@@ -12,8 +12,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
+import { SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 
-const SHEET_TRANSITION_MS = 300;
+const SHEET_ENTER_DELAY_MS = 24;
 
 interface TripCardProps {
   trip: ProcessedTrip;
@@ -47,6 +48,7 @@ export const TripCard = memo(function TripCard({
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -90,11 +92,17 @@ export const TripCard = memo(function TripCard({
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-    // Mount first in closed state, then open on the next frame so enter transition runs.
+    if (openTimerRef.current != null) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+    // Mount closed first, then open slightly later so browser paints initial state.
+    setIsDetailOpen(false);
     setIsDetailMounted(true);
-    requestAnimationFrame(() => {
+    openTimerRef.current = window.setTimeout(() => {
       setIsDetailOpen(true);
-    });
+      openTimerRef.current = null;
+    }, SHEET_ENTER_DELAY_MS);
   };
 
   const handleDetailClose = () => {
@@ -112,6 +120,9 @@ export const TripCard = memo(function TripCard({
     return () => {
       if (closeTimerRef.current != null) {
         window.clearTimeout(closeTimerRef.current);
+      }
+      if (openTimerRef.current != null) {
+        window.clearTimeout(openTimerRef.current);
       }
     };
   }, []);

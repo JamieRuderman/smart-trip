@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { X, AlertTriangle, Clock, DollarSign, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -99,7 +100,8 @@ function SheetContent({
   isNextTrip,
   showFerry,
   onClose,
-}: Omit<TripDetailSheetProps, "isOpen">) {
+  showCloseButton = true,
+}: Omit<TripDetailSheetProps, "isOpen"> & { showCloseButton?: boolean }) {
   const { t } = useTranslation();
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
@@ -195,13 +197,15 @@ function SheetContent({
           )}
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-muted transition-colors shrink-0"
-          aria-label="Close trip details"
-        >
-          <X className="h-5 w-5 text-muted-foreground" />
-        </button>
+        {showCloseButton && (
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-muted transition-colors shrink-0"
+            aria-label="Close trip details"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Status pills + countdown on same row */}
@@ -230,7 +234,7 @@ function SheetContent({
         )}
         <span className="flex items-center gap-1">
           <DollarSign className="h-3 w-3" aria-hidden="true" />
-          ${adultFare} adult
+          {adultFare} adult
         </span>
       </div>
 
@@ -323,12 +327,15 @@ export function TripDetailSheet({
   // Swipe-to-dismiss for mobile bottom sheet
   const touchStartY = useRef<number | null>(null);
   const currentTranslateY = useRef(0);
+  const DISMISS_TRANSITION = "transform 300ms cubic-bezier(0.4,0,0.2,1)";
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     currentTranslateY.current = 0;
     if (sheetRef.current) {
+      // Freeze at current position while dragging
       sheetRef.current.style.transition = "none";
+      sheetRef.current.style.transform = "translateY(0)";
     }
   };
 
@@ -342,12 +349,30 @@ export function TripDetailSheet({
 
   const handleTouchEnd = () => {
     if (!sheetRef.current) return;
-    sheetRef.current.style.transition = "";
+    const el = sheetRef.current;
+
     if (currentTranslateY.current > 100) {
+      // Dismiss: call onClose immediately so backdrop fades at the same time,
+      // then animate the sheet the rest of the way off-screen via inline style
+      // (inline style wins over the CSS class so no jumping)
       onClose();
+      el.style.transition = DISMISS_TRANSITION;
+      el.style.transform = "translateY(110%)";
+      setTimeout(() => {
+        // Class is now translate-y-full (100%) — close enough, clear inline style
+        el.style.transform = "";
+        el.style.transition = "";
+      }, 310);
     } else {
-      sheetRef.current.style.transform = "";
+      // Snap back: animate to 0, then hand control back to CSS class
+      el.style.transition = DISMISS_TRANSITION;
+      el.style.transform = "translateY(0)";
+      setTimeout(() => {
+        el.style.transform = "";
+        el.style.transition = "";
+      }, 310);
     }
+
     touchStartY.current = null;
     currentTranslateY.current = 0;
   };
@@ -355,23 +380,23 @@ export function TripDetailSheet({
   if (!isMobile) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-lg w-[calc(100vw-2rem)] p-0 overflow-hidden max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-lg w-[calc(100vw-2rem)] p-0 overflow-hidden max-h-[85vh] flex flex-col [&>button.absolute]:hidden">
           <DialogTitle className="sr-only">Trip {rest.trip.trip} details</DialogTitle>
           <div className="flex-1 overflow-hidden">
-            <SheetContent {...rest} onClose={onClose} />
+            <SheetContent {...rest} onClose={onClose} showCloseButton={true} />
           </div>
         </DialogContent>
       </Dialog>
     );
   }
 
-  // Mobile bottom sheet
-  return (
+  // Mobile bottom sheet — portalled to body so fixed covers the true full viewport
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/60 transition-opacity duration-300",
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -400,8 +425,9 @@ export function TripDetailSheet({
           <div className={cn("w-10 h-1 rounded-full", handleColor)} />
         </div>
 
-        <SheetContent {...rest} onClose={onClose} />
+        <SheetContent {...rest} onClose={onClose} showCloseButton={false} />
       </div>
-    </>
+    </>,
+    document.body
   );
 }

@@ -473,7 +473,8 @@ export function TripDetailSheet({
         aria-modal="true"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50",
-          "bg-card rounded-t-2xl shadow-2xl overflow-hidden",
+          "bg-card rounded-t-2xl overflow-hidden",
+          "[box-shadow:0_0_8px_rgba(0,0,0,0.35)]",
           "max-h-[92dvh] flex flex-col",
           "transition-transform",
           isOpen ? "translate-y-0" : "translate-y-full"

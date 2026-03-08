@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
@@ -17,6 +17,8 @@ import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
 import { NoTripsFound } from "./NoTripsFound";
 import { EmptyState } from "./EmptyState";
+import { TripDetailSheet } from "./TripDetailSheet";
+import { getDevFixture } from "@/lib/devFixtures";
 
 export function TrainScheduleApp() {
   const { version: scheduleDataVersion } = useScheduleData();
@@ -58,6 +60,13 @@ export function TrainScheduleApp() {
       setFromStation(closestStation);
     }
   }, [closestStation, fromStation, setFromStation]);
+
+  // Dev-only: ?devTrip=<scenario> opens the sheet with fixture data
+  const devFixture = useMemo(() => {
+    if (!import.meta.env.DEV) return null;
+    const param = new URLSearchParams(window.location.search).get("devTrip");
+    return param ? getDevFixture(param) : null;
+  }, []);
 
   return (
     <div
@@ -117,6 +126,22 @@ export function TrainScheduleApp() {
         {/* Bottom bar */}
         <BottomInfoBar />
       </main>
+
+      {/* Dev fixture sheet — only rendered in dev mode via ?devTrip=<scenario> */}
+      {devFixture && (
+        <TripDetailSheet
+          isOpen={true}
+          onClose={() => {}}
+          trip={devFixture.trip}
+          fromStation={devFixture.trip.fromStation}
+          toStation={devFixture.trip.toStation}
+          currentTime={currentTime}
+          realtimeStatus={devFixture.realtimeStatus}
+          timeFormat="12h"
+          isNextTrip={false}
+          showFerry={false}
+        />
+      )}
     </div>
   );
 }

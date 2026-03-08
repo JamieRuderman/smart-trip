@@ -84,6 +84,14 @@ export interface TripRealtimeStatus {
    */
   allStopLiveDepartures?: Partial<Record<string, string>>; // station name → "HH:MM"
   /**
+   * Per-stop delay in minutes, keyed by station name. Computed by diffing the
+   * GTFS-RT absolute departure timestamp against the app's own static schedule
+   * (same method as trip-level delayMinutes). Only entries with delay ≥ 1 min
+   * are stored. Use this instead of deriving delay from HH:MM string comparison,
+   * which is susceptible to rounding noise from schedule data mismatches.
+   */
+  allStopDelayMinutes?: Partial<Record<string, number>>;
+  /**
    * Whether the GTFS-RT feed has stop_time_updates for this trip (true = we have
    * real-time position data, false = position is estimated from static schedule).
    */

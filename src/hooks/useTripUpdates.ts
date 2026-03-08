@@ -53,20 +53,44 @@ function findStopUpdate(
   );
 }
 
-/** Build a map of station name → live departure "HH:MM" from all stop_time_updates */
+/**
+ * Build maps of station name → live departure "HH:MM" and per-stop delay minutes
+ * from all stop_time_updates. Delay is computed by diffing the GTFS-RT absolute
+ * departure timestamp against the app's own static schedule (same method as
+ * trip-level delay), so it is immune to rounding noise from schedule mismatches.
+ */
 function buildAllStopLiveDepartures(
-  stopTimeUpdates: GtfsRtStopTimeUpdate[]
-): Partial<Record<string, string>> {
-  const result: Partial<Record<string, string>> = {};
+  stopTimeUpdates: GtfsRtStopTimeUpdate[],
+  scheduledTimesByStation: Partial<Record<string, string>>,
+  startDate: string | undefined
+): {
+  allStopLiveDepartures: Partial<Record<string, string>>;
+  allStopDelayMinutes: Partial<Record<string, number>>;
+} {
+  const allStopLiveDepartures: Partial<Record<string, string>> = {};
+  const allStopDelayMinutes: Partial<Record<string, number>> = {};
+
   for (const stu of stopTimeUpdates) {
     if (!stu.stopId || !stu.departureTime) continue;
     const station = GTFS_STOP_ID_TO_STATION[stu.stopId];
-    if (station) {
-      // Each station has two platform IDs; last one wins (identical times in practice)
-      result[station] = unixToTimeString(stu.departureTime);
+    if (!station) continue;
+
+    // Each station has two platform IDs; last one wins (identical times in practice)
+    allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
+
+    // Compute delay against the app's own static schedule — same method as trip-level
+    // delay — to avoid false positives from GTFS static vs app schedule mismatches.
+    const scheduledHHMM = scheduledTimesByStation[station];
+    if (scheduledHHMM && startDate) {
+      const scheduledUnix = scheduledHHMMtoUnix(startDate, scheduledHHMM);
+      const delaySeconds = stu.departureTime - scheduledUnix;
+      if (delaySeconds >= MIN_DELAY_SECONDS) {
+        allStopDelayMinutes[station] = Math.round(delaySeconds / 60);
+      }
     }
   }
-  return result;
+
+  return { allStopLiveDepartures, allStopDelayMinutes };
 }
 
 function deriveStatus(
@@ -80,7 +104,10 @@ function deriveStatus(
    */
   scheduledDepartureParam: string | null,
   /** Scheduled arrival at toStation from the static timetable ("HH:MM"). */
-  scheduledArrivalParam: string | null
+  scheduledArrivalParam: string | null,
+  /** All static scheduled times for this trip, keyed by station name. Used to
+   *  compute per-stop delay against the app's own schedule (not GTFS static). */
+  scheduledTimesByStation: Partial<Record<string, string>>
 ): { scheduledDeparture: string | null; isStartTimeFallback?: boolean; status: TripRealtimeStatus } {
   if (update.scheduleRelationship === "CANCELED") {
     // Prefer the static scheduled departure as the key so the canceled badge
@@ -187,7 +214,11 @@ function deriveStatus(
     }
   }
 
-  const allStopLiveDepartures = buildAllStopLiveDepartures(update.stopTimeUpdates);
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildAllStopLiveDepartures(
+    update.stopTimeUpdates,
+    scheduledTimesByStation,
+    update.startDate
+  );
   const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
 
   return {
@@ -201,6 +232,7 @@ function deriveStatus(
       isOriginSkipped,
       isDestinationSkipped,
       allStopLiveDepartures,
+      allStopDelayMinutes,
       hasRealtimeStopData,
     },
   };
@@ -278,12 +310,23 @@ export function useTripRealtimeStatusMap(
       const scheduledDepartureParam = staticTrip?.departureTime ?? null;
       const scheduledArrivalParam = staticTrip?.arrivalTime ?? null;
 
+      // Build a per-station schedule map so deriveStatus can compute per-stop delay
+      // against the app's own static times (not the official GTFS static schedule).
+      const scheduledTimesByStation: Partial<Record<string, string>> = {};
+      if (staticTrip) {
+        for (const [station, idx] of Object.entries(stationIndexMap) as [Station, number][]) {
+          const t = staticTrip.times[idx];
+          if (t && t !== "--" && t !== "") scheduledTimesByStation[station] = t;
+        }
+      }
+
       const { scheduledDeparture, isStartTimeFallback, status } = deriveStatus(
         update,
         fromStation,
         toStation,
         scheduledDepartureParam,
-        scheduledArrivalParam
+        scheduledArrivalParam,
+        scheduledTimesByStation
       );
       if (scheduledDeparture) {
         if (isStartTimeFallback) {

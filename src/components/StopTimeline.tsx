@@ -62,6 +62,7 @@ export function StopTimeline({
   const displayTimes = isSouthbound ? times : [...times].reverse();
 
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
+  const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const hasRealtimeStopData = realtimeStatus?.hasRealtimeStopData ?? false;
 
   const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -147,11 +148,10 @@ export function StopTimeline({
           const showLiveStopTime =
             liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
-          // Per-stop delay in minutes
-          const perStopDelayMin =
-            showLiveStopTime
-              ? parseTimeToMinutes(liveStopTime!) - parseTimeToMinutes(time)
-              : 0;
+          // Per-stop delay in minutes — read from the pre-computed map that diffs
+          // GTFS-RT timestamps against the app's own static schedule, so it's immune
+          // to rounding noise from differences between the two schedule data sources.
+          const perStopDelayMin = allStopDelayMinutes?.[station] ?? 0;
           const hasPerStopDelay = perStopDelayMin > 0 && !isPast;
 
           // Which time to display (live if available)

@@ -6,10 +6,11 @@ import {
 } from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { TimeDisplay } from "./TimeDisplay";
+import { TripIcon } from "@/components/icons/TripIcon";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
-import { MapPin, Circle } from "lucide-react";
+import { Circle, CornerDownRight, MapPin } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -126,31 +127,9 @@ export function StopTimeline({
   ]);
 
   const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const isDelayed = !isCanceled && realtimeStatus?.delayMinutes != null;
-  const delayMinutes = realtimeStatus?.delayMinutes;
 
   return (
     <div className="flex flex-col">
-      {isDelayed && delayMinutes != null && (
-        <p className="text-xs text-smart-gold mb-3 px-1">
-          {t("tracker.runningLate", { minutes: delayMinutes })}
-        </p>
-      )}
-      {isCanceled && (
-        <p className="text-xs text-destructive mb-3 px-1">
-          {t("tracker.tripCanceled")}
-        </p>
-      )}
-      {!isCanceled && (
-        <p className="text-xs text-muted-foreground mb-3 px-1">
-          {inferred.confidence === "high"
-            ? t("tracker.confidenceHigh")
-            : inferred.confidence === "medium"
-            ? t("tracker.confidenceMedium")
-            : t("tracker.confidenceLow")}
-        </p>
-      )}
-
       <div className="relative">
         {displayStops.map((station, i) => {
           const time = displayTimes[i];
@@ -168,149 +147,165 @@ export function StopTimeline({
           const showLiveStopTime =
             liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
-          const showLiveFrom = isFrom && isDelayed && realtimeStatus?.liveDepartureTime;
-          const showLiveTo =
-            isTo && !isFrom && isDelayed && realtimeStatus?.liveArrivalTime;
+          // Per-stop delay in minutes
+          const perStopDelayMin =
+            showLiveStopTime
+              ? parseTimeToMinutes(liveStopTime!) - parseTimeToMinutes(time)
+              : 0;
+          const hasPerStopDelay = perStopDelayMin > 0 && !isPast;
 
+          // Which time to display (live if available)
+          const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
+          const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
+
+          // Status pills
           const isBoardingStop = isFrom && !isPast;
           const isDepartedStop = isFrom && isPast;
 
-          return (
-            <div key={station} className="flex items-start gap-3 relative">
-              <div className="flex flex-col items-center w-5 shrink-0">
-                <div
-                  className={cn(
-                    "w-px flex-1",
-                    isFirst ? "invisible" : isPast ? "bg-muted-foreground/40" : "bg-border"
-                  )}
-                  style={{ minHeight: 8 }}
-                />
+          // Row accent colour drives both station name and time colour
+          type Accent = "green" | "gold" | "muted" | "destructive" | "default";
+          const accent: Accent = isCanceled
+            ? "destructive"
+            : isCurrent || isTo
+            ? "green"
+            : hasPerStopDelay
+            ? "gold"
+            : isPast
+            ? "muted"
+            : "default";
 
-                {isFrom || isTo ? (
-                  <MapPin
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      isCanceled
-                        ? "text-destructive"
-                        : isPast && isFrom
-                        ? "text-muted-foreground"
-                        : isFrom
-                        ? "text-smart-train-green"
-                        : "text-primary"
-                    )}
-                  />
-                ) : isCurrent ? (
-                  <div className="h-3 w-3 rounded-full bg-smart-train-green shadow-[0_0_6px_2px_hsl(var(--smart-train-green)/0.4)] shrink-0" />
-                ) : isPast ? (
-                  <Circle className="h-3 w-3 text-muted-foreground/50 fill-muted-foreground/20 shrink-0" />
-                ) : (
-                  <Circle className="h-3 w-3 text-border shrink-0" />
+          const accentText: Record<Accent, string> = {
+            green: "text-smart-train-green",
+            gold: "text-smart-gold",
+            muted: "text-muted-foreground/50",
+            destructive: "text-destructive",
+            default: "text-foreground",
+          };
+
+          // Pill shown to the right of station name
+          type Pill = { label: string; cls: string } | null;
+          const pill: Pill = isBoardingStop
+            ? { label: t("tracker.boarding"), cls: "bg-smart-train-green text-white" }
+            : isDepartedStop
+            ? { label: t("tracker.departed"), cls: "bg-muted-foreground/40 text-white" }
+            : isTo && !isFrom
+            ? { label: t("tracker.arriving"), cls: "bg-primary text-white" }
+            : hasPerStopDelay
+            ? {
+                label: t("tripCard.delayed", { minutes: perStopDelayMin }),
+                cls: "bg-smart-gold text-white",
+              }
+            : null;
+
+          // Icon(s) in the left column
+          // Current origin: show both TripIcon (where train is) + MapPin (boarding point)
+          const icon =
+            isCurrent && isFrom ? (
+              <div className="flex items-center gap-0.5">
+                <TripIcon className="h-4 w-4 text-smart-train-green" />
+                <MapPin className="h-3.5 w-3.5 text-smart-train-green" />
+              </div>
+            ) : isCurrent ? (
+              <TripIcon className="h-4 w-4 text-smart-train-green" />
+            ) : isTo ? (
+              <CornerDownRight
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  isCanceled ? "text-destructive" : "text-primary"
                 )}
+                style={{ strokeWidth: 3 }}
+              />
+            ) : isPast ? (
+              <Circle className="h-2.5 w-2.5 text-muted-foreground/30 fill-muted-foreground/20 shrink-0" />
+            ) : (
+              <Circle className="h-2.5 w-2.5 text-border shrink-0" />
+            );
 
-                <div
-                  className={cn(
-                    "w-px flex-1",
-                    isLast ? "invisible" : isPast || isCurrent ? "bg-muted-foreground/40" : "bg-border"
-                  )}
-                  style={{ minHeight: 8 }}
-                />
+          // Connector line colour
+          const lineAbove = isFirst
+            ? "invisible"
+            : isPast
+            ? "bg-muted-foreground/30"
+            : "bg-border";
+          const lineBelow = isLast
+            ? "invisible"
+            : isPast || isCurrent
+            ? "bg-muted-foreground/30"
+            : "bg-border";
+
+          return (
+            <div
+              key={station}
+              className={cn(
+                "flex items-center gap-3 relative",
+                isCurrent && "bg-smart-train-green/10 rounded-lg"
+              )}
+            >
+              {/* Icon column — w-[5rem] matches TrainBadge; gap-3 matches header spacing
+                  so station names align with "On time" / times in the header band */}
+              <div className="flex flex-col items-center w-[5rem] shrink-0 self-stretch">
+                <div className={cn("w-px flex-1", lineAbove)} style={{ minHeight: 6 }} />
+                {icon}
+                <div className={cn("w-px flex-1", lineBelow)} style={{ minHeight: 6 }} />
               </div>
 
-              <div
-                className={cn(
-                  "flex items-center justify-between w-full py-1.5 min-h-[36px]",
-                  isPast && !isFrom && !isTo && "opacity-40"
-                )}
-              >
-                <div className="flex flex-col">
+              {/* Row content */}
+              <div className="flex items-center flex-1 py-2.5 pr-3 gap-2 min-w-0">
+                {/* Station name */}
+                <span
+                  className={cn(
+                    "text-sm flex-1 min-w-0 truncate",
+                    (isCurrent || isTo || (isFrom && !isPast)) && "font-semibold",
+                    isCanceled ? "line-through" : "",
+                    accentText[accent]
+                  )}
+                >
+                  {station}
+                </span>
+
+                {/* Pill */}
+                {pill && (
                   <span
                     className={cn(
-                      "text-sm leading-tight",
-                      isFrom || isTo
-                        ? isCanceled
-                          ? "text-destructive font-medium"
-                          : isPast && isFrom
-                          ? "text-muted-foreground font-medium"
-                          : "text-smart-train-green font-semibold"
-                        : isCurrent
-                        ? "font-medium"
-                        : "text-foreground"
+                      "text-xs font-medium px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap",
+                      pill.cls
                     )}
                   >
-                    {station}
+                    {pill.label}
                   </span>
-                  {isBoardingStop && (
-                    <span className="text-xs text-smart-train-green/80">
-                      {t("tracker.boarding")}
-                    </span>
-                  )}
-                  {isDepartedStop && (
-                    <span className="text-xs text-muted-foreground">
-                      {t("tracker.departed")}
-                    </span>
-                  )}
-                  {isTo && !isFrom && (
-                    <span className="text-xs text-primary/80">{t("tracker.arriving")}</span>
-                  )}
-                </div>
+                )}
 
+                {/* Time */}
                 {hasTime && (
-                  <div className="flex flex-col items-end shrink-0 ml-2">
-                    {showLiveFrom && (
-                      <>
-                        <TimeDisplay
-                          time={realtimeStatus!.liveDepartureTime!}
-                          format={timeFormat}
-                          className="text-sm text-smart-gold"
-                        />
-                        <TimeDisplay
-                          time={time}
-                          format={timeFormat}
-                          className="text-xs line-through text-muted-foreground"
-                        />
-                      </>
-                    )}
-                    {showLiveTo && (
-                      <>
-                        <TimeDisplay
-                          time={realtimeStatus!.liveArrivalTime!}
-                          format={timeFormat}
-                          className="text-sm text-smart-gold"
-                        />
-                        <TimeDisplay
-                          time={time}
-                          format={timeFormat}
-                          className="text-xs line-through text-muted-foreground"
-                        />
-                      </>
-                    )}
-                    {!showLiveFrom && !showLiveTo && (
-                      <>
-                        {showLiveStopTime && (
-                          <TimeDisplay
-                            time={liveStopTime!}
-                            format={timeFormat}
-                            className="text-sm text-smart-gold"
-                          />
+                  <div className="shrink-0">
+                    {showLiveFrom ? (
+                      <TimeDisplay
+                        time={realtimeStatus!.liveDepartureTime!}
+                        format={timeFormat}
+                        className={cn("text-sm", accentText[accent])}
+                      />
+                    ) : showLiveTo ? (
+                      <TimeDisplay
+                        time={realtimeStatus!.liveArrivalTime!}
+                        format={timeFormat}
+                        className={cn("text-sm", accentText[accent])}
+                      />
+                    ) : showLiveStopTime ? (
+                      <TimeDisplay
+                        time={liveStopTime!}
+                        format={timeFormat}
+                        className={cn("text-sm", accentText[accent])}
+                      />
+                    ) : (
+                      <TimeDisplay
+                        time={time}
+                        format={timeFormat}
+                        className={cn(
+                          "text-sm",
+                          isCanceled ? "line-through" : "",
+                          accentText[accent]
                         )}
-                        <TimeDisplay
-                          time={time}
-                          format={timeFormat}
-                          className={cn(
-                            showLiveStopTime
-                              ? "text-xs line-through text-muted-foreground"
-                              : "text-sm",
-                            !showLiveStopTime &&
-                              (isCanceled
-                                ? "line-through text-destructive"
-                                : isFrom && !isPast
-                                ? "text-smart-train-green"
-                                : isPast
-                                ? "text-muted-foreground"
-                                : "text-foreground")
-                          )}
-                        />
-                      </>
+                      />
                     )}
                   </div>
                 )}

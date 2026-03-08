@@ -76,6 +76,7 @@ export default {
           gold: "hsl(var(--smart-gold))" /* #E48E25 */,
           "dark-green": "hsl(var(--smart-dark-green))",
           "light-green": "hsl(var(--smart-light-green))",
+          neutral: "hsl(228deg 2.65% 62.94%)" /* default sheet header */,
         },
         // Transit-specific colors
         transit: {

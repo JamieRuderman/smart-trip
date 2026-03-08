@@ -9,6 +9,7 @@ interface TrainBadgeProps {
   isCanceled?: boolean;
   isSkipped?: boolean;
   isDelayed?: boolean;
+  onColoredBg?: boolean;
 }
 
 export function TrainBadge({
@@ -19,12 +20,15 @@ export function TrainBadge({
   isCanceled = false,
   isSkipped = false,
   isDelayed = false,
+  onColoredBg = false,
 }: TrainBadgeProps) {
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 w-[5rem]",
-        isCanceled || isSkipped
+        onColoredBg
+          ? "text-white"
+          : isCanceled || isSkipped
           ? "text-destructive"
           : isDelayed
           ? "text-smart-gold"

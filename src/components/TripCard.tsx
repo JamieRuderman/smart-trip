@@ -145,7 +145,7 @@ export const TripCard = memo(function TripCard({
       <div
         ref={cardRef}
         className={cn(
-          "flex items-center px-4 py-2 rounded-lg border-2 transition-all",
+          "flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
           isCanceledOrSkipped

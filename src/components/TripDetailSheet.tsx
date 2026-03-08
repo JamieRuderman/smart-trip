@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { X, AlertTriangle, Clock, DollarSign, MapPin } from "lucide-react";
+import { X, AlertTriangle, Clock, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
@@ -11,7 +11,6 @@ import { calculateZonesBetweenStations, stationIndexMap } from "@/lib/stationUti
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TrainBadge } from "./TrainBadge";
 import { TimeDisplay } from "./TimeDisplay";
-import { TripStatusPills } from "./TripStatusPills";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import {
@@ -71,38 +70,6 @@ function computeMinutes(
   return depMinutes - nowMinutes;
 }
 
-function CountdownDisplay({ minutesUntil, isCanceled }: { minutesUntil: number; isCanceled: boolean }) {
-  const { t } = useTranslation();
-  if (isCanceled) return null;
-  if (minutesUntil > 60) {
-    const h = Math.floor(minutesUntil / 60);
-    const m = minutesUntil % 60;
-    return (
-      <span className="text-smart-train-green font-medium text-sm">
-        {t("tracker.departsInHoursMinutes", { hours: h, minutes: m })}
-      </span>
-    );
-  }
-  if (minutesUntil > 2) {
-    return (
-      <span className="text-smart-train-green font-medium text-sm">
-        {t("tracker.departsInMinutes", { minutes: minutesUntil })}
-      </span>
-    );
-  }
-  if (minutesUntil >= -2) {
-    return (
-      <span className="text-smart-train-green font-semibold text-sm animate-pulse">
-        {t("tracker.nowBoarding")}
-      </span>
-    );
-  }
-  return (
-    <span className="text-muted-foreground text-sm">
-      {t("tracker.departedMinutesAgo", { minutes: Math.abs(minutesUntil) })}
-    </span>
-  );
-}
 
 function SheetContent({
   trip,
@@ -170,47 +137,62 @@ function SheetContent({
 
   const hasQuickConnection = hasOutboundQuickConnection || hasInboundQuickConnection;
 
-  const getTimeToneClass = (hasLiveTime: boolean) =>
-    isCanceledOrSkipped
-      ? "line-through text-destructive"
-      : isDelayed || hasLiveTime
-      ? "text-smart-gold"
-      : isNextTrip
-      ? "text-smart-train-green"
-      : undefined;
+  // Solid status color for the header band
+  const headerBg = isCanceledOrSkipped
+    ? "bg-destructive"
+    : isDelayed
+    ? "bg-smart-gold"
+    : isNextTrip
+    ? "bg-smart-train-green"
+    : "bg-smart-neutral";
 
   const trainOption = hasInboundQuickConnection ? t("quickConnection.laterTrain") : t("quickConnection.earlierTrain");
 
+  // Short status label shown above times inside the header band
+  const statusLabel = isCanceled
+    ? t("tripCard.canceled")
+    : isOriginSkipped
+    ? t("tripCard.stopSkipped")
+    : isDelayed
+    ? t("tripCard.delayed", { minutes: delayDisplay })
+    : showOnTimeBadge
+    ? t("tripCard.onTime")
+    : null;
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header — mirrors trip card layout: badge | times | close */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-2 shrink-0">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Header band — status color background with white text */}
+      <div className={cn("flex items-center gap-3 px-4 pt-4 pb-3 shrink-0", headerBg)}>
         <TrainBadge
           tripNumber={trip.trip}
           isNextTrip={isNextTrip}
           isCanceled={isCanceled}
           isSkipped={isOriginSkipped}
           isDelayed={isDelayed}
+          onColoredBg={true}
         />
 
-        {/* Times block — same structure as TripCard */}
+        {/* Status label + times stacked */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-lg">
+          {statusLabel && (
+            <p className="text-xs text-white/80 mb-0.5 font-medium">{statusLabel}</p>
+          )}
+          <div className="flex items-center gap-2 text-lg font-semibold">
             <TimeDisplay
               time={departureTime}
               format={timeFormat}
-              className={getTimeToneClass(!!realtimeStatus?.liveDepartureTime)}
+              className={isCanceledOrSkipped ? "line-through text-white" : "text-white"}
             />
-            <span className="text-muted-foreground">→</span>
+            <span className="text-white/60 font-normal">→</span>
             <TimeDisplay
               time={arrivalTime}
               format={timeFormat}
-              className={getTimeToneClass(!!realtimeStatus?.liveArrivalTime)}
+              className={isCanceledOrSkipped ? "line-through text-white" : "text-white"}
             />
           </div>
-          {/* Strikethrough original times when delayed */}
+          {/* Original (scheduled) times struck through when delayed */}
           {isDelayed && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+            <div className="flex items-center gap-2 text-xs mt-0.5 text-white/50">
               <TimeDisplay time={trip.departureTime} format={timeFormat} className="text-xs line-through" />
               {realtimeStatus?.liveArrivalTime && (
                 <>
@@ -225,42 +207,85 @@ function SheetContent({
         {showCloseButton && (
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-muted transition-colors shrink-0"
+            className="p-2 rounded-full transition-colors shrink-0 hover:bg-white/20"
             aria-label={t("tracker.closeTripDetails")}
           >
-            <X className="h-5 w-5 text-muted-foreground" />
+            <X className="h-5 w-5 text-white" />
           </button>
         )}
       </div>
 
-      {/* Status pills + countdown on same row */}
-      <div className="px-4 pb-2 shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <TripStatusPills
-          isCanceled={isCanceled}
-          isOriginSkipped={isOriginSkipped}
-          isDelayed={isDelayed}
-          showOnTimeBadge={showOnTimeBadge}
-          delayDisplay={delayDisplay}
-        />
-        <CountdownDisplay minutesUntil={minutesUntil} isCanceled={isCanceled} />
-      </div>
+      {/*
+        All rows share the same two-column layout as the header band:
+          col-1: w-[5rem]  icon gutter  (= TrainBadge width)
+          col-2: flex-1    text content
+          gap:   gap-3     (= header gap-3 between badge and text)
+        Result: every text baseline aligns with "On time" / times in the header.
+      */}
 
-      {/* Metadata row: duration · stops · fare */}
-      <div className="px-4 pb-3 shrink-0 flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {tripDurationLabel}
-        </span>
-        {stopCount > 0 && (
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" aria-hidden="true" />
-            {t("tracker.stopCount", { count: stopCount })}
+      {/* Large countdown */}
+      {!isCanceledOrSkipped && minutesUntil > -30 && (
+        <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
+          <div className="w-[5rem] shrink-0 flex justify-center">
+            <Clock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
+          </div>
+          {minutesUntil > 60 ? (
+            <span className="text-2xl font-semibold">
+              {Math.floor(minutesUntil / 60)}h {minutesUntil % 60}m
+            </span>
+          ) : minutesUntil >= 1 ? (
+            <span className="text-2xl font-semibold">
+              {t("tracker.departsInMinutes", { minutes: minutesUntil })}
+            </span>
+          ) : minutesUntil === 0 ? (
+            <span className="text-2xl font-semibold text-smart-train-green">
+              {t("tracker.nowBoarding")}
+            </span>
+          ) : (
+            <span className="text-base text-muted-foreground">
+              {t("tracker.departedMinutesAgo", { minutes: Math.abs(minutesUntil) })}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Metadata: duration · stops · fare + confidence */}
+      <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="w-[5rem] shrink-0 flex justify-center">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          </div>
+          {/* All metadata text in one inline block so gap-3 only applies between icon and text */}
+          <span className="flex items-center gap-1 flex-wrap">
+            <span>{tripDurationLabel}</span>
+            {stopCount > 0 && (
+              <>
+                <span className="mx-1">·</span>
+                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{t("tracker.stopCount", { count: stopCount })}</span>
+              </>
+            )}
+            {parseFloat(adultFare) > 0 && (
+              <>
+                <span className="mx-1">·</span>
+                <span>{t("tracker.adultFare", { fare: adultFare })}</span>
+              </>
+            )}
           </span>
+        </div>
+        {/* Confidence — w-[5rem] spacer + gap-3 keeps text on same column as above */}
+        {!isCanceled && (
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="w-[5rem] shrink-0" aria-hidden="true" />
+            <span>
+              {lat != null && lng != null
+                ? t("tracker.confidenceHigh")
+                : realtimeStatus?.hasRealtimeStopData
+                ? t("tracker.confidenceMedium")
+                : t("tracker.confidenceLow")}
+            </span>
+          </div>
         )}
-        <span className="flex items-center gap-1">
-          <DollarSign className="h-3 w-3" aria-hidden="true" />
-          {t("tracker.adultFare", { fare: adultFare })}
-        </span>
       </div>
 
       {/* Quick connection warning */}
@@ -280,10 +305,8 @@ function SheetContent({
         </div>
       )}
 
-      <div className="mx-4 mb-1 border-t border-border shrink-0" />
-
       {/* Scrollable stop timeline */}
-      <div className="flex-1 overflow-y-auto px-4 pt-2" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
+      <div className="flex-1 overflow-y-auto px-4 pt-1" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
         <StopTimeline
           trip={trip}
           fromStation={fromStation}
@@ -329,17 +352,17 @@ export function TripDetailSheet({
   const isMobile = useIsMobile();
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  // Derive accent color class for the drag handle based on trip status
   const isCanceled = rest.realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = rest.realtimeStatus?.isOriginSkipped ?? false;
   const isDelayed = !(isCanceled || isOriginSkipped) && rest.realtimeStatus?.delayMinutes != null;
-  const handleColor = isCanceled || isOriginSkipped
-    ? "bg-destructive/60"
+  // Header band color — matches SheetContent's headerBg
+  const headerBg = isCanceled || isOriginSkipped
+    ? "bg-destructive"
     : isDelayed
-    ? "bg-smart-gold/60"
+    ? "bg-smart-gold"
     : rest.isNextTrip
-    ? "bg-smart-train-green/60"
-    : "bg-muted-foreground/30";
+    ? "bg-smart-train-green"
+    : "bg-smart-neutral";
 
   // Prevent body scroll when sheet is open on mobile
   useEffect(() => {
@@ -412,7 +435,7 @@ export function TripDetailSheet({
           <DialogTitle className="sr-only">
             {t("tracker.tripDetailsAria", { trip: rest.trip.trip })}
           </DialogTitle>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <SheetContent
               {...rest}
               onClose={onClose}
@@ -447,7 +470,7 @@ export function TripDetailSheet({
         aria-modal="true"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50",
-          "bg-card rounded-t-2xl shadow-elevated",
+          "bg-card rounded-t-2xl shadow-2xl overflow-hidden",
           "max-h-[92dvh] flex flex-col",
           "transition-transform",
           isOpen ? "translate-y-0" : "translate-y-full"
@@ -460,9 +483,9 @@ export function TripDetailSheet({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Drag handle — color reflects trip status */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className={cn("w-10 h-1 rounded-full", handleColor)} />
+        {/* Drag handle — sits on the same status-color band as the header */}
+        <div className={cn("flex justify-center pt-3 pb-1 shrink-0", headerBg)}>
+          <div className="w-10 h-1 rounded-full bg-white/40" />
         </div>
 
         <SheetContent

@@ -290,13 +290,13 @@ export function useTripRealtimeStatusMap(
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
     // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
     // originate at the northernmost station (times[0]); northbound at the southernmost (times[last]).
-    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string }>();
+    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string; times: string[] }>();
     for (const trip of trips) {
       const originTime = isSouthbound
         ? trip.times[0]
         : trip.times[trip.times.length - 1];
       if (originTime) {
-        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime });
+        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime, times: trip.times });
       }
     }
 

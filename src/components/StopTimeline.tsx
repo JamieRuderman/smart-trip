@@ -148,11 +148,13 @@ export function StopTimeline({
           const showLiveStopTime =
             liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
-          // Per-stop delay in minutes — read from the pre-computed map that diffs
-          // GTFS-RT timestamps against the app's own static schedule, so it's immune
-          // to rounding noise from differences between the two schedule data sources.
+          // Per-stop delay in minutes — only shown when the trip is delayed overall.
+          // If the train departed on time it cannot be late at intermediate stops;
+          // any apparent difference is schedule data noise between the GTFS-RT feed
+          // and the app's hardcoded schedule.
+          const tripIsDelayed = (realtimeStatus?.delayMinutes ?? 0) > 0;
           const perStopDelayMin = allStopDelayMinutes?.[station] ?? 0;
-          const hasPerStopDelay = perStopDelayMin > 0 && !isPast;
+          const hasPerStopDelay = tripIsDelayed && perStopDelayMin > 0 && !isPast;
 
           // Which time to display (live if available)
           const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;

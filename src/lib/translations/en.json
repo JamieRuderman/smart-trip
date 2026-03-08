@@ -145,9 +145,6 @@
     "confidenceHigh": "Confidence: High (GPS)",
     "confidenceMedium": "Confidence: Medium (Realtime)",
     "confidenceLow": "Confidence: Low (Schedule)",
-    "boarding": "Boarding",
-    "departed": "Departed",
-    "arriving": "Arriving",
     "tripLabel": "Trip"
   }
 }

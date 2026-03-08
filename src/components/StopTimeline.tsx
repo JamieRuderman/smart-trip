@@ -158,18 +158,14 @@ export function StopTimeline({
           const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
           const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
 
-          // Status pills
-          const isBoardingStop = isFrom && !isPast;
-          const isDepartedStop = isFrom && isPast;
-
           // Row accent colour drives both station name and time colour
           type Accent = "green" | "gold" | "muted" | "destructive" | "default";
           const accent: Accent = isCanceled
             ? "destructive"
-            : isCurrent || isTo
-            ? "green"
             : hasPerStopDelay
             ? "gold"
+            : isCurrent
+            ? "green"
             : isPast
             ? "muted"
             : "default";
@@ -184,13 +180,7 @@ export function StopTimeline({
 
           // Pill shown to the right of station name
           type Pill = { label: string; cls: string } | null;
-          const pill: Pill = isBoardingStop
-            ? { label: t("tracker.boarding"), cls: "bg-smart-train-green text-white" }
-            : isDepartedStop
-            ? { label: t("tracker.departed"), cls: "bg-muted-foreground/40 text-white" }
-            : isTo && !isFrom
-            ? { label: t("tracker.arriving"), cls: "bg-primary text-white" }
-            : hasPerStopDelay
+          const pill: Pill = hasPerStopDelay
             ? {
                 label: t("tripCard.delayed", { minutes: perStopDelayMin }),
                 cls: "bg-smart-gold text-white",
@@ -265,7 +255,7 @@ export function StopTimeline({
               </div>
 
               {/* Row content */}
-              <div className="flex items-center flex-1 py-2.5 pr-3 gap-2 min-w-0">
+              <div className="flex items-center flex-1 py-1.5 pr-3 gap-2 min-w-0">
                 {/* Station name */}
                 <span
                   className={cn(

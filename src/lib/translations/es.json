@@ -145,9 +145,6 @@
     "confidenceHigh": "Confianza: Alta (GPS)",
     "confidenceMedium": "Confianza: Media (Tiempo real)",
     "confidenceLow": "Confianza: Baja (Horario)",
-    "boarding": "Abordando",
-    "departed": "Salió",
-    "arriving": "Llegando",
     "tripLabel": "Tren"
   }
 }

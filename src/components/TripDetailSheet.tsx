@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { X, AlertTriangle, Clock, MapPin } from "lucide-react";
+import { X, AlertTriangle, AlarmClock, Clock, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
@@ -163,14 +163,18 @@ function SheetContent({
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Header band — status color background with white text */}
       <div className={cn("flex items-center gap-3 px-4 pt-4 pb-3 shrink-0", headerBg)}>
-        <TrainBadge
-          tripNumber={trip.trip}
-          isNextTrip={isNextTrip}
-          isCanceled={isCanceled}
-          isSkipped={isOriginSkipped}
-          isDelayed={isDelayed}
-          onColoredBg={true}
-        />
+        {/* "Trip" label above badge — mirrors "On time" label above times */}
+        <div className="flex flex-col items-start shrink-0">
+          <p className="text-xs text-white/80 font-medium mb-0.5">{t("tracker.tripLabel")}</p>
+          <TrainBadge
+            tripNumber={trip.trip}
+            isNextTrip={isNextTrip}
+            isCanceled={isCanceled}
+            isSkipped={isOriginSkipped}
+            isDelayed={isDelayed}
+            onColoredBg={true}
+          />
+        </div>
 
         {/* Status label + times stacked */}
         <div className="flex-1 min-w-0">
@@ -227,7 +231,7 @@ function SheetContent({
       {!isCanceledOrSkipped && minutesUntil > -30 && (
         <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
           <div className="w-[5rem] shrink-0 flex justify-center">
-            <Clock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
+            <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
           </div>
           {minutesUntil > 60 ? (
             <span className="text-2xl font-semibold">
@@ -252,11 +256,10 @@ function SheetContent({
       {/* Metadata: duration · stops · fare + confidence */}
       <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <div className="w-[5rem] shrink-0 flex justify-center">
-            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-          </div>
-          {/* All metadata text in one inline block so gap-3 only applies between icon and text */}
+          {/* w-[5rem] spacer keeps text aligned with stop names; icons are inline */}
+          <div className="w-[5rem] shrink-0" aria-hidden="true" />
           <span className="flex items-center gap-1 flex-wrap">
+            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{tripDurationLabel}</span>
             {stopCount > 0 && (
               <>

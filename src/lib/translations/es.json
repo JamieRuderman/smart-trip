@@ -147,6 +147,7 @@
     "confidenceLow": "Confianza: Baja (Horario)",
     "boarding": "Abordando",
     "departed": "Salió",
-    "arriving": "Llegando"
+    "arriving": "Llegando",
+    "tripLabel": "Tren"
   }
 }

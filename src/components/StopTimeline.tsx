@@ -197,29 +197,31 @@ export function StopTimeline({
               }
             : null;
 
-          // Icon(s) in the left column
-          // Current origin: show both TripIcon (where train is) + MapPin (boarding point)
-          const icon =
-            isCurrent && isFrom ? (
-              <div className="flex items-center gap-0.5">
-                <TripIcon className="h-4 w-4 text-smart-train-green" />
-                <MapPin className="h-3.5 w-3.5 text-smart-train-green" />
-              </div>
-            ) : isCurrent ? (
-              <TripIcon className="h-4 w-4 text-smart-train-green" />
-            ) : isTo ? (
-              <CornerDownRight
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  isCanceled ? "text-destructive" : "text-primary"
-                )}
-                style={{ strokeWidth: 3 }}
-              />
-            ) : isPast ? (
-              <Circle className="h-2.5 w-2.5 text-muted-foreground/30 fill-muted-foreground/20 shrink-0" />
-            ) : (
-              <Circle className="h-2.5 w-2.5 text-border shrink-0" />
-            );
+          // Stop-point icon (right sub-column): origin pin, destination arrow, or dot
+          const stopIcon = isFrom ? (
+            <MapPin
+              className={cn(
+                "h-4 w-4 shrink-0",
+                isCanceled
+                  ? "text-destructive"
+                  : isPast
+                  ? "text-muted-foreground/40"
+                  : "text-smart-train-green"
+              )}
+            />
+          ) : isTo ? (
+            <CornerDownRight
+              className={cn(
+                "h-4 w-4 shrink-0",
+                isCanceled ? "text-destructive" : "text-primary"
+              )}
+              style={{ strokeWidth: 3 }}
+            />
+          ) : isPast ? (
+            <Circle className="h-2.5 w-2.5 text-muted-foreground/30 fill-muted-foreground/20 shrink-0" />
+          ) : (
+            <Circle className="h-2.5 w-2.5 text-border shrink-0" />
+          );
 
           // Connector line colour
           const lineAbove = isFirst
@@ -241,12 +243,25 @@ export function StopTimeline({
                 isCurrent && "bg-smart-train-green/10 rounded-lg"
               )}
             >
-              {/* Icon column — w-[5rem] matches TrainBadge; gap-3 matches header spacing
-                  so station names align with "On time" / times in the header band */}
-              <div className="flex flex-col items-center w-[5rem] shrink-0 self-stretch">
-                <div className={cn("w-px flex-1", lineAbove)} style={{ minHeight: 6 }} />
-                {icon}
-                <div className={cn("w-px flex-1", lineBelow)} style={{ minHeight: 6 }} />
+              {/*
+                Icon column — total w-[5rem] split into two sub-columns:
+                  Left  (~w-6): train position indicator — TripIcon when current, empty otherwise
+                  Right (flex-1): stop-point with vertical connector line
+                gap-3 between this column and text mirrors header badge→text spacing
+              */}
+              <div className="flex self-stretch shrink-0 w-[5rem]">
+                {/* Left sub-column: train position */}
+                <div className="flex items-center justify-center w-6 shrink-0">
+                  {isCurrent && (
+                    <TripIcon className="h-4 w-4 text-smart-train-green" />
+                  )}
+                </div>
+                {/* Right sub-column: vertical connector + stop icon */}
+                <div className="flex flex-col items-center flex-1">
+                  <div className={cn("w-px flex-1", lineAbove)} style={{ minHeight: 6 }} />
+                  {stopIcon}
+                  <div className={cn("w-px flex-1", lineBelow)} style={{ minHeight: 6 }} />
+                </div>
               </div>
 
               {/* Row content */}

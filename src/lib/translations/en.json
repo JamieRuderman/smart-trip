@@ -147,6 +147,7 @@
     "confidenceLow": "Confidence: Low (Schedule)",
     "boarding": "Boarding",
     "departed": "Departed",
-    "arriving": "Arriving"
+    "arriving": "Arriving",
+    "tripLabel": "Trip"
   }
 }

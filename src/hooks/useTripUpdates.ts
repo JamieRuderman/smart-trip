@@ -54,12 +54,26 @@ function findStopUpdate(
 }
 
 /**
- * Build maps of station name → live departure "HH:MM" and per-stop delay minutes
- * from all stop_time_updates. Delay is computed by diffing the GTFS-RT absolute
- * departure timestamp against the app's own static schedule (same method as
- * trip-level delay), so it is immune to rounding noise from schedule mismatches.
+ * Diff a live Unix timestamp against a static scheduled "HH:MM" on a given date,
+ * returning delay in whole minutes, or undefined if within the on-time threshold.
+ * Used for both trip-level and per-stop delay so the logic stays in one place.
  */
-function buildAllStopLiveDepartures(
+function computeDelayMinutes(
+  liveUnix: number,
+  scheduledHHMM: string,
+  startDate: string
+): number | undefined {
+  const delaySeconds = liveUnix - scheduledHHMMtoUnix(startDate, scheduledHHMM);
+  return delaySeconds >= MIN_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
+}
+
+/**
+ * Build maps of station name → live departure "HH:MM" and per-stop delay minutes
+ * from all stop_time_updates. Delay is computed via computeDelayMinutes against
+ * the app's own static schedule, so it is immune to rounding noise from
+ * differences between the GTFS static feed and the app's hardcoded schedule.
+ */
+function buildStopRealtimeData(
   stopTimeUpdates: GtfsRtStopTimeUpdate[],
   scheduledTimesByStation: Partial<Record<string, string>>,
   startDate: string | undefined
@@ -78,15 +92,10 @@ function buildAllStopLiveDepartures(
     // Each station has two platform IDs; last one wins (identical times in practice)
     allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
 
-    // Compute delay against the app's own static schedule — same method as trip-level
-    // delay — to avoid false positives from GTFS static vs app schedule mismatches.
     const scheduledHHMM = scheduledTimesByStation[station];
     if (scheduledHHMM && startDate) {
-      const scheduledUnix = scheduledHHMMtoUnix(startDate, scheduledHHMM);
-      const delaySeconds = stu.departureTime - scheduledUnix;
-      if (delaySeconds >= MIN_DELAY_SECONDS) {
-        allStopDelayMinutes[station] = Math.round(delaySeconds / 60);
-      }
+      const delay = computeDelayMinutes(stu.departureTime, scheduledHHMM, startDate);
+      if (delay != null) allStopDelayMinutes[station] = delay;
     }
   }
 
@@ -180,14 +189,13 @@ function deriveStatus(
   // Compute delay by diffing the live departure.time against the static scheduled time.
   // 511 always sends departureDelay: 0 even for delayed trains, so we cannot use
   // that field. Instead we rely on the static timetable passed in from the caller.
-  let delaySeconds: number;
-  if (scheduledDepartureParam && update.startDate) {
-    const scheduledUnix = scheduledHHMMtoUnix(update.startDate, scheduledDepartureParam);
-    delaySeconds = fromUpdate.departureTime - scheduledUnix;
-  } else {
-    // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-    delaySeconds = fromUpdate.departureDelay ?? 0;
-  }
+  const delayMinutes =
+    scheduledDepartureParam && update.startDate
+      ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
+      : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
+        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
+        ? Math.round(fromUpdate.departureDelay / 60)
+        : undefined;
 
   // The map key is the static scheduled departure — so ScheduleResults can look it
   // up by trip.departureTime (which also comes from the static schedule).
@@ -195,8 +203,7 @@ function deriveStatus(
     scheduledDepartureParam ??
     unixToTimeString(fromUpdate.departureTime - (fromUpdate.departureDelay ?? 0));
 
-  const isDelayed = delaySeconds >= MIN_DELAY_SECONDS;
-  const delayMinutes = isDelayed ? Math.round(delaySeconds / 60) : undefined;
+  const isDelayed = delayMinutes != null;
 
   // Live arrival time at destination: 511 also shifts arrivalTime forward when delayed,
   // but arrivalDelay is always 0 (same issue as departureDelay). Show the live arrival
@@ -206,15 +213,15 @@ function deriveStatus(
   if (toUpdate?.arrivalTime && isDelayed) {
     liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
     if (scheduledArrivalParam && update.startDate) {
-      const scheduledArrivalUnix = scheduledHHMMtoUnix(update.startDate, scheduledArrivalParam);
-      const arrivalDelaySeconds = toUpdate.arrivalTime - scheduledArrivalUnix;
-      if (arrivalDelaySeconds >= MIN_DELAY_SECONDS) {
-        arrivalDelayMinutes = Math.round(arrivalDelaySeconds / 60);
-      }
+      arrivalDelayMinutes = computeDelayMinutes(
+        toUpdate.arrivalTime,
+        scheduledArrivalParam,
+        update.startDate
+      );
     }
   }
 
-  const { allStopLiveDepartures, allStopDelayMinutes } = buildAllStopLiveDepartures(
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
     update.stopTimeUpdates,
     scheduledTimesByStation,
     update.startDate

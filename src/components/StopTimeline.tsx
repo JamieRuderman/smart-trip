@@ -1,9 +1,4 @@
 import { cn } from "@/lib/utils";
-import {
-  stationIndexMap,
-  getAllStations,
-  getClosestStationWithDistance,
-} from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { TimeDisplay } from "./TimeDisplay";
 import { TripIcon } from "@/components/icons/TripIcon";
@@ -11,8 +6,8 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Circle, CornerDownRight, MapPin } from "lucide-react";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useStopInference, type StopAccent } from "@/hooks/useStopInference";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
@@ -25,16 +20,13 @@ interface StopTimelineProps {
   currentLng?: number | null;
 }
 
-type StopState = "past" | "current" | "future";
-
-const HIGH_CONFIDENCE_DISTANCE_KM = 1.2;
-
-function clampIndex(index: number, length: number): number {
-  if (length === 0) return 0;
-  if (index < 0) return 0;
-  if (index >= length) return length - 1;
-  return index;
-}
+const accentText: Record<StopAccent, string> = {
+  green: "text-smart-train-green",
+  gold: "text-smart-gold",
+  muted: "text-muted-foreground/50",
+  destructive: "text-destructive",
+  default: "text-foreground",
+};
 
 export function StopTimeline({
   trip,
@@ -47,86 +39,19 @@ export function StopTimeline({
   currentLng,
 }: StopTimelineProps) {
   const { t } = useTranslation();
-  const allStations = getAllStations();
-  const fromIdx = stationIndexMap[fromStation];
-  const toIdx = stationIndexMap[toStation];
 
-  const minIdx = Math.min(fromIdx, toIdx);
-  const maxIdx = Math.max(fromIdx, toIdx);
-  const isSouthbound = fromIdx < toIdx;
-
-  const stops = allStations.slice(minIdx, maxIdx + 1);
-  const times = trip.times.slice(minIdx, maxIdx + 1);
-
-  const displayStops = isSouthbound ? stops : [...stops].reverse();
-  const displayTimes = isSouthbound ? times : [...times].reverse();
+  const { displayStops, displayTimes, statusByStop, states } = useStopInference({
+    trip,
+    fromStation,
+    toStation,
+    currentTime,
+    realtimeStatus,
+    currentLat,
+    currentLng,
+  });
 
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
-  const hasRealtimeStopData = realtimeStatus?.hasRealtimeStopData ?? false;
-
-  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-
-  const inferred = useMemo(() => {
-    const statusByStop = displayStops.map((station, i) => {
-      const staticTime = displayTimes[i] ?? "";
-      const liveTime = allStopLiveDepartures?.[station];
-      const reference = liveTime ?? staticTime;
-      const parsed = reference ? parseTimeToMinutes(reference) : Number.NaN;
-      const isPast = Number.isFinite(parsed) ? parsed <= nowMinutes : false;
-      return {
-        station,
-        staticTime,
-        liveTime,
-        parsed,
-        isPast,
-      };
-    });
-
-    let confidence: "high" | "medium" | "low" = "low";
-    let currentIndex = -1;
-
-    if (currentLat != null && currentLng != null) {
-      const closest = getClosestStationWithDistance(currentLat, currentLng);
-      const idx = displayStops.indexOf(closest.station);
-      if (idx >= 0 && closest.distanceKm <= HIGH_CONFIDENCE_DISTANCE_KM) {
-        confidence = "high";
-        currentIndex = idx;
-      }
-    }
-
-    if (currentIndex === -1) {
-      let lastPast = -1;
-      for (let i = 0; i < statusByStop.length; i += 1) {
-        if (statusByStop[i].isPast) {
-          lastPast = i;
-        }
-      }
-      currentIndex = clampIndex(lastPast >= 0 ? lastPast : 0, statusByStop.length);
-
-      if (hasRealtimeStopData && statusByStop.some((s) => s.liveTime)) {
-        confidence = "medium";
-      }
-    }
-
-    const states: StopState[] = statusByStop.map((stop, index) => {
-      void stop;
-      if (index < currentIndex) return "past";
-      if (index === currentIndex) return "current";
-      return "future";
-    });
-
-    return { statusByStop, states, currentIndex, confidence };
-  }, [
-    currentLat,
-    currentLng,
-    displayStops,
-    displayTimes,
-    allStopLiveDepartures,
-    nowMinutes,
-    hasRealtimeStopData,
-  ]);
-
   const isCanceled = realtimeStatus?.isCanceled ?? false;
 
   return (
@@ -138,26 +63,24 @@ export function StopTimeline({
 
           const isFrom = station === fromStation;
           const isTo = station === toStation;
-          const state = inferred.states[i];
+          const state = states[i];
           const isPast = state === "past";
           const isCurrent = state === "current";
           const isFirst = i === 0;
           const isLast = i === displayStops.length - 1;
 
-          const liveStopTime = allStopLiveDepartures?.[station];
+          const { liveTime: liveStopTime, staticTime } = statusByStop[i];
           const showLiveStopTime =
             liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
           const perStopDelayMin = allStopDelayMinutes?.[station] ?? 0;
           const hasPerStopDelay = perStopDelayMin > 0 && !isPast;
 
-          // Which time to display (live if available)
           const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
           const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
 
-          // Row accent colour drives both station name and time colour
-          type Accent = "green" | "gold" | "muted" | "destructive" | "default";
-          const accent: Accent = isCanceled
+          // Row accent — same logic as useStopInference but scoped per stop
+          const accent: StopAccent = isCanceled
             ? "destructive"
             : hasPerStopDelay
             ? "gold"
@@ -167,24 +90,13 @@ export function StopTimeline({
             ? "muted"
             : "default";
 
-          const accentText: Record<Accent, string> = {
-            green: "text-smart-train-green",
-            gold: "text-smart-gold",
-            muted: "text-muted-foreground/50",
-            destructive: "text-destructive",
-            default: "text-foreground",
-          };
+          // Delay pill
+          const pill =
+            hasPerStopDelay
+              ? { label: t("tripCard.delayed", { minutes: perStopDelayMin }), cls: "bg-smart-gold text-white" }
+              : null;
 
-          // Pill shown to the right of station name
-          type Pill = { label: string; cls: string } | null;
-          const pill: Pill = hasPerStopDelay
-            ? {
-                label: t("tripCard.delayed", { minutes: perStopDelayMin }),
-                cls: "bg-smart-gold text-white",
-              }
-            : null;
-
-          // Stop-point icon (right sub-column): origin pin, destination arrow, or dot
+          // Stop-point icon
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
@@ -218,17 +130,12 @@ export function StopTimeline({
             <Circle className="h-2.5 w-2.5 text-border shrink-0" />
           );
 
-          // Connector line colour
-          const lineAbove = isFirst
-            ? "invisible"
-            : isPast
-            ? "bg-muted-foreground/30"
-            : "bg-border";
-          const lineBelow = isLast
-            ? "invisible"
-            : isPast || isCurrent
-            ? "bg-muted-foreground/30"
-            : "bg-border";
+          // Connector lines
+          const lineAbove = isFirst ? "invisible" : isPast ? "bg-muted-foreground/30" : "bg-border";
+          const lineBelow = isLast ? "invisible" : isPast || isCurrent ? "bg-muted-foreground/30" : "bg-border";
+
+          // Unused but kept to satisfy the destructuring from statusByStop
+          void staticTime;
 
           return (
             <div
@@ -244,25 +151,20 @@ export function StopTimeline({
             >
               {/*
                 Icon column — total w-[5rem] split into two sub-columns:
-                  Left  (~w-6): train position indicator — TripIcon when current, empty otherwise
+                  Left  (~w-6): train position indicator
                   Right (flex-1): stop-point with vertical connector line
-                gap-3 between this column and text mirrors header badge→text spacing
               */}
               <div className="flex self-stretch shrink-0 w-[5rem]">
-                {/* Left sub-column: train position */}
                 <div className="flex items-center justify-end w-6 shrink-0">
                   {isCurrent && (
                     <TripIcon
                       className={cn(
                         "h-4 w-4",
-                        accent === "gold"
-                          ? "text-smart-gold"
-                          : "text-smart-train-green"
+                        accent === "gold" ? "text-smart-gold" : "text-smart-train-green"
                       )}
                     />
                   )}
                 </div>
-                {/* Right sub-column: vertical connector + stop icon */}
                 <div className="flex flex-col items-center flex-1">
                   <div className={cn("w-px flex-1", lineAbove)} style={{ minHeight: 6 }} />
                   {stopIcon}
@@ -272,7 +174,6 @@ export function StopTimeline({
 
               {/* Row content */}
               <div className="flex items-center flex-1 py-1.5 pr-3 gap-2 min-w-0">
-                {/* Station name */}
                 <span
                   className={cn(
                     "text-sm flex-1 min-w-0 truncate",
@@ -284,19 +185,12 @@ export function StopTimeline({
                   {station}
                 </span>
 
-                {/* Pill */}
                 {pill && (
-                  <span
-                    className={cn(
-                      "text-xs font-medium px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap",
-                      pill.cls
-                    )}
-                  >
+                  <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap", pill.cls)}>
                     {pill.label}
                   </span>
                 )}
 
-                {/* Time */}
                 {hasTime && (
                   <div className="shrink-0">
                     {showLiveFrom ? (
@@ -321,11 +215,7 @@ export function StopTimeline({
                       <TimeDisplay
                         time={time}
                         format={timeFormat}
-                        className={cn(
-                          "text-sm",
-                          isCanceled ? "line-through" : "",
-                          accentText[accent]
-                        )}
+                        className={cn("text-sm", isCanceled ? "line-through" : "", accentText[accent])}
                       />
                     )}
                   </div>

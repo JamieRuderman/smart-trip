@@ -25,6 +25,7 @@ import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
 import { useTripStatus } from "@/hooks/useTripStatus";
+import { useStopInference } from "@/hooks/useStopInference";
 import {
   Dialog,
   DialogContent,
@@ -100,7 +101,7 @@ function SheetContent({
   const { t } = useTranslation();
   const { preferences } = useUserPreferences();
 
-  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed, headerBg, statusLabel } =
+  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus, isNextTrip);
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
@@ -116,6 +117,23 @@ function SheetContent({
     autoRequestOnNative: false,
   });
   const hasLocation = lat != null && lng != null;
+
+  // Derive header colour from the active stop's accent so the header always
+  // matches the highlighted stop row in the timeline below it.
+  const { currentAccent, hasStarted } = useStopInference({
+    trip, fromStation, toStation, currentTime, realtimeStatus,
+    currentLat: lat, currentLng: lng,
+  });
+  const accentBg = {
+    destructive: "bg-destructive",
+    gold: "bg-smart-gold",
+    // Only colour green when the trip is active or it's the user's next train;
+    // future non-next trips stay neutral.
+    green: isNextTrip || hasStarted ? "bg-smart-train-green" : "bg-smart-neutral",
+    muted: "bg-smart-neutral",
+    default: "bg-smart-neutral",
+  } as const;
+  const headerBg = accentBg[currentAccent];
 
   // Trip metadata
   const tripDurationMinutes =

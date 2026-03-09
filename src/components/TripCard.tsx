@@ -5,10 +5,10 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
 import { TrainBadge } from "./TrainBadge";
-import { TripStatusPills } from "./TripStatusPills";
 import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTripStatus } from "@/hooks/useTripStatus";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -47,9 +47,8 @@ export const TripCard = memo(function TripCard({
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
-  const isCanceledOrSkipped = isCanceled || isOriginSkipped;
+  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed } =
+    useTripStatus(realtimeStatus);
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
@@ -78,15 +77,8 @@ export const TripCard = memo(function TripCard({
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
 
-  const isDelayed =
-    !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
-  const showOnTimeBadge = isNextTrip && !isCanceledOrSkipped && !isDelayed;
   const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
   const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
-  const delayDisplay =
-    realtimeStatus?.delayMinutes === 0
-      ? "<1"
-      : String(realtimeStatus?.delayMinutes ?? "");
 
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
@@ -219,15 +211,6 @@ export const TripCard = memo(function TripCard({
                 />
               </div>
             </div>
-            <div className="flex flex-wrap gap-1 mt-0.5">
-              <TripStatusPills
-                isCanceled={isCanceled}
-                isOriginSkipped={isOriginSkipped}
-                isDelayed={isDelayed}
-                showOnTimeBadge={showOnTimeBadge}
-                delayDisplay={delayDisplay}
-              />
-            </div>
             {isDelayed && (
               <div className="flex flex-row gap-2 items-start text-xs text-muted-foreground whitespace-nowrap mt-2">
                 <TimeDisplay
@@ -304,13 +287,6 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            <TripStatusPills
-              isCanceled={isCanceled}
-              isOriginSkipped={isOriginSkipped}
-              isDelayed={isDelayed}
-              showOnTimeBadge={showOnTimeBadge}
-              delayDisplay={delayDisplay}
-            />
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}

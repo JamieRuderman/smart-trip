@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
-import { useTripStatus } from "@/hooks/useTripStatus";
 import { getDistanceToStationKm } from "@/lib/stationUtils";
 import { computeMinutesUntil } from "@/lib/timeUtils";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
@@ -79,8 +78,6 @@ export function TripDetailSheet({
     currentLng: lng,
   });
 
-  const { headerBg: tripStatusBg } = useTripStatus(rest.realtimeStatus, rest.isNextTrip);
-
   const accentBg = {
     destructive: "bg-destructive",
     gold: "bg-smart-gold",
@@ -91,7 +88,7 @@ export function TripDetailSheet({
   } as const;
 
   // Ended trips always go grey; otherwise use the accent-matched colour.
-  const headerBg = isEnded ? "bg-smart-neutral" : (accentBg[currentAccent] ?? tripStatusBg);
+  const headerBg = isEnded ? "bg-smart-neutral" : accentBg[currentAccent];
 
   // Distance to the next upcoming stop (mi), shown when GPS is available.
   // Before departure: distance to the origin station (useful when walking to the platform).

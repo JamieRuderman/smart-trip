@@ -6,7 +6,7 @@ export function PillBadge({
   className,
 }: {
   label: string;
-  color?: "green" | "gold" | "neutral";
+  color?: "green" | "gold" | "neutral" | "destructive";
   className?: string;
 }) {
   return (
@@ -16,6 +16,7 @@ export function PillBadge({
         color === "green" && "bg-primary text-primary-foreground border-transparent",
         color === "gold" && "bg-smart-gold text-white border-transparent",
         color === "neutral" && "bg-foreground text-background border-transparent",
+        color === "destructive" && "bg-destructive text-white border-transparent",
         className,
       )}
     >

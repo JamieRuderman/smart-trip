@@ -83,7 +83,7 @@ export function TripDetailContent({
   const { preferences } = useUserPreferences();
 
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
-    useTripStatus(realtimeStatus, isNextTrip);
+    useTripStatus(realtimeStatus);
 
   const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
 
@@ -142,11 +142,12 @@ export function TripDetailContent({
       : t("tracker.endedMinutesAgo", { minutes: minutesAfterArrival })
     : null;
 
-  // Small header badge — "Ended" for finished trips, realtime label otherwise,
-  // "Scheduled" as a fallback for trips that haven't started with no realtime data.
+  // Small header badge — "Ended" for finished trips, realtime label otherwise.
+  // Falls back to "Scheduled" before departure or "On time" once en route when
+  // no realtime data is available (GPS is tracking, no delay reported).
   const headerStatusLabel = isEnded
     ? t("tracker.ended")
-    : statusLabel ?? (!hasStarted ? t("tracker.scheduled") : null);
+    : statusLabel ?? (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -164,9 +165,9 @@ export function TripDetailContent({
 
         {/* Status label + times */}
         <div className="flex-1 min-w-0">
-          {headerStatusLabel && (
-            <p className="text-xs text-white/80 mb-0.5 font-medium">{headerStatusLabel}</p>
-          )}
+          <p className={cn("text-xs text-white/80 mb-0.5 font-medium", !headerStatusLabel && "invisible")}>
+            {headerStatusLabel ?? "\u00a0"}
+          </p>
           <TimePair
             departure={departureTime}
             arrival={arrivalTime}

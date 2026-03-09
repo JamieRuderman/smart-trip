@@ -2,12 +2,14 @@ import { useTranslation } from "react-i18next";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 /**
- * Derives all status flags and the header colour from realtime data.
- * Single source of truth shared by SheetContent and TripDetailSheet.
+ * Derives all status flags and the display label from realtime data.
+ * Single source of truth used by both TripCard (pill) and TripDetailContent (header badge).
+ *
+ * "On time" is shown for the full duration of the trip whenever realtime data
+ * confirms no delay — not just while it is the immediate next departure.
  */
 export function useTripStatus(
   realtimeStatus: TripRealtimeStatus | null | undefined,
-  isNextTrip: boolean
 ) {
   const { t } = useTranslation();
 
@@ -15,28 +17,27 @@ export function useTripStatus(
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
   const isDelayed = !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
+  const isOnTime = realtimeStatus != null && !isCanceledOrSkipped && !isDelayed;
+
   const delayDisplay =
     realtimeStatus?.delayMinutes === 0
       ? "<1"
       : String(realtimeStatus?.delayMinutes ?? "");
-  const showOnTimeBadge = isNextTrip && !isCanceledOrSkipped && !isDelayed;
 
-  const headerBg = isCanceledOrSkipped
-    ? "bg-destructive"
-    : isDelayed
-    ? "bg-smart-gold"
-    : isNextTrip
-    ? "bg-smart-train-green"
-    : "bg-smart-neutral";
-
-  const statusLabel = isCanceled
+  const statusLabel: string | null = isCanceled
     ? t("tripCard.canceled")
     : isOriginSkipped
     ? t("tripCard.stopSkipped")
     : isDelayed
     ? t("tripCard.delayed", { minutes: delayDisplay })
-    : showOnTimeBadge
+    : isOnTime
     ? t("tripCard.onTime")
+    : null;
+
+  const statusColor: "green" | "gold" | "destructive" | null =
+    isCanceledOrSkipped ? "destructive"
+    : isDelayed ? "gold"
+    : isOnTime ? "green"
     : null;
 
   return {
@@ -44,7 +45,7 @@ export function useTripStatus(
     isOriginSkipped,
     isCanceledOrSkipped,
     isDelayed,
-    headerBg,
     statusLabel,
+    statusColor,
   };
 }

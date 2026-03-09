@@ -6,10 +6,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
-import { FERRY_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
-import { calculateZonesBetweenStations, stationIndexMap } from "@/lib/stationUtils";
+import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { calculateFare } from "@/lib/scheduleUtils";
+import { stationIndexMap } from "@/lib/stationUtils";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
-import { TrainBadge } from "./TrainBadge";
 import { TimeDisplay } from "./TimeDisplay";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
@@ -88,6 +89,7 @@ function SheetContent({
   trackingEnabled?: boolean;
 }) {
   const { t } = useTranslation();
+  const { preferences } = useUserPreferences();
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
@@ -118,13 +120,16 @@ function SheetContent({
           minutes: tripDurationMinutes % 60,
         })
       : t("tracker.durationMinutes", { minutes: tripDurationMinutes });
-  const zones = calculateZonesBetweenStations(fromStation, toStation);
-  const adultFare = (zones * FARE_CONSTANTS.ADULT_FARE_PER_ZONE).toFixed(2);
+  const selectedFareType = preferences.selectedFareType;
+  const fareInfo =
+    selectedFareType !== "none"
+      ? calculateFare(fromStation, toStation, selectedFareType)
+      : null;
 
-  // Stop count (intermediate stops between from and to, not including endpoints)
+  // Stop count: all stops after boarding, including the destination
   const fromIdx = stationIndexMap[fromStation];
   const toIdx = stationIndexMap[toStation];
-  const stopCount = Math.abs(toIdx - fromIdx) - 1; // stops in between
+  const stopCount = Math.abs(toIdx - fromIdx);
 
   const hasOutboundQuickConnection =
     showFerry &&
@@ -164,17 +169,10 @@ function SheetContent({
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Header band — status color background with white text */}
       <div className={cn("flex items-center gap-3 px-4 pt-4 pb-3 shrink-0", headerBg)}>
-        {/* "Trip" label above badge — mirrors "On time" label above times */}
-        <div className="flex flex-col items-start shrink-0">
+        {/* Trip number — w-[5rem] keeps this column aligned with the stop timeline icon gutter */}
+        <div className="flex flex-col items-end shrink-0 w-[5rem]">
           <p className="text-xs text-white/80 font-medium mb-0.5">{t("tracker.tripLabel")}</p>
-          <TrainBadge
-            tripNumber={trip.trip}
-            isNextTrip={isNextTrip}
-            isCanceled={isCanceled}
-            isSkipped={isOriginSkipped}
-            isDelayed={isDelayed}
-            onColoredBg={true}
-          />
+          <span className="text-4xl font-semibold text-white leading-none">{trip.trip}</span>
         </div>
 
         {/* Status label + times stacked */}
@@ -231,7 +229,7 @@ function SheetContent({
       {/* Large countdown */}
       {!isCanceledOrSkipped && minutesUntil > -30 && (
         <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
-          <div className="w-[5rem] shrink-0 flex justify-center">
+          <div className="w-[5rem] shrink-0 flex justify-end">
             <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
           </div>
           {minutesUntil > 60 ? (
@@ -269,10 +267,10 @@ function SheetContent({
                 <span>{t("tracker.stopCount", { count: stopCount })}</span>
               </>
             )}
-            {parseFloat(adultFare) > 0 && (
+            {fareInfo && fareInfo.price > 0 && (
               <>
                 <span className="mx-1">·</span>
-                <span>{t("tracker.adultFare", { fare: adultFare })}</span>
+                <span>${fareInfo.price.toFixed(2)}</span>
               </>
             )}
           </span>

@@ -15,7 +15,6 @@ import {
   LocateFixed,
   Loader2,
 } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
 import { getAllStations, hasFerryConnection } from "@/lib/stationUtils";
 import type { Station } from "@/types/smartSchedule";
 import { PillBadge } from "./PillBadge";

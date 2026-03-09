@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
+import { stateText } from "@/lib/tripTheme";
 
 /** Countdown text for the departure alarm row. */
 export function CountdownLabel({ minutesUntil }: { minutesUntil: number }) {
@@ -23,7 +25,7 @@ export function CountdownLabel({ minutesUntil }: { minutesUntil: number }) {
   }
   if (minutesUntil >= 0) {
     return (
-      <span className="text-2xl font-semibold text-smart-train-green">
+      <span className={cn("text-2xl font-semibold", stateText["ontime"])}>
         {t("tracker.nowBoarding")}
       </span>
     );

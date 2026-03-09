@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { TripState } from "@/lib/tripTheme";
 
 /**
  * Derives all status flags and the display label from realtime data.
@@ -34,10 +35,10 @@ export function useTripStatus(
     ? t("tripCard.onTime")
     : null;
 
-  const statusColor: "green" | "gold" | "destructive" | null =
-    isCanceledOrSkipped ? "destructive"
-    : isDelayed ? "gold"
-    : isOnTime ? "green"
+  const statusColor: TripState | null =
+    isCanceledOrSkipped ? "canceled"
+    : isDelayed ? "delayed"
+    : isOnTime ? "ontime"
     : null;
 
   return {

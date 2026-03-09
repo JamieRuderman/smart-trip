@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
+import { stateBg } from "@/lib/tripTheme";
 import { getDistanceToStationKm } from "@/lib/stationUtils";
 import { computeMinutesUntil } from "@/lib/timeUtils";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
@@ -76,17 +77,11 @@ export function TripDetailSheet({
     realtimeStatus: rest.realtimeStatus,
   });
 
-  const accentBg = {
-    destructive: "bg-destructive",
-    gold: "bg-smart-gold",
-    green: rest.isNextTrip || hasStarted ? "bg-smart-train-green" : "bg-smart-neutral",
-    muted: "bg-smart-neutral",
-    // "default" = trip not yet started, time-based inference. Still go green for isNextTrip.
-    default: rest.isNextTrip ? "bg-smart-train-green" : "bg-smart-neutral",
-  } as const;
-
-  // Ended trips always go grey; otherwise use the accent-matched colour.
-  const headerBg = isEnded ? "bg-smart-neutral" : accentBg[currentAccent];
+  // Ended trips always go grey.
+  // "future" (not yet started) goes green when this is the next trip, neutral otherwise.
+  const headerBg = isEnded
+    ? "bg-smart-neutral"
+    : stateBg[currentAccent === "future" && rest.isNextTrip ? "ontime" : currentAccent];
 
   // Distance to the next upcoming stop (mi), shown when GPS is available.
   // Before departure: distance to the origin station (useful when walking to the platform).

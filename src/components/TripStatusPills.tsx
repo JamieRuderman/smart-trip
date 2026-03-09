@@ -1,8 +1,9 @@
 import { PillBadge } from "./PillBadge";
+import type { TripState } from "@/lib/tripTheme";
 
 interface TripStatusPillsProps {
   statusLabel: string | null;
-  statusColor: "green" | "gold" | "destructive" | null;
+  statusColor: TripState | null;
 }
 
 export function TripStatusPills({ statusLabel, statusColor }: TripStatusPillsProps) {

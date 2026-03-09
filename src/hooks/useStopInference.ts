@@ -7,9 +7,9 @@ import { parseTimeToMinutes } from "@/lib/timeUtils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
+import type { TripState } from "@/lib/tripTheme";
 
 export type StopState = "past" | "current" | "future";
-export type StopAccent = "green" | "gold" | "muted" | "destructive" | "default";
 
 export interface StopInferenceResult {
   /** Ordered stops in display direction (fromStation → toStation). */
@@ -31,10 +31,10 @@ export interface StopInferenceResult {
   /** Whether any stops are already past (trip has started). */
   hasStarted: boolean;
   /**
-   * Accent for the current stop — the single source of truth for both the
+   * Semantic state for the current stop — single source of truth for the
    * stop-timeline row highlight and the sheet header colour.
    */
-  currentAccent: StopAccent;
+  currentAccent: TripState;
 }
 
 export function useStopInference({
@@ -104,13 +104,13 @@ export function useStopInference({
     const currentStation = currentIndex >= 0 ? displayStops[currentIndex] : null;
     const perStopDelayMin =
       currentStation != null ? (allStopDelayMinutes?.[currentStation] ?? 0) : 0;
-    const currentAccent: StopAccent = isCanceled
-      ? "destructive"
+    const currentAccent: TripState = isCanceled
+      ? "canceled"
       : currentIndex === -1
-      ? "default"
+      ? "future"
       : perStopDelayMin > 0
-      ? "gold"
-      : "green";
+      ? "delayed"
+      : "ontime";
 
     return {
       displayStops,

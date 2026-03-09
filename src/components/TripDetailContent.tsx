@@ -64,7 +64,6 @@ export function TripDetailContent({
   currentTime,
   realtimeStatus,
   timeFormat,
-  isNextTrip,
   showFerry,
   onClose,
   headerBg,
@@ -92,14 +91,15 @@ export function TripDetailContent({
   const minutesUntil = useCountdown(
     trip.departureTime,
     realtimeStatus?.liveDepartureTime,
-    currentTime
+    currentTime,
   );
 
   const hasLocation = lat != null && lng != null;
 
   // Trip metadata
   const tripDurationMinutes =
-    parseTimeToMinutes(trip.arrivalTime) - parseTimeToMinutes(trip.departureTime);
+    parseTimeToMinutes(trip.arrivalTime) -
+    parseTimeToMinutes(trip.departureTime);
   const tripDurationLabel =
     tripDurationMinutes >= 60
       ? t("tracker.durationHoursMinutes", {
@@ -120,12 +120,17 @@ export function TripDetailContent({
   const hasOutboundQuickConnection =
     showFerry &&
     trip.outboundFerry &&
-    isQuickConnection(calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart));
+    isQuickConnection(
+      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
+    );
   const hasInboundQuickConnection =
     trip.inboundFerry &&
     trip.fromStation === FERRY_CONSTANTS.FERRY_STATION &&
-    isQuickConnection(calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime));
-  const hasQuickConnection = hasOutboundQuickConnection || hasInboundQuickConnection;
+    isQuickConnection(
+      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
+    );
+  const hasQuickConnection =
+    hasOutboundQuickConnection || hasInboundQuickConnection;
 
   const trainOption = hasInboundQuickConnection
     ? t("quickConnection.laterTrain")
@@ -146,12 +151,18 @@ export function TripDetailContent({
   // no realtime data is available (GPS is tracking, no delay reported).
   const headerStatusLabel = isEnded
     ? t("tracker.ended")
-    : statusLabel ?? (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
+    : statusLabel ??
+      (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Header band */}
-      <div className={cn("flex items-start gap-3 px-4 pt-4 pb-3 shrink-0", headerBg)}>
+      <div
+        className={cn(
+          "flex items-start gap-3 px-4 pt-4 pb-3 shrink-0",
+          headerBg,
+        )}
+      >
         {/* Trip number — w-[5rem] aligns with the stop timeline icon gutter */}
         <div className="flex flex-col items-end shrink-0 w-[5rem]">
           <p className="text-xs text-white/80 font-medium mb-0.5">
@@ -164,7 +175,12 @@ export function TripDetailContent({
 
         {/* Status label + times */}
         <div className="flex-1 min-w-0">
-          <p className={cn("text-xs text-white/80 mb-0.5 font-medium", !headerStatusLabel && "invisible")}>
+          <p
+            className={cn(
+              "text-xs text-white/80 mb-0.5 font-medium",
+              !headerStatusLabel && "invisible",
+            )}
+          >
             {headerStatusLabel ?? "\u00a0"}
           </p>
           <TimePair
@@ -208,7 +224,10 @@ export function TripDetailContent({
       {/* Countdown / Ended — always shown */}
       <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
         <div className="w-[5rem] shrink-0 flex justify-end">
-          <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
+          <AlarmClock
+            className="h-6 w-6 text-muted-foreground/50"
+            aria-hidden="true"
+          />
         </div>
         {isCanceledOrSkipped ? (
           <span className="text-base text-muted-foreground">
@@ -220,10 +239,12 @@ export function TripDetailContent({
           </span>
         ) : minutesUntil < 0 ? (
           // En route — show time remaining to arrival
-          <ArrivalLabel minutesUntilArrival={
-            parseTimeToMinutes(arrivalTime) -
-            (currentTime.getHours() * 60 + currentTime.getMinutes())
-          } />
+          <ArrivalLabel
+            minutesUntilArrival={
+              parseTimeToMinutes(arrivalTime) -
+              (currentTime.getHours() * 60 + currentTime.getMinutes())
+            }
+          />
         ) : (
           <CountdownLabel minutesUntil={minutesUntil} />
         )}
@@ -254,7 +275,10 @@ export function TripDetailContent({
         {!isEnded && distanceToNextStopMi != null && nextStop != null && (
           <GutterRow className="text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
-              <LocateFixed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <LocateFixed
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
               <span>
                 {distanceToNextStopMi < 0.05
                   ? t("tracker.atStop", { stop: nextStop })
@@ -276,9 +300,15 @@ export function TripDetailContent({
               aria-label={t("header.useMyLocation")}
             >
               {locationLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden="true" />
+                <Loader2
+                  className="h-3.5 w-3.5 animate-spin shrink-0"
+                  aria-hidden="true"
+                />
               ) : (
-                <LocateFixed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <LocateFixed
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
               )}
               <span>{t("header.useMyLocation")}</span>
             </button>
@@ -315,7 +345,9 @@ export function TripDetailContent({
                     <Trans
                       i18nKey="quickConnection.message"
                       values={{ trainOption }}
-                      components={{ strong: <strong className="text-foreground" /> }}
+                      components={{
+                        strong: <strong className="text-foreground" />,
+                      }}
                     />
                   </p>
                 </div>
@@ -328,16 +360,17 @@ export function TripDetailContent({
             />
           </div>
         )}
-        {trip.inboundFerry && trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
-          <div className="mt-3 pt-3 border-t border-border">
-            <FerryConnection
-              ferry={trip.inboundFerry}
-              trainDepartureTime={departureTime}
-              timeFormat={timeFormat}
-              inbound
-            />
-          </div>
-        )}
+        {trip.inboundFerry &&
+          trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <FerryConnection
+                ferry={trip.inboundFerry}
+                trainDepartureTime={departureTime}
+                timeFormat={timeFormat}
+                inbound
+              />
+            </div>
+          )}
       </div>
     </div>
   );

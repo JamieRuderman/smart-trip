@@ -9,6 +9,7 @@ import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
+import { stateText, stateCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -80,13 +81,15 @@ export const TripCard = memo(function TripCard({
   const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
   const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
 
+  const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
+
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
-      ? "line-through text-destructive"
+      ? cn("line-through", stateText["canceled"])
       : isDelayed || hasLiveTime
-      ? "text-smart-gold"
+      ? stateText["delayed"]
       : isNextTrip
-      ? "text-smart-train-green"
+      ? stateText["ontime"]
       : undefined;
 
   const handleCardClick = useCallback(() => {
@@ -164,13 +167,7 @@ export const TripCard = memo(function TripCard({
           "flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
-          isCanceledOrSkipped
-            ? "bg-destructive/5 border-destructive/30 hover:bg-destructive/10 focus:border-destructive/75 focus:shadow-[0_0_0_1px_hsl(var(--destructive)/0.75)]"
-            : isDelayed
-            ? "bg-smart-gold/5 border-smart-gold/30 hover:bg-smart-gold/10 focus:border-smart-gold/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-gold)/0.8)]"
-            : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/30 hover:bg-smart-train-green/10 focus:border-smart-train-green/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-train-green)/0.8)]"
-            : "bg-gradient-card border-border hover:bg-muted/50 focus:border-foreground/45 focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+          stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}

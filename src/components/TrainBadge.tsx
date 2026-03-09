@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { TripIcon } from "@/components/icons/TripIcon";
+import { stateText } from "@/lib/tripTheme";
 
 interface TrainBadgeProps {
   tripNumber: number;
@@ -29,11 +30,11 @@ export function TrainBadge({
         onColoredBg
           ? "text-white"
           : isCanceled || isSkipped
-          ? "text-destructive"
+          ? stateText["canceled"]
           : isDelayed
-          ? "text-smart-gold"
+          ? stateText["delayed"]
           : isNextTrip
-          ? "text-smart-train-green"
+          ? stateText["ontime"]
           : undefined,
         isPastTrip && showAllTrips && "text-muted-foreground/60"
       )}

@@ -162,8 +162,8 @@ export function StationSelector({
                 }
                 badge={
                   <>
-                    {station === toStation && <PillBadge label={t("header.endStation")} color="green" className="ml-2" />}
-                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="green" className="ml-2" />}
+                    {station === toStation && <PillBadge label={t("header.endStation")} color="ontime" className="ml-2" />}
+                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="ontime" className="ml-2" />}
                   </>
                 }
               />
@@ -198,8 +198,8 @@ export function StationSelector({
                 }
                 badge={
                   <>
-                    {station === fromStation && <PillBadge label={t("header.startStation")} color="green" className="ml-2" />}
-                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="green" className="ml-2" />}
+                    {station === fromStation && <PillBadge label={t("header.startStation")} color="ontime" className="ml-2" />}
+                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="ontime" className="ml-2" />}
                   </>
                 }
               />

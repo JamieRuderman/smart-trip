@@ -6,7 +6,15 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Circle, CornerDownRight, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useStopInference, type StopAccent } from "@/hooks/useStopInference";
+import { useStopInference } from "@/hooks/useStopInference";
+import {
+  type TripState,
+  stateText,
+  stateIconText,
+  stateTint,
+  stateLineColor,
+  stateBg,
+} from "@/lib/tripTheme";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
@@ -18,14 +26,6 @@ interface StopTimelineProps {
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
 }
-
-const accentText: Record<StopAccent, string> = {
-  green: "text-smart-train-green",
-  gold: "text-smart-gold",
-  muted: "text-muted-foreground/50",
-  destructive: "text-destructive",
-  default: "text-foreground",
-};
 
 export function StopTimeline({
   trip,
@@ -54,7 +54,7 @@ export function StopTimeline({
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
 
-  // When the trip has ended all stops are forced to "past" so nothing stays green.
+  // When the trip has ended all stops are forced to "past" so nothing stays highlighted.
   const states = isEnded
     ? inferredStates.map(() => "past" as const)
     : inferredStates;
@@ -84,22 +84,22 @@ export function StopTimeline({
           const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
           const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
 
-          // Row accent — same logic as useStopInference but scoped per stop
-          const accent: StopAccent = isCanceled
-            ? "destructive"
+          // Per-stop semantic state — drives all colours for this row
+          const accent: TripState = isCanceled
+            ? "canceled"
             : hasPerStopDelay
-            ? "gold"
+            ? "delayed"
             : isCurrent
-            ? "green"
+            ? "ontime"
             : isPast
-            ? "muted"
-            : "default";
+            ? "past"
+            : "future";
 
           // Delay pill
           const pill = hasPerStopDelay
             ? {
                 label: t("tripCard.delayed", { minutes: perStopDelayMin }),
-                cls: "bg-smart-gold text-white",
+                cls: cn(stateBg["delayed"], "text-white"),
               }
             : null;
 
@@ -107,25 +107,19 @@ export function StopTimeline({
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
-                "h-4 w-4 shrink-0",
-                isCanceled
-                  ? "text-destructive"
-                  : isPast
-                  ? "text-muted-foreground/40"
-                  : accentText[accent],
+                "h-5 w-5",
+                isPast ? stateIconText["past"] : stateText[accent],
               )}
             />
           ) : isTo ? (
             <CornerDownRight
               className={cn(
-                "h-4 w-4 shrink-0",
-                isCanceled
-                  ? "text-destructive"
-                  : isPast
-                  ? "text-muted-foreground/40"
+                "h-4 w-4 ml-3",
+                isPast
+                  ? stateIconText["past"]
                   : isCurrent
-                  ? accentText[accent]
-                  : "text-muted-foreground/40",
+                  ? stateText[accent]
+                  : stateIconText["future"],
               )}
               style={{ strokeWidth: 3 }}
             />
@@ -139,13 +133,13 @@ export function StopTimeline({
           const lineAbove = isFirst
             ? "invisible"
             : isPast
-            ? "bg-muted-foreground/30"
-            : "bg-border";
+            ? stateLineColor["past"]
+            : stateLineColor["future"];
           const lineBelow = isLast
             ? "invisible"
             : isPast || isCurrent
-            ? "bg-muted-foreground/30"
-            : "bg-border";
+            ? stateLineColor["past"]
+            : stateLineColor["future"];
 
           // Unused but kept to satisfy the destructuring from statusByStop
           void staticTime;
@@ -155,11 +149,8 @@ export function StopTimeline({
               key={station}
               className={cn(
                 "flex items-center gap-3 relative",
-                isCurrent && accent === "gold"
-                  ? "bg-smart-gold/10 rounded-lg"
-                  : isCurrent
-                  ? "bg-smart-train-green/10 rounded-lg"
-                  : "",
+                isCurrent && "rounded-lg",
+                isCurrent && stateTint[accent],
               )}
             >
               {/*
@@ -171,12 +162,7 @@ export function StopTimeline({
                 <div className="flex items-center justify-end w-8 shrink-0">
                   {isCurrent && (
                     <TripIcon
-                      className={cn(
-                        "h-4 w-4",
-                        accent === "gold"
-                          ? "text-smart-gold"
-                          : "text-smart-train-green",
-                      )}
+                      className={cn("h-4 w-4", stateText[accent])}
                     />
                   )}
                 </div>
@@ -198,10 +184,9 @@ export function StopTimeline({
                 <span
                   className={cn(
                     "text-sm flex-1 min-w-0 truncate",
-                    (isCurrent || isTo || (isFrom && !isPast)) &&
-                      "font-semibold",
-                    isCanceled ? "line-through" : "",
-                    accentText[accent],
+                    (isCurrent || isTo || (isFrom && !isPast)) && "font-semibold",
+                    isCanceled && "line-through",
+                    stateText[accent],
                   )}
                 >
                   {station}
@@ -224,19 +209,19 @@ export function StopTimeline({
                       <TimeDisplay
                         time={realtimeStatus!.liveDepartureTime!}
                         format={timeFormat}
-                        className={cn("text-sm", accentText[accent])}
+                        className={cn("text-sm", stateText[accent])}
                       />
                     ) : showLiveTo ? (
                       <TimeDisplay
                         time={realtimeStatus!.liveArrivalTime!}
                         format={timeFormat}
-                        className={cn("text-sm", accentText[accent])}
+                        className={cn("text-sm", stateText[accent])}
                       />
                     ) : showLiveStopTime ? (
                       <TimeDisplay
                         time={liveStopTime!}
                         format={timeFormat}
-                        className={cn("text-sm", accentText[accent])}
+                        className={cn("text-sm", stateText[accent])}
                       />
                     ) : (
                       <TimeDisplay
@@ -244,8 +229,8 @@ export function StopTimeline({
                         format={timeFormat}
                         className={cn(
                           "text-sm",
-                          isCanceled ? "line-through" : "",
-                          accentText[accent],
+                          isCanceled && "line-through",
+                          stateText[accent],
                         )}
                       />
                     )}

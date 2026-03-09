@@ -7,6 +7,7 @@ import {
   MapPin,
   LocateFixed,
   Loader2,
+  Navigation2,
 } from "lucide-react";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -43,6 +44,10 @@ export interface TripDetailContentProps {
   minutesAfterArrival: number;
   /** True once at least one stop is in the past (trip has started). */
   hasStarted: boolean;
+  /** Next upcoming stop on the route (null when ended or no GPS). */
+  nextStop?: Station | null;
+  /** Straight-line distance to nextStop in miles (null when no GPS or ended). */
+  distanceToNextStopMi?: number | null;
   /** GPS position — lifted to parent so the drag handle colour can incorporate it. */
   lat: number | null;
   lng: number | null;
@@ -65,6 +70,8 @@ export function TripDetailContent({
   headerBg,
   minutesAfterArrival,
   hasStarted,
+  nextStop = null,
+  distanceToNextStopMi = null,
   lat,
   lng,
   locationLoading,
@@ -247,6 +254,22 @@ export function TripDetailContent({
           </GutterRow>
         )}
 
+        {!isEnded && distanceToNextStopMi != null && nextStop != null && (
+          <GutterRow className="text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Navigation2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {distanceToNextStopMi < 0.05
+                  ? t("tracker.atStop", { stop: nextStop })
+                  : t("tracker.distanceMiToStop", {
+                      distance: distanceToNextStopMi.toFixed(1),
+                      stop: nextStop,
+                    })}
+              </span>
+            </span>
+          </GutterRow>
+        )}
+
         {!hasLocation && (
           <GutterRow>
             <button
@@ -265,25 +288,6 @@ export function TripDetailContent({
           </GutterRow>
         )}
       </div>
-
-      {/* Quick connection warning */}
-      {hasQuickConnection && !isCanceledOrSkipped && (
-        <div className="mx-4 mb-3 p-3 rounded-lg bg-smart-gold/10 border border-smart-gold/40 flex items-start gap-2 shrink-0">
-          <AlertTriangle className="h-4 w-4 text-smart-gold mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-smart-gold">
-              {t("quickConnection.quickTransferWarning")}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              <Trans
-                i18nKey="quickConnection.message"
-                values={{ trainOption }}
-                components={{ strong: <strong className="text-foreground" /> }}
-              />
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Scrollable stop timeline */}
       <div
@@ -304,6 +308,24 @@ export function TripDetailContent({
 
         {showFerry && trip.outboundFerry && (
           <div className="mt-3 pt-3 border-t border-border">
+            {/* Quick connection warning — sits between the divider and ferry times */}
+            {hasQuickConnection && !isCanceledOrSkipped && (
+              <div className="mb-3 p-3 rounded-lg bg-smart-gold/10 border border-smart-gold/40 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-smart-gold mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-smart-gold">
+                    {t("quickConnection.quickTransferWarning")}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <Trans
+                      i18nKey="quickConnection.message"
+                      values={{ trainOption }}
+                      components={{ strong: <strong className="text-foreground" /> }}
+                    />
+                  </p>
+                </div>
+              </div>
+            )}
             <FerryConnection
               ferry={trip.outboundFerry}
               trainArrivalTime={arrivalTime}

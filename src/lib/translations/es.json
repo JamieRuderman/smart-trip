@@ -149,6 +149,8 @@
     "confidenceHigh": "Confianza: Alta (GPS)",
     "confidenceMedium": "Confianza: Media (Tiempo real)",
     "confidenceLow": "Confianza: Baja (Horario)",
+    "distanceMiToStop": "{{distance}} mi a {{stop}}",
+    "atStop": "En {{stop}}",
     "tripLabel": "Tren"
   }
 }

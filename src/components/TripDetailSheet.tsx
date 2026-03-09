@@ -5,6 +5,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
 import { useTripStatus } from "@/hooks/useTripStatus";
+import { getDistanceToStationKm } from "@/lib/stationUtils";
 import { computeMinutesUntil } from "@/lib/timeUtils";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TripDetailContent } from "./TripDetailContent";
@@ -68,7 +69,7 @@ export function TripDetailSheet({
 
   // Single source of truth for the coloured header band used by both the
   // drag handle (here) and TripDetailContent's header.
-  const { currentAccent, hasStarted } = useStopInference({
+  const { currentAccent, hasStarted, displayStops, currentIndex } = useStopInference({
     trip: rest.trip,
     fromStation: rest.fromStation,
     toStation: rest.toStation,
@@ -85,11 +86,26 @@ export function TripDetailSheet({
     gold: "bg-smart-gold",
     green: rest.isNextTrip || hasStarted ? "bg-smart-train-green" : "bg-smart-neutral",
     muted: "bg-smart-neutral",
-    default: "bg-smart-neutral",
+    // "default" = trip not yet started, time-based inference. Still go green for isNextTrip.
+    default: rest.isNextTrip ? "bg-smart-train-green" : "bg-smart-neutral",
   } as const;
 
   // Ended trips always go grey; otherwise use the accent-matched colour.
   const headerBg = isEnded ? "bg-smart-neutral" : (accentBg[currentAccent] ?? tripStatusBg);
+
+  // Distance to the next upcoming stop (mi), shown when GPS is available.
+  // Before departure: distance to the origin station (useful when walking to the platform).
+  // After departure:  distance to the next stop after the current one.
+  const nextStop = (() => {
+    if (lat == null || lng == null) return null;
+    if (currentIndex === -1) return displayStops[0] ?? null;          // not yet started
+    const next = currentIndex + 1;
+    return next < displayStops.length ? displayStops[next] : null;    // next in route
+  })();
+  const distanceToNextStopMi =
+    nextStop != null && lat != null && lng != null
+      ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
+      : null;
 
   // Prevent body scroll when sheet is open on mobile.
   useEffect(() => {
@@ -150,6 +166,8 @@ export function TripDetailSheet({
     headerBg,
     minutesAfterArrival,
     hasStarted,
+    nextStop,
+    distanceToNextStopMi,
     lat,
     lng,
     locationLoading,

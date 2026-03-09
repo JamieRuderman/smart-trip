@@ -149,6 +149,8 @@
     "confidenceHigh": "Confidence: High (GPS)",
     "confidenceMedium": "Confidence: Medium (Realtime)",
     "confidenceLow": "Confidence: Low (Schedule)",
+    "distanceMiToStop": "{{distance}} mi to {{stop}}",
+    "atStop": "At {{stop}}",
     "tripLabel": "Trip"
   }
 }

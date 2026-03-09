@@ -141,3 +141,11 @@ export function getClosestStationWithDistance(
   }
   return { station: closest, distanceKm: minDist };
 }
+
+/**
+ * Straight-line distance in km from the given coordinates to a specific station.
+ */
+export function getDistanceToStationKm(lat: number, lng: number, station: Station): number {
+  const coords = STATION_COORDINATES[station];
+  return haversineKm(lat, lng, coords.lat, coords.lng);
+}

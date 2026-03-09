@@ -12,6 +12,12 @@ interface GeolocationState {
 interface UseGeolocationOptions {
   watch?: boolean;
   autoRequestOnNative?: boolean;
+  /**
+   * On web, silently call getCurrentPosition on mount if the browser has
+   * already granted the geolocation permission (no prompt is shown).
+   * Defaults to true so that previously-approved permission is used immediately.
+   */
+  autoRequestOnWeb?: boolean;
 }
 
 interface Coordinates {
@@ -46,6 +52,7 @@ function fetchWebLocation(): Promise<Coordinates> {
 export function useGeolocation({
   watch = false,
   autoRequestOnNative = true,
+  autoRequestOnWeb = true,
 }: UseGeolocationOptions = {}): GeolocationState {
   const [coords, setCoords] = useState<Coordinates | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +76,20 @@ export function useGeolocation({
   }, []);
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform() && autoRequestOnNative) {
-      void requestLocation();
+    if (Capacitor.isNativePlatform()) {
+      if (autoRequestOnNative) void requestLocation();
+      return;
     }
-  }, [autoRequestOnNative, requestLocation]);
+    // Web: only auto-request if permission is already granted (no prompt shown).
+    if (autoRequestOnWeb && "permissions" in navigator) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((result) => {
+          if (result.state === "granted") void requestLocation();
+        })
+        .catch(() => {/* permissions API unavailable — skip */});
+    }
+  }, [autoRequestOnNative, autoRequestOnWeb, requestLocation]);
 
   useEffect(() => {
     let cancelled = false;

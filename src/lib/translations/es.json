@@ -133,6 +133,8 @@
     "departsInMinutes": "Sale en {{minutes}} min",
     "nowBoarding": "Abordando ahora",
     "departedMinutesAgo": "Salió hace {{minutes}} min",
+    "endedMinutesAgo": "Terminó hace {{minutes}} min",
+    "endedHoursMinutesAgo": "Terminó hace {{hours}}h {{minutes}}m",
     "durationHoursMinutes": "{{hours}}h {{minutes}}m",
     "durationMinutes": "{{minutes}}m",
     "stopCount_one": "{{count}} parada",

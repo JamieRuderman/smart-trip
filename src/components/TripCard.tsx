@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -27,6 +27,8 @@ interface TripCardProps {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  selectedTripNumber: number | null;
+  onSelectTrip: (tripNumber: number | null) => void;
 }
 
 export const TripCard = memo(function TripCard({
@@ -40,6 +42,8 @@ export const TripCard = memo(function TripCard({
   fromStation,
   toStation,
   currentTime,
+  selectedTripNumber,
+  onSelectTrip,
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -51,8 +55,14 @@ export const TripCard = memo(function TripCard({
   const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isDetailMounted, setIsDetailMounted] = useState(false);
+
+  // Derive open state from URL-synced selectedTripNumber
+  const isOpen = selectedTripNumber === trip.trip;
+
+  // Animation state — driven by isOpen prop, initialized to match it (deep-link case)
+  const [isDetailOpen, setIsDetailOpen] = useState(isOpen);
+  const [isDetailMounted, setIsDetailMounted] = useState(isOpen);
+  const isFirstRender = useRef(true);
 
   const hasOutboundQuickConnection =
     showFerry &&
@@ -87,7 +97,21 @@ export const TripCard = memo(function TripCard({
       ? "text-smart-train-green"
       : undefined;
 
-  const handleCardClick = () => {
+  const handleCardClick = useCallback(() => {
+    onSelectTrip(trip.trip);
+  }, [onSelectTrip, trip.trip]);
+
+  const handleDetailClose = useCallback(() => {
+    onSelectTrip(null);
+  }, [onSelectTrip]);
+
+  // Drive sheet animation from the URL-synced isOpen prop
+  useEffect(() => {
+    // Skip on initial mount — animation state already seeded from isOpen (deep-link case)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     if (closeTimerRef.current != null) {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -96,25 +120,25 @@ export const TripCard = memo(function TripCard({
       window.clearTimeout(openTimerRef.current);
       openTimerRef.current = null;
     }
-    // Mount closed first, then open slightly later so browser paints initial state.
-    setIsDetailOpen(false);
-    setIsDetailMounted(true);
-    openTimerRef.current = window.setTimeout(() => {
-      setIsDetailOpen(true);
-      openTimerRef.current = null;
-    }, SHEET_ENTER_DELAY_MS);
-  };
-
-  const handleDetailClose = () => {
-    setIsDetailOpen(false);
-    closeTimerRef.current = window.setTimeout(() => {
-      setIsDetailMounted(false);
-      requestAnimationFrame(() => {
-        cardRef.current?.focus({ preventScroll: true });
-      });
-      closeTimerRef.current = null;
-    }, SHEET_TRANSITION_MS);
-  };
+    if (isOpen) {
+      // Mount closed first, then open slightly later so browser paints initial state
+      setIsDetailOpen(false);
+      setIsDetailMounted(true);
+      openTimerRef.current = window.setTimeout(() => {
+        setIsDetailOpen(true);
+        openTimerRef.current = null;
+      }, SHEET_ENTER_DELAY_MS);
+    } else {
+      setIsDetailOpen(false);
+      closeTimerRef.current = window.setTimeout(() => {
+        setIsDetailMounted(false);
+        requestAnimationFrame(() => {
+          cardRef.current?.focus({ preventScroll: true });
+        });
+        closeTimerRef.current = null;
+      }, SHEET_TRANSITION_MS);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     return () => {

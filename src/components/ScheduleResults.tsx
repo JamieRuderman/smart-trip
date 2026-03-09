@@ -18,6 +18,8 @@ interface ScheduleResultsProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   timeFormat: "12h" | "24h";
+  selectedTripNumber: number | null;
+  onSelectTrip: (tripNumber: number | null) => void;
 }
 
 export function ScheduleResults({
@@ -28,6 +30,8 @@ export function ScheduleResults({
   showAllTrips,
   onToggleShowAllTrips,
   timeFormat,
+  selectedTripNumber,
+  onSelectTrip,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
   const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
@@ -103,6 +107,8 @@ export function ScheduleResults({
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}
+                selectedTripNumber={selectedTripNumber}
+                onSelectTrip={onSelectTrip}
               />
             );
           })}

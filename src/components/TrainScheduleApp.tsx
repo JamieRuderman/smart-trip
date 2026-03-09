@@ -36,11 +36,13 @@ export function TrainScheduleApp() {
     showAllTrips,
     currentTime,
     filteredTrips,
+    selectedTripNumber,
     setFromStation,
     setToStation,
     setScheduleType,
     toggleShowAllTrips,
     swapStations,
+    setSelectedTrip,
   } = useTrainScheduleState(scheduleDataVersion);
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
@@ -133,6 +135,8 @@ export function TrainScheduleApp() {
             showAllTrips={showAllTrips}
             onToggleShowAllTrips={toggleShowAllTrips}
             timeFormat="12h"
+            selectedTripNumber={selectedTripNumber}
+            onSelectTrip={setSelectedTrip}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (

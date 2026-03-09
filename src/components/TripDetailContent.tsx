@@ -41,6 +41,8 @@ export interface TripDetailContentProps {
   headerBg: string;
   /** Minutes since the train arrived at the destination (positive = past, negative = not yet). */
   minutesAfterArrival: number;
+  /** True once at least one stop is in the past (trip has started). */
+  hasStarted: boolean;
   /** GPS position — lifted to parent so the drag handle colour can incorporate it. */
   lat: number | null;
   lng: number | null;
@@ -62,6 +64,7 @@ export function TripDetailContent({
   onClose,
   headerBg,
   minutesAfterArrival,
+  hasStarted,
   lat,
   lng,
   locationLoading,
@@ -131,8 +134,11 @@ export function TripDetailContent({
       : t("tracker.endedMinutesAgo", { minutes: minutesAfterArrival })
     : null;
 
-  // Small header badge — "Ended" for finished trips, realtime label otherwise.
-  const headerStatusLabel = isEnded ? t("tracker.ended") : statusLabel;
+  // Small header badge — "Ended" for finished trips, realtime label otherwise,
+  // "Scheduled" as a fallback for trips that haven't started with no realtime data.
+  const headerStatusLabel = isEnded
+    ? t("tracker.ended")
+    : statusLabel ?? (!hasStarted ? t("tracker.scheduled") : null);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

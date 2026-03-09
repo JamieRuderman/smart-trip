@@ -113,9 +113,7 @@ export function StopTimeline({
                   ? "text-destructive"
                   : isPast
                   ? "text-muted-foreground/40"
-                  : accent === "gold"
-                  ? "text-smart-gold"
-                  : "text-smart-train-green"
+                  : accentText[accent]
               )}
             />
           ) : isTo ? (

@@ -133,6 +133,7 @@
     "departsInMinutes": "Sale en {{minutes}} min",
     "nowBoarding": "Abordando ahora",
     "departedMinutesAgo": "Salió hace {{minutes}} min",
+    "scheduled": "Programado",
     "ended": "Terminado",
     "endedMinutesAgo": "Terminó hace {{minutes}} min",
     "endedHoursMinutesAgo": "Terminó hace {{hours}}h {{minutes}}m",

@@ -149,6 +149,7 @@ export function TripDetailSheet({
     onClose,
     headerBg,
     minutesAfterArrival,
+    hasStarted,
     lat,
     lng,
     locationLoading,

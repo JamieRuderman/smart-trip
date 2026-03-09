@@ -110,13 +110,18 @@ export function useStopInference({
       for (let i = 0; i < statusByStop.length; i += 1) {
         if (statusByStop[i].isPast) lastPast = i;
       }
-      currentIndex = clampIndex(lastPast >= 0 ? lastPast : 0, statusByStop.length);
+      // Only pin a "current" stop once the trip has actually started (≥1 past stop).
+      // Before departure, leave currentIndex at -1 so no stop highlights green.
+      if (lastPast >= 0) {
+        currentIndex = lastPast;
+      }
       if (hasRealtimeStopData && statusByStop.some((s) => s.liveTime)) {
         confidence = "medium";
       }
     }
 
     const states: StopState[] = statusByStop.map((_, i) => {
+      if (currentIndex === -1) return "future";
       if (i < currentIndex) return "past";
       if (i === currentIndex) return "current";
       return "future";
@@ -124,10 +129,13 @@ export function useStopInference({
 
     const hasStarted = statusByStop.some((s) => s.isPast);
 
-    const currentStation = displayStops[currentIndex];
-    const perStopDelayMin = allStopDelayMinutes?.[currentStation] ?? 0;
+    const currentStation = currentIndex >= 0 ? displayStops[currentIndex] : null;
+    const perStopDelayMin =
+      currentStation != null ? (allStopDelayMinutes?.[currentStation] ?? 0) : 0;
     const currentAccent: StopAccent = isCanceled
       ? "destructive"
+      : currentIndex === -1
+      ? "default"
       : perStopDelayMin > 0
       ? "gold"
       : "green";

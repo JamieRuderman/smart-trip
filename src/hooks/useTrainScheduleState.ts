@@ -18,6 +18,9 @@ export interface TrainScheduleState {
 const todayScheduleType = (): "weekday" | "weekend" =>
   isWeekend() ? "weekend" : "weekday";
 
+/** Params managed by the state sync — all others are preserved verbatim. */
+const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);
+
 export function useTrainScheduleState(scheduleDataVersion?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
   const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
@@ -47,8 +50,13 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
   // Sync state → URL whenever stations or selected trip change.
   // type is included only when a trip is open (shared-link context); without
   // a trip it is omitted so stale type params never affect a fresh page load.
+  // Unmanaged params (e.g. debugTime, debugDate) are preserved as-is.
   useEffect(() => {
     const params: Record<string, string> = {};
+    // Carry forward any params we don't own (debug helpers, etc.)
+    searchParams.forEach((value, key) => {
+      if (!MANAGED_PARAMS.has(key)) params[key] = value;
+    });
     if (state.fromStation) params.from = state.fromStation;
     if (state.toStation) params.to = state.toStation;
     if (state.selectedTripNumber != null) {

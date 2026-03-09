@@ -97,8 +97,8 @@ export function StationSelector({
   locationLoading,
   onRequestLocation,
 }: StationSelectorProps) {
-  // Show location button only on web (native auto-requests on mount)
-  const showLocationButton = !Capacitor.isNativePlatform() && !!onRequestLocation && !closestStation;
+  // Show location button whenever a handler is provided — on all platforms
+  const showLocationButton = !!onRequestLocation;
   const { t } = useTranslation();
   const stations = getAllStations();
 
@@ -130,165 +130,116 @@ export function StationSelector({
       </div>
 
       {/* Station Selectors */}
-      <div className="flex-1 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <Select value={fromStation} onValueChange={handleFromStationChange}>
-              <SelectTrigger
-                className="h-11"
-                aria-label={t("header.selectDepartureStation")}
-              >
-                {fromStation ? (
-                  <StationWithFerry
-                    station={fromStation}
-                    direction="southbound"
-                  />
-                ) : (
-                  <SelectValue placeholder={t("header.yourLocation")} />
-                )}
-              </SelectTrigger>
-              <SelectContent
-                role="listbox"
-                aria-label={t("header.availableStations")}
-              >
-                {stations.map((station) => (
-                  <StationSelectItem
-                    key={station}
-                    station={station}
-                    value={station}
-                    role="option"
-                    direction="southbound"
-                    className={station === toStation ? "text-primary" : ""}
-                    gutterIcon={
-                      station === toStation ? (
-                        stations.indexOf(toStation as Station) >
-                        stations.indexOf(fromStation as Station) ? (
-                          <CornerDownRight
-                            className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
-                            style={{ strokeWidth: 3 }}
-                          />
-                        ) : (
-                          <CornerUpRight
-                            className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
-                            style={{ strokeWidth: 3 }}
-                          />
-                        )
-                      ) : undefined
-                    }
-                    badge={
-                      <>
-                        {station === toStation && (
-                          <PillBadge
-                            label={t("header.endStation")}
-                            color="green"
-                            className="ml-2"
-                          />
-                        )}
-                        {station === closestStation && (
-                          <PillBadge
-                            label={t("header.nearYou")}
-                            color="green"
-                            className="ml-2"
-                          />
-                        )}
-                      </>
-                    }
-                  />
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* "Use my location" button — web only, hidden once location is known */}
-          {showLocationButton && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="shrink-0 h-11 w-11"
-              onClick={onRequestLocation}
-              disabled={locationLoading}
-              aria-label={t("header.useMyLocation")}
-              title={t("header.useMyLocation")}
-            >
-              {locationLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <LocateFixed className="h-4 w-4" aria-hidden="true" />
-              )}
-            </Button>
-          )}
-        </div>
+      <div className="flex-1 min-w-0 space-y-3">
+        <Select value={fromStation} onValueChange={handleFromStationChange}>
+          <SelectTrigger
+            className="h-11"
+            aria-label={t("header.selectDepartureStation")}
+          >
+            {fromStation ? (
+              <StationWithFerry station={fromStation} direction="southbound" />
+            ) : (
+              <SelectValue placeholder={t("header.yourLocation")} />
+            )}
+          </SelectTrigger>
+          <SelectContent role="listbox" aria-label={t("header.availableStations")}>
+            {stations.map((station) => (
+              <StationSelectItem
+                key={station}
+                station={station}
+                value={station}
+                role="option"
+                direction="southbound"
+                className={station === toStation ? "text-primary" : ""}
+                gutterIcon={
+                  station === toStation ? (
+                    stations.indexOf(toStation as Station) >
+                    stations.indexOf(fromStation as Station) ? (
+                      <CornerDownRight className="mt-1 ml-1 h-3 w-3 flex-shrink-0" style={{ strokeWidth: 3 }} />
+                    ) : (
+                      <CornerUpRight className="mt-2 ml-1 h-3 w-3 flex-shrink-0" style={{ strokeWidth: 3 }} />
+                    )
+                  ) : undefined
+                }
+                badge={
+                  <>
+                    {station === toStation && <PillBadge label={t("header.endStation")} color="green" className="ml-2" />}
+                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="green" className="ml-2" />}
+                  </>
+                }
+              />
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <Select value={toStation} onValueChange={handleToStationChange}>
-              <SelectTrigger
-                className="h-11"
-                aria-label={t("header.selectArrivalStation")}
-              >
-                {toStation ? (
-                  <StationWithFerry
-                    station={toStation}
-                    direction="northbound"
-                  />
-                ) : (
-                  <SelectValue placeholder={t("header.destination")} />
-                )}
-              </SelectTrigger>
-              <SelectContent
-                role="listbox"
-                aria-label={t("header.availableStations")}
-              >
-                {stations.map((station) => (
-                  <StationSelectItem
-                    key={station}
-                    station={station}
-                    value={station}
-                    role="option"
-                    direction="northbound"
-                    className={station === fromStation ? "text-primary" : ""}
-                    gutterIcon={
-                      station === fromStation ? (
-                        <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
-                      ) : undefined
-                    }
-                    badge={
-                      <>
-                        {station === fromStation && (
-                          <PillBadge
-                            label={t("header.startStation")}
-                            color="green"
-                            className="ml-2"
-                          />
-                        )}
-                        {station === closestStation && (
-                          <PillBadge
-                            label={t("header.nearYou")}
-                            color="green"
-                            className="ml-2"
-                          />
-                        )}
-                      </>
-                    }
-                  />
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <Select value={toStation} onValueChange={handleToStationChange}>
+          <SelectTrigger
+            className="h-11"
+            aria-label={t("header.selectArrivalStation")}
+          >
+            {toStation ? (
+              <StationWithFerry station={toStation} direction="northbound" />
+            ) : (
+              <SelectValue placeholder={t("header.destination")} />
+            )}
+          </SelectTrigger>
+          <SelectContent role="listbox" aria-label={t("header.availableStations")}>
+            {stations.map((station) => (
+              <StationSelectItem
+                key={station}
+                station={station}
+                value={station}
+                role="option"
+                direction="northbound"
+                className={station === fromStation ? "text-primary" : ""}
+                gutterIcon={
+                  station === fromStation ? (
+                    <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
+                  ) : undefined
+                }
+                badge={
+                  <>
+                    {station === fromStation && <PillBadge label={t("header.startStation")} color="green" className="ml-2" />}
+                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="green" className="ml-2" />}
+                  </>
+                }
+              />
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Swap Button */}
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={onSwapStations}
-        className="shrink-0"
-        disabled={!fromStation || !toStation}
-        aria-label={t("header.swapStations")}
-        title={t("header.swapStations")}
-      >
-        <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-      </Button>
+      {/* Right column: location button (top) + swap button (bottom) */}
+      <div className="flex flex-col justify-between self-stretch shrink-0 gap-3">
+        {showLocationButton && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11"
+            onClick={onRequestLocation}
+            disabled={locationLoading}
+            aria-label={t("header.useMyLocation")}
+            title={t("header.useMyLocation")}
+          >
+            {locationLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <LocateFixed className="h-4 w-4" aria-hidden="true" />
+            )}
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onSwapStations}
+          className="h-11 w-11"
+          disabled={!fromStation || !toStation}
+          aria-label={t("header.swapStations")}
+          title={t("header.swapStations")}
+        >
+          <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }

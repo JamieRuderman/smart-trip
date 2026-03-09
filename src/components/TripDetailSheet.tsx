@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { X, AlertTriangle, AlarmClock, Clock, MapPin } from "lucide-react";
+import { X, AlertTriangle, AlarmClock, Clock, MapPin, LocateFixed, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
@@ -102,10 +102,11 @@ function SheetContent({
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
   const minutesUntil = useCountdown(trip.departureTime, realtimeStatus?.liveDepartureTime, currentTime);
-  const { lat, lng } = useGeolocation({
+  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation({
     watch: trackingEnabled,
     autoRequestOnNative: false,
   });
+  const hasLocation = lat != null && lng != null;
 
   // Trip metadata
   const tripDurationMinutes =
@@ -281,12 +282,31 @@ function SheetContent({
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <div className="w-[5rem] shrink-0" aria-hidden="true" />
             <span>
-              {lat != null && lng != null
+              {hasLocation
                 ? t("tracker.confidenceHigh")
                 : realtimeStatus?.hasRealtimeStopData
                 ? t("tracker.confidenceMedium")
                 : t("tracker.confidenceLow")}
             </span>
+          </div>
+        )}
+        {/* Location button — only when GPS hasn't been granted yet */}
+        {!hasLocation && (
+          <div className="flex items-center gap-3">
+            <div className="w-[5rem] shrink-0" aria-hidden="true" />
+            <button
+              onClick={requestLocation}
+              disabled={locationLoading}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              aria-label={t("header.useMyLocation")}
+            >
+              {locationLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden="true" />
+              ) : (
+                <LocateFixed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              )}
+              <span>{t("header.useMyLocation")}</span>
+            </button>
           </div>
         )}
       </div>

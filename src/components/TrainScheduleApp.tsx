@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
@@ -52,7 +52,7 @@ export function TrainScheduleApp() {
   });
   const closestStation = lat != null && lng != null ? getClosestStation(lat, lng) : null;
 
-  // Auto-select from station if empty when location resolves
+  // Auto-select from station when location first resolves (native or first web grant)
   const didAutoSelect = useRef(false);
   useEffect(() => {
     if (closestStation && !fromStation && !didAutoSelect.current) {
@@ -60,6 +60,27 @@ export function TrainScheduleApp() {
       setFromStation(closestStation);
     }
   }, [closestStation, fromStation, setFromStation]);
+
+  // When the user explicitly taps the location button: snap to closest station
+  // immediately if we already have it, otherwise request fresh location.
+  // A ref tracks whether a manual request is in flight so we can auto-select
+  // when the location resolves without clobbering the user's own selection otherwise.
+  const locationRequestedRef = useRef(false);
+  useEffect(() => {
+    if (closestStation && locationRequestedRef.current) {
+      locationRequestedRef.current = false;
+      setFromStation(closestStation);
+    }
+  }, [closestStation, setFromStation]);
+
+  const handleRequestLocation = useCallback(() => {
+    if (closestStation) {
+      setFromStation(closestStation);
+    } else {
+      locationRequestedRef.current = true;
+      requestLocation();
+    }
+  }, [closestStation, requestLocation, setFromStation]);
 
   // Dev-only: ?devTrip=<scenario> opens the sheet with fixture data
   const devFixture = useMemo(() => {
@@ -84,7 +105,7 @@ export function TrainScheduleApp() {
         onSwapStations={swapStations}
         closestStation={closestStation}
         locationLoading={locationLoading}
-        onRequestLocation={requestLocation}
+        onRequestLocation={handleRequestLocation}
       />
 
       <main

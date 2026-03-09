@@ -14,11 +14,6 @@ export type StopAccent = "green" | "gold" | "muted" | "destructive" | "default";
 
 const HIGH_CONFIDENCE_DISTANCE_KM = 1.2;
 
-function clampIndex(index: number, length: number): number {
-  if (length === 0) return 0;
-  return Math.max(0, Math.min(index, length - 1));
-}
-
 export interface StopInferenceResult {
   /** Ordered stops in display direction (fromStation → toStation). */
   displayStops: Station[];

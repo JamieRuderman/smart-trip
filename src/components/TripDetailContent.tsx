@@ -22,6 +22,7 @@ import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
+import { ArrivalLabel } from "./ArrivalLabel";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -81,7 +82,7 @@ export function TripDetailContent({
   const { t } = useTranslation();
   const { preferences } = useUserPreferences();
 
-  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed, statusLabel } =
+  const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus, isNextTrip);
 
   const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
@@ -204,21 +205,29 @@ export function TripDetailContent({
         GutterRow handles this automatically for metadata rows.
       */}
 
-      {/* Countdown / Ended */}
-      {!isCanceledOrSkipped && (isEnded || minutesUntil > -30) && (
-        <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
-          <div className="w-[5rem] shrink-0 flex justify-end">
-            <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
-          </div>
-          {isEnded ? (
-            <span className="text-2xl font-semibold text-muted-foreground">
-              {endedText}
-            </span>
-          ) : (
-            <CountdownLabel minutesUntil={minutesUntil} />
-          )}
+      {/* Countdown / Ended — always shown */}
+      <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
+        <div className="w-[5rem] shrink-0 flex justify-end">
+          <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
         </div>
-      )}
+        {isCanceledOrSkipped ? (
+          <span className="text-base text-muted-foreground">
+            {isCanceled ? t("tracker.tripCanceled") : t("tripCard.stopSkipped")}
+          </span>
+        ) : isEnded ? (
+          <span className="text-2xl font-semibold text-muted-foreground">
+            {endedText}
+          </span>
+        ) : minutesUntil < 0 ? (
+          // En route — show time remaining to arrival
+          <ArrivalLabel minutesUntilArrival={
+            parseTimeToMinutes(arrivalTime) -
+            (currentTime.getHours() * 60 + currentTime.getMinutes())
+          } />
+        ) : (
+          <CountdownLabel minutesUntil={minutesUntil} />
+        )}
+      </div>
 
       {/* Metadata: duration · stops · fare */}
       <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">

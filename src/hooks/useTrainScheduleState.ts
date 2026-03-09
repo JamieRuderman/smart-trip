@@ -42,7 +42,9 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     toStation: (searchParams.get("to") as Station) ?? "",
     // Shared-link mode: use the URL type. Normal mode: always auto-detect from today.
     scheduleType: isSharedLink && urlType ? urlType : todayScheduleType(),
-    showAllTrips: false,
+    // Expand all trips when deep-linking to a specific trip so it's always visible,
+    // even if it's an en-route trip that would otherwise be hidden above the fold.
+    showAllTrips: !isNaN(urlTripNumber),
     currentTime: debugCurrentTime ?? new Date(),
     selectedTripNumber: !isNaN(urlTripNumber) ? urlTripNumber : null,
   });

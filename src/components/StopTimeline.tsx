@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { TimeDisplay } from "./TimeDisplay";
 import { TripIcon } from "@/components/icons/TripIcon";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -43,7 +42,12 @@ export function StopTimeline({
 }: StopTimelineProps) {
   const { t } = useTranslation();
 
-  const { displayStops, displayTimes, statusByStop, states: inferredStates } = useStopInference({
+  const {
+    displayStops,
+    displayTimes,
+    statusByStop,
+    states: inferredStates,
+  } = useStopInference({
     trip,
     fromStation,
     toStation,
@@ -53,7 +57,6 @@ export function StopTimeline({
     currentLng,
   });
 
-  const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
 
@@ -99,10 +102,12 @@ export function StopTimeline({
             : "default";
 
           // Delay pill
-          const pill =
-            hasPerStopDelay
-              ? { label: t("tripCard.delayed", { minutes: perStopDelayMin }), cls: "bg-smart-gold text-white" }
-              : null;
+          const pill = hasPerStopDelay
+            ? {
+                label: t("tripCard.delayed", { minutes: perStopDelayMin }),
+                cls: "bg-smart-gold text-white",
+              }
+            : null;
 
           // Stop-point icon
           const stopIcon = isFrom ? (
@@ -113,7 +118,7 @@ export function StopTimeline({
                   ? "text-destructive"
                   : isPast
                   ? "text-muted-foreground/40"
-                  : accentText[accent]
+                  : accentText[accent],
               )}
             />
           ) : isTo ? (
@@ -126,7 +131,7 @@ export function StopTimeline({
                   ? "text-muted-foreground/40"
                   : isCurrent
                   ? accentText[accent]
-                  : "text-muted-foreground/40"
+                  : "text-muted-foreground/40",
               )}
               style={{ strokeWidth: 3 }}
             />
@@ -137,8 +142,16 @@ export function StopTimeline({
           );
 
           // Connector lines
-          const lineAbove = isFirst ? "invisible" : isPast ? "bg-muted-foreground/30" : "bg-border";
-          const lineBelow = isLast ? "invisible" : isPast || isCurrent ? "bg-muted-foreground/30" : "bg-border";
+          const lineAbove = isFirst
+            ? "invisible"
+            : isPast
+            ? "bg-muted-foreground/30"
+            : "bg-border";
+          const lineBelow = isLast
+            ? "invisible"
+            : isPast || isCurrent
+            ? "bg-muted-foreground/30"
+            : "bg-border";
 
           // Unused but kept to satisfy the destructuring from statusByStop
           void staticTime;
@@ -152,7 +165,7 @@ export function StopTimeline({
                   ? "bg-smart-gold/10 rounded-lg"
                   : isCurrent
                   ? "bg-smart-train-green/10 rounded-lg"
-                  : ""
+                  : "",
               )}
             >
               {/*
@@ -161,20 +174,28 @@ export function StopTimeline({
                   Right (flex-1): stop-point with vertical connector line
               */}
               <div className="flex self-stretch shrink-0 w-[5rem]">
-                <div className="flex items-center justify-end w-6 shrink-0">
+                <div className="flex items-center justify-end w-8 shrink-0">
                   {isCurrent && (
                     <TripIcon
                       className={cn(
                         "h-4 w-4",
-                        accent === "gold" ? "text-smart-gold" : "text-smart-train-green"
+                        accent === "gold"
+                          ? "text-smart-gold"
+                          : "text-smart-train-green",
                       )}
                     />
                   )}
                 </div>
                 <div className="flex flex-col items-center flex-1">
-                  <div className={cn("w-px flex-1", lineAbove)} style={{ minHeight: 6 }} />
+                  <div
+                    className={cn("w-px flex-1", lineAbove)}
+                    style={{ minHeight: 6 }}
+                  />
                   {stopIcon}
-                  <div className={cn("w-px flex-1", lineBelow)} style={{ minHeight: 6 }} />
+                  <div
+                    className={cn("w-px flex-1", lineBelow)}
+                    style={{ minHeight: 6 }}
+                  />
                 </div>
               </div>
 
@@ -183,16 +204,22 @@ export function StopTimeline({
                 <span
                   className={cn(
                     "text-sm flex-1 min-w-0 truncate",
-                    (isCurrent || isTo || (isFrom && !isPast)) && "font-semibold",
+                    (isCurrent || isTo || (isFrom && !isPast)) &&
+                      "font-semibold",
                     isCanceled ? "line-through" : "",
-                    accentText[accent]
+                    accentText[accent],
                   )}
                 >
                   {station}
                 </span>
 
                 {pill && (
-                  <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap", pill.cls)}>
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap",
+                      pill.cls,
+                    )}
+                  >
                     {pill.label}
                   </span>
                 )}
@@ -221,7 +248,11 @@ export function StopTimeline({
                       <TimeDisplay
                         time={time}
                         format={timeFormat}
-                        className={cn("text-sm", isCanceled ? "line-through" : "", accentText[accent])}
+                        className={cn(
+                          "text-sm",
+                          isCanceled ? "line-through" : "",
+                          accentText[accent],
+                        )}
                       />
                     )}
                   </div>

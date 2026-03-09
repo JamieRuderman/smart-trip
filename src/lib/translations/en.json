@@ -145,12 +145,15 @@
     "closeTripDetails": "Close trip details",
     "tripDetailsAria": "Trip {{trip}} details",
     "runningLate": "Running approximately {{minutes}} min late",
-    "tripCanceled": "This trip has been canceled",
+    "tripCanceled": "Trip canceled",
     "confidenceHigh": "Confidence: High (GPS)",
     "confidenceMedium": "Confidence: Medium (Realtime)",
     "confidenceLow": "Confidence: Low (Schedule)",
     "distanceMiToStop": "{{distance}} mi to {{stop}}",
     "atStop": "At {{stop}}",
-    "tripLabel": "Trip"
+    "tripLabel": "Trip",
+    "arrivesInMinutes": "Arrives in {{minutes}} min",
+    "arrivesInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
+    "arrivingNow": "Arriving now"
   }
 }

@@ -145,12 +145,15 @@
     "closeTripDetails": "Cerrar detalles del viaje",
     "tripDetailsAria": "Detalles del tren {{trip}}",
     "runningLate": "Circula aproximadamente con {{minutes}} min de retraso",
-    "tripCanceled": "Este viaje ha sido cancelado",
+    "tripCanceled": "Viaje cancelado",
     "confidenceHigh": "Confianza: Alta (GPS)",
     "confidenceMedium": "Confianza: Media (Tiempo real)",
     "confidenceLow": "Confianza: Baja (Horario)",
     "distanceMiToStop": "{{distance}} mi a {{stop}}",
     "atStop": "En {{stop}}",
-    "tripLabel": "Tren"
+    "tripLabel": "Tren",
+    "arrivesInMinutes": "Llega en {{minutes}} min",
+    "arrivesInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
+    "arrivingNow": "Llegando ahora"
   }
 }

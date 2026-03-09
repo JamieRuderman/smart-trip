@@ -15,8 +15,6 @@ interface StopTimelineProps {
   currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
-  currentLat?: number | null;
-  currentLng?: number | null;
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
 }
@@ -36,8 +34,6 @@ export function StopTimeline({
   currentTime,
   realtimeStatus,
   timeFormat,
-  currentLat,
-  currentLng,
   isEnded = false,
 }: StopTimelineProps) {
   const { t } = useTranslation();
@@ -53,8 +49,6 @@ export function StopTimeline({
     toStation,
     currentTime,
     realtimeStatus,
-    currentLat,
-    currentLng,
   });
 
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;

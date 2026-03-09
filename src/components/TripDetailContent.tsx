@@ -7,7 +7,6 @@ import {
   MapPin,
   LocateFixed,
   Loader2,
-  Navigation2,
 } from "lucide-react";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -252,22 +251,10 @@ export function TripDetailContent({
           </span>
         </GutterRow>
 
-        {!isCanceled && (
-          <GutterRow className="text-sm text-muted-foreground">
-            <span>
-              {hasLocation
-                ? t("tracker.confidenceHigh")
-                : realtimeStatus?.hasRealtimeStopData
-                ? t("tracker.confidenceMedium")
-                : t("tracker.confidenceLow")}
-            </span>
-          </GutterRow>
-        )}
-
         {!isEnded && distanceToNextStopMi != null && nextStop != null && (
           <GutterRow className="text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Navigation2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <LocateFixed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
                 {distanceToNextStopMi < 0.05
                   ? t("tracker.atStop", { stop: nextStop })
@@ -311,8 +298,6 @@ export function TripDetailContent({
           currentTime={currentTime}
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
-          currentLat={lat}
-          currentLng={lng}
           isEnded={isEnded}
         />
 

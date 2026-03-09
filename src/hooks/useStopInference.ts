@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import {
   getAllStations,
-  getClosestStationWithDistance,
   stationIndexMap,
 } from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
@@ -11,8 +10,6 @@ import type { Station } from "@/types/smartSchedule";
 
 export type StopState = "past" | "current" | "future";
 export type StopAccent = "green" | "gold" | "muted" | "destructive" | "default";
-
-const HIGH_CONFIDENCE_DISTANCE_KM = 1.2;
 
 export interface StopInferenceResult {
   /** Ordered stops in display direction (fromStation → toStation). */
@@ -31,8 +28,6 @@ export interface StopInferenceResult {
   states: StopState[];
   /** Index of the inferred current stop. */
   currentIndex: number;
-  /** Position-inference confidence. */
-  confidence: "high" | "medium" | "low";
   /** Whether any stops are already past (trip has started). */
   hasStarted: boolean;
   /**
@@ -48,16 +43,12 @@ export function useStopInference({
   toStation,
   currentTime,
   realtimeStatus,
-  currentLat,
-  currentLng,
 }: {
   trip: ProcessedTrip;
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
-  currentLat?: number | null;
-  currentLng?: number | null;
 }): StopInferenceResult {
   const allStations = getAllStations();
   const fromIdx = stationIndexMap[fromStation];
@@ -73,7 +64,6 @@ export function useStopInference({
 
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
-  const hasRealtimeStopData = realtimeStatus?.hasRealtimeStopData ?? false;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
 
   const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -88,19 +78,9 @@ export function useStopInference({
       return { station, staticTime, liveTime, parsed, isPast };
     });
 
-    let confidence: "high" | "medium" | "low" = "low";
     let currentIndex = -1;
 
-    if (currentLat != null && currentLng != null) {
-      const closest = getClosestStationWithDistance(currentLat, currentLng);
-      const idx = displayStops.indexOf(closest.station);
-      if (idx >= 0 && closest.distanceKm <= HIGH_CONFIDENCE_DISTANCE_KM) {
-        confidence = "high";
-        currentIndex = idx;
-      }
-    }
-
-    if (currentIndex === -1) {
+    {
       let lastPast = -1;
       for (let i = 0; i < statusByStop.length; i += 1) {
         if (statusByStop[i].isPast) lastPast = i;
@@ -109,9 +89,6 @@ export function useStopInference({
       // Before departure, leave currentIndex at -1 so no stop highlights green.
       if (lastPast >= 0) {
         currentIndex = lastPast;
-      }
-      if (hasRealtimeStopData && statusByStop.some((s) => s.liveTime)) {
-        confidence = "medium";
       }
     }
 
@@ -141,19 +118,15 @@ export function useStopInference({
       statusByStop,
       states,
       currentIndex,
-      confidence,
       hasStarted,
       currentAccent,
     };
   }, [
-    currentLat,
-    currentLng,
     displayStops,
     displayTimes,
     allStopLiveDepartures,
     allStopDelayMinutes,
     nowMinutes,
-    hasRealtimeStopData,
     isCanceled,
   ]);
 }

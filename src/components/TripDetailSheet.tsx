@@ -74,8 +74,6 @@ export function TripDetailSheet({
     toStation: rest.toStation,
     currentTime: rest.currentTime,
     realtimeStatus: rest.realtimeStatus,
-    currentLat: lat,
-    currentLng: lng,
   });
 
   const accentBg = {

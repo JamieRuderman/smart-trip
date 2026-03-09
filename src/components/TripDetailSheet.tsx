@@ -17,6 +17,7 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
+import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
 
 export interface TripDetailSheetProps {
   isOpen: boolean;
@@ -31,8 +32,6 @@ export interface TripDetailSheetProps {
   showFerry: boolean;
 }
 
-/** How long after arrival before the sheet goes grey ("Ended X ago"). */
-const ENDED_THRESHOLD_MIN = 30;
 
 /**
  * TripDetailSheet — layout-only wrapper.
@@ -65,7 +64,7 @@ export function TripDetailSheet({
   const arrivalTime = rest.realtimeStatus?.liveArrivalTime ?? rest.trip.arrivalTime;
   const minutesAfterArrival = -(computeMinutesUntil(rest.currentTime, arrivalTime));
 
-  const isEnded = minutesAfterArrival > ENDED_THRESHOLD_MIN;
+  const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
 
   // Single source of truth for the coloured header band used by both the
   // drag handle (here) and TripDetailContent's header.

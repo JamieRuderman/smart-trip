@@ -25,6 +25,7 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Trans, useTranslation } from "react-i18next";
+import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
 
 export interface TripDetailContentProps {
   trip: ProcessedTrip;
@@ -48,8 +49,6 @@ export interface TripDetailContentProps {
   showCloseButton?: boolean;
 }
 
-/** How long after arrival the sheet switches to the "Ended" state. */
-const ENDED_THRESHOLD_MIN = 30;
 
 export function TripDetailContent({
   trip,
@@ -75,7 +74,7 @@ export function TripDetailContent({
   const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus, isNextTrip);
 
-  const isEnded = minutesAfterArrival > ENDED_THRESHOLD_MIN;
+  const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
@@ -287,6 +286,7 @@ export function TripDetailContent({
           timeFormat={timeFormat}
           currentLat={lat}
           currentLng={lng}
+          isEnded={isEnded}
         />
 
         {showFerry && trip.outboundFerry && (

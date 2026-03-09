@@ -18,6 +18,8 @@ interface StopTimelineProps {
   timeFormat: "12h" | "24h";
   currentLat?: number | null;
   currentLng?: number | null;
+  /** When true all stops are rendered as past/muted — used for the ended state. */
+  isEnded?: boolean;
 }
 
 const accentText: Record<StopAccent, string> = {
@@ -37,10 +39,11 @@ export function StopTimeline({
   timeFormat,
   currentLat,
   currentLng,
+  isEnded = false,
 }: StopTimelineProps) {
   const { t } = useTranslation();
 
-  const { displayStops, displayTimes, statusByStop, states } = useStopInference({
+  const { displayStops, displayTimes, statusByStop, states: inferredStates } = useStopInference({
     trip,
     fromStation,
     toStation,
@@ -53,6 +56,11 @@ export function StopTimeline({
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
+
+  // When the trip has ended all stops are forced to "past" so nothing stays green.
+  const states = isEnded
+    ? inferredStates.map(() => "past" as const)
+    : inferredStates;
 
   return (
     <div className="flex flex-col">

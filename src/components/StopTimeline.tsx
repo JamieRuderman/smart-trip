@@ -193,6 +193,8 @@ export function StopTimeline({
                   ? "text-destructive"
                   : isPast
                   ? "text-muted-foreground/40"
+                  : accent === "gold"
+                  ? "text-smart-gold"
                   : "text-smart-train-green"
               )}
             />
@@ -200,7 +202,13 @@ export function StopTimeline({
             <CornerDownRight
               className={cn(
                 "h-4 w-4 shrink-0",
-                isCanceled ? "text-destructive" : "text-primary"
+                isCanceled
+                  ? "text-destructive"
+                  : isPast
+                  ? "text-muted-foreground/40"
+                  : isCurrent
+                  ? accentText[accent]
+                  : "text-muted-foreground/40"
               )}
               style={{ strokeWidth: 3 }}
             />
@@ -227,7 +235,11 @@ export function StopTimeline({
               key={station}
               className={cn(
                 "flex items-center gap-3 relative",
-                isCurrent && "bg-smart-train-green/10 rounded-lg"
+                isCurrent && accent === "gold"
+                  ? "bg-smart-gold/10 rounded-lg"
+                  : isCurrent
+                  ? "bg-smart-train-green/10 rounded-lg"
+                  : ""
               )}
             >
               {/*
@@ -238,9 +250,16 @@ export function StopTimeline({
               */}
               <div className="flex self-stretch shrink-0 w-[5rem]">
                 {/* Left sub-column: train position */}
-                <div className="flex items-center justify-center w-6 shrink-0">
+                <div className="flex items-center justify-end w-6 shrink-0">
                   {isCurrent && (
-                    <TripIcon className="h-4 w-4 text-smart-train-green" />
+                    <TripIcon
+                      className={cn(
+                        "h-4 w-4",
+                        accent === "gold"
+                          ? "text-smart-gold"
+                          : "text-smart-train-green"
+                      )}
+                    />
                   )}
                 </div>
                 {/* Right sub-column: vertical connector + stop icon */}

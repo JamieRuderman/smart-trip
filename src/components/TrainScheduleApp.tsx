@@ -54,14 +54,15 @@ export function TrainScheduleApp() {
   });
   const closestStation = lat != null && lng != null ? getClosestStation(lat, lng) : null;
 
-  // Auto-select from station when location first resolves (native or first web grant)
+  // Auto-select from station when location first resolves (native or first web grant).
+  // Skip if the closest station is already the destination — that would create an invalid route.
   const didAutoSelect = useRef(false);
   useEffect(() => {
-    if (closestStation && !fromStation && !didAutoSelect.current) {
+    if (closestStation && !fromStation && !didAutoSelect.current && closestStation !== toStation) {
       didAutoSelect.current = true;
       setFromStation(closestStation);
     }
-  }, [closestStation, fromStation, setFromStation]);
+  }, [closestStation, fromStation, toStation, setFromStation]);
 
   // When the user explicitly taps the location button: snap to closest station
   // immediately if we already have it, otherwise request fresh location.
@@ -69,20 +70,20 @@ export function TrainScheduleApp() {
   // when the location resolves without clobbering the user's own selection otherwise.
   const locationRequestedRef = useRef(false);
   useEffect(() => {
-    if (closestStation && locationRequestedRef.current) {
+    if (closestStation && locationRequestedRef.current && closestStation !== toStation) {
       locationRequestedRef.current = false;
       setFromStation(closestStation);
     }
-  }, [closestStation, setFromStation]);
+  }, [closestStation, toStation, setFromStation]);
 
   const handleRequestLocation = useCallback(() => {
-    if (closestStation) {
+    if (closestStation && closestStation !== toStation) {
       setFromStation(closestStation);
     } else {
       locationRequestedRef.current = true;
       requestLocation();
     }
-  }, [closestStation, requestLocation, setFromStation]);
+  }, [closestStation, toStation, requestLocation, setFromStation]);
 
   // Dev-only: ?devTrip=<scenario> opens the sheet with fixture data
   const devFixture = useMemo(() => {

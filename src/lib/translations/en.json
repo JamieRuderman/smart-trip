@@ -133,6 +133,7 @@
     "departsInMinutes": "Departs in {{minutes}} min",
     "nowBoarding": "Now boarding",
     "departedMinutesAgo": "Departed {{minutes}} min ago",
+    "ended": "Ended",
     "endedMinutesAgo": "Ended {{minutes}} min ago",
     "endedHoursMinutesAgo": "Ended {{hours}}h {{minutes}}m ago",
     "durationHoursMinutes": "{{hours}}h {{minutes}}m",

@@ -121,8 +121,8 @@ export function TripDetailContent({
     ? t("quickConnection.laterTrain")
     : t("quickConnection.earlierTrain");
 
-  // "Ended X ago" label shown in the header when the trip has finished.
-  const endedLabel = isEnded
+  // Large "Ended X ago" text shown in the countdown row once the trip is done.
+  const endedText = isEnded
     ? minutesAfterArrival >= 60
       ? t("tracker.endedHoursMinutesAgo", {
           hours: Math.floor(minutesAfterArrival / 60),
@@ -131,7 +131,8 @@ export function TripDetailContent({
       : t("tracker.endedMinutesAgo", { minutes: minutesAfterArrival })
     : null;
 
-  const headerStatusLabel = endedLabel ?? statusLabel;
+  // Small header badge — "Ended" for finished trips, realtime label otherwise.
+  const headerStatusLabel = isEnded ? t("tracker.ended") : statusLabel;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -190,13 +191,19 @@ export function TripDetailContent({
         GutterRow handles this automatically for metadata rows.
       */}
 
-      {/* Countdown — hidden once the trip has ended */}
-      {!isCanceledOrSkipped && !isEnded && minutesUntil > -30 && (
+      {/* Countdown / Ended */}
+      {!isCanceledOrSkipped && (isEnded || minutesUntil > -30) && (
         <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
           <div className="w-[5rem] shrink-0 flex justify-end">
             <AlarmClock className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
           </div>
-          <CountdownLabel minutesUntil={minutesUntil} />
+          {isEnded ? (
+            <span className="text-2xl font-semibold text-muted-foreground">
+              {endedText}
+            </span>
+          ) : (
+            <CountdownLabel minutesUntil={minutesUntil} />
+          )}
         </div>
       )}
 

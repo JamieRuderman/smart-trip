@@ -85,12 +85,11 @@ export function TripDetailSheet({
 
   // Distance to the next upcoming stop (mi), shown when GPS is available.
   // Before departure: distance to the origin station (useful when walking to the platform).
-  // After departure:  distance to the next stop after the current one.
+  // After departure:  distance to the current highlighted stop (the green one = where you're heading).
   const nextStop = (() => {
     if (lat == null || lng == null) return null;
     if (currentIndex === -1) return displayStops[0] ?? null;          // not yet started
-    const next = currentIndex + 1;
-    return next < displayStops.length ? displayStops[next] : null;    // next in route
+    return displayStops[currentIndex] ?? null;                         // current (green) stop
   })();
   const distanceToNextStopMi =
     nextStop != null && lat != null && lng != null

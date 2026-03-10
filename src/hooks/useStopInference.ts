@@ -87,8 +87,12 @@ export function useStopInference({
       }
       // Only pin a "current" stop once the trip has actually started (≥1 past stop).
       // Before departure, leave currentIndex at -1 so no stop highlights green.
+      // Point to the next upcoming stop (where the train is heading), so the
+      // green highlight always shows the stop you're approaching, not the one
+      // you just left. At the final stop, keep it on the last stop.
       if (lastPast >= 0) {
-        currentIndex = lastPast;
+        const next = lastPast + 1;
+        currentIndex = next < displayStops.length ? next : lastPast;
       }
     }
 

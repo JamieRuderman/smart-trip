@@ -90,7 +90,13 @@ export function useStopInference({
       // Point to the next upcoming stop (where the train is heading), so the
       // green highlight always shows the stop you're approaching, not the one
       // you just left. At the final stop, keep it on the last stop.
-      if (lastPast >= 0) {
+      //
+      // Guard: require the origin stop (index 0) to also be in the past before
+      // advancing. A stale or incorrect live time on an intermediate stop (e.g.
+      // a northbound pass-through time applied to a southbound stop by the
+      // GTFS-RT feed) can make that stop appear "past" before the trip has
+      // actually departed, incorrectly skipping the origin highlight.
+      if (lastPast >= 0 && statusByStop[0]?.isPast) {
         const next = lastPast + 1;
         currentIndex = next < displayStops.length ? next : lastPast;
       }
@@ -103,7 +109,7 @@ export function useStopInference({
       return "future";
     });
 
-    const hasStarted = statusByStop.some((s) => s.isPast);
+    const hasStarted = statusByStop[0]?.isPast ?? false;
 
     const currentStation = currentIndex >= 0 ? displayStops[currentIndex] : null;
     const perStopDelayMin =

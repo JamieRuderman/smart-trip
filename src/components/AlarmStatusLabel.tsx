@@ -35,7 +35,7 @@ export function AlarmStatusLabel({
   return (
     <span
       className={cn(
-        "text-[1.7rem] leading-tight font-semibold",
+        "text-[1.7rem] leading-tight font-semibold tracking-[-0.02em]",
         status.tone === "muted" ? stateText.future : stateText.future,
       )}
     >

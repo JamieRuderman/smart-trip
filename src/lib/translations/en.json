@@ -43,11 +43,11 @@
     "northboundSchedule": "Northbound Schedule",
     "showEarlierTrains": "Show earlier trains",
     "hideEarlierTrains": "Hide earlier trains",
-    "lastUpdatedLoading": "Loading updates…",
-    "updatedJustNow": "Updated just now",
-    "updatedMinutesAgo_one": "Updated {{count}} min ago",
-    "updatedMinutesAgo_other": "Updated {{count}} min ago",
-    "dataMayBeStale": "Data may be stale"
+    "lastUpdatedLoading": "Loading…",
+    "updatedJustNow": "Just now",
+    "updatedMinutesAgo_one": "{{count}}m ago",
+    "updatedMinutesAgo_other": "{{count}}m ago",
+    "dataMayBeStale": "stale"
   },
   "fare": {
     "fareInformation": "Fare Information",

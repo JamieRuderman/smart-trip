@@ -69,21 +69,29 @@ export function TrainScheduleApp() {
   // A ref tracks whether a manual request is in flight so we can auto-select
   // when the location resolves without clobbering the user's own selection otherwise.
   const locationRequestedRef = useRef(false);
-  useEffect(() => {
-    if (closestStation && locationRequestedRef.current && closestStation !== toStation) {
-      locationRequestedRef.current = false;
-      setFromStation(closestStation);
+
+  const applyClosestStation = useCallback((station: NonNullable<typeof closestStation>) => {
+    setFromStation(station);
+    if (station === toStation) {
+      setToStation("" as typeof station);
     }
-  }, [closestStation, toStation, setFromStation]);
+  }, [setFromStation, setToStation, toStation]);
+
+  useEffect(() => {
+    if (closestStation && locationRequestedRef.current) {
+      locationRequestedRef.current = false;
+      applyClosestStation(closestStation);
+    }
+  }, [applyClosestStation, closestStation]);
 
   const handleRequestLocation = useCallback(() => {
-    if (closestStation && closestStation !== toStation) {
-      setFromStation(closestStation);
+    if (closestStation) {
+      applyClosestStation(closestStation);
     } else {
       locationRequestedRef.current = true;
       requestLocation();
     }
-  }, [closestStation, toStation, requestLocation, setFromStation]);
+  }, [applyClosestStation, closestStation, requestLocation]);
 
   // Dev-only: ?devTrip=<scenario> opens the sheet with fixture data
   const devFixture = useMemo(() => {

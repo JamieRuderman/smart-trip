@@ -3,19 +3,19 @@ import type { Station, StationZone } from "@/types/smartSchedule";
 // Lat/lng coordinates for each SMART station (verified against Google Maps)
 export const STATION_COORDINATES: Record<Station, { lat: number; lng: number }> = {
   "Windsor": { lat: 38.5491125, lng: -122.818189 },
-  "Sonoma County Airport": { lat: 38.5044, lng: -122.7426 },
-  "Santa Rosa North": { lat: 38.4594, lng: -122.7286 },
-  "Santa Rosa Downtown": { lat: 38.4407, lng: -122.7178 },
+  "Sonoma County Airport": { lat: 38.5100832, lng: -122.7843567 },
+  "Santa Rosa North": { lat: 38.455112, lng: -122.7366214 },
+  "Santa Rosa Downtown": { lat: 38.4374356, lng: -122.7218848 },
   "Rohnert Park": { lat: 38.3473735, lng: -122.7037793 },
-  "Cotati": { lat: 38.3247, lng: -122.7073 },
-  "Petaluma North": { lat: 38.2629, lng: -122.6637 },
-  "Petaluma Downtown": { lat: 38.2318, lng: -122.6437 },
-  "Novato San Marin": { lat: 38.0834, lng: -122.5671 },
-  "Novato Downtown": { lat: 38.1095, lng: -122.5706 },
-  "Novato Hamilton": { lat: 38.0586, lng: -122.5266 },
-  "Marin Civic Center": { lat: 37.9744, lng: -122.5259 },
-  "San Rafael": { lat: 37.9763, lng: -122.5320 },
-  "Larkspur": { lat: 37.9437, lng: -122.5044 },
+  "Cotati": { lat: 38.3312591, lng: -122.6916985 },
+  "Petaluma North": { lat: 38.2675533, lng: -122.6557996 },
+  "Petaluma Downtown": { lat: 38.2369926, lng: -122.635302 },
+  "Novato San Marin": { lat: 38.120578, lng: -122.5688409 },
+  "Novato Downtown": { lat: 38.10598, lng: -122.5670149 },
+  "Novato Hamilton": { lat: 38.0563341, lng: -122.5242735 },
+  "Marin Civic Center": { lat: 38.0013104, lng: -122.5383129 },
+  "San Rafael": { lat: 37.971135, lng: -122.5234037 },
+  "Larkspur": { lat: 37.9478532, lng: -122.5132702 },
 };
 
 // Raw station data - this represents what would come from an API

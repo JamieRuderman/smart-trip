@@ -29,7 +29,7 @@ async function fetchNativeLocation(): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
   await Geolocation.requestPermissions();
   const pos = await Geolocation.getCurrentPosition({
-    enableHighAccuracy: false,
+    enableHighAccuracy: true,
     timeout: 10000,
   });
   return { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -44,7 +44,7 @@ function fetchWebLocation(): Promise<Coordinates> {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   });
 }
@@ -118,7 +118,7 @@ export function useGeolocation({
         await Geolocation.requestPermissions();
         const watchId = await Geolocation.watchPosition(
           {
-            enableHighAccuracy: false,
+            enableHighAccuracy: true,
             timeout: 10000,
             maximumAge: 15000,
           },
@@ -154,7 +154,7 @@ export function useGeolocation({
           setError(watchError.message);
         },
         {
-          enableHighAccuracy: false,
+          enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 15000,
         }

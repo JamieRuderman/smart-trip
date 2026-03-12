@@ -1,12 +1,12 @@
 import type { Station, StationZone } from "@/types/smartSchedule";
 
-// Lat/lng coordinates for each SMART station (from SMART GTFS stops.txt)
+// Lat/lng coordinates for each SMART station (verified against Google Maps)
 export const STATION_COORDINATES: Record<Station, { lat: number; lng: number }> = {
-  "Windsor": { lat: 38.5477, lng: -122.8125 },
+  "Windsor": { lat: 38.5491125, lng: -122.818189 },
   "Sonoma County Airport": { lat: 38.5044, lng: -122.7426 },
   "Santa Rosa North": { lat: 38.4594, lng: -122.7286 },
   "Santa Rosa Downtown": { lat: 38.4407, lng: -122.7178 },
-  "Rohnert Park": { lat: 38.3350, lng: -122.6972 },
+  "Rohnert Park": { lat: 38.3473735, lng: -122.7037793 },
   "Cotati": { lat: 38.3247, lng: -122.7073 },
   "Petaluma North": { lat: 38.2629, lng: -122.6637 },
   "Petaluma Downtown": { lat: 38.2318, lng: -122.6437 },

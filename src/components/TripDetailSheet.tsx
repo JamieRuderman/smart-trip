@@ -113,14 +113,12 @@ export function TripDetailSheet({
 
   const disableScrollArea = (scrollArea: HTMLElement | null) => {
     if (!scrollArea) return;
-    scrollArea.dataset.sheetDragLocked = "true";
     scrollArea.style.overflowY = "hidden";
     scrollArea.style.touchAction = "none";
   };
 
   const restoreScrollArea = (scrollArea: HTMLElement | null) => {
     if (!scrollArea) return;
-    delete scrollArea.dataset.sheetDragLocked;
     scrollArea.style.overflowY = "";
     scrollArea.style.touchAction = "";
   };

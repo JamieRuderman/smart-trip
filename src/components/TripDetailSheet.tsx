@@ -129,7 +129,8 @@ export function TripDetailSheet({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current === null || !sheetRef.current) return;
-    const delta = e.touches[0].clientY - touchStartY.current;
+    const currentY = e.touches[0].clientY;
+    let delta = currentY - touchStartY.current;
     const scrollArea = activeScrollAreaRef.current;
 
     if (scrollArea) {
@@ -140,6 +141,10 @@ export function TripDetailSheet({
       if (!dragEnabledRef.current) {
         if ((delta > 0 && atTop) || (delta < 0 && atBottom)) {
           dragEnabledRef.current = true;
+          // Start the sheet drag from the handoff point instead of replaying
+          // the full finger travel from when the inner scroller was moving.
+          touchStartY.current = currentY;
+          delta = 0;
         } else {
           return;
         }
@@ -147,6 +152,7 @@ export function TripDetailSheet({
     }
 
     if (!dragEnabledRef.current) return;
+    e.preventDefault();
 
     if (delta < 0) {
       currentTranslateY.current = delta * 0.18;

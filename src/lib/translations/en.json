@@ -20,7 +20,9 @@
     "weekendSchedule": "Weekend and holiday schedule",
     "availableStations": "Available stations",
     "startStation": "Departing",
-    "endStation": "Arriving"
+    "endStation": "Arriving",
+    "nearYou": "Near you",
+    "useMyLocation": "Use my location"
   },
   "emptyState": {
     "selectYourRoute": "Select Your Route",
@@ -40,7 +42,12 @@
     "southboundSchedule": "Southbound Schedule",
     "northboundSchedule": "Northbound Schedule",
     "showEarlierTrains": "Show earlier trains",
-    "hideEarlierTrains": "Hide earlier trains"
+    "hideEarlierTrains": "Hide earlier trains",
+    "lastUpdatedLoading": "Loading updates…",
+    "updatedJustNow": "Updated just now",
+    "updatedMinutesAgo_one": "Updated {{count}} min ago",
+    "updatedMinutesAgo_other": "Updated {{count}} min ago",
+    "dataMayBeStale": "Data may be stale"
   },
   "fare": {
     "fareInformation": "Fare Information",
@@ -120,5 +127,30 @@
   "noMoreTrains": {
     "noMoreTrainsToday": "No more trains today",
     "allTrainsDeparted": "All scheduled trains for today have departed"
+  },
+  "tracker": {
+    "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Departs in {{minutes}} min",
+    "nowBoarding": "Now boarding",
+    "departedMinutesAgo": "Departed {{minutes}} min ago",
+    "scheduled": "Scheduled",
+    "ended": "Ended",
+    "endedMinutesAgo": "Ended {{minutes}} min ago",
+    "endedHoursMinutesAgo": "Ended {{hours}}h {{minutes}}m ago",
+    "durationHoursMinutes": "{{hours}}h {{minutes}}m",
+    "durationMinutes": "{{minutes}}m",
+    "stopCount_one": "{{count}} stop",
+    "stopCount_other": "{{count}} stops",
+    "adultFare": "${{fare}} adult",
+    "closeTripDetails": "Close trip details",
+    "tripDetailsAria": "Trip {{trip}} details",
+    "runningLate": "Running approximately {{minutes}} min late",
+    "tripCanceled": "Trip canceled",
+    "distanceMiToStop": "{{distance}} mi to {{stop}}",
+    "atStop": "At {{stop}}",
+    "tripLabel": "Trip",
+    "arrivesInMinutes": "Arrives in {{minutes}} min",
+    "arrivesInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
+    "arrivingNow": "Arriving now"
   }
 }

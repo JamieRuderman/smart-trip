@@ -1,21 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Station, FareType } from "@/types/smartSchedule";
+import type { FareType } from "@/types/smartSchedule";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { logger } from "@/lib/logger";
 
 export interface UserPreferences {
-  lastSelectedStations: {
-    from: Station | "";
-    to: Station | "";
-  };
   selectedFareType: FareType | "none";
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  lastSelectedStations: {
-    from: "",
-    to: "",
-  },
   selectedFareType: "none",
 };
 
@@ -27,7 +19,6 @@ const STORAGE_KEY = APP_CONSTANTS.PREFERENCES_STORAGE_KEY;
 export function useUserPreferences() {
   const [preferences, setPreferences] =
     useState<UserPreferences>(DEFAULT_PREFERENCES);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load preferences from localStorage on mount
   useEffect(() => {
@@ -39,8 +30,6 @@ export function useUserPreferences() {
       }
     } catch (error) {
       logger.warn("Failed to load user preferences", error);
-    } finally {
-      setIsLoaded(true);
     }
   }, []);
 
@@ -58,16 +47,6 @@ export function useUserPreferences() {
     [preferences]
   );
 
-  // Update last selected stations
-  const updateLastSelected = useCallback(
-    (from: Station | "", to: Station | "") => {
-      savePreferences({
-        lastSelectedStations: { from, to },
-      });
-    },
-    [savePreferences]
-  );
-
   // Update selected fare type
   const updateSelectedFareType = useCallback(
     (fareType: FareType | "none") => {
@@ -80,8 +59,6 @@ export function useUserPreferences() {
 
   return {
     preferences,
-    isLoaded,
-    updateLastSelected,
     updateSelectedFareType,
   };
 }

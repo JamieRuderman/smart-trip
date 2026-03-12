@@ -69,3 +69,16 @@ export function isTimeInPast(currentTime: Date, timeString: string): boolean {
 export function isQuickConnection(transferTimeMinutes: number): boolean {
   return transferTimeMinutes < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
 }
+
+/**
+ * Minutes remaining until a scheduled (or live) time relative to the given Date.
+ * Positive = still in the future; negative = already past.
+ */
+export function computeMinutesUntil(
+  currentTime: Date,
+  staticTime: string,
+  liveTime?: string
+): number {
+  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+  return parseTimeToMinutes(liveTime ?? staticTime) - nowMinutes;
+}

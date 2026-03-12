@@ -1,46 +1,53 @@
 import { Button } from "@/components/ui/button";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
   currentTime: Date;
-  timeFormat: "12h" | "24h";
   nextTripIndex: number;
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
+  lastUpdated: Date | null;
+}
+
+function computeLabel(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  lastUpdated: Date | null,
+  currentTime: Date
+): string {
+  if (!lastUpdated) return t("schedule.lastUpdatedLoading");
+  const diffMs = currentTime.getTime() - lastUpdated.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return t("schedule.updatedJustNow");
+  const relative = t("schedule.updatedMinutesAgo", { count: diffMin });
+  if (diffMin >= 10) {
+    return `${relative} · ${t("schedule.dataMayBeStale")}`;
+  }
+  return relative;
 }
 
 export function ScheduleHeader({
   direction,
   currentTime,
-  timeFormat,
   nextTripIndex,
   showAllTrips,
   onToggleShowAllTrips,
+  lastUpdated,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
+  const updatedLabel = computeLabel(t, lastUpdated, currentTime);
 
   return (
     <CardHeader className="p-3 md:p-6">
-      <CardTitle
-        id="schedule-results-title"
-        className="flex items-center gap-2"
-      >
+      <CardTitle id="schedule-results-title" className="flex items-center gap-2">
         {direction === "southbound"
           ? t("schedule.southboundSchedule")
           : t("schedule.northboundSchedule")}
         <div className="flex-grow flex justify-end items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
-          {currentTime.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: timeFormat === "12h",
-          })}
-          <Clock
-            className="inline-block h-5 w-5 text-primary"
-            aria-hidden="true"
-          />
+          {updatedLabel}
+          <RefreshCw className="inline-block h-4 w-4 text-primary" aria-hidden="true" />
         </div>
       </CardTitle>
       {nextTripIndex > 0 && !showAllTrips && (

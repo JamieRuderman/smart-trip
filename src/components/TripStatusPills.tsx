@@ -1,51 +1,12 @@
-import { useTranslation } from "react-i18next";
 import { PillBadge } from "./PillBadge";
+import type { TripState } from "@/lib/tripTheme";
 
 interface TripStatusPillsProps {
-  isCanceled: boolean;
-  isOriginSkipped: boolean;
-  isDelayed: boolean;
-  showOnTimeBadge: boolean;
-  delayDisplay: string;
+  statusLabel: string | null;
+  statusColor: TripState | null;
 }
 
-export function TripStatusPills({
-  isCanceled,
-  isOriginSkipped,
-  isDelayed,
-  showOnTimeBadge,
-  delayDisplay,
-}: TripStatusPillsProps) {
-  const { t } = useTranslation();
-
-  return (
-    <>
-      {isCanceled && (
-        <PillBadge
-          label={t("tripCard.canceled")}
-          color="gold"
-          className="bg-destructive"
-        />
-      )}
-      {isOriginSkipped && !isCanceled && (
-        <PillBadge
-          label={t("tripCard.stopSkipped")}
-          color="gold"
-          className="bg-destructive"
-        />
-      )}
-      {isDelayed && !isCanceled && !isOriginSkipped && (
-        <PillBadge
-          label={t("tripCard.delayed", { minutes: delayDisplay })}
-          color="gold"
-        />
-      )}
-      {showOnTimeBadge && (
-        <PillBadge
-          label={t("tripCard.onTime")}
-          color="green"
-        />
-      )}
-    </>
-  );
+export function TripStatusPills({ statusLabel, statusColor }: TripStatusPillsProps) {
+  if (!statusLabel || !statusColor) return null;
+  return <PillBadge label={statusLabel} color={statusColor} />;
 }

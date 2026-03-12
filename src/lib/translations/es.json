@@ -20,7 +20,9 @@
     "weekendSchedule": "Fin de semana y festivos",
     "availableStations": "Estaciones disponibles",
     "startStation": "Salida",
-    "endStation": "Llegada"
+    "endStation": "Llegada",
+    "nearYou": "Cerca de ti",
+    "useMyLocation": "Usar mi ubicación"
   },
   "emptyState": {
     "selectYourRoute": "Selecciona Tu Ruta",
@@ -40,7 +42,12 @@
     "southboundSchedule": "Horario Hacia el Sur",
     "northboundSchedule": "Horario Hacia el Norte",
     "showEarlierTrains": "Mostrar trenes anteriores",
-    "hideEarlierTrains": "Ocultar trenes previos"
+    "hideEarlierTrains": "Ocultar trenes previos",
+    "lastUpdatedLoading": "Cargando actualizaciones…",
+    "updatedJustNow": "Actualizado justo ahora",
+    "updatedMinutesAgo_one": "Actualizado hace {{count}} min",
+    "updatedMinutesAgo_other": "Actualizado hace {{count}} min",
+    "dataMayBeStale": "Los datos pueden estar desactualizados"
   },
   "fare": {
     "fareInformation": "Tarifas",
@@ -120,5 +127,30 @@
   "noMoreTrains": {
     "noMoreTrainsToday": "No hay más trenes hoy",
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
+  },
+  "tracker": {
+    "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Sale en {{minutes}} min",
+    "nowBoarding": "Abordando ahora",
+    "departedMinutesAgo": "Salió hace {{minutes}} min",
+    "scheduled": "Programado",
+    "ended": "Terminado",
+    "endedMinutesAgo": "Terminó hace {{minutes}} min",
+    "endedHoursMinutesAgo": "Terminó hace {{hours}}h {{minutes}}m",
+    "durationHoursMinutes": "{{hours}}h {{minutes}}m",
+    "durationMinutes": "{{minutes}}m",
+    "stopCount_one": "{{count}} parada",
+    "stopCount_other": "{{count}} paradas",
+    "adultFare": "${{fare}} adulto",
+    "closeTripDetails": "Cerrar detalles del viaje",
+    "tripDetailsAria": "Detalles del tren {{trip}}",
+    "runningLate": "Circula aproximadamente con {{minutes}} min de retraso",
+    "tripCanceled": "Viaje cancelado",
+    "distanceMiToStop": "{{distance}} mi a {{stop}}",
+    "atStop": "En {{stop}}",
+    "tripLabel": "Tren",
+    "arrivesInMinutes": "Llega en {{minutes}} min",
+    "arrivesInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
+    "arrivingNow": "Llegando ahora"
   }
 }

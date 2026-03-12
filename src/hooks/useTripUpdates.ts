@@ -12,7 +12,10 @@ import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
-const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
+// GTFS-RT timestamps have second-level precision while our app schedule is minute-level.
+// A 1-2 minute threshold creates too many false positives when feeds drift slightly.
+// Treat only >=3 minutes as delayed to reduce incorrect "Delayed" badges.
+const MIN_DELAY_SECONDS = 3 * 60;
 
 async function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   const res = await fetch(`${apiBaseUrl}/api/gtfsrt/tripupdates`);
@@ -53,6 +56,55 @@ function findStopUpdate(
   );
 }
 
+/**
+ * Diff a live Unix timestamp against a static scheduled "HH:MM" on a given date,
+ * returning delay in whole minutes, or undefined if within the on-time threshold.
+ * Used for both trip-level and per-stop delay so the logic stays in one place.
+ */
+function computeDelayMinutes(
+  liveUnix: number,
+  scheduledHHMM: string,
+  startDate: string
+): number | undefined {
+  const delaySeconds = liveUnix - scheduledHHMMtoUnix(startDate, scheduledHHMM);
+  return delaySeconds >= MIN_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
+}
+
+/**
+ * Build maps of station name → live departure "HH:MM" and per-stop delay minutes
+ * from all stop_time_updates. Delay is computed via computeDelayMinutes against
+ * the app's own static schedule, so it is immune to rounding noise from
+ * differences between the GTFS static feed and the app's hardcoded schedule.
+ */
+function buildStopRealtimeData(
+  stopTimeUpdates: GtfsRtStopTimeUpdate[],
+  scheduledTimesByStation: Partial<Record<string, string>>,
+  startDate: string | undefined
+): {
+  allStopLiveDepartures: Partial<Record<string, string>>;
+  allStopDelayMinutes: Partial<Record<string, number>>;
+} {
+  const allStopLiveDepartures: Partial<Record<string, string>> = {};
+  const allStopDelayMinutes: Partial<Record<string, number>> = {};
+
+  for (const stu of stopTimeUpdates) {
+    if (!stu.stopId || !stu.departureTime) continue;
+    const station = GTFS_STOP_ID_TO_STATION[stu.stopId];
+    if (!station) continue;
+
+    // Each station has two platform IDs; last one wins (identical times in practice)
+    allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
+
+    const scheduledHHMM = scheduledTimesByStation[station];
+    if (scheduledHHMM && startDate) {
+      const delay = computeDelayMinutes(stu.departureTime, scheduledHHMM, startDate);
+      if (delay != null) allStopDelayMinutes[station] = delay;
+    }
+  }
+
+  return { allStopLiveDepartures, allStopDelayMinutes };
+}
+
 function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
@@ -64,7 +116,10 @@ function deriveStatus(
    */
   scheduledDepartureParam: string | null,
   /** Scheduled arrival at toStation from the static timetable ("HH:MM"). */
-  scheduledArrivalParam: string | null
+  scheduledArrivalParam: string | null,
+  /** All static scheduled times for this trip, keyed by station name. Used to
+   *  compute per-stop delay against the app's own schedule (not GTFS static). */
+  scheduledTimesByStation: Partial<Record<string, string>>
 ): { scheduledDeparture: string | null; isStartTimeFallback?: boolean; status: TripRealtimeStatus } {
   if (update.scheduleRelationship === "CANCELED") {
     // Prefer the static scheduled departure as the key so the canceled badge
@@ -137,14 +192,13 @@ function deriveStatus(
   // Compute delay by diffing the live departure.time against the static scheduled time.
   // 511 always sends departureDelay: 0 even for delayed trains, so we cannot use
   // that field. Instead we rely on the static timetable passed in from the caller.
-  let delaySeconds: number;
-  if (scheduledDepartureParam && update.startDate) {
-    const scheduledUnix = scheduledHHMMtoUnix(update.startDate, scheduledDepartureParam);
-    delaySeconds = fromUpdate.departureTime - scheduledUnix;
-  } else {
-    // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-    delaySeconds = fromUpdate.departureDelay ?? 0;
-  }
+  const delayMinutes =
+    scheduledDepartureParam && update.startDate
+      ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
+      : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
+        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
+        ? Math.round(fromUpdate.departureDelay / 60)
+        : undefined;
 
   // The map key is the static scheduled departure — so ScheduleResults can look it
   // up by trip.departureTime (which also comes from the static schedule).
@@ -152,8 +206,7 @@ function deriveStatus(
     scheduledDepartureParam ??
     unixToTimeString(fromUpdate.departureTime - (fromUpdate.departureDelay ?? 0));
 
-  const isDelayed = delaySeconds >= MIN_DELAY_SECONDS;
-  const delayMinutes = isDelayed ? Math.round(delaySeconds / 60) : undefined;
+  const isDelayed = delayMinutes != null;
 
   // Live arrival time at destination: 511 also shifts arrivalTime forward when delayed,
   // but arrivalDelay is always 0 (same issue as departureDelay). Show the live arrival
@@ -163,13 +216,20 @@ function deriveStatus(
   if (toUpdate?.arrivalTime && isDelayed) {
     liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
     if (scheduledArrivalParam && update.startDate) {
-      const scheduledArrivalUnix = scheduledHHMMtoUnix(update.startDate, scheduledArrivalParam);
-      const arrivalDelaySeconds = toUpdate.arrivalTime - scheduledArrivalUnix;
-      if (arrivalDelaySeconds >= MIN_DELAY_SECONDS) {
-        arrivalDelayMinutes = Math.round(arrivalDelaySeconds / 60);
-      }
+      arrivalDelayMinutes = computeDelayMinutes(
+        toUpdate.arrivalTime,
+        scheduledArrivalParam,
+        update.startDate
+      );
     }
   }
+
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+    update.stopTimeUpdates,
+    scheduledTimesByStation,
+    update.startDate
+  );
+  const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
 
   return {
     scheduledDeparture,
@@ -181,6 +241,9 @@ function deriveStatus(
       arrivalDelayMinutes,
       isOriginSkipped,
       isDestinationSkipped,
+      allStopLiveDepartures,
+      allStopDelayMinutes,
+      hasRealtimeStopData,
     },
   };
 }
@@ -204,6 +267,8 @@ export interface TripRealtimeStatusMaps {
    * Callers should scan ProcessedTrip.times for any matching key as a fallback.
    */
   canceledByStartTime: Map<string, TripRealtimeStatus>;
+  /** When the GTFS-RT data was last successfully fetched (null if never). */
+  lastUpdated: Date | null;
 }
 
 /**
@@ -223,7 +288,9 @@ export function useTripRealtimeStatusMap(
   const { data } = useTripUpdates();
 
   return useMemo(() => {
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map() };
+    const lastUpdated =
+      data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
     if (!data || !fromStation || !toStation) return empty;
 
     const fromIdx = stationIndexMap[fromStation] ?? -1;
@@ -233,13 +300,13 @@ export function useTripRealtimeStatusMap(
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
     // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
     // originate at the northernmost station (times[0]); northbound at the southernmost (times[last]).
-    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string }>();
+    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string; times: string[] }>();
     for (const trip of trips) {
       const originTime = isSouthbound
         ? trip.times[0]
         : trip.times[trip.times.length - 1];
       if (originTime) {
-        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime });
+        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime, times: trip.times });
       }
     }
 
@@ -253,12 +320,23 @@ export function useTripRealtimeStatusMap(
       const scheduledDepartureParam = staticTrip?.departureTime ?? null;
       const scheduledArrivalParam = staticTrip?.arrivalTime ?? null;
 
+      // Build a per-station schedule map so deriveStatus can compute per-stop delay
+      // against the app's own static times (not the official GTFS static schedule).
+      const scheduledTimesByStation: Partial<Record<string, string>> = {};
+      if (staticTrip) {
+        for (const [station, idx] of Object.entries(stationIndexMap) as [Station, number][]) {
+          const t = staticTrip.times[idx];
+          if (t && t !== "--" && t !== "") scheduledTimesByStation[station] = t;
+        }
+      }
+
       const { scheduledDeparture, isStartTimeFallback, status } = deriveStatus(
         update,
         fromStation,
         toStation,
         scheduledDepartureParam,
-        scheduledArrivalParam
+        scheduledArrivalParam,
+        scheduledTimesByStation
       );
       if (scheduledDeparture) {
         if (isStartTimeFallback) {
@@ -270,6 +348,6 @@ export function useTripRealtimeStatusMap(
         }
       }
     }
-    return { statusMap, canceledByStartTime };
+    return { statusMap, canceledByStartTime, lastUpdated };
   }, [data, fromStation, toStation, trips]);
 }

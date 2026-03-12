@@ -18,6 +18,8 @@ interface ScheduleResultsProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   timeFormat: "12h" | "24h";
+  selectedTripNumber: number | null;
+  onSelectTrip: (tripNumber: number | null) => void;
 }
 
 export function ScheduleResults({
@@ -28,9 +30,11 @@ export function ScheduleResults({
   showAllTrips,
   onToggleShowAllTrips,
   timeFormat,
+  selectedTripNumber,
+  onSelectTrip,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
-  const { statusMap: realtimeStatusMap, canceledByStartTime } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
+  const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
     filteredTrips.length > 0
@@ -65,10 +69,10 @@ export function ScheduleResults({
       <ScheduleHeader
         direction={direction.direction}
         currentTime={currentTime}
-        timeFormat={timeFormat}
         nextTripIndex={nextTripIndex}
         showAllTrips={showAllTrips}
         onToggleShowAllTrips={onToggleShowAllTrips}
+        lastUpdated={lastUpdated}
       />
       <CardContent className="p-3 md:p-6 md:pt-0">
         {nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />}
@@ -100,6 +104,11 @@ export function ScheduleResults({
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
+                fromStation={fromStation}
+                toStation={toStation}
+                currentTime={currentTime}
+                selectedTripNumber={selectedTripNumber}
+                onSelectTrip={onSelectTrip}
               />
             );
           })}

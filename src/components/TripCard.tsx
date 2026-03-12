@@ -1,16 +1,21 @@
-import { memo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
 import { TrainBadge } from "./TrainBadge";
-import { TripStatusPills } from "./TripStatusPills";
 import { FerryConnection } from "./FerryConnection";
-import { QuickConnectionModal } from "./QuickConnectionModal";
+import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTripStatus } from "@/hooks/useTripStatus";
+import { stateText, stateCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
+import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
+import { SHEET_TRANSITION_MS } from "@/lib/animationConstants";
+
+const SHEET_ENTER_DELAY_MS = 24;
 
 interface TripCardProps {
   trip: ProcessedTrip;
@@ -20,6 +25,11 @@ interface TripCardProps {
   showFerry: boolean;
   timeFormat: "12h" | "24h";
   realtimeStatus?: TripRealtimeStatus | null;
+  fromStation: Station;
+  toStation: Station;
+  currentTime: Date;
+  selectedTripNumber: number | null;
+  onSelectTrip: (tripNumber: number | null) => void;
 }
 
 export const TripCard = memo(function TripCard({
@@ -30,17 +40,29 @@ export const TripCard = memo(function TripCard({
   showFerry,
   timeFormat,
   realtimeStatus,
+  fromStation,
+  toStation,
+  currentTime,
+  selectedTripNumber,
+  onSelectTrip,
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
-  const isCanceledOrSkipped = isCanceled || isOriginSkipped;
+  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed } =
+    useTripStatus(realtimeStatus);
   const cardRef = useRef<HTMLDivElement>(null);
-  // Use live departure/arrival times when available, otherwise fall back to static scheduled times
+  const closeTimerRef = useRef<number | null>(null);
+  const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Derive open state from URL-synced selectedTripNumber
+  const isOpen = selectedTripNumber === trip.trip;
+
+  // Animation state — driven by isOpen prop, initialized to match it (deep-link case)
+  const [isDetailOpen, setIsDetailOpen] = useState(isOpen);
+  const [isDetailMounted, setIsDetailMounted] = useState(isOpen);
+  const isFirstRender = useRef(true);
 
   const hasOutboundQuickConnection =
     showFerry &&
@@ -56,40 +78,73 @@ export const TripCard = memo(function TripCard({
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
 
-  const hasQuickConnection =
-    hasOutboundQuickConnection || hasInboundQuickConnection;
-
-  const isDelayed =
-    !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
-  const showOnTimeBadge = isNextTrip && !isCanceledOrSkipped && !isDelayed;
   const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
   const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
-  const delayDisplay =
-    realtimeStatus?.delayMinutes === 0
-      ? "<1"
-      : String(realtimeStatus?.delayMinutes ?? "");
+
+  const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
-      ? "line-through text-destructive"
+      ? cn("line-through", stateText["canceled"])
       : isDelayed || hasLiveTime
-      ? "text-smart-gold"
+      ? stateText["delayed"]
       : isNextTrip
-      ? "text-smart-train-green"
+      ? stateText["ontime"]
       : undefined;
 
-  const handleCardClick = () => {
-    if (hasQuickConnection && !isCanceledOrSkipped) {
-      setIsModalOpen(true);
-    }
-  };
+  const handleCardClick = useCallback(() => {
+    onSelectTrip(trip.trip);
+  }, [onSelectTrip, trip.trip]);
 
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-    requestAnimationFrame(() => {
-      cardRef.current?.focus({ preventScroll: true });
-    });
-  };
+  const handleDetailClose = useCallback(() => {
+    onSelectTrip(null);
+  }, [onSelectTrip]);
+
+  // Drive sheet animation from the URL-synced isOpen prop
+  useEffect(() => {
+    // Skip on initial mount — animation state already seeded from isOpen (deep-link case)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (openTimerRef.current != null) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+    if (isOpen) {
+      // Mount closed first, then open slightly later so browser paints initial state
+      setIsDetailOpen(false);
+      setIsDetailMounted(true);
+      openTimerRef.current = window.setTimeout(() => {
+        setIsDetailOpen(true);
+        openTimerRef.current = null;
+      }, SHEET_ENTER_DELAY_MS);
+    } else {
+      setIsDetailOpen(false);
+      closeTimerRef.current = window.setTimeout(() => {
+        setIsDetailMounted(false);
+        requestAnimationFrame(() => {
+          cardRef.current?.focus({ preventScroll: true });
+        });
+        closeTimerRef.current = null;
+      }, SHEET_TRANSITION_MS);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current != null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+      if (openTimerRef.current != null) {
+        window.clearTimeout(openTimerRef.current);
+      }
+    };
+  }, []);
 
   const ariaParts = [
     `Train ${trip.trip}`,
@@ -99,7 +154,9 @@ export const TripCard = memo(function TripCard({
     isOriginSkipped ? t("tripCard.stopSkipped") : null,
     isNextTrip ? t("tripCard.nextTrain") : null,
     isPastTrip ? t("tripCard.departed") : null,
-    hasQuickConnection ? t("tripCard.tapForTransferWarning") : null,
+    hasOutboundQuickConnection || hasInboundQuickConnection
+      ? t("tripCard.tapForTransferWarning")
+      : null,
   ].filter(Boolean);
 
   return (
@@ -107,24 +164,21 @@ export const TripCard = memo(function TripCard({
       <div
         ref={cardRef}
         className={cn(
-          "flex items-center px-4 py-2 rounded-lg border-2 transition-all",
-          "touch-manipulation",
+          "flex items-center px-4 py-2 rounded-lg border transition-all",
+          "touch-manipulation cursor-pointer",
           "focus:outline-none",
-          hasQuickConnection &&
-            !isCanceledOrSkipped &&
-            "cursor-pointer hover:bg-smart-train-green/5",
-          isCanceledOrSkipped
-            ? "bg-destructive/5 border-destructive/30 focus:border-destructive/75 focus:shadow-[0_0_0_1px_hsl(var(--destructive)/0.75)]"
-            : isDelayed
-            ? "bg-smart-gold/5 border-smart-gold/30 focus:border-smart-gold/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-gold)/0.8)]"
-            : isNextTrip
-            ? "bg-smart-train-green/5 border-smart-train-green/30 focus:border-smart-train-green/80 focus:shadow-[0_0_0_1px_hsl(var(--smart-train-green)/0.8)]"
-            : "bg-gradient-card border-border focus:border-foreground/45 focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+          stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
         tabIndex={0}
         onClick={handleCardClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleCardClick();
+          }
+        }}
       >
         <TrainBadge
           tripNumber={trip.trip}
@@ -153,15 +207,6 @@ export const TripCard = memo(function TripCard({
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-1 mt-0.5">
-              <TripStatusPills
-                isCanceled={isCanceled}
-                isOriginSkipped={isOriginSkipped}
-                isDelayed={isDelayed}
-                showOnTimeBadge={showOnTimeBadge}
-                delayDisplay={delayDisplay}
-              />
             </div>
             {isDelayed && (
               <div className="flex flex-row gap-2 items-start text-xs text-muted-foreground whitespace-nowrap mt-2">
@@ -239,13 +284,6 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            <TripStatusPills
-              isCanceled={isCanceled}
-              isOriginSkipped={isOriginSkipped}
-              isDelayed={isDelayed}
-              showOnTimeBadge={showOnTimeBadge}
-              delayDisplay={delayDisplay}
-            />
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}
@@ -266,11 +304,18 @@ export const TripCard = memo(function TripCard({
         )}
       </div>
 
-      {hasQuickConnection && !isCanceledOrSkipped && (
-        <QuickConnectionModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          isInbound={hasInboundQuickConnection}
+      {isDetailMounted && (
+        <TripDetailSheet
+          isOpen={isDetailOpen}
+          onClose={handleDetailClose}
+          trip={trip}
+          fromStation={fromStation}
+          toStation={toStation}
+          currentTime={currentTime}
+          realtimeStatus={realtimeStatus}
+          timeFormat={timeFormat}
+          isNextTrip={isNextTrip}
+          showFerry={showFerry}
         />
       )}
     </>

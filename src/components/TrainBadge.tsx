@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { TripIcon } from "@/components/icons/TripIcon";
+import { stateText } from "@/lib/tripTheme";
 
 interface TrainBadgeProps {
   tripNumber: number;
@@ -9,6 +10,7 @@ interface TrainBadgeProps {
   isCanceled?: boolean;
   isSkipped?: boolean;
   isDelayed?: boolean;
+  onColoredBg?: boolean;
 }
 
 export function TrainBadge({
@@ -19,17 +21,20 @@ export function TrainBadge({
   isCanceled = false,
   isSkipped = false,
   isDelayed = false,
+  onColoredBg = false,
 }: TrainBadgeProps) {
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 w-[5rem]",
-        isCanceled || isSkipped
-          ? "text-destructive"
+        onColoredBg
+          ? "text-white"
+          : isCanceled || isSkipped
+          ? stateText["canceled"]
           : isDelayed
-          ? "text-smart-gold"
+          ? stateText["delayed"]
           : isNextTrip
-          ? "text-smart-train-green"
+          ? stateText["ontime"]
           : undefined,
         isPastTrip && showAllTrips && "text-muted-foreground/60"
       )}

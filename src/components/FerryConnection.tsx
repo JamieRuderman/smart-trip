@@ -3,6 +3,7 @@ import { TimeDisplay } from "./TimeDisplay";
 import { APP_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
 import { Ship, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { stateText } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 
 interface FerryConnectionProps {
@@ -68,7 +69,7 @@ export function FerryConnection({
         <div
           className={cn(
             "flex items-center gap-2 text-xs leading-none",
-            isShortConnection && "text-smart-gold font-medium"
+            isShortConnection && cn(stateText["delayed"], "font-medium")
           )}
         >
           {isShortConnection ? (

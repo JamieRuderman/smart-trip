@@ -19,6 +19,9 @@ export type StickyHeaderProps = {
   onToStationChange: (station: Station) => void;
   onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   onSwapStations: () => void;
+  closestStation?: Station | null;
+  locationLoading?: boolean;
+  onRequestLocation?: () => void;
 };
 
 export const StickyHeader = memo(function StickyHeader({
@@ -30,12 +33,15 @@ export const StickyHeader = memo(function StickyHeader({
   onToStationChange,
   onScheduleTypeChange,
   onSwapStations,
+  closestStation,
+  locationLoading,
+  onRequestLocation,
 }: StickyHeaderProps) {
   const { t } = useTranslation();
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-50"
+      className="fixed inset-x-0 top-0 z-30"
       style={{ overflowAnchor: "none" }}
     >
       {/* Logo Header */}
@@ -101,6 +107,9 @@ export const StickyHeader = memo(function StickyHeader({
               onFromStationChange={onFromStationChange}
               onToStationChange={onToStationChange}
               onSwapStations={onSwapStations}
+              closestStation={closestStation}
+              locationLoading={locationLoading}
+              onRequestLocation={onRequestLocation}
             />
 
             {/* Schedule Type Tabs */}

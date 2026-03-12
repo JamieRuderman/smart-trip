@@ -4,6 +4,7 @@
   --muted: #2f4a41;
   --link: #0d6b4a;
   --line: #dbe7e2;
+  --surface: #ffffff;
 }
 
 * {
@@ -18,26 +19,42 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background: #ffffff;
+  background: linear-gradient(180deg, #f8fcfa 0%, var(--surface) 220px);
   color: var(--text);
 }
 
 .hero {
+  position: relative;
   background: var(--brand);
   color: #ffffff;
   text-align: center;
-  padding: 52px 16px 36px;
+  padding: 42px 16px 26px;
+}
+
+.hero-home-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero > * {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-icon {
-  width: 108px;
-  height: 108px;
+  width: 84px;
+  height: 84px;
   color: #ffffff;
 }
 
+.hero-title-wrap {
+  margin-top: 12px;
+}
+
 .hero-title {
-  margin: 18px 0 14px;
-  font-size: clamp(2rem, 5vw, 3.2rem);
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 3rem);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -50,8 +67,9 @@ body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.22);
-  padding: 10px 24px;
-  font-size: clamp(1rem, 3vw, 1.2rem);
+  margin-top: 16px;
+  padding: 9px 18px;
+  font-size: clamp(0.95rem, 3vw, 1.1rem);
   font-weight: 500;
 }
 
@@ -68,7 +86,7 @@ main {
 }
 
 h1 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 1.8rem;
 }
 
@@ -88,6 +106,10 @@ li {
   line-height: 1.58;
 }
 
+strong {
+  font-weight: 500;
+}
+
 a {
   color: var(--link);
 }
@@ -103,4 +125,19 @@ hr {
   border: 0;
   border-top: 1px solid var(--line);
   margin: 24px 0;
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 32px 14px 22px;
+  }
+
+  .hero-icon {
+    width: 70px;
+    height: 70px;
+  }
+
+  main {
+    padding: 22px 18px 42px;
+  }
 }

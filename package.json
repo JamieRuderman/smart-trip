@@ -1,5 +1,5 @@
 {
-  "name": "smart-train-schedule",
+  "name": "smart-train-trip",
   "description": "A modern, responsive web application for viewing SMART train schedules and ferry connections",
   "version": "1.2.1",
   "private": true,
@@ -23,7 +23,7 @@
     "build-native": "tsc --noEmit && vite build --mode native",
     "dev": "vite",
     "dev-vercel": "npx vercel dev --listen 3210",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
     "update-build": "npm run update-transit && npm run build",
@@ -39,6 +39,7 @@
     "@capacitor/app": "^6.0.2",
     "@capacitor/core": "^6.1.2",
     "@capacitor/device": "^6.0.3",
+    "@capacitor/geolocation": "^6.1.1",
     "@capacitor/haptics": "^6.0.2",
     "@capacitor/keyboard": "^6.0.3",
     "@capacitor/splash-screen": "^6.0.4",

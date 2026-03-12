@@ -25,13 +25,13 @@ interface Coordinates {
   lng: number;
 }
 
+const GEO_BASE = { enableHighAccuracy: true, timeout: 10000 } as const;
+const GEO_WATCH_OPTIONS = { ...GEO_BASE, maximumAge: 15000 } as const;
+
 async function fetchNativeLocation(): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
   await Geolocation.requestPermissions();
-  const pos = await Geolocation.getCurrentPosition({
-    enableHighAccuracy: true,
-    timeout: 10000,
-  });
+  const pos = await Geolocation.getCurrentPosition(GEO_BASE);
   return { lat: pos.coords.latitude, lng: pos.coords.longitude };
 }
 
@@ -44,7 +44,7 @@ function fetchWebLocation(): Promise<Coordinates> {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { ...GEO_BASE, maximumAge: 60000 }
     );
   });
 }
@@ -117,11 +117,7 @@ export function useGeolocation({
         const { Geolocation } = await import("@capacitor/geolocation");
         await Geolocation.requestPermissions();
         const watchId = await Geolocation.watchPosition(
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 15000,
-          },
+          GEO_WATCH_OPTIONS,
           (position, watchError) => {
             if (cancelled) return;
             if (watchError) {
@@ -153,11 +149,7 @@ export function useGeolocation({
           if (cancelled) return;
           setError(watchError.message);
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 15000,
-        }
+        GEO_WATCH_OPTIONS
       );
     };
 

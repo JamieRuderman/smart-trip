@@ -154,6 +154,11 @@ export function TripDetailSheet({
     if (!dragEnabledRef.current) return;
     e.preventDefault();
 
+    if (scrollArea) {
+      const maxScrollTop = scrollArea.scrollHeight - scrollArea.clientHeight;
+      scrollArea.scrollTop = delta >= 0 ? 0 : Math.max(0, maxScrollTop);
+    }
+
     if (delta < 0) {
       currentTranslateY.current = delta * 0.18;
       sheetRef.current.style.transform = `translateY(${currentTranslateY.current}px)`;

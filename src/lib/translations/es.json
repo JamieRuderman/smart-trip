@@ -151,6 +151,10 @@
     "tripLabel": "Tren",
     "arrivesInMinutes": "Llega en {{minutes}} min",
     "arrivesInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
-    "arrivingNow": "Llegando ahora"
+    "arrivingNow": "Llegando ahora",
+    "leavingSoon": "Saliendo pronto",
+    "arrivingSoon": "Llegando pronto",
+    "onTheWay": "En camino",
+    "atDestination": "En destino"
   }
 }

@@ -27,6 +27,7 @@ export interface TripDetailSheetProps {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  lastUpdated: Date | null;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;

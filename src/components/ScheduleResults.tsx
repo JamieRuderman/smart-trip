@@ -104,6 +104,7 @@ export function ScheduleResults({
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
+                lastUpdated={lastUpdated}
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}

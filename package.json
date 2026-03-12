@@ -24,6 +24,7 @@
     "dev": "vite",
     "dev-vercel": "npx vercel dev --listen 3210",
     "typecheck": "tsc -b --noEmit",
+    "test:unit": "vitest run",
     "lint": "eslint .",
     "preview": "vite preview",
     "update-build": "npm run update-transit && npm run build",
@@ -111,6 +112,7 @@
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vitest": "^4.1.0"
   }
 }

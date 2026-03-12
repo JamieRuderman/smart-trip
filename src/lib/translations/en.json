@@ -151,6 +151,10 @@
     "tripLabel": "Trip",
     "arrivesInMinutes": "Arrives in {{minutes}} min",
     "arrivesInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
-    "arrivingNow": "Arriving now"
+    "arrivingNow": "Arriving now",
+    "leavingSoon": "Leaving soon",
+    "arrivingSoon": "Arriving soon",
+    "onTheWay": "On the way",
+    "atDestination": "At destination"
   }
 }

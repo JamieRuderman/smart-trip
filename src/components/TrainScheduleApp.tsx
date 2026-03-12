@@ -162,6 +162,7 @@ export function TrainScheduleApp() {
           fromStation={devFixture.trip.fromStation}
           toStation={devFixture.trip.toStation}
           currentTime={currentTime}
+          lastUpdated={null}
           realtimeStatus={devFixture.realtimeStatus}
           timeFormat="12h"
           isNextTrip={false}

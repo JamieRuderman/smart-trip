@@ -75,11 +75,20 @@ function computeDelayMinutes(
  * from all stop_time_updates. Delay is computed via computeDelayMinutes against
  * the app's own static schedule, so it is immune to rounding noise from
  * differences between the GTFS static feed and the app's hardcoded schedule.
+ *
+ * minStopSequence: when provided, entries with a stopSequence strictly less than
+ * this value are skipped. SMART encodes some trips as a single round-trip GTFS
+ * trip (e.g. southbound → northern terminus → southbound), so a station like
+ * "Santa Rosa Downtown" can appear twice: once on the northbound leg (lower
+ * stopSequence, wrong departure time) and once on the southbound leg (higher
+ * stopSequence, correct time). Passing the origin station's stopSequence here
+ * excludes the pre-origin pass-through entries.
  */
 function buildStopRealtimeData(
   stopTimeUpdates: GtfsRtStopTimeUpdate[],
   scheduledTimesByStation: Partial<Record<string, string>>,
-  startDate: string | undefined
+  startDate: string | undefined,
+  minStopSequence?: number
 ): {
   allStopLiveDepartures: Partial<Record<string, string>>;
   allStopDelayMinutes: Partial<Record<string, number>>;
@@ -89,10 +98,13 @@ function buildStopRealtimeData(
 
   for (const stu of stopTimeUpdates) {
     if (!stu.stopId || !stu.departureTime) continue;
+    // Skip stops that belong to the pre-origin leg of the trip (earlier in the
+    // stop sequence than the user's boarding station).
+    if (minStopSequence != null && stu.stopSequence != null && stu.stopSequence < minStopSequence) continue;
     const station = GTFS_STOP_ID_TO_STATION[stu.stopId];
     if (!station) continue;
 
-    // Each station has two platform IDs; last one wins (identical times in practice)
+    // Each station has two platform IDs (northbound/southbound); last one wins.
     allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
 
     const scheduledHHMM = scheduledTimesByStation[station];
@@ -227,7 +239,8 @@ function deriveStatus(
   const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
     update.stopTimeUpdates,
     scheduledTimesByStation,
-    update.startDate
+    update.startDate,
+    fromUpdate?.stopSequence
   );
   const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
 

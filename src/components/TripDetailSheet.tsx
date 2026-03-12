@@ -107,11 +107,20 @@ export function TripDetailSheet({
   // ── Swipe-to-dismiss ──────────────────────────────────────────────────────
   const touchStartY = useRef<number | null>(null);
   const currentTranslateY = useRef(0);
+  const activeScrollAreaRef = useRef<HTMLElement | null>(null);
+  const dragEnabledRef = useRef(false);
   const DISMISS_TRANSITION = `transform ${SHEET_TRANSITION_MS}ms ${SHEET_EASING}`;
+
+  const findScrollArea = (target: EventTarget | null): HTMLElement | null => {
+    if (!(target instanceof HTMLElement)) return null;
+    return target.closest("[data-sheet-scroll-area='true']");
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     currentTranslateY.current = 0;
+    activeScrollAreaRef.current = findScrollArea(e.target);
+    dragEnabledRef.current = activeScrollAreaRef.current == null;
     if (sheetRef.current) {
       sheetRef.current.style.transition = "none";
       sheetRef.current.style.transform = "translateY(0)";
@@ -121,7 +130,30 @@ export function TripDetailSheet({
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current === null || !sheetRef.current) return;
     const delta = e.touches[0].clientY - touchStartY.current;
-    if (delta < 0) return;
+    const scrollArea = activeScrollAreaRef.current;
+
+    if (scrollArea) {
+      const atTop = scrollArea.scrollTop <= 0;
+      const maxScrollTop = scrollArea.scrollHeight - scrollArea.clientHeight;
+      const atBottom = scrollArea.scrollTop >= maxScrollTop - 1;
+
+      if (!dragEnabledRef.current) {
+        if ((delta > 0 && atTop) || (delta < 0 && atBottom)) {
+          dragEnabledRef.current = true;
+        } else {
+          return;
+        }
+      }
+    }
+
+    if (!dragEnabledRef.current) return;
+
+    if (delta < 0) {
+      currentTranslateY.current = delta * 0.18;
+      sheetRef.current.style.transform = `translateY(${currentTranslateY.current}px)`;
+      return;
+    }
+
     currentTranslateY.current = delta;
     sheetRef.current.style.transform = `translateY(${delta}px)`;
   };
@@ -147,6 +179,8 @@ export function TripDetailSheet({
     }
     touchStartY.current = null;
     currentTranslateY.current = 0;
+    activeScrollAreaRef.current = null;
+    dragEnabledRef.current = false;
   };
 
   // ── Shared content props ──────────────────────────────────────────────────

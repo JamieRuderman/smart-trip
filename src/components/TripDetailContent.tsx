@@ -311,6 +311,7 @@ export function TripDetailContent({
 
       {/* Scrollable stop timeline */}
       <div
+        data-sheet-scroll-area="true"
         className="flex-1 overflow-y-auto px-4 pt-1"
         style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
       >

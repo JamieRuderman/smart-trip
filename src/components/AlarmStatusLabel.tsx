@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { CountdownLabel } from "./CountdownLabel";
 import { ArrivalLabel } from "./ArrivalLabel";
 import type { AlarmStatusSelection } from "@/lib/alarmStatus";
+import { stateText } from "@/lib/tripTheme";
 
 export function AlarmStatusLabel({
   status,
@@ -34,8 +35,8 @@ export function AlarmStatusLabel({
   return (
     <span
       className={cn(
-        "text-2xl font-semibold",
-        status.tone === "muted" ? "text-muted-foreground" : "text-foreground",
+        "text-[1.7rem] leading-tight font-semibold",
+        status.tone === "muted" ? stateText.future : stateText.future,
       )}
     >
       {text}

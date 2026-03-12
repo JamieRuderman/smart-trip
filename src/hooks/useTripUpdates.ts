@@ -56,6 +56,31 @@ function findStopUpdate(
   );
 }
 
+function getStopUpdateOrder(
+  stopTimeUpdates: GtfsRtStopTimeUpdate[],
+  station: Station
+): number | null {
+  // The same station can occasionally appear multiple times in noisy feeds.
+  // Use the earliest known order to keep direction checks deterministic.
+  let minSequence: number | null = null;
+  let minIndex: number | null = null;
+
+  for (let i = 0; i < stopTimeUpdates.length; i += 1) {
+    const stop = stopTimeUpdates[i];
+    if (stop.stopId == null || GTFS_STOP_ID_TO_STATION[stop.stopId] !== station) {
+      continue;
+    }
+
+    if (minIndex == null) minIndex = i;
+
+    if (stop.stopSequence != null) {
+      minSequence = minSequence == null ? stop.stopSequence : Math.min(minSequence, stop.stopSequence);
+    }
+  }
+
+  return minSequence ?? minIndex;
+}
+
 /**
  * Diff a live Unix timestamp against a static scheduled "HH:MM" on a given date,
  * returning delay in whole minutes, or undefined if within the on-time threshold.
@@ -121,6 +146,26 @@ function deriveStatus(
    *  compute per-stop delay against the app's own schedule (not GTFS static). */
   scheduledTimesByStation: Partial<Record<string, string>>
 ): { scheduledDeparture: string | null; isStartTimeFallback?: boolean; status: TripRealtimeStatus } {
+  const emptyStatus: TripRealtimeStatus = {
+    isCanceled: false,
+    isOriginSkipped: false,
+    isDestinationSkipped: false,
+  };
+
+  // Guard against opposite-direction GTFS updates. The same physical stations
+  // can appear in either direction, so we only accept updates whose stop order
+  // matches the selected leg (fromStation -> toStation). Keep this before the
+  // CANCELED branch too, otherwise opposite-direction canceled trips can still
+  // be matched by station name and show an incorrect canceled badge.
+  const fromOrder = getStopUpdateOrder(update.stopTimeUpdates, fromStation);
+  const toOrder = getStopUpdateOrder(update.stopTimeUpdates, toStation);
+  if (fromOrder != null && toOrder != null && fromOrder >= toOrder) {
+    return {
+      scheduledDeparture: null,
+      status: emptyStatus,
+    };
+  }
+
   if (update.scheduleRelationship === "CANCELED") {
     // Prefer the static scheduled departure as the key so the canceled badge
     // lines up with the correct trip card even when 511 omits stop_time_updates.
@@ -175,11 +220,7 @@ function deriveStatus(
     // No data for this station pair in this update
     return {
       scheduledDeparture: null,
-      status: {
-        isCanceled: false,
-        isOriginSkipped: false,
-        isDestinationSkipped: false,
-      },
+      status: emptyStatus,
     };
   }
 

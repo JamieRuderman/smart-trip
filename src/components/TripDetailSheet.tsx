@@ -111,6 +111,20 @@ export function TripDetailSheet({
   const dragEnabledRef = useRef(false);
   const DISMISS_TRANSITION = `transform ${SHEET_TRANSITION_MS}ms ${SHEET_EASING}`;
 
+  const disableScrollArea = (scrollArea: HTMLElement | null) => {
+    if (!scrollArea) return;
+    scrollArea.dataset.sheetDragLocked = "true";
+    scrollArea.style.overflowY = "hidden";
+    scrollArea.style.touchAction = "none";
+  };
+
+  const restoreScrollArea = (scrollArea: HTMLElement | null) => {
+    if (!scrollArea) return;
+    delete scrollArea.dataset.sheetDragLocked;
+    scrollArea.style.overflowY = "";
+    scrollArea.style.touchAction = "";
+  };
+
   const findScrollArea = (target: EventTarget | null): HTMLElement | null => {
     if (!(target instanceof HTMLElement)) return null;
     return target.closest("[data-sheet-scroll-area='true']");
@@ -119,6 +133,7 @@ export function TripDetailSheet({
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     currentTranslateY.current = 0;
+    restoreScrollArea(activeScrollAreaRef.current);
     activeScrollAreaRef.current = findScrollArea(e.target);
     dragEnabledRef.current = activeScrollAreaRef.current == null;
     if (sheetRef.current) {
@@ -141,6 +156,7 @@ export function TripDetailSheet({
       if (!dragEnabledRef.current) {
         if ((delta > 0 && atTop) || (delta < 0 && atBottom)) {
           dragEnabledRef.current = true;
+          disableScrollArea(scrollArea);
           // Start the sheet drag from the handoff point instead of replaying
           // the full finger travel from when the inner scroller was moving.
           touchStartY.current = currentY;
@@ -153,11 +169,6 @@ export function TripDetailSheet({
 
     if (!dragEnabledRef.current) return;
     e.preventDefault();
-
-    if (scrollArea) {
-      const maxScrollTop = scrollArea.scrollHeight - scrollArea.clientHeight;
-      scrollArea.scrollTop = delta >= 0 ? 0 : Math.max(0, maxScrollTop);
-    }
 
     if (delta < 0) {
       currentTranslateY.current = delta * 0.18;
@@ -188,6 +199,7 @@ export function TripDetailSheet({
         el.style.transition = "";
       }, SHEET_TRANSITION_MS);
     }
+    restoreScrollArea(activeScrollAreaRef.current);
     touchStartY.current = null;
     currentTranslateY.current = 0;
     activeScrollAreaRef.current = null;

@@ -25,6 +25,7 @@ interface TripCardProps {
   showFerry: boolean;
   timeFormat: "12h" | "24h";
   realtimeStatus?: TripRealtimeStatus | null;
+  lastUpdated: Date | null;
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
@@ -40,6 +41,7 @@ export const TripCard = memo(function TripCard({
   showFerry,
   timeFormat,
   realtimeStatus,
+  lastUpdated,
   fromStation,
   toStation,
   currentTime,
@@ -312,6 +314,7 @@ export const TripCard = memo(function TripCard({
           fromStation={fromStation}
           toStation={toStation}
           currentTime={currentTime}
+          lastUpdated={lastUpdated}
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}

@@ -45,6 +45,16 @@ export function ScheduleResults({
     ? filteredTrips
     : filteredTrips.slice(nextTripIndex >= 0 ? nextTripIndex : 0);
 
+  const visibleTrips =
+    selectedTripNumber != null &&
+    !showAllTrips &&
+    !displayedTrips.some((trip) => trip.trip === selectedTripNumber)
+      ? filteredTrips.filter(
+          (trip) =>
+            trip.trip === selectedTripNumber || displayedTrips.includes(trip),
+        )
+      : displayedTrips;
+
   if (!direction) return null;
 
   /**
@@ -81,12 +91,12 @@ export function ScheduleResults({
           role="list"
           aria-label="Train schedule results"
         >
-          {displayedTrips.map((trip, index) => {
+          {visibleTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip =
               !isPastTrip &&
-              displayedTrips
+              visibleTrips
                 .slice(0, index)
                 .every((prevTrip) =>
                   isTimeInPast(currentTime, prevTrip.departureTime)
@@ -104,6 +114,7 @@ export function ScheduleResults({
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
+                lastUpdated={lastUpdated}
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}

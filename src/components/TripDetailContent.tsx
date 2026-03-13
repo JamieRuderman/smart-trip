@@ -15,13 +15,13 @@ import { calculateFare } from "@/lib/scheduleUtils";
 import { stationIndexMap } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useCountdown } from "@/hooks/useCountdown";
+import { useAlarmStatus } from "@/hooks/useAlarmStatus";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
-import { CountdownLabel } from "./CountdownLabel";
-import { ArrivalLabel } from "./ArrivalLabel";
+import { AlarmStatusLabel } from "./AlarmStatusLabel";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -33,6 +33,7 @@ export interface TripDetailContentProps {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  lastUpdated: Date | null;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
@@ -62,6 +63,7 @@ export function TripDetailContent({
   fromStation,
   toStation,
   currentTime,
+  lastUpdated,
   realtimeStatus,
   timeFormat,
   showFerry,
@@ -136,16 +138,6 @@ export function TripDetailContent({
     ? t("quickConnection.laterTrain")
     : t("quickConnection.earlierTrain");
 
-  // Large "Ended X ago" text shown in the countdown row once the trip is done.
-  const endedText = isEnded
-    ? minutesAfterArrival >= 60
-      ? t("tracker.endedHoursMinutesAgo", {
-          hours: Math.floor(minutesAfterArrival / 60),
-          minutes: minutesAfterArrival % 60,
-        })
-      : t("tracker.endedMinutesAgo", { minutes: minutesAfterArrival })
-    : null;
-
   // Small header badge — "Ended" for finished trips, realtime label otherwise.
   // Falls back to "Scheduled" before departure or "On time" once en route when
   // no realtime data is available (GPS is tracking, no delay reported).
@@ -153,6 +145,25 @@ export function TripDetailContent({
     ? t("tracker.ended")
     : statusLabel ??
       (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
+
+  const minutesUntilArrival =
+    parseTimeToMinutes(arrivalTime) -
+    (currentTime.getHours() * 60 + currentTime.getMinutes());
+
+  const alarmStatus = useAlarmStatus({
+    tripId: trip.trip,
+    minutesUntilDeparture: minutesUntil,
+    minutesUntilArrival,
+    minutesAfterArrival,
+    hasStarted,
+    isCanceled,
+    isCanceledOrSkipped,
+    isEnded,
+    hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
+    hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
+    lastUpdated,
+    currentTime,
+  });
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -229,25 +240,7 @@ export function TripDetailContent({
             aria-hidden="true"
           />
         </div>
-        {isCanceledOrSkipped ? (
-          <span className="text-base text-muted-foreground">
-            {isCanceled ? t("tracker.tripCanceled") : t("tripCard.stopSkipped")}
-          </span>
-        ) : isEnded ? (
-          <span className="text-2xl font-semibold text-muted-foreground">
-            {endedText}
-          </span>
-        ) : minutesUntil < 0 ? (
-          // En route — show time remaining to arrival
-          <ArrivalLabel
-            minutesUntilArrival={
-              parseTimeToMinutes(arrivalTime) -
-              (currentTime.getHours() * 60 + currentTime.getMinutes())
-            }
-          />
-        ) : (
-          <CountdownLabel minutesUntil={minutesUntil} />
-        )}
+        <AlarmStatusLabel status={alarmStatus} />
       </div>
 
       {/* Metadata: duration · stops · fare */}
@@ -318,7 +311,8 @@ export function TripDetailContent({
 
       {/* Scrollable stop timeline */}
       <div
-        className="flex-1 overflow-y-auto px-4 pt-1"
+        data-sheet-scroll-area="true"
+        className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1"
         style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
       >
         <StopTimeline

@@ -83,6 +83,7 @@ export interface DevFixture {
 
 export const DEV_FIXTURE_IDS = [
   "on-time",
+  "boarding",
   "delayed",
   "canceled",
   "mid-trip",
@@ -127,6 +128,13 @@ export function getDevFixture(scenario: string): DevFixture | null {
           hasRealtimeStopData: true,
           allStopLiveDepartures: makeLiveDepartures(depOffset, delayMin, now),
         },
+      };
+    }
+
+    case "boarding": {
+      return {
+        trip: makeTrip(102, 1),
+        realtimeStatus: null,
       };
     }
 

@@ -1,0 +1,45 @@
+import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
+import { CountdownLabel } from "./CountdownLabel";
+import { ArrivalLabel } from "./ArrivalLabel";
+import type { AlarmStatusSelection } from "@/lib/alarmStatus";
+import { stateText } from "@/lib/tripTheme";
+
+export function AlarmStatusLabel({
+  status,
+}: {
+  status: AlarmStatusSelection;
+}) {
+  const { t } = useTranslation();
+
+  const text = (() => {
+    if (
+      status.kind === "departure-countdown" &&
+      status.minutesUntilDeparture != null
+    ) {
+      return <CountdownLabel minutesUntil={status.minutesUntilDeparture} />;
+    }
+
+    if (
+      status.kind === "arrival-countdown" &&
+      status.minutesUntilArrival != null
+    ) {
+      return <ArrivalLabel minutesUntilArrival={status.minutesUntilArrival} />;
+    }
+
+    return status.translationKey
+      ? t(status.translationKey, status.translationValues)
+      : "";
+  })();
+
+  return (
+    <span
+      className={cn(
+        "text-[1.7rem] leading-tight font-semibold tracking-[-0.02em]",
+        status.tone === "muted" ? stateText.future : stateText.future,
+      )}
+    >
+      {text}
+    </span>
+  );
+}

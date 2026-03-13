@@ -21,7 +21,7 @@ const todayScheduleType = (): "weekday" | "weekend" =>
 /** Params managed by the state sync — all others are preserved verbatim. */
 const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);
 
-export function useTrainScheduleState() {
+export function useTrainScheduleState(scheduleDataVersion?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
   const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
 
@@ -79,13 +79,14 @@ export function useTrainScheduleState() {
   // Derived values
 
   const filteredTrips = useMemo(() => {
+    void scheduleDataVersion;
     if (!state.fromStation || !state.toStation) return [];
     return getFilteredTrips(
       state.fromStation,
       state.toStation,
       state.scheduleType
     );
-  }, [state.fromStation, state.toStation, state.scheduleType]);
+  }, [state.fromStation, state.toStation, state.scheduleType, scheduleDataVersion]);
 
   // Action handlers
   const setFromStation = useCallback((station: Station) => {

@@ -8,7 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "./ThemeProvider";
+import { useTheme } from "./theme-context";
 import { useTranslation } from "react-i18next";
 
 export function ThemeToggle() {

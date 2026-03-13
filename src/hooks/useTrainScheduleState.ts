@@ -85,6 +85,10 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
       state.toStation,
       state.scheduleType
     );
+    // `scheduleDataVersion` is a refresh token from useScheduleData().
+    // Keep it in the dependency list so trips recompute when cached/remote
+    // schedule data is swapped in memory, even though the value is not read here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.fromStation, state.toStation, state.scheduleType, scheduleDataVersion]);
 
   // Action handlers

@@ -1,4 +1,3 @@
-import type { DetectorOptions } from "i18next-browser-languagedetector";
 import { Device } from "@capacitor/device";
 import { Capacitor } from "@capacitor/core";
 
@@ -75,7 +74,7 @@ export const getSystemLanguage = async (): Promise<string> => {
  */
 const capacitorLanguageDetector = {
   name: "capacitorDevice" as const,
-  lookup: (_options?: DetectorOptions): string | undefined => {
+  lookup: (): string | undefined => {
     // Return cached device language (set by initDeviceLanguage)
     // If not on native platform or not cached, return undefined to fall back to next detector
     return cachedDeviceLanguage;

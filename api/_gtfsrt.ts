@@ -1,18 +1,21 @@
 // gtfs-realtime-bindings is a CommonJS module (module.exports = $root).
 // A default ESM import gives us the $root object; we re-export transit_realtime
 // so consuming files can use enum values without importing the package directly.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-import GtfsRealtimeBindings from "gtfs-realtime-bindings";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const transit_realtime = (GtfsRealtimeBindings as any).transit_realtime as any;
+import GtfsRealtimeBindings, {
+  transit_realtime as transitRealtimeTypes,
+} from "gtfs-realtime-bindings";
+
+type GtfsRealtimeModule = {
+  transit_realtime: typeof transitRealtimeTypes;
+};
+
+export const transit_realtime = (GtfsRealtimeBindings as GtfsRealtimeModule).transit_realtime;
 
 const BASE = "http://api.511.org/transit";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchGtfsRt(
   feed: "servicealerts" | "vehiclepositions" | "tripupdates"
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
+): Promise<transitRealtimeTypes.FeedMessage> {
   const apiKey = process.env.TRANSIT_511_API_KEY;
   if (!apiKey) throw new Error("Missing TRANSIT_511_API_KEY");
 
@@ -24,10 +27,10 @@ export async function fetchGtfsRt(
   return transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getTranslation(translated: any): string {
+export function getTranslation(
+  translated: transitRealtimeTypes.ITranslatedString | null | undefined
+): string {
   if (!translated?.translation?.length) return "";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const en = translated.translation.find((t: any) => t.language === "en");
+  const en = translated.translation.find((translation) => translation.language === "en");
   return en?.text ?? translated.translation[0]?.text ?? "";
 }

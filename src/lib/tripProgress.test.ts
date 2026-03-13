@@ -39,12 +39,12 @@ describe("selectNextStopTarget", () => {
     ).toBe("Marin Civic Center");
   });
 
-  it("starts at the origin before departure", () => {
+  it("stays anchored to the origin before departure even near a downstream stop", () => {
     expect(
       selectNextStopTarget({
         displayStops: route,
         currentIndex: -1,
-        nearestOnRouteIndex: 0,
+        nearestOnRouteIndex: 2,
         useGpsForProgress: true,
       }),
     ).toBe("Larkspur");

@@ -23,7 +23,11 @@ export function selectNextStopTarget({
 }): Station | null {
   if (displayStops.length === 0) return null;
 
-  const fallbackIndex = currentIndex === -1 ? 0 : currentIndex;
+  if (currentIndex === -1) {
+    return displayStops[0] ?? null;
+  }
+
+  const fallbackIndex = currentIndex;
   if (!useGpsForProgress || nearestOnRouteIndex == null) {
     return displayStops[Math.min(fallbackIndex, displayStops.length - 1)] ?? null;
   }

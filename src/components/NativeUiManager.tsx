@@ -1,5 +1,5 @@
 import { useNativeUi } from "@/hooks/useNativeUi";
-import { useTheme } from "./ThemeProvider";
+import { useTheme } from "./theme-context";
 
 export function NativeUiManager() {
   const { theme } = useTheme();

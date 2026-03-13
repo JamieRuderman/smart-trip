@@ -6,7 +6,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "android/app/build"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -39,7 +39,6 @@ export default tseslint.config(
       // Additional TypeScript-specific rules
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/prefer-as-const": "error",
-      "@typescript-eslint/no-non-null-assertion": "warn",
     },
   }
 );

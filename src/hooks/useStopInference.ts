@@ -102,12 +102,12 @@ export function useStopInference({
       }
     }
 
-    const states: StopState[] = statusByStop.map((_, i) => {
-      if (currentIndex === -1) return "future";
-      if (i < currentIndex) return "past";
-      if (i === currentIndex) return "current";
-      return "future";
-    });
+    const states: StopState[] = Array.from({ length: statusByStop.length }, () => "future");
+    for (let i = 0; i < states.length; i += 1) {
+      if (currentIndex === -1) continue;
+      if (i < currentIndex) states[i] = "past";
+      else if (i === currentIndex) states[i] = "current";
+    }
 
     const hasStarted = statusByStop[0]?.isPast ?? false;
 

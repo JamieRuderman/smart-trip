@@ -21,7 +21,7 @@ import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
 
 export function TrainScheduleApp() {
-  const { version: scheduleDataVersion } = useScheduleData();
+  useScheduleData();
   const headerContainerRef = useRef<HTMLDivElement>(null);
   const headerHeights = useResponsiveHeaderHeights();
   useStickyHeaderCollapse(headerContainerRef, headerHeights);
@@ -43,7 +43,7 @@ export function TrainScheduleApp() {
     toggleShowAllTrips,
     swapStations,
     setSelectedTrip,
-  } = useTrainScheduleState(scheduleDataVersion);
+  } = useTrainScheduleState();
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 

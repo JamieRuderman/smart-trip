@@ -1,8 +1,9 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { readFileSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 
 // https://vitejs.dev/config/
@@ -28,10 +29,9 @@ export default defineConfig(({ mode }) => {
       mode === "development" &&
         useSampleData && {
           name: "sample-api-mock",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          configureServer(server: any) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            server.middlewares.use("/api/gtfsrt/tripupdates", (_req: any, res: any) => {
+          configureServer(server: ViteDevServer) {
+            server.middlewares.use("/api/gtfsrt/tripupdates", (req: IncomingMessage, res: ServerResponse) => {
+              void req;
               const data = readFileSync(
                 resolve(__dirname, "sample/tripupdates.json"),
                 "utf-8"
@@ -40,8 +40,8 @@ export default defineConfig(({ mode }) => {
               res.setHeader("Cache-Control", "no-store");
               res.end(data);
             });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            server.middlewares.use("/api/gtfsrt/alerts", (_req: any, res: any) => {
+            server.middlewares.use("/api/gtfsrt/alerts", (req: IncomingMessage, res: ServerResponse) => {
+              void req;
               const data = readFileSync(
                 resolve(__dirname, "sample/alert.json"),
                 "utf-8"

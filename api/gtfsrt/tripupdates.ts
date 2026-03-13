@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 import { applyCors } from "../_cors.js";
 import { fetchGtfsRt, transit_realtime } from "../_gtfsrt.js";
 
 const { TripDescriptor, TripUpdate } = transit_realtime;
+type FeedEntity = GtfsRealtime.IFeedEntity;
+type TripUpdateData = GtfsRealtime.ITripUpdate;
+type StopTimeUpdate = GtfsRealtime.TripUpdate.IStopTimeUpdate;
 
 const SCHEDULE_RELATIONSHIP: Record<number, string> = {
   [TripDescriptor.ScheduleRelationship.SCHEDULED]: "SCHEDULED",
@@ -36,10 +40,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const timestamp = Number(feed.header?.timestamp ?? 0);
 
     const updates = (feed.entity ?? [])
-      .filter((e: any) => e.tripUpdate)
-      .map((e: any) => {
-        const tu = e.tripUpdate!;
-        const trip = tu.trip ?? {};
+      .filter(
+        (entity): entity is FeedEntity & { tripUpdate: TripUpdateData } =>
+          entity.tripUpdate != null
+      )
+      .map((entity) => {
+        const tripUpdate = entity.tripUpdate;
+        const trip = tripUpdate.trip ?? {};
         const schedRel = trip.scheduleRelationship ?? 0;
         const schedRelStr = SCHEDULE_RELATIONSHIP[schedRel] ?? "SCHEDULED";
 
@@ -51,21 +58,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? `${baseTripId}_${trip.startTime}`
             : baseTripId;
 
-        const stopTimeUpdates = (tu.stopTimeUpdate ?? []).map((stu: any) => {
-          const stopSchedRel = stu.scheduleRelationship ?? 0;
+        const stopTimeUpdates = (tripUpdate.stopTimeUpdate ?? []).map((stopTimeUpdate: StopTimeUpdate) => {
+          const stopSchedRel = stopTimeUpdate.scheduleRelationship ?? 0;
           // Use departure.time per SMART's specification — they manually adjust these
           // when holds/delays occur that the prediction algorithm can't capture
-          const departureTime = stu.departure?.time
-            ? Number(stu.departure.time)
+          const departureTime = stopTimeUpdate.departure?.time
+            ? Number(stopTimeUpdate.departure.time)
             : undefined;
-          const arrivalTime = stu.arrival?.time
-            ? Number(stu.arrival.time)
+          const arrivalTime = stopTimeUpdate.arrival?.time
+            ? Number(stopTimeUpdate.arrival.time)
             : undefined;
-          const departureDelay = stu.departure?.delay ?? undefined;
+          const departureDelay = stopTimeUpdate.departure?.delay ?? undefined;
 
           return {
-            stopSequence: stu.stopSequence ?? undefined,
-            stopId: stu.stopId ?? undefined,
+            stopSequence: stopTimeUpdate.stopSequence ?? undefined,
+            stopId: stopTimeUpdate.stopId ?? undefined,
             arrivalTime,
             departureTime,
             scheduleRelationship:

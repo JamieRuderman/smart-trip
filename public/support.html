@@ -31,11 +31,13 @@
       </p>
       <p>If you are reporting a bug, please include:</p>
       <ul>
+        <li>Your <strong>platform</strong> (web, iPhone, iPad, or Android)</li>
         <li>
-          Your <strong>device model</strong> (for example, iPhone 15 / iPad Air)
+          Your <strong>device model</strong> (for example, iPhone 15, Pixel 9, or iPad Air)
         </li>
-        <li>Your <strong>iOS/iPadOS version</strong></li>
+        <li>Your <strong>OS or browser version</strong></li>
         <li>The <strong>app version</strong> (for example, 1.2.1)</li>
+        <li>The <strong>route</strong> you searched (from -&gt; to)</li>
         <li>Approximate <strong>time</strong> the problem occurred</li>
         <li>A short description and <strong>screenshot</strong> (if available)</li>
       </ul>
@@ -49,12 +51,17 @@
           delay, cancellation, and skipped-stop indicators (when available)
         </li>
         <li>
+          <strong>Trip detail sheets</strong> with countdowns, stop timelines,
+          and GPS-assisted distance and progress messaging when location access
+          is available
+        </li>
+        <li>
           <strong>In-app service alerts</strong> with an unread badge and
           slide-in alerts panel
         </li>
         <li>
           <strong>Interactive route planning</strong>: choose departure and
-          arrival stations and swap them easily
+          arrival stations, swap them easily, and use closest-station selection
         </li>
         <li>
           <strong>Ferry connections</strong>: see connecting ferry schedules
@@ -71,6 +78,7 @@
           navigation
         </li>
         <li><strong>Bilingual support</strong>: full English + Spanish interface</li>
+        <li><strong>Platforms</strong>: web plus Capacitor-based iOS and Android apps</li>
       </ul>
 
       <hr />
@@ -82,12 +90,18 @@
         incomplete.
       </p>
       <p>
+        GPS-assisted trip-detail messaging depends on device permissions,
+        location accuracy, and whether the device has a recent fix near the
+        selected route.
+      </p>
+      <p>
         If you see something that looks wrong (missing trip, incorrect delay badge,
         and similar issues), email support with:
       </p>
       <ul>
         <li>station pair (from -&gt; to)</li>
         <li>the trip time you expected</li>
+        <li>whether location access was enabled</li>
         <li>a screenshot (if possible)</li>
       </ul>
 
@@ -104,6 +118,14 @@
       <p>
         Real-time info may not be available for every trip at all times. When
         the feed does not provide it, the app falls back to scheduled times.
+      </p>
+
+      <h3>Why does the trip detail sheet show different progress or distance messaging?</h3>
+      <p>
+        When location access is available and the GPS fix is recent and close to
+        the selected route, the trip detail sheet can use that signal to improve
+        stop targeting and arrival messaging. Without a reliable fix, it falls
+        back to schedule and realtime feed data.
       </p>
 
       <h3>I got an alert badge. Where do I read it?</h3>
@@ -124,7 +146,7 @@
       <p>SMART trip is an open-source, community-built app for SMART riders.</p>
       <p><strong>Not affiliated with Sonoma-Marin Area Rail Transit (SMART).</strong></p>
 
-      <p class="meta">Last updated: February 28, 2026</p>
+      <p class="meta">Last updated: March 13, 2026</p>
     </main>
   </body>
 </html>

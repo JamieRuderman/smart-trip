@@ -168,3 +168,11 @@ android/              Capacitor Android project
 - `npm run build`
 
 `npm run lint` currently fails in this repo because of pre-existing issues in generated Android build output and unrelated source files.
+
+## License
+
+The code in this repository is available under the MIT License. See [LICENSE](/Users/jamie/Code/smart-trip/LICENSE).
+
+The `SMART trip` name, logo, and other project branding are not granted under the code license.
+
+Built with ❤️ for the SMART Train community

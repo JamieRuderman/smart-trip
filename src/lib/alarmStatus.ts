@@ -17,6 +17,8 @@ export interface AlarmStatusInput {
   isCanceledOrSkipped: boolean;
   isEnded: boolean;
   hasFreshRealtime: boolean;
+  hasReliableGps?: boolean;
+  isOnTrain?: boolean;
   forcePostDeparture?: boolean;
 }
 
@@ -56,6 +58,7 @@ function buildEndedLabel(minutesAfterArrival: number): AlarmStatusSelection {
 function buildEnRouteSelection(
   minutesUntilArrival: number,
   hasFreshRealtime: boolean,
+  hasReliableGps: boolean,
 ): AlarmStatusSelection {
   if (minutesUntilArrival <= 0) {
     return {
@@ -66,7 +69,7 @@ function buildEnRouteSelection(
     };
   }
 
-  if (!hasFreshRealtime) {
+  if (!hasFreshRealtime && !hasReliableGps) {
     return {
       phase: "EN_ROUTE_STALE",
       kind: "message",
@@ -102,6 +105,8 @@ export function selectAlarmStatus(
     isCanceledOrSkipped,
     isEnded,
     hasFreshRealtime,
+    hasReliableGps = false,
+    isOnTrain = false,
     forcePostDeparture = false,
   } = input;
 
@@ -128,10 +133,10 @@ export function selectAlarmStatus(
   }
 
   const isPostDeparture =
-    forcePostDeparture || hasStarted || minutesUntilDeparture < -2;
+    forcePostDeparture || hasStarted || isOnTrain || minutesUntilDeparture < -2;
 
   if (isPostDeparture) {
-    return buildEnRouteSelection(minutesUntilArrival, hasFreshRealtime);
+    return buildEnRouteSelection(minutesUntilArrival, hasFreshRealtime, hasReliableGps);
   }
 
   if (minutesUntilDeparture <= 2) {

@@ -4,6 +4,10 @@ import { Capacitor } from "@capacitor/core";
 interface GeolocationState {
   lat: number | null;
   lng: number | null;
+  accuracy: number | null;
+  speedMps: number | null;
+  heading: number | null;
+  timestampMs: number | null;
   error: string | null;
   loading: boolean;
   requestLocation: () => void;
@@ -23,16 +27,81 @@ interface UseGeolocationOptions {
 interface Coordinates {
   lat: number;
   lng: number;
+  accuracy: number | null;
+  speedMps: number | null;
+  heading: number | null;
+  timestampMs: number;
+}
+
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6_371_000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function normalizeCoordinates(
+  pos: GeolocationPosition,
+  previous: Coordinates | null,
+): Coordinates {
+  const rawSpeed = pos.coords.speed;
+  const timestampMs = Number.isFinite(pos.timestamp)
+    ? pos.timestamp
+    : Date.now();
+
+  let speedMps =
+    typeof rawSpeed === "number" && Number.isFinite(rawSpeed) && rawSpeed >= 0
+      ? rawSpeed
+      : null;
+
+  if (speedMps == null && previous) {
+    const dtSeconds = (timestampMs - previous.timestampMs) / 1000;
+    if (dtSeconds >= 1.5) {
+      const meters = haversineMeters(
+        previous.lat,
+        previous.lng,
+        pos.coords.latitude,
+        pos.coords.longitude,
+      );
+      speedMps = meters / dtSeconds;
+    }
+  }
+
+  return {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    accuracy:
+      typeof pos.coords.accuracy === "number" && Number.isFinite(pos.coords.accuracy)
+        ? pos.coords.accuracy
+        : null,
+    speedMps,
+    heading:
+      typeof pos.coords.heading === "number" && Number.isFinite(pos.coords.heading)
+        ? pos.coords.heading
+        : null,
+    timestampMs,
+  };
 }
 
 async function fetchNativeLocation(): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
   await Geolocation.requestPermissions();
   const pos = await Geolocation.getCurrentPosition({
-    enableHighAccuracy: false,
+    enableHighAccuracy: true,
     timeout: 10000,
+    maximumAge: 0,
   });
-  return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  return normalizeCoordinates(pos as GeolocationPosition, null);
 }
 
 function fetchWebLocation(): Promise<Coordinates> {
@@ -42,9 +111,9 @@ function fetchWebLocation(): Promise<Coordinates> {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => resolve(normalizeCoordinates(pos, null)),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   });
 }
@@ -59,6 +128,7 @@ export function useGeolocation({
   const [loading, setLoading] = useState(false);
   const nativeWatchIdRef = useRef<string | null>(null);
   const webWatchIdRef = useRef<number | null>(null);
+  const lastCoordsRef = useRef<Coordinates | null>(null);
 
   const requestLocation = useCallback(async () => {
     setLoading(true);
@@ -67,6 +137,7 @@ export function useGeolocation({
       const result = Capacitor.isNativePlatform()
         ? await fetchNativeLocation()
         : await fetchWebLocation();
+      lastCoordsRef.current = result;
       setCoords(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Location unavailable");
@@ -118,9 +189,10 @@ export function useGeolocation({
         await Geolocation.requestPermissions();
         const watchId = await Geolocation.watchPosition(
           {
-            enableHighAccuracy: false,
+            enableHighAccuracy: true,
             timeout: 10000,
-            maximumAge: 15000,
+            maximumAge: 0,
+            minimumUpdateInterval: 1000,
           },
           (position, watchError) => {
             if (cancelled) return;
@@ -129,7 +201,12 @@ export function useGeolocation({
               return;
             }
             if (position?.coords) {
-              setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+              const normalized = normalizeCoordinates(
+                position as GeolocationPosition,
+                lastCoordsRef.current,
+              );
+              lastCoordsRef.current = normalized;
+              setCoords(normalized);
               setError(null);
             }
           }
@@ -146,7 +223,9 @@ export function useGeolocation({
       webWatchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           if (cancelled) return;
-          setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+          const normalized = normalizeCoordinates(position, lastCoordsRef.current);
+          lastCoordsRef.current = normalized;
+          setCoords(normalized);
           setError(null);
         },
         (watchError) => {
@@ -154,9 +233,9 @@ export function useGeolocation({
           setError(watchError.message);
         },
         {
-          enableHighAccuracy: false,
+          enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 15000,
+          maximumAge: 0,
         }
       );
     };
@@ -190,6 +269,10 @@ export function useGeolocation({
   return {
     lat: coords?.lat ?? null,
     lng: coords?.lng ?? null,
+    accuracy: coords?.accuracy ?? null,
+    speedMps: coords?.speedMps ?? null,
+    heading: coords?.heading ?? null,
+    timestampMs: coords?.timestampMs ?? null,
     error,
     loading,
     requestLocation,

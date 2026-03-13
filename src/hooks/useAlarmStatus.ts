@@ -17,6 +17,8 @@ interface UseAlarmStatusParams {
   isEnded: boolean;
   hasRealtimeStopData: boolean;
   hasLiveDepartureTime: boolean;
+  hasReliableGps?: boolean;
+  isOnTrain?: boolean;
   lastUpdated: Date | null;
   currentTime: Date;
 }
@@ -37,6 +39,8 @@ export function useAlarmStatus(
     isEnded,
     hasRealtimeStopData,
     hasLiveDepartureTime,
+    hasReliableGps = false,
+    isOnTrain = false,
     lastUpdated,
     currentTime,
   } = params;
@@ -70,6 +74,8 @@ export function useAlarmStatus(
         isCanceledOrSkipped,
         isEnded,
         hasFreshRealtime,
+        hasReliableGps,
+        isOnTrain,
         forcePostDeparture: shouldForcePostDeparture,
       }),
     [
@@ -82,6 +88,8 @@ export function useAlarmStatus(
       isEnded,
       hasFreshRealtime,
       shouldForcePostDeparture,
+      hasReliableGps,
+      isOnTrain,
     ],
   );
 

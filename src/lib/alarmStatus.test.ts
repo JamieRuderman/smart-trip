@@ -67,6 +67,42 @@ describe("selectAlarmStatus", () => {
     expect(status.translationKey).toBe("tracker.onTheWay");
   });
 
+
+  it("uses arrival countdown when GPS is reliable even if realtime is stale", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: -5,
+      minutesUntilArrival: 18,
+      minutesAfterArrival: -18,
+      hasStarted: true,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+      hasReliableGps: true,
+    });
+
+    expect(status.phase).toBe("EN_ROUTE_FRESH");
+    expect(status.kind).toBe("arrival-countdown");
+    expect(status.minutesUntilArrival).toBe(18);
+  });
+
+  it("treats rider as post-departure when on-train GPS is detected", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: 1,
+      minutesUntilArrival: 46,
+      minutesAfterArrival: -46,
+      hasStarted: false,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+      hasReliableGps: true,
+      isOnTrain: true,
+    });
+
+    expect(status.phase).toBe("EN_ROUTE_FRESH");
+    expect(status.kind).toBe("arrival-countdown");
+  });
   it("keeps exact departure countdown for delayed trips before live departure", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: 6,

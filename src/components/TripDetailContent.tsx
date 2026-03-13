@@ -54,6 +54,8 @@ export interface TripDetailContentProps {
   lng: number | null;
   locationLoading: boolean;
   requestLocation: () => void;
+  hasReliableGps?: boolean;
+  isOnTrain?: boolean;
   showCloseButton?: boolean;
 }
 
@@ -77,6 +79,8 @@ export function TripDetailContent({
   lng,
   locationLoading,
   requestLocation,
+  hasReliableGps = false,
+  isOnTrain = false,
   showCloseButton = true,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
@@ -161,6 +165,8 @@ export function TripDetailContent({
     isEnded,
     hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
     hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
+    hasReliableGps,
+    isOnTrain,
     lastUpdated,
     currentTime,
   });

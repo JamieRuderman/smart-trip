@@ -5,7 +5,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
 import { stateBg } from "@/lib/tripTheme";
-import { getDistanceToStationKm } from "@/lib/stationUtils";
+import {
+  getDistanceToStationKm,
+} from "@/lib/stationUtils";
+import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
 import { computeMinutesUntil } from "@/lib/timeUtils";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TripDetailContent } from "./TripDetailContent";
@@ -57,7 +60,15 @@ export function TripDetailSheet({
 
   // Geolocation is lifted here so the drag handle (rendered in this component)
   // can share the same position data used by TripDetailContent for the header colour.
-  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation({
+  const {
+    lat,
+    lng,
+    accuracy,
+    speedMps,
+    timestampMs,
+    loading: locationLoading,
+    requestLocation,
+  } = useGeolocation({
     watch: isOpen,
     autoRequestOnNative: false,
   });
@@ -78,6 +89,38 @@ export function TripDetailSheet({
     realtimeStatus: rest.realtimeStatus,
   });
 
+
+
+  const gpsAgeMs = timestampMs == null ? Infinity : Date.now() - timestampMs;
+  const hasReliableGps =
+    lat != null &&
+    lng != null &&
+    accuracy != null &&
+    accuracy <= 65 &&
+    gpsAgeMs <= 20_000;
+
+  const nearestOnRoute =
+    hasReliableGps && displayStops.length > 0
+      ? displayStops.reduce(
+          (best, station, index) => {
+            const km = getDistanceToStationKm(lat!, lng!, station);
+            return km < best.km ? { station, index, km } : best;
+          },
+          { station: displayStops[0], index: 0, km: Number.POSITIVE_INFINITY },
+        )
+      : null;
+
+  const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
+  const isNearRoute = isNearSelectedRoute(routeDistanceKm);
+  const inferredOnTrain =
+    hasReliableGps &&
+    isNearRoute &&
+    speedMps != null &&
+    speedMps >= 5.5 &&
+    speedMps <= 45;
+
+  const useGpsForProgress = hasReliableGps && (inferredOnTrain || routeDistanceKm <= 0.35);
+
   // Ended trips always go grey.
   // "future" (not yet started) goes green when this is the next trip, neutral otherwise.
   const headerBg = isEnded
@@ -87,11 +130,15 @@ export function TripDetailSheet({
   // Distance to the next upcoming stop (mi), shown when GPS is available.
   // Before departure: distance to the origin station (useful when walking to the platform).
   // After departure:  distance to the current highlighted stop (the green one = where you're heading).
-  const nextStop = (() => {
-    if (lat == null || lng == null) return null;
-    if (currentIndex === -1) return displayStops[0] ?? null;          // not yet started
-    return displayStops[currentIndex] ?? null;                         // current (green) stop
-  })();
+  const nextStop =
+    lat == null || lng == null
+      ? null
+      : selectNextStopTarget({
+          displayStops,
+          currentIndex,
+          nearestOnRouteIndex: nearestOnRoute?.index ?? null,
+          useGpsForProgress,
+        });
   const distanceToNextStopMi =
     nextStop != null && lat != null && lng != null
       ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
@@ -217,6 +264,8 @@ export function TripDetailSheet({
     lng,
     locationLoading,
     requestLocation,
+    hasReliableGps,
+    isOnTrain: inferredOnTrain,
   };
 
   // ── Desktop dialog ────────────────────────────────────────────────────────

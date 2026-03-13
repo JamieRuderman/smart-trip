@@ -6,9 +6,9 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
 import { stateBg } from "@/lib/tripTheme";
 import {
-  getClosestStationWithDistance,
   getDistanceToStationKm,
 } from "@/lib/stationUtils";
+import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
 import { computeMinutesUntil } from "@/lib/timeUtils";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TripDetailContent } from "./TripDetailContent";
@@ -102,18 +102,16 @@ export function TripDetailSheet({
   const nearestOnRoute =
     hasReliableGps && displayStops.length > 0
       ? displayStops.reduce(
-          (best, station) => {
+          (best, station, index) => {
             const km = getDistanceToStationKm(lat!, lng!, station);
-            return km < best.km ? { station, km } : best;
+            return km < best.km ? { station, index, km } : best;
           },
-          { station: displayStops[0], km: Number.POSITIVE_INFINITY },
+          { station: displayStops[0], index: 0, km: Number.POSITIVE_INFINITY },
         )
       : null;
 
   const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
-  const closestSystem =
-    hasReliableGps ? getClosestStationWithDistance(lat!, lng!) : null;
-  const isNearRoute = routeDistanceKm <= 1.5 || (closestSystem?.distanceKm ?? Infinity) <= 1.5;
+  const isNearRoute = isNearSelectedRoute(routeDistanceKm);
   const inferredOnTrain =
     hasReliableGps &&
     isNearRoute &&
@@ -132,12 +130,15 @@ export function TripDetailSheet({
   // Distance to the next upcoming stop (mi), shown when GPS is available.
   // Before departure: distance to the origin station (useful when walking to the platform).
   // After departure:  distance to the current highlighted stop (the green one = where you're heading).
-  const nextStop = (() => {
-    if (lat == null || lng == null) return null;
-    if (useGpsForProgress && nearestOnRoute != null) return nearestOnRoute.station;
-    if (currentIndex === -1) return displayStops[0] ?? null;
-    return displayStops[currentIndex] ?? null;
-  })();
+  const nextStop =
+    lat == null || lng == null
+      ? null
+      : selectNextStopTarget({
+          displayStops,
+          currentIndex,
+          nearestOnRouteIndex: nearestOnRoute?.index ?? null,
+          useGpsForProgress,
+        });
   const distanceToNextStopMi =
     nextStop != null && lat != null && lng != null
       ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371

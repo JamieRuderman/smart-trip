@@ -4,46 +4,75 @@
 
 ## Summary
 
-* No account is required to use the app.
-* We do not collect or sell personal information.
-* Schedule data is fetched from our public server.
-* Anonymous usage analytics may be used to improve the app.
+- No account is required to use the app.
+- We do not sell personal information.
+- The app can request location permission for closest-station and trip-detail features.
+- Location is processed on-device and is not sent with transit data requests.
+- The web app uses Vercel Analytics for aggregated usage measurement.
+- The app stores limited local preferences on your device.
 
 ## Information We Collect
 
-SMART Trip does not collect personal information. We do not request or store your
-name, email address, location, or other personal identifiers.
+SMART trip does not require you to create an account or provide your name, email
+address, or other direct identifiers to use the app.
 
-### Anonymous Analytics
+### Location Data
 
-The app may collect aggregated, anonymous usage data (such as feature usage or
-navigation patterns) to help understand general usage trends and improve the app.
-This data is not linked to your identity.
+If you grant permission, the app may access your device location to:
+
+- suggest the closest SMART station
+- improve trip-detail progress and distance messaging
+
+Location is processed on-device for these features. It is not included in the
+app's schedule or realtime transit API requests.
+
+### Local Device Storage
+
+The app stores limited local state on your device, such as:
+
+- theme preference
+- language preference
+- fare preference
+- read or dismissed service alert state
+
+This information is stored locally to preserve your app settings and UI state.
+
+### Analytics
+
+The web app includes Vercel Analytics, which may collect aggregated usage and
+performance information. We use this to understand general usage trends and
+improve the app. Native iOS and Android builds do not mount this web analytics
+client.
 
 ## How We Use Information
 
-Anonymous analytics data is used solely to improve performance, usability, and
-overall app quality.
+We use the information above only to:
+
+- provide location-based app features when you request them
+- remember your local app preferences
+- monitor aggregated usage and performance on the web app
+- improve app reliability and usability
 
 ## Data Sharing
 
-We do not sell personal data and do not share personal information with third
-parties.
+We do not sell personal information. We do not share personal information for
+advertising purposes.
 
 ## Third-Party Services
 
-The app retrieves train schedule data from a hosted public endpoint. No personal
-information is included in these requests.
+The app retrieves schedule and realtime transit data from hosted endpoints backed
+by 511.org data. Standard web requests to the app or its API may include network
+metadata such as IP address in server logs, as is typical for web hosting.
 
-## Children’s Privacy
+## Children's Privacy
 
-This app is not directed to children under the age of 13, and we do not knowingly
-collect personal information from children.
+This app is not directed to children under 13, and we do not knowingly collect
+personal information from children.
 
 ## Changes to This Policy
 
-This policy may be updated from time to time. Any changes will be posted on this
-page with an updated effective date.
+This policy may be updated from time to time. Any changes will be posted with an
+updated effective date.
 
 ## Contact
 

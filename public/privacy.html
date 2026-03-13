@@ -22,46 +22,68 @@
       <h2>Summary</h2>
       <ul>
         <li>No account is required to use the app.</li>
-        <li>We do not collect or sell personal information.</li>
-        <li>Schedule data is fetched from our public server.</li>
-        <li>Anonymous usage analytics may be used to improve the app experience.</li>
+        <li>We do not sell personal information.</li>
+        <li>The app can request location permission for closest-station and trip-detail features.</li>
+        <li>Location is processed on-device and is not sent with transit API requests.</li>
+        <li>The web app uses Vercel Analytics for aggregated usage measurement.</li>
+        <li>The app stores limited local preferences on your device.</li>
       </ul>
 
       <h2>Information We Collect</h2>
       <p>
-        SMART Trip does not collect personal information. We do not request or
-        store your name, email address, location, or other personal identifiers.
+        SMART trip does not require you to create an account or provide your
+        name, email address, or other direct identifiers to use the app.
       </p>
 
-      <h2>Anonymous Analytics</h2>
+      <h2>Location Data</h2>
       <p>
-        The app may collect aggregated, anonymous usage data (such as feature
-        usage or navigation patterns) to help understand general usage trends and
-        improve the app. This data is not linked to your identity.
+        If you grant permission, the app may access your device location to
+        suggest the closest SMART station and improve trip-detail progress and
+        distance messaging.
+      </p>
+      <p>
+        Location is processed on-device for these features. It is not included
+        in the app's schedule or realtime transit API requests.
+      </p>
+
+      <h2>Local Device Storage</h2>
+      <p>
+        The app stores limited local state on your device, such as theme,
+        language, fare preference, and read or dismissed service alert state.
+      </p>
+
+      <h2>Analytics</h2>
+      <p>
+        The web app includes Vercel Analytics, which may collect aggregated
+        usage and performance information to help improve the app. Native iOS
+        and Android builds do not mount this web analytics client.
       </p>
 
       <h2>How We Use Information</h2>
       <p>
-        Anonymous analytics data is used solely to improve performance,
-        usability, and overall app quality.
+        We use this information only to provide location-based app features when
+        you request them, remember local app preferences, monitor aggregated web
+        usage and performance, and improve app reliability and usability.
       </p>
 
       <h2>Data Sharing</h2>
       <p>
-        We do not sell personal data and do not share personal information with third
-        parties.
+        We do not sell personal information. We do not share personal
+        information for advertising purposes.
       </p>
 
       <h2>Third-Party Services</h2>
       <p>
-        The app retrieves train schedule data from a hosted public endpoint. No
-        personal information is included in these requests.
+        The app retrieves schedule and realtime transit data from hosted
+        endpoints backed by 511.org data. Standard web requests to the app or
+        its API may include network metadata such as IP address in server logs,
+        as is typical for web hosting.
       </p>
 
       <h2>Children's Privacy</h2>
       <p>
-        This app is not directed to children under the age of 13, and we do not
-        knowingly collect personal information from children.
+        This app is not directed to children under 13, and we do not knowingly
+        collect personal information from children.
       </p>
 
       <h2>Changes to This Policy</h2>
@@ -76,7 +98,7 @@
         <a href="mailto:smart-train@proton.me">smart-train@proton.me</a>.
       </p>
 
-      <p class="meta">Last updated: February 28, 2026</p>
+      <p class="meta">Last updated: March 13, 2026</p>
     </main>
   </body>
 </html>

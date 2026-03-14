@@ -60,6 +60,65 @@ export interface GtfsRtTripUpdatesResponse {
   updates: GtfsRtTripUpdate[];
 }
 
+// ── Vehicle Positions ─────────────────────────────────────────────────────────
+
+export type VehicleStopStatus = "STOPPED_AT" | "IN_TRANSIT_TO" | "INCOMING_AT";
+
+export interface GtfsRtVehicleTrip {
+  tripId: string;
+  startTime: string;  // "HH:MM:SS" — the trip's scheduled origin departure
+  startDate: string;  // "YYYYMMDD"
+  routeId: string;
+  directionId: number; // 0 = southbound (Windsor→Larkspur), 1 = northbound
+}
+
+export interface GtfsRtVehiclePosition {
+  vehicleId: string;
+  vehicleLabel: string;
+  /** Only present for active revenue trips; absent for parked/deadheading vehicles. */
+  trip?: GtfsRtVehicleTrip;
+  position: {
+    latitude: number;
+    longitude: number;
+    bearing?: number;  // degrees from north
+    speed?: number;    // meters/second
+  };
+  currentStopSequence?: number;
+  currentStatus?: VehicleStopStatus;
+  /** GTFS platform stop ID, e.g. "71092" for Cotati southbound */
+  stopId?: string;
+  /** Unix seconds when this vehicle report was generated */
+  timestamp?: number;
+}
+
+export interface GtfsRtVehiclePositionsResponse {
+  /** Feed header timestamp in Unix seconds */
+  timestamp: number;
+  vehicles: GtfsRtVehiclePosition[];
+  /** Validation warnings from the server-side parsing pipeline */
+  warnings?: string[];
+}
+
+/**
+ * Derived match between a vehicle and the trip the user is viewing.
+ * Returned by useVehiclePositionForTrip when a fresh, valid match exists.
+ */
+export interface VehiclePositionMatch {
+  vehicleId: string;
+  /** Resolved station name from stopId via GTFS_STOP_ID_TO_STATION; null if stopId unknown */
+  currentStation: import("./smartSchedule").Station | null;
+  currentStatus: VehicleStopStatus;
+  currentStopSequence: number;
+  position: {
+    latitude: number;
+    longitude: number;
+    bearing?: number;
+    speed?: number;
+  };
+  /** Unix seconds of the vehicle report */
+  timestamp: number;
+}
+
 /**
  * Derived real-time status for a specific trip leg (fromStation → toStation).
  * Used by TripCard to overlay live data on the static schedule.

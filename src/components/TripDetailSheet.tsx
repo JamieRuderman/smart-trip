@@ -4,9 +4,11 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
+import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
 import { stateBg } from "@/lib/tripTheme";
 import {
   getDistanceToStationKm,
+  stationIndexMap,
 } from "@/lib/stationUtils";
 import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
 import { computeMinutesUntil } from "@/lib/timeUtils";
@@ -18,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
@@ -35,6 +37,8 @@ export interface TripDetailSheetProps {
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
   showFerry: boolean;
+  /** Dev-only: override the live vehicle position hook result (used by devFixtures). */
+  vehiclePositionOverride?: VehiclePositionMatch | null;
 }
 
 
@@ -79,6 +83,35 @@ export function TripDetailSheet({
 
   const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
 
+  // ── Vehicle position matching ─────────────────────────────────────────────
+  // Derive the trip's origin departure time (same logic as useTripRealtimeStatusMap).
+  // directionId: 0 = southbound (Windsor → Larkspur), 1 = northbound.
+  const fromIdx = stationIndexMap[rest.fromStation] ?? 0;
+  const toIdx = stationIndexMap[rest.toStation] ?? 0;
+  const isSouthbound = fromIdx < toIdx;
+  const originStartTime = isSouthbound
+    ? rest.trip.times[0]?.slice(0, 5)        // "HH:MM" of first stop
+    : rest.trip.times[rest.trip.times.length - 1]?.slice(0, 5);
+  const tripDirectionId = isSouthbound ? 0 : 1;
+  // Today's date in YYYYMMDD format (local time).
+  const todayYYYYMMDD = (() => {
+    const d = rest.currentTime;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}${m}${day}`;
+  })();
+
+  const liveVehiclePosition = useVehiclePositionForTrip(
+    originStartTime,
+    todayYYYYMMDD,
+    tripDirectionId
+  );
+  // Dev fixtures can inject a vehiclePosition override; live hook result used otherwise.
+  const vehiclePosition = rest.vehiclePositionOverride !== undefined
+    ? rest.vehiclePositionOverride
+    : liveVehiclePosition;
+
   // Single source of truth for the coloured header band used by both the
   // drag handle (here) and TripDetailContent's header.
   const { currentAccent, hasStarted, displayStops, currentIndex } = useStopInference({
@@ -87,6 +120,9 @@ export function TripDetailSheet({
     toStation: rest.toStation,
     currentTime: rest.currentTime,
     realtimeStatus: rest.realtimeStatus,
+    progressHint: vehiclePosition?.currentStation
+      ? { source: "vehicle", station: vehiclePosition.currentStation, status: vehiclePosition.currentStatus }
+      : null,
   });
 
 
@@ -112,14 +148,25 @@ export function TripDetailSheet({
 
   const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
   const isNearRoute = isNearSelectedRoute(routeDistanceKm);
+  // Phone GPS on-train inference is only used when vehicle position feed has no match.
   const inferredOnTrain =
+    vehiclePosition == null &&
     hasReliableGps &&
     isNearRoute &&
     speedMps != null &&
     speedMps >= 5.5 &&
     speedMps <= 45;
 
-  const useGpsForProgress = hasReliableGps && (inferredOnTrain || routeDistanceKm <= 0.35);
+  const useGpsForProgress =
+    vehiclePosition == null && hasReliableGps && (inferredOnTrain || routeDistanceKm <= 0.35);
+
+  // Which source is actively driving the progress indicator.
+  const activeProgressSource: "vehicle" | "gps" | "schedule" =
+    vehiclePosition?.currentStation != null && displayStops.includes(vehiclePosition.currentStation)
+      ? "vehicle"
+      : useGpsForProgress
+      ? "gps"
+      : "schedule";
 
   // Ended trips always go grey.
   // "future" (not yet started) goes green when this is the next trip, neutral otherwise.
@@ -142,6 +189,15 @@ export function TripDetailSheet({
   const distanceToNextStopMi =
     nextStop != null && lat != null && lng != null
       ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
+      : null;
+
+  // Distance from user's phone to the train's GPS position (when both are available).
+  const distanceToTrainMi =
+    lat != null && lng != null && vehiclePosition != null
+      ? Math.sqrt(
+          Math.pow((lat - vehiclePosition.position.latitude) * 111, 2) +
+          Math.pow((lng - vehiclePosition.position.longitude) * 111 * Math.cos(lat * Math.PI / 180), 2)
+        ) * 0.621371
       : null;
 
   // Prevent body scroll when sheet is open on mobile.
@@ -266,6 +322,9 @@ export function TripDetailSheet({
     requestLocation,
     hasReliableGps,
     isOnTrain: inferredOnTrain,
+    vehiclePosition,
+    activeProgressSource,
+    distanceToTrainMi,
   };
 
   // ── Desktop dialog ────────────────────────────────────────────────────────

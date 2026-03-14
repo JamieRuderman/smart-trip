@@ -1,0 +1,344 @@
+{
+  "header": {
+    "gtfsRealtimeVersion": "1.0",
+    "incrementality": "FULL_DATASET",
+    "timestamp": "1773444014"
+  },
+  "entity": [
+    {
+      "id": "SMRT0101",
+      "vehicle": {
+        "position": {
+          "latitude": 38.341094970703125,
+          "longitude": -122.6972885131836,
+          "bearing": 153,
+          "speed": 15.359999656677246
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT0101",
+          "label": "SMRT0101",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT0106",
+      "vehicle": {
+        "position": {
+          "latitude": 38.10948944091797,
+          "longitude": -122.56607818603516,
+          "bearing": 177,
+          "speed": 10.380000114440918
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT0106",
+          "label": "SMRT0106",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT0113",
+      "vehicle": {
+        "position": {
+          "latitude": 37.94758224487305,
+          "longitude": -122.51273345947266,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT0113",
+          "label": "SMRT0113",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT101",
+      "vehicle": {
+        "trip": {
+          "tripId": "t_6043274_b_86583_tn_0",
+          "startTime": "15:53:15",
+          "startDate": "20260313",
+          "scheduleRelationship": "SCHEDULED",
+          "routeId": "SMART",
+          "directionId": 0
+        },
+        "position": {
+          "latitude": 38.33074188232422,
+          "longitude": -122.69084930419922,
+          "bearing": 154,
+          "speed": 2.2351999282836914
+        },
+        "currentStopSequence": 6,
+        "currentStatus": "STOPPED_AT",
+        "timestamp": "1773444006",
+        "stopId": "71092",
+        "vehicle": {
+          "id": "SMRT101",
+          "label": "SMRT101",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT103",
+      "vehicle": {
+        "position": {
+          "latitude": 38.50974655151367,
+          "longitude": -122.78438568115234,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT103",
+          "label": "SMRT103",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT107",
+      "vehicle": {
+        "trip": {
+          "tripId": "t_6043267_b_86583_tn_0",
+          "startTime": "15:21:15",
+          "startDate": "20260313",
+          "scheduleRelationship": "SCHEDULED",
+          "routeId": "SMART",
+          "directionId": 0
+        },
+        "position": {
+          "latitude": 38.1091194152832,
+          "longitude": -122.56611633300781,
+          "bearing": 173,
+          "speed": 10.380000114440918
+        },
+        "currentStopSequence": 10,
+        "currentStatus": "IN_TRANSIT_TO",
+        "timestamp": "1773444006",
+        "stopId": "71052",
+        "vehicle": {
+          "id": "SMRT107",
+          "label": "SMRT107",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT108",
+      "vehicle": {
+        "position": {
+          "latitude": 38.510101318359375,
+          "longitude": -122.78509521484375,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT108",
+          "label": "SMRT108",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT109",
+      "vehicle": {
+        "trip": {
+          "tripId": "t_6043282_b_86583_tn_0",
+          "startTime": "15:59:15",
+          "startDate": "20260313",
+          "scheduleRelationship": "SCHEDULED",
+          "routeId": "SMART",
+          "directionId": 1
+        },
+        "position": {
+          "latitude": 38.06246566772461,
+          "longitude": -122.53099822998047,
+          "bearing": 311,
+          "speed": 14.7523193359375
+        },
+        "currentStopSequence": 5,
+        "currentStatus": "IN_TRANSIT_TO",
+        "timestamp": "1773444006",
+        "stopId": "71051",
+        "vehicle": {
+          "id": "SMRT109",
+          "label": "SMRT109",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT110",
+      "vehicle": {
+        "position": {
+          "latitude": 38.06146240234375,
+          "longitude": -122.52949523925781,
+          "bearing": 311,
+          "speed": 14.800000190734863
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT110",
+          "label": "SMRT110",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT112",
+      "vehicle": {
+        "position": {
+          "latitude": 38.332618713378906,
+          "longitude": -122.69198608398438,
+          "bearing": 156,
+          "speed": 10.130000114440918
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT112",
+          "label": "SMRT112",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT113",
+      "vehicle": {
+        "trip": {
+          "tripId": "t_6043290_b_86583_tn_0",
+          "startTime": "16:31:15",
+          "startDate": "20260313",
+          "scheduleRelationship": "SCHEDULED",
+          "routeId": "SMART",
+          "directionId": 1
+        },
+        "position": {
+          "latitude": 37.94758224487305,
+          "longitude": -122.5126953125,
+          "speed": 0
+        },
+        "currentStopSequence": 1,
+        "currentStatus": "STOPPED_AT",
+        "timestamp": "1773444006",
+        "stopId": "71011",
+        "vehicle": {
+          "id": "SMRT113",
+          "label": "SMRT113",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT115",
+      "vehicle": {
+        "position": {
+          "latitude": 38.548805236816406,
+          "longitude": -122.81814575195312,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT115",
+          "label": "SMRT115",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT116",
+      "vehicle": {
+        "position": {
+          "latitude": 38.54923629760742,
+          "longitude": -122.81861877441406,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT116",
+          "label": "SMRT116",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT117",
+      "vehicle": {
+        "trip": {
+          "tripId": "t_6043294_b_86583_tn_0",
+          "startTime": "15:27:15",
+          "startDate": "20260313",
+          "scheduleRelationship": "SCHEDULED",
+          "routeId": "SMART",
+          "directionId": 1
+        },
+        "position": {
+          "latitude": 38.300716400146484,
+          "longitude": -122.67223358154297,
+          "bearing": 321,
+          "speed": 19.110000610351562
+        },
+        "currentStopSequence": 9,
+        "currentStatus": "IN_TRANSIT_TO",
+        "timestamp": "1773444006",
+        "stopId": "71091",
+        "vehicle": {
+          "id": "SMRT117",
+          "label": "SMRT117",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT118",
+      "vehicle": {
+        "position": {
+          "latitude": 37.94796371459961,
+          "longitude": -122.51249694824219,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT118",
+          "label": "SMRT118",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT1201",
+      "vehicle": {
+        "position": {
+          "latitude": 38.880348205566406,
+          "longitude": -123.05403900146484,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT1201",
+          "label": "SMRT1201",
+          "licensePlate": ""
+        }
+      }
+    },
+    {
+      "id": "SMRT1801",
+      "vehicle": {
+        "position": {
+          "latitude": 38.32910919189453,
+          "longitude": -122.30187225341797,
+          "speed": 0
+        },
+        "timestamp": "1773444006",
+        "vehicle": {
+          "id": "SMRT1801",
+          "label": "SMRT1801",
+          "licensePlate": ""
+        }
+      }
+    }
+  ]
+}

@@ -63,7 +63,7 @@ export function useVehiclePositionForTrip(
       return null;
     }
 
-    for (const vehicle of data.vehicles) {
+    for (const vehicle of data.vehicles ?? []) {
       // Only consider active revenue trips
       if (!vehicle.trip) continue;
 

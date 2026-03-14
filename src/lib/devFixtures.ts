@@ -1,5 +1,5 @@
 import type { ProcessedTrip } from "./scheduleUtils";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +79,8 @@ function makeLiveDepartures(
 export interface DevFixture {
   trip: ProcessedTrip;
   realtimeStatus: TripRealtimeStatus | null;
+  /** Optional vehicle position override for testing without a live feed. */
+  vehiclePosition?: VehiclePositionMatch | null;
 }
 
 export const DEV_FIXTURE_IDS = [
@@ -150,7 +152,8 @@ export function getDevFixture(scenario: string): DevFixture | null {
     }
 
     case "mid-trip": {
-      // Departed 20 min ago — currently between Cotati and Petaluma North
+      // Departed 20 min ago — currently between Cotati and Petaluma North.
+      // Vehicle feed shows train is IN_TRANSIT_TO Petaluma North.
       return {
         trip: makeTrip(107, -20),
         realtimeStatus: {
@@ -159,14 +162,31 @@ export function getDevFixture(scenario: string): DevFixture | null {
           isDestinationSkipped: false,
           hasRealtimeStopData: false,
         },
+        vehiclePosition: {
+          vehicleId: "107",
+          currentStation: "Petaluma North",
+          currentStatus: "IN_TRANSIT_TO",
+          currentStopSequence: 7,
+          position: { latitude: 38.2518, longitude: -122.6397, speed: 25, bearing: 165 },
+          timestamp: Math.floor(now.getTime() / 1000) - 10,
+        },
       };
     }
 
     case "arriving": {
-      // Departed 65 min ago — ~6 min from Larkspur
+      // Departed 65 min ago — ~6 min from Larkspur.
+      // Vehicle feed shows train is IN_TRANSIT_TO Larkspur.
       return {
         trip: makeTrip(109, -65),
         realtimeStatus: null,
+        vehiclePosition: {
+          vehicleId: "109",
+          currentStation: "Larkspur",
+          currentStatus: "IN_TRANSIT_TO",
+          currentStopSequence: 14,
+          position: { latitude: 37.9550, longitude: -122.5300, speed: 20, bearing: 175 },
+          timestamp: Math.floor(now.getTime() / 1000) - 8,
+        },
       };
     }
 

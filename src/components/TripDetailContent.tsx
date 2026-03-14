@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   X,
@@ -7,6 +8,10 @@ import {
   MapPin,
   LocateFixed,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  Smartphone,
+  Train,
 } from "lucide-react";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -23,7 +28,7 @@ import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
 import { AlarmStatusLabel } from "./AlarmStatusLabel";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Trans, useTranslation } from "react-i18next";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
@@ -57,6 +62,12 @@ export interface TripDetailContentProps {
   hasReliableGps?: boolean;
   isOnTrain?: boolean;
   showCloseButton?: boolean;
+  /** Matched vehicle position from the GTFS-RT vehiclepositions feed. */
+  vehiclePosition?: VehiclePositionMatch | null;
+  /** Which data source is actively driving the stop progress indicator. */
+  activeProgressSource?: "vehicle" | "gps" | "schedule";
+  /** Approximate distance from user's phone GPS to the train's GPS position (miles). */
+  distanceToTrainMi?: number | null;
 }
 
 
@@ -82,8 +93,12 @@ export function TripDetailContent({
   hasReliableGps = false,
   isOnTrain = false,
   showCloseButton = true,
+  vehiclePosition = null,
+  activeProgressSource = "schedule",
+  distanceToTrainMi = null,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const { preferences } = useUserPreferences();
 
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
@@ -312,6 +327,96 @@ export function TripDetailContent({
               <span>{t("header.useMyLocation")}</span>
             </button>
           </GutterRow>
+        )}
+      </div>
+
+      {/* ── Debug: Data Sources panel (dev/QA only, collapsed by default) ── */}
+      <div className="px-4 shrink-0">
+        <button
+          onClick={() => setShowDebugPanel((v) => !v)}
+          className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors w-full py-1"
+          aria-expanded={showDebugPanel}
+        >
+          {showDebugPanel ? (
+            <ChevronUp className="h-3 w-3 shrink-0" />
+          ) : (
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          )}
+          <span>Data sources</span>
+        </button>
+
+        {showDebugPanel && (
+          <div className="mb-2 rounded-md border border-border/60 divide-y divide-border/40 text-xs overflow-hidden">
+            {/* Schedule inference row */}
+            <div className="flex items-start gap-2 px-3 py-2">
+              <span
+                className={cn(
+                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                  activeProgressSource === "schedule" ? "bg-green-500" : "bg-muted-foreground/30"
+                )}
+              />
+              <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground/80">Schedule</p>
+                <p className="text-muted-foreground">
+                  {hasStarted ? `Current: ${nextStop ?? "—"}` : "Not yet departed"}
+                </p>
+              </div>
+            </div>
+
+            {/* Train GPS (vehicle positions) row */}
+            <div className="flex items-start gap-2 px-3 py-2">
+              <span
+                className={cn(
+                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                  activeProgressSource === "vehicle" ? "bg-green-500" : "bg-muted-foreground/30"
+                )}
+              />
+              <Train className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground/80">Train GPS</p>
+                {vehiclePosition ? (
+                  <p className="text-muted-foreground">
+                    {vehiclePosition.currentStatus === "STOPPED_AT" ? "Stopped at" : "In transit to"}{" "}
+                    {vehiclePosition.currentStation ?? `stop #${vehiclePosition.currentStopSequence}`}
+                    {vehiclePosition.position.speed != null && (
+                      <> · {(vehiclePosition.position.speed * 2.237).toFixed(0)} mph</>
+                    )}
+                    {distanceToTrainMi != null && (
+                      <> · train {distanceToTrainMi.toFixed(1)} mi away</>
+                    )}
+                    {" · "}age {Math.round((Date.now() / 1000) - vehiclePosition.timestamp)}s
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">No match</p>
+                )}
+              </div>
+            </div>
+
+            {/* Phone GPS row */}
+            <div className="flex items-start gap-2 px-3 py-2">
+              <span
+                className={cn(
+                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                  activeProgressSource === "gps" ? "bg-green-500" : "bg-muted-foreground/30"
+                )}
+              />
+              <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground/80">Phone GPS</p>
+                {hasReliableGps ? (
+                  <p className="text-muted-foreground">
+                    {nextStop ? `Nearest: ${nextStop}` : "—"}
+                    {isOnTrain && <> · on train</>}
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {lat != null ? "Low accuracy / stale" : "No location"}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
-import { applyCors } from "../_cors.js";
-import { fetchGtfsRt, getTranslation, transit_realtime } from "../_gtfsrt.js";
+import { createGtfsRtHandler } from "../_handler.js";
+import { getTranslation, transit_realtime } from "../_gtfsrt.js";
 
 const { Alert } = transit_realtime;
 type FeedEntity = GtfsRealtime.IFeedEntity;
@@ -21,19 +18,11 @@ function mapCause(cause: number | null | undefined): string {
   return Alert.Cause[cause] ?? "UNKNOWN_CAUSE";
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (applyCors(req, res)) return;
-
-  try {
-    if (process.env.USE_SAMPLE_DATA === "true") {
-      const samplePath = resolve(process.cwd(), "sample/alert.json");
-      const sample = JSON.parse(readFileSync(samplePath, "utf-8"));
-      res.setHeader("Cache-Control", "no-store");
-      return res.json(sample);
-    }
-
-    const feed = await fetchGtfsRt("servicealerts");
-
+export default createGtfsRtHandler({
+  feed: "servicealerts",
+  sampleFile: "sample/alert.json",
+  cacheControl: "s-maxage=60, stale-while-revalidate=30",
+  transform(feed) {
     const timestamp = Number(feed.header?.timestamp ?? 0);
 
     const alerts = (feed.entity ?? [])
@@ -60,10 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
       });
 
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
-    res.json({ timestamp, alerts });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: message });
-  }
-}
+    return { timestamp, alerts };
+  },
+});

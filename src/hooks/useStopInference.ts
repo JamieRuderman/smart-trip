@@ -11,6 +11,22 @@ import type { TripState } from "@/lib/tripTheme";
 
 export type StopState = "past" | "current" | "future";
 
+/**
+ * Source-aware hint about the train's current position.
+ * Provided by TripDetailSheet after resolving the best available data source.
+ *
+ * - "vehicle": from the GTFS-RT vehiclepositions feed (authoritative for progress)
+ * - "gps": from the user's phone GPS (fallback when no vehicle match)
+ *
+ * useStopInference uses this as a higher-priority override over time-based inference,
+ * subject to a sanity check that the station is within the displayed stop range.
+ */
+export interface ProgressHint {
+  source: "vehicle" | "gps";
+  station: Station;
+  status?: "STOPPED_AT" | "IN_TRANSIT_TO" | "INCOMING_AT";
+}
+
 export interface StopInferenceResult {
   /** Ordered stops in display direction (fromStation → toStation). */
   displayStops: Station[];
@@ -43,12 +59,19 @@ export function useStopInference({
   toStation,
   currentTime,
   realtimeStatus,
+  progressHint,
 }: {
   trip: ProcessedTrip;
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
+  /**
+   * Optional hint from an external source (vehicle position or phone GPS) about
+   * the train's current position. When valid, this overrides time-based inference.
+   * A sanity check ensures the station is within the displayed stop range.
+   */
+  progressHint?: ProgressHint | null;
 }): StopInferenceResult {
   const allStations = getAllStations();
   const fromIdx = stationIndexMap[fromStation];
@@ -80,7 +103,24 @@ export function useStopInference({
 
     let currentIndex = -1;
 
-    {
+    // ── ProgressHint: highest-priority override for current stop ─────────────
+    // When a vehicle position or GPS hint is available, use it to determine which
+    // stop is current, bypassing time-based inference. Requires a sanity check
+    // that the hinted station is within the user's from-to stop range.
+    if (progressHint != null) {
+      const hintIdx = displayStops.indexOf(progressHint.station);
+      if (hintIdx !== -1) {
+        // Station is within the displayed range — use the hint.
+        // For STOPPED_AT: train is at the station. For IN_TRANSIT_TO / INCOMING_AT:
+        // the train is heading toward that stop (it's the "next" stop in our semantics).
+        currentIndex = hintIdx;
+      }
+      // If hintIdx === -1, the vehicle's station is outside the from-to segment;
+      // fall through to time-based inference below.
+    }
+
+    // ── Time-based inference (fallback when no valid hint) ───────────────────
+    if (currentIndex === -1) {
       let lastPast = -1;
       for (let i = 0; i < statusByStop.length; i += 1) {
         if (statusByStop[i].isPast) lastPast = i;
@@ -138,5 +178,6 @@ export function useStopInference({
     allStopDelayMinutes,
     nowMinutes,
     isCanceled,
+    progressHint,
   ]);
 }

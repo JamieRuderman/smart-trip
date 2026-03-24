@@ -32,6 +32,7 @@ import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Trans, useTranslation } from "react-i18next";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
+import type { ProgressHint } from "@/hooks/useStopInference";
 
 export interface TripDetailContentProps {
   trip: ProcessedTrip;
@@ -68,6 +69,8 @@ export interface TripDetailContentProps {
   activeProgressSource?: "vehicle" | "gps" | "schedule";
   /** Approximate distance from user's phone GPS to the train's GPS position (miles). */
   distanceToTrainMi?: number | null;
+  /** Optional progress hint used to keep timeline highlighting in sync with header state. */
+  progressHint?: ProgressHint | null;
 }
 
 
@@ -96,6 +99,7 @@ export function TripDetailContent({
   vehiclePosition = null,
   activeProgressSource = "schedule",
   distanceToTrainMi = null,
+  progressHint = null,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -434,6 +438,7 @@ export function TripDetailContent({
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isEnded={isEnded}
+          progressHint={progressHint}
         />
 
         {showFerry && trip.outboundFerry && (

@@ -15,6 +15,7 @@ import {
   stateLineColor,
   stateBg,
 } from "@/lib/tripTheme";
+import type { ProgressHint } from "@/hooks/useStopInference";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
@@ -25,6 +26,8 @@ interface StopTimelineProps {
   timeFormat: "12h" | "24h";
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
+  /** Optional progress hint (vehicle/gps) to drive the current stop highlight. */
+  progressHint?: ProgressHint | null;
 }
 
 export function StopTimeline({
@@ -35,6 +38,7 @@ export function StopTimeline({
   realtimeStatus,
   timeFormat,
   isEnded = false,
+  progressHint = null,
 }: StopTimelineProps) {
   const { t } = useTranslation();
 
@@ -49,6 +53,7 @@ export function StopTimeline({
     toStation,
     currentTime,
     realtimeStatus,
+    progressHint,
   });
 
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;

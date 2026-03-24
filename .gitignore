@@ -27,3 +27,4 @@ dist-ssr
 public/data/schedules.json
 .vercel
 .env*.local
+.worktrees

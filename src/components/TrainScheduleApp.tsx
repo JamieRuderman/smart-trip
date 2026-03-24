@@ -175,6 +175,7 @@ export function TrainScheduleApp() {
           timeFormat="12h"
           isNextTrip={false}
           showFerry={false}
+          vehiclePositionOverride={devFixture.vehiclePosition}
         />
       )}
     </div>

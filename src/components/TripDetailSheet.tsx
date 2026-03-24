@@ -112,6 +112,15 @@ export function TripDetailSheet({
     ? rest.vehiclePositionOverride
     : liveVehiclePosition;
 
+  const progressHint =
+    vehiclePosition?.currentStation != null
+      ? {
+          source: "vehicle" as const,
+          station: vehiclePosition.currentStation,
+          status: vehiclePosition.currentStatus,
+        }
+      : null;
+
   // Single source of truth for the coloured header band used by both the
   // drag handle (here) and TripDetailContent's header.
   const { currentAccent, hasStarted, displayStops, currentIndex } = useStopInference({
@@ -120,9 +129,7 @@ export function TripDetailSheet({
     toStation: rest.toStation,
     currentTime: rest.currentTime,
     realtimeStatus: rest.realtimeStatus,
-    progressHint: vehiclePosition?.currentStation
-      ? { source: "vehicle", station: vehiclePosition.currentStation, status: vehiclePosition.currentStatus }
-      : null,
+    progressHint,
   });
 
 
@@ -325,6 +332,7 @@ export function TripDetailSheet({
     vehiclePosition,
     activeProgressSource,
     distanceToTrainMi,
+    progressHint,
   };
 
   // ── Desktop dialog ────────────────────────────────────────────────────────

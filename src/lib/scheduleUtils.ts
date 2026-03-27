@@ -261,8 +261,8 @@ export function getNextTripIndex(
   currentTime: Date
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    const departureTime = trips[i].departureTime;
-    if (!isTimeInPast(currentTime, departureTime)) {
+    const arrivalTime = trips[i].arrivalTime;
+    if (!isTimeInPast(currentTime, arrivalTime)) {
       return i;
     }
   }

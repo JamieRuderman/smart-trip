@@ -269,6 +269,26 @@ export function getNextTripIndex(
   return -1;
 }
 
+/**
+ * Finds the index of the first trip that is still in progress
+ * (departure is in the past but arrival is not yet past).
+ * Returns -1 if no in-progress trips exist.
+ */
+export function getFirstInProgressTripIndex(
+  trips: ProcessedTrip[],
+  currentTime: Date
+): number {
+  for (let i = 0; i < trips.length; i++) {
+    if (
+      isTimeInPast(currentTime, trips[i].departureTime) &&
+      !isTimeInPast(currentTime, trips[i].arrivalTime)
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 // Station and fare utilities are now exported from stationUtils
 export { getStationZone, calculateZonesBetweenStations } from "./stationUtils";
 

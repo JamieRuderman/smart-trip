@@ -4,7 +4,7 @@ import { TripCard } from "./TripCard";
 import { ScheduleHeader } from "./ScheduleHeader";
 import { NoMoreTrainsAlert } from "./NoMoreTrainsAlert";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { isTimeInPast, getNextTripIndex } from "@/lib/scheduleUtils";
+import { isTimeInPast, getNextTripIndex, getFirstInProgressTripIndex } from "@/lib/scheduleUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
@@ -41,9 +41,20 @@ export function ScheduleResults({
       ? getNextTripIndex(filteredTrips, currentTime)
       : -1;
 
-  const displayedTrips = showAllTrips
-    ? filteredTrips
-    : filteredTrips.slice(nextTripIndex >= 0 ? nextTripIndex : 0);
+  // Show in-progress trips (departed but not yet arrived) before the next upcoming trip.
+  const firstInProgressIndex = !showAllTrips
+    ? getFirstInProgressTripIndex(filteredTrips, currentTime)
+    : -1;
+
+  const sliceStart = showAllTrips
+    ? 0
+    : firstInProgressIndex >= 0
+      ? firstInProgressIndex
+      : nextTripIndex >= 0
+        ? nextTripIndex
+        : 0;
+
+  const displayedTrips = filteredTrips.slice(sliceStart);
 
   const visibleTrips =
     selectedTripNumber != null &&

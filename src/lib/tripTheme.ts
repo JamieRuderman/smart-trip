@@ -23,15 +23,16 @@ export const stateText: Record<TripState, string> = {
 };
 
 /**
- * Icon and connector text — slightly dimmer than the label colour for past
- * stops so the hierarchy between label and icon is preserved.
+ * Icon and connector text — matches the primary text colour so that
+ * circles, lines, and labels feel cohesive within each state.
+ * Past icons are slightly dimmer than past text to preserve hierarchy.
  */
 export const stateIconText: Record<TripState, string> = {
   ontime:   "text-smart-train-green",
   delayed:  "text-smart-gold",
   canceled: "text-destructive",
   past:     "text-muted-foreground/30",
-  future:   "text-muted-foreground/40",
+  future:   "text-foreground/40",
 };
 
 /** Solid background used for the sheet header band. */
@@ -61,7 +62,7 @@ export const stateLineColor: Record<TripState, string> = {
   delayed:  "bg-muted-foreground/30",
   canceled: "bg-muted-foreground/30",
   past:     "bg-muted-foreground/30",
-  future:   "bg-border",
+  future:   "bg-foreground/20",
 };
 
 /**

@@ -98,7 +98,7 @@ export function StopTimeline({
               }
             : null;
 
-          // Stop-point icon
+          // Stop-point icon — uses theme maps so colours stay in sync with text
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
@@ -110,18 +110,18 @@ export function StopTimeline({
             <CornerDownRight
               className={cn(
                 "h-4 w-4 ml-3",
-                isPast
-                  ? stateIconText["past"]
-                  : isCurrent
-                  ? stateText[accent]
-                  : stateIconText["future"],
+                isPast ? stateIconText["past"] : stateText[accent],
               )}
               style={{ strokeWidth: 3 }}
             />
-          ) : isPast ? (
-            <Circle className="h-2.5 w-2.5 text-muted-foreground/30 fill-muted-foreground/20 shrink-0" />
           ) : (
-            <Circle className="h-2.5 w-2.5 text-border shrink-0" />
+            <Circle
+              className={cn(
+                "h-2.5 w-2.5 shrink-0",
+                stateIconText[accent],
+                isPast && "fill-muted-foreground/20",
+              )}
+            />
           );
 
           // Connector lines

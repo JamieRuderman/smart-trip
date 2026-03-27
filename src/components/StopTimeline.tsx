@@ -99,18 +99,22 @@ export function StopTimeline({
             : null;
 
           // Stop-point icon — uses theme maps so colours stay in sync with text
+          const endpointIconColor = isCurrent
+            ? stateText[accent]
+            : stateIconText["future"];
+
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
                 "h-5 w-5",
-                isPast ? stateIconText["past"] : stateText[accent],
+                endpointIconColor,
               )}
             />
           ) : isTo ? (
             <CornerDownRight
               className={cn(
                 "h-4 w-4 ml-3",
-                isPast ? stateIconText["past"] : stateText[accent],
+                endpointIconColor,
               )}
               style={{ strokeWidth: 3 }}
             />
@@ -127,12 +131,12 @@ export function StopTimeline({
           // Connector lines
           const lineAbove = isFirst
             ? "invisible"
-            : isPast
+            : isPast || isCurrent
             ? stateLineColor["past"]
             : stateLineColor["future"];
           const lineBelow = isLast
             ? "invisible"
-            : isPast || isCurrent
+            : isPast
             ? stateLineColor["past"]
             : stateLineColor["future"];
 

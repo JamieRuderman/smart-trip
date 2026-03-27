@@ -62,7 +62,7 @@ export const stateLineColor: Record<TripState, string> = {
   delayed:  "bg-muted-foreground/30",
   canceled: "bg-muted-foreground/30",
   past:     "bg-muted-foreground/30",
-  future:   "bg-foreground/50",
+  future:   "bg-foreground/65",
 };
 
 /**

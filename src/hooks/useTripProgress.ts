@@ -209,9 +209,11 @@ export function useTripProgress({
   const toIdx = stationIndexMap[toStation];
   const totalStops = Math.abs(toIdx - fromIdx);
 
+  // currentIndex points to the next upcoming stop (the green highlight),
+  // so all stops from currentIndex onward are still ahead of the rider.
   const remainingStops =
     hasStarted && currentIndex >= 0
-      ? Math.max(0, displayStops.length - 1 - currentIndex)
+      ? Math.max(0, displayStops.length - currentIndex)
       : isEnded
         ? 0
         : null;

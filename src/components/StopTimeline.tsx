@@ -38,6 +38,7 @@ export function StopTimeline({
   stopInference,
 }: StopTimelineProps) {
   const { t } = useTranslation();
+  void trip;
 
   const {
     displayStops,
@@ -101,6 +102,8 @@ export function StopTimeline({
           // Stop-point icon — uses theme maps so colours stay in sync with text
           const endpointIconColor = isCurrent
             ? stateText[accent]
+            : isPast
+            ? stateIconText["past"]
             : stateIconText["future"];
 
           const stopIcon = isFrom ? (
@@ -123,7 +126,7 @@ export function StopTimeline({
               className={cn(
                 "h-2.5 w-2.5 shrink-0",
                 stateIconText[accent],
-                isPast && "fill-muted-foreground/20",
+                isCurrent ? "fill-current" : "fill-transparent",
               )}
             />
           );

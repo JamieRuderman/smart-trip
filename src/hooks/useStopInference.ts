@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   getAllStations,
   stationIndexMap,
+  isSouthbound as isSouthboundFn,
 } from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -78,12 +79,12 @@ export function useStopInference({
   const toIdx = stationIndexMap[toStation];
   const minIdx = Math.min(fromIdx, toIdx);
   const maxIdx = Math.max(fromIdx, toIdx);
-  const isSouthbound = fromIdx < toIdx;
+  const southbound = isSouthboundFn(fromStation, toStation);
 
   const stops = allStations.slice(minIdx, maxIdx + 1);
   const times = trip.times.slice(minIdx, maxIdx + 1);
-  const displayStops = isSouthbound ? stops : [...stops].reverse();
-  const displayTimes = isSouthbound ? times : [...times].reverse();
+  const displayStops = southbound ? stops : [...stops].reverse();
+  const displayTimes = southbound ? times : [...times].reverse();
 
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;

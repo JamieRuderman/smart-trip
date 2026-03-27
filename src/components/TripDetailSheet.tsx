@@ -2,16 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useGeolocation } from "@/hooks/useGeolocation";
-import { useStopInference } from "@/hooks/useStopInference";
-import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
-import { stateBg } from "@/lib/tripTheme";
-import {
-  getDistanceToStationKm,
-  stationIndexMap,
-} from "@/lib/stationUtils";
-import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
-import { computeMinutesUntil } from "@/lib/timeUtils";
+import { useTripProgress } from "@/hooks/useTripProgress";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { TripDetailContent } from "./TripDetailContent";
 import {
@@ -23,7 +14,6 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
-import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
 
 export interface TripDetailSheetProps {
   isOpen: boolean;
@@ -46,8 +36,8 @@ export interface TripDetailSheetProps {
  * TripDetailSheet — layout-only wrapper.
  *
  * Responsible for:
- *  - Lifting useGeolocation and useStopInference so the mobile drag handle
- *    and TripDetailContent share exactly the same headerBg colour.
+ *  - Lifting useTripProgress so the mobile drag handle and TripDetailContent
+ *    share exactly the same headerBg colour and stop inference results.
  *  - Rendering the mobile bottom-sheet (portal + swipe-to-dismiss) or the
  *    desktop Dialog.
  *
@@ -62,150 +52,18 @@ export function TripDetailSheet({
   const isMobile = useIsMobile();
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  // Geolocation is lifted here so the drag handle (rendered in this component)
-  // can share the same position data used by TripDetailContent for the header colour.
-  const {
-    lat,
-    lng,
-    accuracy,
-    speedMps,
-    timestampMs,
-    loading: locationLoading,
-    requestLocation,
-  } = useGeolocation({
-    watch: isOpen,
-    autoRequestOnNative: false,
-  });
-
-  // Minutes since arrival — positive means the trip has ended.
-  const arrivalTime = rest.realtimeStatus?.liveArrivalTime ?? rest.trip.arrivalTime;
-  const minutesAfterArrival = -(computeMinutesUntil(rest.currentTime, arrivalTime));
-
-  const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
-
-  // ── Vehicle position matching ─────────────────────────────────────────────
-  // Derive the trip's origin departure time (same logic as useTripRealtimeStatusMap).
-  // directionId: 0 = southbound (Windsor → Larkspur), 1 = northbound.
-  const fromIdx = stationIndexMap[rest.fromStation] ?? 0;
-  const toIdx = stationIndexMap[rest.toStation] ?? 0;
-  const isSouthbound = fromIdx < toIdx;
-  const originStartTime = isSouthbound
-    ? rest.trip.times[0]?.slice(0, 5)        // "HH:MM" of first stop
-    : rest.trip.times[rest.trip.times.length - 1]?.slice(0, 5);
-  const tripDirectionId = isSouthbound ? 0 : 1;
-  // Today's date in YYYYMMDD format (local time).
-  const todayYYYYMMDD = (() => {
-    const d = rest.currentTime;
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}${m}${day}`;
-  })();
-
-  const liveVehiclePosition = useVehiclePositionForTrip(
-    originStartTime,
-    todayYYYYMMDD,
-    tripDirectionId
-  );
-  // Dev fixtures can inject a vehiclePosition override; live hook result used otherwise.
-  const vehiclePosition = rest.vehiclePositionOverride !== undefined
-    ? rest.vehiclePositionOverride
-    : liveVehiclePosition;
-
-  const progressHint =
-    vehiclePosition?.currentStation != null
-      ? {
-          source: "vehicle" as const,
-          station: vehiclePosition.currentStation,
-          status: vehiclePosition.currentStatus,
-        }
-      : null;
-
-  // Single source of truth for the coloured header band used by both the
-  // drag handle (here) and TripDetailContent's header.
-  const { currentAccent, hasStarted, displayStops, currentIndex } = useStopInference({
+  // Single hook for all trip progress logic: geolocation, vehicle matching,
+  // GPS inference, stop inference, distance calculations, and derived state.
+  const progress = useTripProgress({
     trip: rest.trip,
     fromStation: rest.fromStation,
     toStation: rest.toStation,
     currentTime: rest.currentTime,
     realtimeStatus: rest.realtimeStatus,
-    progressHint,
+    isNextTrip: rest.isNextTrip,
+    isOpen,
+    vehiclePositionOverride: rest.vehiclePositionOverride,
   });
-
-
-
-  const gpsAgeMs = timestampMs == null ? Infinity : Date.now() - timestampMs;
-  const hasReliableGps =
-    lat != null &&
-    lng != null &&
-    accuracy != null &&
-    accuracy <= 65 &&
-    gpsAgeMs <= 20_000;
-
-  const nearestOnRoute =
-    hasReliableGps && displayStops.length > 0
-      ? displayStops.reduce(
-          (best, station, index) => {
-            const km = getDistanceToStationKm(lat!, lng!, station);
-            return km < best.km ? { station, index, km } : best;
-          },
-          { station: displayStops[0], index: 0, km: Number.POSITIVE_INFINITY },
-        )
-      : null;
-
-  const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
-  const isNearRoute = isNearSelectedRoute(routeDistanceKm);
-  // Phone GPS on-train inference is only used when vehicle position feed has no match.
-  const inferredOnTrain =
-    vehiclePosition == null &&
-    hasReliableGps &&
-    isNearRoute &&
-    speedMps != null &&
-    speedMps >= 5.5 &&
-    speedMps <= 45;
-
-  const useGpsForProgress =
-    vehiclePosition == null && hasReliableGps && (inferredOnTrain || routeDistanceKm <= 0.35);
-
-  // Which source is actively driving the progress indicator.
-  const activeProgressSource: "vehicle" | "gps" | "schedule" =
-    vehiclePosition?.currentStation != null && displayStops.includes(vehiclePosition.currentStation)
-      ? "vehicle"
-      : useGpsForProgress
-      ? "gps"
-      : "schedule";
-
-  // Ended trips always go grey.
-  // "future" (not yet started) goes green when this is the next trip, neutral otherwise.
-  const headerBg = isEnded
-    ? "bg-smart-neutral"
-    : stateBg[currentAccent === "future" && rest.isNextTrip ? "ontime" : currentAccent];
-
-  // Distance to the next upcoming stop (mi), shown when GPS is available.
-  // Before departure: distance to the origin station (useful when walking to the platform).
-  // After departure:  distance to the current highlighted stop (the green one = where you're heading).
-  const nextStop =
-    lat == null || lng == null
-      ? null
-      : selectNextStopTarget({
-          displayStops,
-          currentIndex,
-          nearestOnRouteIndex: nearestOnRoute?.index ?? null,
-          useGpsForProgress,
-        });
-  const distanceToNextStopMi =
-    nextStop != null && lat != null && lng != null
-      ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
-      : null;
-
-  // Distance from user's phone to the train's GPS position (when both are available).
-  const distanceToTrainMi =
-    lat != null && lng != null && vehiclePosition != null
-      ? Math.sqrt(
-          Math.pow((lat - vehiclePosition.position.latitude) * 111, 2) +
-          Math.pow((lng - vehiclePosition.position.longitude) * 111 * Math.cos(lat * Math.PI / 180), 2)
-        ) * 0.621371
-      : null;
 
   // Prevent body scroll when sheet is open on mobile.
   useEffect(() => {
@@ -318,21 +176,7 @@ export function TripDetailSheet({
   const contentProps = {
     ...rest,
     onClose,
-    headerBg,
-    minutesAfterArrival,
-    hasStarted,
-    nextStop,
-    distanceToNextStopMi,
-    lat,
-    lng,
-    locationLoading,
-    requestLocation,
-    hasReliableGps,
-    isOnTrain: inferredOnTrain,
-    vehiclePosition,
-    activeProgressSource,
-    distanceToTrainMi,
-    progressHint,
+    progress,
   };
 
   // ── Desktop dialog ────────────────────────────────────────────────────────
@@ -351,7 +195,7 @@ export function TripDetailSheet({
     );
   }
 
-  // ── Mobile bottom sheet ───────────────────────────────────────────────────
+  // ── Mobile bottom sheet ─────────────────────────────────────────────────
   return createPortal(
     <>
       {/* Backdrop */}
@@ -388,7 +232,7 @@ export function TripDetailSheet({
         onTouchEnd={handleTouchEnd}
       >
         {/* Drag handle — same headerBg as TripDetailContent's header band */}
-        <div className={cn("flex justify-center pt-3 pb-1 shrink-0", headerBg)}>
+        <div className={cn("flex justify-center pt-3 pb-1 shrink-0", progress.headerBg)}>
           <div className="w-10 h-1 rounded-full bg-white/40" />
         </div>
 

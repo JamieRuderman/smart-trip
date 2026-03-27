@@ -6,7 +6,7 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Circle, CornerDownRight, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useStopInference } from "@/hooks/useStopInference";
+import type { StopInferenceResult } from "@/hooks/useStopInference";
 import {
   type TripState,
   stateText,
@@ -15,46 +15,37 @@ import {
   stateLineColor,
   stateBg,
 } from "@/lib/tripTheme";
-import type { ProgressHint } from "@/hooks/useStopInference";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
   fromStation: Station;
   toStation: Station;
-  currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
-  /** Optional progress hint (vehicle/gps) to drive the current stop highlight. */
-  progressHint?: ProgressHint | null;
+  /** Pre-computed stop inference results from useTripProgress. */
+  stopInference: StopInferenceResult;
 }
 
 export function StopTimeline({
   trip,
   fromStation,
   toStation,
-  currentTime,
   realtimeStatus,
   timeFormat,
   isEnded = false,
-  progressHint = null,
+  stopInference,
 }: StopTimelineProps) {
   const { t } = useTranslation();
+  void trip;
 
   const {
     displayStops,
     displayTimes,
     statusByStop,
     states: inferredStates,
-  } = useStopInference({
-    trip,
-    fromStation,
-    toStation,
-    currentTime,
-    realtimeStatus,
-    progressHint,
-  });
+  } = stopInference;
 
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
@@ -108,41 +99,47 @@ export function StopTimeline({
               }
             : null;
 
-          // Stop-point icon
+          // Stop-point icon — uses theme maps so colours stay in sync with text
+          const endpointIconColor = isCurrent
+            ? stateText[accent]
+            : isPast
+            ? stateIconText["past"]
+            : stateIconText["future"];
+
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
                 "h-5 w-5",
-                isPast ? stateIconText["past"] : stateText[accent],
+                endpointIconColor,
               )}
             />
           ) : isTo ? (
             <CornerDownRight
               className={cn(
                 "h-4 w-4 ml-3",
-                isPast
-                  ? stateIconText["past"]
-                  : isCurrent
-                  ? stateText[accent]
-                  : stateIconText["future"],
+                endpointIconColor,
               )}
               style={{ strokeWidth: 3 }}
             />
-          ) : isPast ? (
-            <Circle className="h-2.5 w-2.5 text-muted-foreground/30 fill-muted-foreground/20 shrink-0" />
           ) : (
-            <Circle className="h-2.5 w-2.5 text-border shrink-0" />
+            <Circle
+              className={cn(
+                "h-2.5 w-2.5 shrink-0",
+                stateIconText[accent],
+                isCurrent ? "fill-current" : "fill-transparent",
+              )}
+            />
           );
 
           // Connector lines
           const lineAbove = isFirst
             ? "invisible"
-            : isPast
+            : isPast || isCurrent
             ? stateLineColor["past"]
             : stateLineColor["future"];
           const lineBelow = isLast
             ? "invisible"
-            : isPast || isCurrent
+            : isPast
             ? stateLineColor["past"]
             : stateLineColor["future"];
 

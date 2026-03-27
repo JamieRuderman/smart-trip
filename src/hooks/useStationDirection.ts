@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Station } from "@/types/smartSchedule";
-import { getStationIndex } from "@/lib/stationUtils";
+import { isSouthbound } from "@/lib/stationUtils";
 
 export interface StationDirection {
   direction: "southbound" | "northbound";
@@ -18,14 +18,12 @@ export function useStationDirection(
   return useMemo(() => {
     if (!fromStation || !toStation) return null;
 
-    const fromIndex = getStationIndex(fromStation);
-    const toIndex = getStationIndex(toStation);
-    const isSouthbound = fromIndex < toIndex;
+    const sb = isSouthbound(fromStation, toStation);
 
     return {
-      direction: isSouthbound ? "southbound" : "northbound",
-      isSouthbound,
-      isNorthbound: !isSouthbound,
+      direction: sb ? "southbound" : "northbound",
+      isSouthbound: sb,
+      isNorthbound: !sb,
     };
   }, [fromStation, toStation]);
 }

@@ -101,9 +101,17 @@ export function getAllStations(): Station[] {
 }
 
 /**
- * Haversine distance in km between two lat/lng points
+ * Determine whether travel from `from` to `to` is southbound.
+ * Southbound means fromIndex < toIndex (Windsor → Larkspur direction).
  */
-function haversineKm(
+export function isSouthbound(from: Station, to: Station): boolean {
+  return (stationIndexMap[from] ?? 0) < (stationIndexMap[to] ?? 0);
+}
+
+/**
+ * Haversine distance in km between two lat/lng points.
+ */
+export function haversineKm(
   lat1: number, lng1: number,
   lat2: number, lng2: number
 ): number {

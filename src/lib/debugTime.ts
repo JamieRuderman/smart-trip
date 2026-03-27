@@ -1,5 +1,5 @@
 export function parseDebugTimeFromUrl(): Date | null {
-  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  if (typeof window === "undefined") return null;
   const raw = new URLSearchParams(window.location.search).get("debugTime");
   if (!raw) return null;
 

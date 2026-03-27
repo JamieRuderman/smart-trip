@@ -28,11 +28,10 @@ import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
 import { AlarmStatusLabel } from "./AlarmStatusLabel";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Trans, useTranslation } from "react-i18next";
-import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
-import type { ProgressHint } from "@/hooks/useStopInference";
+import type { TripProgressResult } from "@/hooks/useTripProgress";
 
 export interface TripDetailContentProps {
   trip: ProcessedTrip;
@@ -45,32 +44,9 @@ export interface TripDetailContentProps {
   isNextTrip: boolean;
   showFerry: boolean;
   onClose: () => void;
-  /** Pre-computed by TripDetailSheet so the drag handle and header share one colour. */
-  headerBg: string;
-  /** Minutes since the train arrived at the destination (positive = past, negative = not yet). */
-  minutesAfterArrival: number;
-  /** True once at least one stop is in the past (trip has started). */
-  hasStarted: boolean;
-  /** Next upcoming stop on the route (null when ended or no GPS). */
-  nextStop?: Station | null;
-  /** Straight-line distance to nextStop in miles (null when no GPS or ended). */
-  distanceToNextStopMi?: number | null;
-  /** GPS position — lifted to parent so the drag handle colour can incorporate it. */
-  lat: number | null;
-  lng: number | null;
-  locationLoading: boolean;
-  requestLocation: () => void;
-  hasReliableGps?: boolean;
-  isOnTrain?: boolean;
+  /** All trip progress state, computed once in TripDetailSheet. */
+  progress: TripProgressResult;
   showCloseButton?: boolean;
-  /** Matched vehicle position from the GTFS-RT vehiclepositions feed. */
-  vehiclePosition?: VehiclePositionMatch | null;
-  /** Which data source is actively driving the stop progress indicator. */
-  activeProgressSource?: "vehicle" | "gps" | "schedule";
-  /** Approximate distance from user's phone GPS to the train's GPS position (miles). */
-  distanceToTrainMi?: number | null;
-  /** Optional progress hint used to keep timeline highlighting in sync with header state. */
-  progressHint?: ProgressHint | null;
 }
 
 
@@ -84,31 +60,38 @@ export function TripDetailContent({
   timeFormat,
   showFerry,
   onClose,
-  headerBg,
-  minutesAfterArrival,
-  hasStarted,
-  nextStop = null,
-  distanceToNextStopMi = null,
-  lat,
-  lng,
-  locationLoading,
-  requestLocation,
-  hasReliableGps = false,
-  isOnTrain = false,
+  progress,
   showCloseButton = true,
-  vehiclePosition = null,
-  activeProgressSource = "schedule",
-  distanceToTrainMi = null,
-  progressHint = null,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const { preferences } = useUserPreferences();
 
+  const {
+    headerBg,
+    isEnded,
+    minutesAfterArrival,
+    nextStop,
+    distanceToNextStopMi,
+    lat,
+    lng,
+    locationLoading,
+    requestLocation,
+    hasReliableGps,
+    inferredOnTrain: isOnTrain,
+    vehiclePosition,
+    activeProgressSource,
+    distanceToTrainMi,
+    progressHint,
+    stopInference,
+    remainingStops,
+    minutesUntilArrival,
+  } = progress;
+
+  const { hasStarted } = stopInference;
+
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
-
-  const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
@@ -169,14 +152,13 @@ export function TripDetailContent({
     : statusLabel ??
       (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
-  const minutesUntilArrival =
-    parseTimeToMinutes(arrivalTime) -
-    (currentTime.getHours() * 60 + currentTime.getMinutes());
-
   const alarmStatus = useAlarmStatus({
     tripId: trip.trip,
     minutesUntilDeparture: minutesUntil,
-    minutesUntilArrival,
+    minutesUntilArrival: minutesUntilArrival ?? (
+      parseTimeToMinutes(arrivalTime) -
+      (currentTime.getHours() * 60 + currentTime.getMinutes())
+    ),
     minutesAfterArrival,
     hasStarted,
     isCanceled,
@@ -189,6 +171,21 @@ export function TripDetailContent({
     lastUpdated,
     currentTime,
   });
+
+  // Build the trip stats line: duration, remaining/total stops, fare
+  const stopsLabel = remainingStops != null && remainingStops < stopCount
+    ? t("tracker.remainingStopCount", { remaining: remainingStops, total: stopCount })
+    : t("tracker.stopCount", { count: stopCount });
+
+  // Build the duration label: show remaining time when en route
+  const durationDisplay = minutesUntilArrival != null
+    ? minutesUntilArrival >= 60
+      ? t("tracker.remainingDurationHoursMinutes", {
+          hours: Math.floor(minutesUntilArrival / 60),
+          minutes: minutesUntilArrival % 60,
+        })
+      : t("tracker.remainingDurationMinutes", { minutes: minutesUntilArrival })
+    : tripDurationLabel;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -273,12 +270,12 @@ export function TripDetailContent({
         <GutterRow className="text-sm text-muted-foreground">
           <span className="flex items-center gap-1 flex-wrap">
             <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>{tripDurationLabel}</span>
+            <span>{durationDisplay}</span>
             {stopCount > 0 && (
               <>
                 <span className="mx-1">·</span>
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>{t("tracker.stopCount", { count: stopCount })}</span>
+                <span>{stopsLabel}</span>
               </>
             )}
             {fareInfo && fareInfo.price > 0 && (
@@ -434,11 +431,10 @@ export function TripDetailContent({
           trip={trip}
           fromStation={fromStation}
           toStation={toStation}
-          currentTime={currentTime}
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isEnded={isEnded}
-          progressHint={progressHint}
+          stopInference={stopInference}
         />
 
         {showFerry && trip.outboundFerry && (

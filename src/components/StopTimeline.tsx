@@ -38,6 +38,7 @@ export function StopTimeline({
   stopInference,
 }: StopTimelineProps) {
   const { t } = useTranslation();
+  void trip;
 
   const {
     displayStops,
@@ -99,18 +100,24 @@ export function StopTimeline({
             : null;
 
           // Stop-point icon — uses theme maps so colours stay in sync with text
+          const endpointIconColor = isCurrent
+            ? stateText[accent]
+            : isPast
+            ? stateIconText["past"]
+            : stateIconText["future"];
+
           const stopIcon = isFrom ? (
             <MapPin
               className={cn(
                 "h-5 w-5",
-                isPast ? stateIconText["past"] : stateText[accent],
+                endpointIconColor,
               )}
             />
           ) : isTo ? (
             <CornerDownRight
               className={cn(
                 "h-4 w-4 ml-3",
-                isPast ? stateIconText["past"] : stateText[accent],
+                endpointIconColor,
               )}
               style={{ strokeWidth: 3 }}
             />
@@ -119,7 +126,7 @@ export function StopTimeline({
               className={cn(
                 "h-2.5 w-2.5 shrink-0",
                 stateIconText[accent],
-                isPast && "fill-muted-foreground/20",
+                isCurrent ? "fill-current" : "fill-transparent",
               )}
             />
           );
@@ -127,12 +134,12 @@ export function StopTimeline({
           // Connector lines
           const lineAbove = isFirst
             ? "invisible"
-            : isPast
+            : isPast || isCurrent
             ? stateLineColor["past"]
             : stateLineColor["future"];
           const lineBelow = isLast
             ? "invisible"
-            : isPast || isCurrent
+            : isPast
             ? stateLineColor["past"]
             : stateLineColor["future"];
 

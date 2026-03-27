@@ -32,7 +32,7 @@ export const stateIconText: Record<TripState, string> = {
   delayed:  "text-smart-gold",
   canceled: "text-destructive",
   past:     "text-muted-foreground/30",
-  future:   "text-foreground/50",
+  future:   "text-foreground/65",
 };
 
 /** Solid background used for the sheet header band. */
@@ -62,7 +62,7 @@ export const stateLineColor: Record<TripState, string> = {
   delayed:  "bg-muted-foreground/30",
   canceled: "bg-muted-foreground/30",
   past:     "bg-muted-foreground/30",
-  future:   "bg-foreground/50",
+  future:   "bg-foreground/65",
 };
 
 /**

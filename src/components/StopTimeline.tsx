@@ -6,7 +6,7 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { Circle, CornerDownRight, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useStopInference } from "@/hooks/useStopInference";
+import type { StopInferenceResult } from "@/hooks/useStopInference";
 import {
   type TripState,
   stateText,
@@ -15,30 +15,27 @@ import {
   stateLineColor,
   stateBg,
 } from "@/lib/tripTheme";
-import type { ProgressHint } from "@/hooks/useStopInference";
 
 interface StopTimelineProps {
   trip: ProcessedTrip;
   fromStation: Station;
   toStation: Station;
-  currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
-  /** Optional progress hint (vehicle/gps) to drive the current stop highlight. */
-  progressHint?: ProgressHint | null;
+  /** Pre-computed stop inference results from useTripProgress. */
+  stopInference: StopInferenceResult;
 }
 
 export function StopTimeline({
   trip,
   fromStation,
   toStation,
-  currentTime,
   realtimeStatus,
   timeFormat,
   isEnded = false,
-  progressHint = null,
+  stopInference,
 }: StopTimelineProps) {
   const { t } = useTranslation();
 
@@ -47,14 +44,7 @@ export function StopTimeline({
     displayTimes,
     statusByStop,
     states: inferredStates,
-  } = useStopInference({
-    trip,
-    fromStation,
-    toStation,
-    currentTime,
-    realtimeStatus,
-    progressHint,
-  });
+  } = stopInference;
 
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;

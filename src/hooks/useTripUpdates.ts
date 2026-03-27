@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { apiBaseUrl } from "@/lib/env";
-import { GTFS_STOP_ID_TO_STATION, stationIndexMap } from "@/lib/stationUtils";
+import { GTFS_STOP_ID_TO_STATION, stationIndexMap, isSouthbound as isSouthboundFn } from "@/lib/stationUtils";
 import type {
   GtfsRtTripUpdatesResponse,
   GtfsRtTripUpdate,
@@ -306,16 +306,14 @@ export function useTripRealtimeStatusMap(
     const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
     if (!data || !fromStation || !toStation) return empty;
 
-    const fromIdx = stationIndexMap[fromStation] ?? -1;
-    const toIdx = stationIndexMap[toStation] ?? -1;
-    const isSouthbound = fromIdx < toIdx;
+    const southbound = isSouthboundFn(fromStation as Station, toStation as Station);
 
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
     // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
     // originate at the northernmost station (times[0]); northbound at the southernmost (times[last]).
     const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string; times: string[] }>();
     for (const trip of trips) {
-      const originTime = isSouthbound
+      const originTime = southbound
         ? trip.times[0]
         : trip.times[trip.times.length - 1];
       if (originTime) {

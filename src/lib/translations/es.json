@@ -110,7 +110,9 @@
   },
   "ferry": {
     "arrives": "llega",
+    "arrived": "llegó",
     "departs": "sale",
+    "departed": "salió",
     "minTransfer": "min de transferencia",
     "inbound": "Entrada",
     "outbound": "Salida"

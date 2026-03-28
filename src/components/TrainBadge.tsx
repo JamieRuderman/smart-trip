@@ -36,7 +36,7 @@ export function TrainBadge({
           : isNextTrip
           ? stateText["ontime"]
           : undefined,
-        isPastTrip && showAllTrips && "text-muted-foreground/60"
+        isPastTrip && "text-muted-foreground/60"
       )}
     >
       <TripIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />

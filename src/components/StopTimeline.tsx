@@ -108,18 +108,15 @@ export function StopTimeline({
 
           const stopIcon = isFrom ? (
             <MapPin
-              className={cn(
-                "h-5 w-5",
-                endpointIconColor,
-              )}
+              className={cn("h-5 w-5", endpointIconColor)}
+              style={{ marginBottom: -1 }}
+              strokeWidth={1.5}
             />
           ) : isTo ? (
             <CornerDownRight
-              className={cn(
-                "h-4 w-4 ml-3",
-                endpointIconColor,
-              )}
-              style={{ strokeWidth: 3 }}
+              className={cn("h-4 w-4", endpointIconColor)}
+              style={{ marginLeft: 11, marginTop: -3 }}
+              strokeWidth={1.5}
             />
           ) : (
             <Circle

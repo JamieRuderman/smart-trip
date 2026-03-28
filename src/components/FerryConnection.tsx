@@ -4,6 +4,7 @@ import { APP_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
 import { Ship, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { stateText } from "@/lib/tripTheme";
+import { isTimeInPast } from "@/lib/scheduleUtils";
 import { useTranslation } from "react-i18next";
 
 interface FerryConnectionProps {
@@ -13,6 +14,7 @@ interface FerryConnectionProps {
   isMobile?: boolean;
   timeFormat?: "12h" | "24h";
   inbound?: boolean; // when true, show ferry arrival then train departure
+  currentTime?: Date;
 }
 
 export function FerryConnection({
@@ -22,6 +24,7 @@ export function FerryConnection({
   isMobile = false,
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
+  currentTime,
 }: FerryConnectionProps) {
   const { t } = useTranslation();
 
@@ -51,8 +54,11 @@ export function FerryConnection({
   const isShortConnection =
     transferTime < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
 
-  const displayLabel = inbound ? t("ferry.arrives") : t("ferry.departs");
   const displayTime = inbound ? ferry.arrive : ferry.depart;
+  const ferryHasDeparted = currentTime != null && isTimeInPast(currentTime, displayTime);
+  const displayLabel = inbound
+    ? (ferryHasDeparted ? t("ferry.arrived") : t("ferry.arrives"))
+    : (ferryHasDeparted ? t("ferry.departed") : t("ferry.departs"));
 
   return (
     <div

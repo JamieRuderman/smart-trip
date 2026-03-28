@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   X,
   AlertTriangle,
-  AlarmClock,
+  Timer,
   Clock,
   MapPin,
   LocateFixed,
@@ -78,11 +78,10 @@ export function TripDetailContent({
     locationLoading,
     requestLocation,
     hasReliableGps,
-    inferredOnTrain: isOnTrain,
+    isOnTrain,
     vehiclePosition,
     activeProgressSource,
     distanceToTrainMi,
-    progressHint,
     stopInference,
     remainingStops,
     minutesUntilArrival,
@@ -197,7 +196,7 @@ export function TripDetailContent({
         )}
       >
         {/* Trip number — w-[5rem] aligns with the stop timeline icon gutter */}
-        <div className="flex flex-col items-end shrink-0 w-[5rem]">
+        <div className="flex flex-col items-end shrink-0 w-[5rem] pr-3">
           <p className="text-xs text-white/80 font-medium mb-0.5">
             {t("tracker.tripLabel")}
           </p>
@@ -221,7 +220,7 @@ export function TripDetailContent({
             arrival={arrivalTime}
             format={timeFormat}
             strikethrough={isCanceledOrSkipped}
-            className="text-lg font-semibold text-white"
+            className="text-2xl font-semibold text-white"
           />
           {/* Struck-through scheduled times shown only when delayed */}
           {isDelayed && (
@@ -229,8 +228,8 @@ export function TripDetailContent({
               departure={trip.departureTime}
               arrival={trip.arrivalTime}
               format={timeFormat}
-              strikethrough
               className="text-xs mt-0.5 text-white/50"
+              strikethrough
             />
           )}
         </div>
@@ -256,11 +255,8 @@ export function TripDetailContent({
 
       {/* Countdown / Ended — always shown */}
       <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
-        <div className="w-[5rem] shrink-0 flex justify-end">
-          <AlarmClock
-            className="h-6 w-6 text-muted-foreground/50"
-            aria-hidden="true"
-          />
+        <div className="w-[5rem] shrink-0 flex justify-end pr-3">
+          <Timer className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
         </div>
         <AlarmStatusLabel status={alarmStatus} />
       </div>
@@ -333,88 +329,116 @@ export function TripDetailContent({
 
       {/* ── Debug: Data Sources panel (dev/QA only, collapsed by default) ── */}
       <div className="px-4 shrink-0">
-        <button
-          onClick={() => setShowDebugPanel((v) => !v)}
-          className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors w-full py-1"
-          aria-expanded={showDebugPanel}
-        >
-          {showDebugPanel ? (
-            <ChevronUp className="h-3 w-3 shrink-0" />
-          ) : (
-            <ChevronDown className="h-3 w-3 shrink-0" />
-          )}
-          <span>Data sources</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-[5rem] shrink-0" aria-hidden="true" />
+          <button
+            onClick={() => setShowDebugPanel((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground/70 transition-colors py-1"
+            aria-expanded={showDebugPanel}
+          >
+            {showDebugPanel ? (
+              <ChevronUp className="h-3 w-3 shrink-0" />
+            ) : (
+              <ChevronDown className="h-3 w-3 shrink-0" />
+            )}
+            Data sources
+          </button>
+        </div>
 
         {showDebugPanel && (
-          <div className="mb-2 rounded-md border border-border/60 divide-y divide-border/40 text-xs overflow-hidden">
-            {/* Schedule inference row */}
-            <div className="flex items-start gap-2 px-3 py-2">
-              <span
-                className={cn(
-                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
-                  activeProgressSource === "schedule" ? "bg-green-500" : "bg-muted-foreground/30"
-                )}
-              />
-              <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground/80">Schedule</p>
-                <p className="text-muted-foreground">
-                  {hasStarted ? `Current: ${nextStop ?? "—"}` : "Not yet departed"}
-                </p>
+          <div className="flex gap-3">
+            <div className="w-[5rem] shrink-0" aria-hidden="true" />
+            <div className="mb-2 rounded-md border border-border/60 divide-y divide-border/40 text-xs overflow-hidden flex-1">
+              {/* Schedule inference row */}
+              <div className="flex items-start gap-2 px-3 py-2">
+                <span
+                  className={cn(
+                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                    activeProgressSource === "schedule"
+                      ? "bg-green-500"
+                      : "bg-muted-foreground/30",
+                  )}
+                />
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground/80">Schedule</p>
+                  <p className="text-muted-foreground">
+                    {hasStarted
+                      ? `Current: ${nextStop ?? "—"}`
+                      : "Not yet departed"}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Train GPS (vehicle positions) row */}
-            <div className="flex items-start gap-2 px-3 py-2">
-              <span
-                className={cn(
-                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
-                  activeProgressSource === "vehicle" ? "bg-green-500" : "bg-muted-foreground/30"
-                )}
-              />
-              <Train className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground/80">Train GPS</p>
-                {vehiclePosition ? (
-                  <p className="text-muted-foreground">
-                    {vehiclePosition.currentStatus === "STOPPED_AT" ? "Stopped at" : "In transit to"}{" "}
-                    {vehiclePosition.currentStation ?? `stop #${vehiclePosition.currentStopSequence}`}
-                    {vehiclePosition.position.speed != null && (
-                      <> · {(vehiclePosition.position.speed * 2.237).toFixed(0)} mph</>
-                    )}
-                    {distanceToTrainMi != null && (
-                      <> · train {distanceToTrainMi.toFixed(1)} mi away</>
-                    )}
-                    {" · "}age {Math.round((Date.now() / 1000) - vehiclePosition.timestamp)}s
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">No match</p>
-                )}
+              {/* Train GPS (vehicle positions) row */}
+              <div className="flex items-start gap-2 px-3 py-2">
+                <span
+                  className={cn(
+                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                    activeProgressSource === "vehicle"
+                      ? "bg-green-500"
+                      : "bg-muted-foreground/30",
+                  )}
+                />
+                <Train className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground/80">Train GPS</p>
+                  {vehiclePosition ? (
+                    <p className="text-muted-foreground">
+                      {vehiclePosition.currentStatus === "STOPPED_AT"
+                        ? "Stopped at"
+                        : "In transit to"}{" "}
+                      {vehiclePosition.currentStation ??
+                        `stop #${vehiclePosition.currentStopSequence}`}
+                      {vehiclePosition.position.speed != null && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          {(vehiclePosition.position.speed * 2.237).toFixed(
+                            0,
+                          )}{" "}
+                          mph
+                        </>
+                      )}
+                      {distanceToTrainMi != null && (
+                        <> · train {distanceToTrainMi.toFixed(1)} mi away</>
+                      )}
+                      {" · "}age{" "}
+                      {Math.round(
+                        Date.now() / 1000 - vehiclePosition.timestamp,
+                      )}
+                      s
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">No match</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Phone GPS row */}
-            <div className="flex items-start gap-2 px-3 py-2">
-              <span
-                className={cn(
-                  "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
-                  activeProgressSource === "gps" ? "bg-green-500" : "bg-muted-foreground/30"
-                )}
-              />
-              <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground/80">Phone GPS</p>
-                {hasReliableGps ? (
-                  <p className="text-muted-foreground">
-                    {nextStop ? `Nearest: ${nextStop}` : "—"}
-                    {isOnTrain && <> · on train</>}
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">
-                    {lat != null ? "Low accuracy / stale" : "No location"}
-                  </p>
-                )}
+              {/* Phone GPS row */}
+              <div className="flex items-start gap-2 px-3 py-2">
+                <span
+                  className={cn(
+                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
+                    activeProgressSource === "gps"
+                      ? "bg-green-500"
+                      : "bg-muted-foreground/30",
+                  )}
+                />
+                <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground/80">Phone GPS</p>
+                  {hasReliableGps ? (
+                    <p className="text-muted-foreground">
+                      {nextStop ? `Nearest: ${nextStop}` : "—"}
+                      {isOnTrain && <> · on train</>}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      {lat != null ? "Low accuracy / stale" : "No location"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

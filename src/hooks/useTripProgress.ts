@@ -6,7 +6,6 @@ import {
   getDistanceToStationKm,
   haversineKm,
   isSouthbound,
-  stationIndexMap,
 } from "@/lib/stationUtils";
 import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
 import { computeMinutesUntil } from "@/lib/timeUtils";
@@ -24,7 +23,7 @@ export interface TripProgressResult {
   locationLoading: boolean;
   requestLocation: () => void;
   hasReliableGps: boolean;
-  inferredOnTrain: boolean;
+  isOnTrain: boolean;
 
   // Vehicle position
   vehiclePosition: VehiclePositionMatch | null;
@@ -151,7 +150,7 @@ export function useTripProgress({
   const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
   const isNearRoute = isNearSelectedRoute(routeDistanceKm);
 
-  const inferredOnTrain =
+  const isOnTrain =
     vehiclePosition == null &&
     hasReliableGps &&
     isNearRoute &&
@@ -162,7 +161,7 @@ export function useTripProgress({
   const useGpsForProgress =
     vehiclePosition == null &&
     hasReliableGps &&
-    (inferredOnTrain || routeDistanceKm <= 0.35);
+    (isOnTrain || routeDistanceKm <= 0.35);
 
   // ── Active progress source ────────────────────────────────────────────────
   const activeProgressSource: "vehicle" | "gps" | "schedule" =
@@ -205,10 +204,6 @@ export function useTripProgress({
       : null;
 
   // ── Remaining trip stats ──────────────────────────────────────────────────
-  const fromIdx = stationIndexMap[fromStation];
-  const toIdx = stationIndexMap[toStation];
-  const totalStops = Math.abs(toIdx - fromIdx);
-
   // currentIndex points to the next upcoming stop (the green highlight),
   // so all stops from currentIndex onward are still ahead of the rider.
   const remainingStops =
@@ -238,7 +233,7 @@ export function useTripProgress({
     locationLoading,
     requestLocation,
     hasReliableGps,
-    inferredOnTrain,
+    isOnTrain,
     vehiclePosition,
     progressHint,
     activeProgressSource,

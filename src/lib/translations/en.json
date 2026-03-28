@@ -110,7 +110,9 @@
   },
   "ferry": {
     "arrives": "arrives",
+    "arrived": "arrived",
     "departs": "departs",
+    "departed": "departed",
     "minTransfer": "min transfer",
     "inbound": "Inbound",
     "outbound": "Outbound"

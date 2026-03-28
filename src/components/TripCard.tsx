@@ -92,6 +92,8 @@ export const TripCard = memo(function TripCard({
       ? stateText["delayed"]
       : isNextTrip
       ? stateText["ontime"]
+      : isPastTrip
+      ? stateText["past"]
       : undefined;
 
   const handleCardClick = useCallback(() => {
@@ -201,7 +203,7 @@ export const TripCard = memo(function TripCard({
                   className={getTimeToneClass(hasLiveDepartureTime)}
                 />
               </div>
-              <span className="text-muted-foreground">→</span>
+              <span className={cardState === "future" ? "text-muted-foreground" : stateText[cardState]}>→</span>
               <div className="flex flex-col">
                 <TimeDisplay
                   time={arrivalTime}
@@ -234,6 +236,7 @@ export const TripCard = memo(function TripCard({
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
                 timeFormat={timeFormat}
+                currentTime={currentTime}
                 isMobile
               />
             )}
@@ -243,6 +246,7 @@ export const TripCard = memo(function TripCard({
                   ferry={trip.inboundFerry}
                   trainDepartureTime={departureTime}
                   timeFormat={timeFormat}
+                  currentTime={currentTime}
                   isMobile
                   inbound
                 />
@@ -269,7 +273,7 @@ export const TripCard = memo(function TripCard({
                   />
                 )}
               </div>
-              <span className="text-muted-foreground">→</span>
+              <span className={cardState === "future" ? "text-muted-foreground" : stateText[cardState]}>→</span>
               <div className="flex flex-col">
                 <TimeDisplay
                   time={arrivalTime}
@@ -286,11 +290,17 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
+            {isNextTrip && !isCanceledOrSkipped && !isDelayed && (
+              <span className="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap bg-primary text-primary-foreground">
+                {t("tripCard.nextTrain")}
+              </span>
+            )}
             {showFerry && trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
                 timeFormat={timeFormat}
+                currentTime={currentTime}
               />
             )}
             {trip.inboundFerry &&
@@ -299,6 +309,7 @@ export const TripCard = memo(function TripCard({
                   ferry={trip.inboundFerry}
                   trainDepartureTime={departureTime}
                   timeFormat={timeFormat}
+                  currentTime={currentTime}
                   inbound
                 />
               )}

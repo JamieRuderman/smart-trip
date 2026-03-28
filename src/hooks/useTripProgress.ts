@@ -188,10 +188,17 @@ export function useTripProgress({
           useGpsForProgress,
         });
 
+  // Prefer train GPS position for distance-to-next-stop; fall back to phone GPS.
   const distanceToNextStopMi =
-    nextStop != null && lat != null && lng != null
-      ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
-      : null;
+    nextStop != null && vehiclePosition != null
+      ? getDistanceToStationKm(
+          vehiclePosition.position.latitude,
+          vehiclePosition.position.longitude,
+          nextStop,
+        ) * 0.621371
+      : nextStop != null && lat != null && lng != null
+        ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
+        : null;
 
   const distanceToTrainMi =
     lat != null && lng != null && vehiclePosition != null

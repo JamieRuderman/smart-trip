@@ -1,7 +1,7 @@
 {
   "name": "smart-train-trip",
   "description": "A modern, responsive web application for viewing SMART train schedules and ferry connections",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "type": "module",
   "keywords": [

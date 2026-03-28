@@ -66,7 +66,8 @@ npm run dev
 If you use `npm run dev`, real-time endpoints only work when either:
 
 - `USE_SAMPLE_DATA=true` is set in `.env.local`, or
-- a local API target is running at `http://localhost:3000`
+- a local API target is running at `http://localhost:3000`, or
+- `DEV_API_PROXY_TARGET` in `.env.local` points `/api` at another backend such as a feature-branch deployment
 
 Default local URL:
 
@@ -78,7 +79,8 @@ Default local URL:
 | --- | --- | --- |
 | `TRANSIT_511_API_KEY` | `.env.local` or Vercel env | 511.org API key for static and realtime feeds |
 | `USE_SAMPLE_DATA` | `.env.local` | Serve fixtures from `sample/` instead of the live API |
-| `VITE_API_BASE_URL` | `.env.native` | Absolute API base URL for native builds |
+| `DEV_API_PROXY_TARGET` | `.env.local` | Dev-only `/api` proxy target for `npm run dev`; defaults to `http://localhost:3000` |
+| `VITE_API_BASE_URL` | `.env.native` or `.env.native.local` | Absolute API base URL for native builds |
 
 For production on Vercel, keep `TRANSIT_511_API_KEY` server-side only.
 
@@ -119,6 +121,8 @@ Trip updates are matched against static schedule entries by scheduled origin dep
 ## Mobile Development
 
 Native builds use Capacitor and read `VITE_API_BASE_URL` from `.env.native` so app requests go to a deployed API base instead of relative web paths.
+
+Use `.env.native.local` for developer- or branch-specific overrides such as a PR deployment URL. That file is already ignored by Git.
 
 Typical flow:
 

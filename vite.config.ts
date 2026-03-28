@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
   // Load all env vars (not just VITE_* prefixed) so we can read USE_SAMPLE_DATA
   const env = loadEnv(mode, process.cwd(), "");
   const useSampleData = env.USE_SAMPLE_DATA === "true";
+  const devApiProxyTarget = env.DEV_API_PROXY_TARGET?.trim() || "http://localhost:3000";
 
   return {
     server: {
@@ -19,7 +20,7 @@ export default defineConfig(({ mode }) => {
       // When not using sample data, proxy /api to a local vercel dev instance
       proxy:
         mode === "development" && !useSampleData
-          ? { "/api": "http://localhost:3000" }
+          ? { "/api": devApiProxyTarget }
           : undefined,
     },
     plugins: [

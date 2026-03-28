@@ -1,6 +1,7 @@
 import type { Station, StationZone } from "@/types/smartSchedule";
 
-// Lat/lng coordinates for each SMART station (from SMART GTFS stops.txt)
+// Lat/lng coordinates for each SMART station, manually validated against Google Maps.
+// These intentionally differ from raw 511.org GTFS stops.txt coordinates where those were inaccurate.
 export const STATION_COORDINATES: Record<Station, { lat: number; lng: number }> = {
   "Windsor": { lat: 38.5477, lng: -122.8125 },
   "Sonoma County Airport": { lat: 38.5044, lng: -122.7426 },

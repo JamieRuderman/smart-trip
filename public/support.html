@@ -36,7 +36,7 @@
           Your <strong>device model</strong> (for example, iPhone 15, Pixel 9, or iPad Air)
         </li>
         <li>Your <strong>OS or browser version</strong></li>
-        <li>The <strong>app version</strong> (for example, 1.2.1)</li>
+        <li>The <strong>app version</strong> (for example, 1.3.1)</li>
         <li>The <strong>route</strong> you searched (from -&gt; to)</li>
         <li>Approximate <strong>time</strong> the problem occurred</li>
         <li>A short description and <strong>screenshot</strong> (if available)</li>
@@ -54,6 +54,15 @@
           <strong>Trip detail sheets</strong> with countdowns, stop timelines,
           and GPS-assisted distance and progress messaging when location access
           is available
+        </li>
+        <li>
+          <strong>Live train GPS tracking</strong>: see your train's real-time
+          position and distance to the next stop, powered by GTFS-RT vehicle
+          positions
+        </li>
+        <li>
+          <strong>In-progress trips</strong>: trips that have departed but not
+          yet arrived appear in the schedule with past-trip styling
         </li>
         <li>
           <strong>In-app service alerts</strong> with an unread badge and
@@ -122,10 +131,11 @@
 
       <h3>Why does the trip detail sheet show different progress or distance messaging?</h3>
       <p>
-        When location access is available and the GPS fix is recent and close to
-        the selected route, the trip detail sheet can use that signal to improve
-        stop targeting and arrival messaging. Without a reliable fix, it falls
-        back to schedule and realtime feed data.
+        The trip detail sheet prefers the train's own GPS position (from the
+        GTFS-RT vehicle positions feed) to show distance to the next stop. When
+        train GPS is unavailable, it falls back to your phone's location if
+        permission is granted and the fix is recent. Without either signal, it
+        falls back to schedule and realtime feed data.
       </p>
 
       <h3>I got an alert badge. Where do I read it?</h3>
@@ -146,7 +156,7 @@
       <p>SMART trip is an open-source, community-built app for SMART riders.</p>
       <p><strong>Not affiliated with Sonoma-Marin Area Rail Transit (SMART).</strong></p>
 
-      <p class="meta">Last updated: March 13, 2026</p>
+      <p class="meta">Last updated: March 27, 2026</p>
     </main>
   </body>
 </html>

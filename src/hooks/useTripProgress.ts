@@ -41,6 +41,7 @@ export interface TripProgressResult {
   // Distance
   nextStop: Station | null;
   distanceToNextStopMi: number | null;
+  phoneDistanceToNextStopMi: number | null;
   distanceToTrainMi: number | null;
 
   // Remaining trip stats
@@ -200,6 +201,12 @@ export function useTripProgress({
         ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
         : null;
 
+  // Phone GPS distance to next stop (always uses phone coordinates).
+  const phoneDistanceToNextStopMi =
+    nextStop != null && lat != null && lng != null
+      ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
+      : null;
+
   const distanceToTrainMi =
     lat != null && lng != null && vehiclePosition != null
       ? haversineKm(
@@ -250,6 +257,7 @@ export function useTripProgress({
     headerBg,
     nextStop,
     distanceToNextStopMi,
+    phoneDistanceToNextStopMi,
     distanceToTrainMi,
     remainingStops,
     minutesUntilArrival,

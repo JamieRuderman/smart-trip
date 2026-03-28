@@ -22,6 +22,7 @@ import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useAlarmStatus } from "@/hooks/useAlarmStatus";
 import { useTripStatus } from "@/hooks/useTripStatus";
+import { useNow } from "@/hooks/useNow";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
@@ -65,6 +66,7 @@ export function TripDetailContent({
 }: TripDetailContentProps) {
   const { t } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const nowSec = useNow(1000, showDebugPanel);
   const { preferences } = useUserPreferences();
 
   const {
@@ -73,6 +75,7 @@ export function TripDetailContent({
     minutesAfterArrival,
     nextStop,
     distanceToNextStopMi,
+    phoneDistanceToNextStopMi,
     lat,
     lng,
     locationLoading,
@@ -401,13 +404,10 @@ export function TripDetailContent({
                         </>
                       )}
                       {distanceToTrainMi != null && (
-                        <> · train {distanceToTrainMi.toFixed(1)} mi away</>
+                        <> · {distanceToTrainMi.toFixed(1)} mi from phone</>
                       )}
                       {" · "}age{" "}
-                      {Math.round(
-                        Date.now() / 1000 - vehiclePosition.timestamp,
-                      )}
-                      s
+                      {nowSec - Math.floor(vehiclePosition.timestamp)}s
                     </p>
                   ) : (
                     <p className="text-muted-foreground">No match</p>
@@ -431,6 +431,9 @@ export function TripDetailContent({
                   {hasReliableGps ? (
                     <p className="text-muted-foreground">
                       {nextStop ? `Nearest: ${nextStop}` : "—"}
+                      {phoneDistanceToNextStopMi != null && (
+                        <> · {phoneDistanceToNextStopMi.toFixed(1)} mi</>
+                      )}
                       {isOnTrain && <> · on train</>}
                     </p>
                   ) : (

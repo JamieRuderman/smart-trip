@@ -131,9 +131,9 @@
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
   },
   "tracker": {
-    "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
-    "departsInMinutes": "Sale en {{minutes}} min",
-    "nowBoarding": "Abordando ahora",
+    "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Llega en {{minutes}} min",
+    "nowBoarding": "Saliendo",
     "departedMinutesAgo": "Salió hace {{minutes}} min",
     "scheduled": "Programado",
     "ended": "Terminado",
@@ -154,10 +154,10 @@
     "distanceMiToStop": "{{distance}} mi a {{stop}}",
     "atStop": "En {{stop}}",
     "tripLabel": "Tren",
-    "arrivesInMinutes": "Llega en {{minutes}} min",
-    "arrivesInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
+    "arrivesInMinutes": "{{minutes}} min al destino",
+    "arrivesInHoursMinutes": "{{hours}}h {{minutes}}m al destino",
     "arrivingNow": "Llegando ahora",
-    "leavingSoon": "Saliendo pronto",
+    "leavingSoon": "En la estación",
     "arrivingSoon": "Llegando pronto",
     "onTheWay": "En camino",
     "atDestination": "En destino"

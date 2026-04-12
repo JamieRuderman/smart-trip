@@ -154,7 +154,10 @@ function deriveServiceTypes(
   referenceDate?: Date
 ): Map<string, ScheduleType> {
   const ref = referenceDate ?? new Date();
-  const refDateStr = ref.toISOString().slice(0, 10).replace(/-/g, "");
+  const y = ref.getFullYear();
+  const m = String(ref.getMonth() + 1).padStart(2, "0");
+  const d = String(ref.getDate()).padStart(2, "0");
+  const refDateStr = `${y}${m}${d}`;
 
   const addedServices = new Set<string>();
   const removedServices = new Set<string>();

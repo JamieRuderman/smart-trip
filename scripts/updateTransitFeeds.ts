@@ -148,10 +148,35 @@ function toTimeString(raw: string): string {
   return `${adjustedHours.toString().padStart(2, "0")}:${minutes.padStart(2, "0")}`;
 }
 
-function deriveServiceTypes(calendarRows: CsvRow[]): Map<string, ScheduleType> {
+function deriveServiceTypes(
+  calendarRows: CsvRow[],
+  calendarDateRows: CsvRow[],
+  referenceDate?: Date
+): Map<string, ScheduleType> {
+  const ref = referenceDate ?? new Date();
+  const refDateStr = ref.toISOString().slice(0, 10).replace(/-/g, "");
+
+  const addedServices = new Set<string>();
+  const removedServices = new Set<string>();
+  for (const row of calendarDateRows) {
+    if (row.date === refDateStr) {
+      if (row.exception_type === "1") addedServices.add(row.service_id);
+      if (row.exception_type === "2") removedServices.add(row.service_id);
+    }
+  }
+
   const serviceTypes = new Map<string, ScheduleType>();
 
   for (const row of calendarRows) {
+    const startDate = row.start_date ?? "";
+    const endDate = row.end_date ?? "";
+
+    const inRange = startDate <= refDateStr && refDateStr <= endDate;
+    const isActive =
+      (inRange && !removedServices.has(row.service_id)) ||
+      addedServices.has(row.service_id);
+    if (!isActive) continue;
+
     const weekdayActive = ["monday", "tuesday", "wednesday", "thursday", "friday"].some(
       (day) => row[day] === "1"
     );
@@ -204,7 +229,7 @@ function buildStopIdToStationMap(stops: CsvRow[]): Map<string, string> {
 }
 
 function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
-  const serviceTypes = deriveServiceTypes(gtfs.calendar);
+  const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
   const stopToStation = buildStopIdToStationMap(gtfs.stops);
 
   const stopTimesByTrip = new Map<string, CsvRow[]>();
@@ -301,7 +326,7 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
 }
 
 function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
-  const serviceTypes = deriveServiceTypes(gtfs.calendar);
+  const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
 
   const stopRoleMap = new Map<string, "larkspur" | "sf">();
 

@@ -1,9 +1,67 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
 import { isWeekend, createMinuteInterval } from "@/lib/utils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
+import { APP_CONSTANTS } from "@/lib/fareConstants";
+
+// --- Native state persistence ---
+
+interface PersistedState {
+  fromStation: Station;
+  toStation: Station;
+  scheduleType: "weekday" | "weekend";
+  tripNumber: number | null;
+  savedAt: number;
+}
+
+const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function loadPersistedState(): PersistedState | null {
+  try {
+    const raw = localStorage.getItem(APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: PersistedState = JSON.parse(raw);
+    if (!parsed.fromStation || !parsed.toStation || !parsed.savedAt) {
+      localStorage.removeItem(APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY);
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > EXPIRY_MS) {
+      localStorage.removeItem(APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedState(
+  fromStation: Station,
+  toStation: Station,
+  scheduleType: "weekday" | "weekend",
+  tripNumber: number | null
+): void {
+  try {
+    const data: PersistedState = {
+      fromStation,
+      toStation,
+      scheduleType,
+      tripNumber,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(
+      APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY,
+      JSON.stringify(data)
+    );
+  } catch {
+    // localStorage may be unavailable (private browsing, quota exceeded).
+  }
+}
+
+// --- State hook ---
 
 export interface TrainScheduleState {
   fromStation: Station | "";
@@ -37,16 +95,33 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
   // Track whether we entered via a shared link so setSelectedTrip knows to revert.
   const isSharedLinkRef = useRef(isSharedLink);
 
-  const [state, setState] = useState<TrainScheduleState>({
-    fromStation: (searchParams.get("from") as Station) ?? "",
-    toStation: (searchParams.get("to") as Station) ?? "",
-    // Shared-link mode: use the URL type. Normal mode: always auto-detect from today.
-    scheduleType: isSharedLink && urlType ? urlType : todayScheduleType(),
-    // Expand all trips when deep-linking to a specific trip so it's always visible,
-    // even if it's an en-route trip that would otherwise be hidden above the fold.
-    showAllTrips: !isNaN(urlTripNumber),
-    currentTime: debugCurrentTime ?? new Date(),
-    selectedTripNumber: !isNaN(urlTripNumber) ? urlTripNumber : null,
+  const [state, setState] = useState<TrainScheduleState>(() => {
+    // Restore persisted state on native when no URL overrides are present.
+    const persisted = Capacitor.isNativePlatform()
+      ? loadPersistedState()
+      : null;
+
+    return {
+      fromStation:
+        (searchParams.get("from") as Station) ||
+        (persisted ? persisted.fromStation : ""),
+      toStation:
+        (searchParams.get("to") as Station) ||
+        (persisted ? persisted.toStation : ""),
+      scheduleType:
+        isSharedLink && urlType
+          ? urlType
+          : persisted
+            ? persisted.scheduleType
+            : todayScheduleType(),
+      showAllTrips: false,
+      currentTime: debugCurrentTime ?? new Date(),
+      selectedTripNumber: !isNaN(urlTripNumber)
+        ? urlTripNumber
+        : persisted
+          ? persisted.tripNumber
+          : null,
+    };
   });
 
   // Sync state → URL whenever stations or selected trip change.
@@ -67,6 +142,24 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     }
     setSearchParams(params, { replace: true });
   }, [state.fromStation, state.toStation, state.selectedTripNumber, state.scheduleType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist state to localStorage on native so it survives app restarts (24h expiry).
+  const isInitialRender = useRef(true);
+  useEffect(() => {
+    // Skip the initial render — we just loaded from persistence, no need to write back.
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    if (!Capacitor.isNativePlatform() || !state.fromStation || !state.toStation)
+      return;
+    savePersistedState(
+      state.fromStation,
+      state.toStation,
+      state.scheduleType,
+      state.selectedTripNumber
+    );
+  }, [state.fromStation, state.toStation, state.scheduleType, state.selectedTripNumber]);
 
   // Update current time every minute
   useEffect(() => {
@@ -122,10 +215,13 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
       // scheduleType to today's auto-detected value.
       const exitingSharedLink = tripNumber === null && isSharedLinkRef.current;
       if (exitingSharedLink) isSharedLinkRef.current = false;
+
       return {
         ...prev,
         selectedTripNumber: tripNumber,
-        scheduleType: exitingSharedLink ? todayScheduleType() : prev.scheduleType,
+        scheduleType: exitingSharedLink
+          ? todayScheduleType()
+          : prev.scheduleType,
       };
     });
   }, []);

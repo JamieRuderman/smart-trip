@@ -68,4 +68,5 @@ export const APP_CONSTANTS = {
   PREFERENCES_STORAGE_KEY: "smart-train-preferences",
   THEME_STORAGE_KEY: "vite-ui-theme",
   LANGUAGE_STORAGE_KEY: "smart-train-language",
+  ACTIVE_TRIP_STORAGE_KEY: "smart-train-active-trip",
 } as const;

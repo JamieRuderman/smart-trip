@@ -117,7 +117,7 @@ export function StationSelector({
   };
 
   return (
-    <div className="flex items-center gap-4 mb-2">
+    <div className="flex items-center gap-3 mb-2">
       {/* Visual Indicators */}
       <div className="flex flex-col items-center">
         <MapPin className="h-5 w-5 text-primary fill" />
@@ -141,7 +141,10 @@ export function StationSelector({
               <SelectValue placeholder={t("header.yourLocation")} />
             )}
           </SelectTrigger>
-          <SelectContent role="listbox" aria-label={t("header.availableStations")}>
+          <SelectContent
+            role="listbox"
+            aria-label={t("header.availableStations")}
+          >
             {stations.map((station) => (
               <StationSelectItem
                 key={station}
@@ -154,16 +157,34 @@ export function StationSelector({
                   station === toStation ? (
                     stations.indexOf(toStation as Station) >
                     stations.indexOf(fromStation as Station) ? (
-                      <CornerDownRight className="mt-1 ml-1 h-3 w-3 flex-shrink-0" style={{ strokeWidth: 3 }} />
+                      <CornerDownRight
+                        className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
+                        style={{ strokeWidth: 3 }}
+                      />
                     ) : (
-                      <CornerUpRight className="mt-2 ml-1 h-3 w-3 flex-shrink-0" style={{ strokeWidth: 3 }} />
+                      <CornerUpRight
+                        className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
+                        style={{ strokeWidth: 3 }}
+                      />
                     )
                   ) : undefined
                 }
                 badge={
                   <>
-                    {station === toStation && <PillBadge label={t("header.endStation")} color="ontime" className="ml-2" />}
-                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="ontime" className="ml-2" />}
+                    {station === toStation && (
+                      <PillBadge
+                        label={t("header.endStation")}
+                        color="ontime"
+                        className="ml-2"
+                      />
+                    )}
+                    {station === closestStation && (
+                      <PillBadge
+                        label={t("header.nearYou")}
+                        color="ontime"
+                        className="ml-2"
+                      />
+                    )}
                   </>
                 }
               />
@@ -182,7 +203,10 @@ export function StationSelector({
               <SelectValue placeholder={t("header.destination")} />
             )}
           </SelectTrigger>
-          <SelectContent role="listbox" aria-label={t("header.availableStations")}>
+          <SelectContent
+            role="listbox"
+            aria-label={t("header.availableStations")}
+          >
             {stations.map((station) => (
               <StationSelectItem
                 key={station}
@@ -198,8 +222,20 @@ export function StationSelector({
                 }
                 badge={
                   <>
-                    {station === fromStation && <PillBadge label={t("header.startStation")} color="ontime" className="ml-2" />}
-                    {station === closestStation && <PillBadge label={t("header.nearYou")} color="ontime" className="ml-2" />}
+                    {station === fromStation && (
+                      <PillBadge
+                        label={t("header.startStation")}
+                        color="ontime"
+                        className="ml-2"
+                      />
+                    )}
+                    {station === closestStation && (
+                      <PillBadge
+                        label={t("header.nearYou")}
+                        color="ontime"
+                        className="ml-2"
+                      />
+                    )}
                   </>
                 }
               />

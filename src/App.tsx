@@ -10,6 +10,7 @@ import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
+import Map from "./pages/Map";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -39,6 +40,7 @@ const App = () => {
               <ErrorBoundary>
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/map" element={<Map />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -1,20 +1,18 @@
 import { STATION_COORDINATES } from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import stations from "@/data/stations";
+import { SMART_RAIL_COORDINATES } from "@/data/generated/railGeometry.generated";
 
 /** Station order from north (Windsor) to south (Larkspur) */
 export const STATION_ORDER: Station[] = stations;
 
-/** Route line as GeoJSON connecting all stations north→south */
+/** Route line as GeoJSON following the actual SMART rail corridor (from Sonoma County GIS). */
 export const ROUTE_GEOJSON: GeoJSON.Feature<GeoJSON.LineString> = {
   type: "Feature",
   properties: {},
   geometry: {
     type: "LineString",
-    coordinates: STATION_ORDER.map((s) => [
-      STATION_COORDINATES[s].lng,
-      STATION_COORDINATES[s].lat,
-    ]),
+    coordinates: SMART_RAIL_COORDINATES,
   },
 };
 

@@ -19,3 +19,6 @@ export const apiBaseUrl =
 export const scheduleUrl =
   readOptionalEnvString(import.meta.env.VITE_SCHEDULE_URL) ??
   `${apiBaseUrl}${DEFAULT_SCHEDULE_URL}`;
+
+export const mapboxToken =
+  readOptionalEnvString(import.meta.env.VITE_MAPBOX_TOKEN) ?? "";

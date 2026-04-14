@@ -169,12 +169,6 @@ function buildPopupHtml(train: MapTrain): string {
     ? `<div style="font-size:12px;color:#444;margin-top:3px">Next: <strong>${train.nextStation}</strong></div>`
     : "";
 
-  // Build the trip query param for the link
-  const tripParam = encodeURIComponent(
-    JSON.stringify({ tripId: train.tripLabel, startTime: train.startTime })
-  );
-  const href = `/?trip=${tripParam}`;
-
   return `
     <div style="min-width:160px;padding:4px 2px">
       <div style="font-weight:700;font-size:13px;margin-bottom:5px">Train ${train.tripLabel ?? train.vehicleId}</div>
@@ -185,7 +179,7 @@ function buildPopupHtml(train: MapTrain): string {
       ${speedHtml}
       ${nextStopHtml}
       <div style="margin-top:8px">
-        <a href="${href}" style="font-size:12px;color:#11ab75;font-weight:600;text-decoration:none">View Trip Details →</a>
+        <a href="/" style="font-size:12px;color:#11ab75;font-weight:600;text-decoration:none">View Schedule →</a>
       </div>
     </div>
   `;
@@ -202,6 +196,26 @@ export default function Map() {
     autoRequestOnNative: true,
     autoRequestOnWeb: true,
   });
+
+  // Guard: if no Mapbox token, show a helpful message instead of crashing
+  if (!mapboxToken) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-sm space-y-4">
+          <h2 className="text-lg font-semibold">Mapbox Token Required</h2>
+          <p className="text-sm text-muted-foreground">
+            Add your Mapbox public token to <code className="text-xs bg-muted px-1 py-0.5 rounded">.env.local</code> as <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_MAPBOX_TOKEN</code> and restart the dev server.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="text-sm font-medium text-smart-train-green"
+          >
+            ← Back to schedule
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -349,18 +363,20 @@ export default function Map() {
       }
 
       const el = createTrainElement(train);
-      const popup = new mapboxgl.Popup({ offset: 16, closeButton: true, maxWidth: "240px" }).setHTML(
-        buildPopupHtml(train)
-      );
+      const popup = new mapboxgl.Popup({ offset: 16, closeButton: true, maxWidth: "240px" })
+        .setHTML(buildPopupHtml(train));
 
-      el.addEventListener("click", () => {
-        popupRef.current?.remove();
+      // Close any other open popup when this one opens
+      popup.on("open", () => {
+        if (popupRef.current && popupRef.current !== popup) {
+          popupRef.current.remove();
+        }
         popupRef.current = popup;
-        popup.addTo(map);
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([train.longitude, train.latitude])
+        .setPopup(popup)
         .addTo(map);
 
       trainMarkersRef.current.set(train.key, marker);

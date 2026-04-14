@@ -16,6 +16,7 @@ import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
 import { NoTripsFound } from "./NoTripsFound";
+import { MapPreviewCard } from "./MapPreviewCard";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
@@ -151,6 +152,9 @@ export function TrainScheduleApp() {
         {fromStation && toStation && filteredTrips.length === 0 && (
           <NoTripsFound />
         )}
+
+        {/* Live Train Map */}
+        <MapPreviewCard />
 
         {/* Fare Section */}
         {fromStation && toStation && (

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ChevronLeft } from "lucide-react";
@@ -17,6 +17,27 @@ import { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+/** Hex colors mirroring the smart-train-green / smart-gold Tailwind tokens.
+ *  Needed because Mapbox marker elements are built with raw inline styles. */
+const MARKER_COLOR = {
+  ontime: "#11ab75",
+  delayed: "#E48E25",
+  canceled: "#888",
+  userLocation: "#4285f4",
+} as const;
+
+/** Minimum delay (minutes) to flip a marker from ontime → delayed. */
+const DELAY_MINUTES_THRESHOLD = 3;
+
+/** Fallback bearings (degrees from north) used when GTFS-RT omits the vehicle
+ *  bearing. Chosen to roughly follow the SMART rail corridor so the arrow
+ *  points along the tracks even without real-time heading data. */
+const NORTHBOUND_FALLBACK_BEARING = 340;
+const SOUTHBOUND_FALLBACK_BEARING = 160;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,11 +51,6 @@ function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
     ? "dark"
     : "light";
 }
-
-// ─── SVG path for TripIcon ────────────────────────────────────────────────────
-
-const TRIP_ICON_PATH =
-  "M185.985 327.015H162.647M326.015 327.015H349.353M162.647 420.368L115.97 490.383M349.353 420.368L396.03 490.383M69.2939 239.496V303.677C69.2939 369.024 120.638 420.368 185.985 420.368H326.015C391.362 420.368 442.706 369.024 442.706 303.677V239.496M69.2939 239.496V210.324C69.2939 160.806 88.9647 113.317 123.979 78.3024C135.618 66.6635 148.635 56.72 162.647 48.6308M69.2939 239.496H162.647M442.706 239.496V210.324C442.706 160.806 423.035 113.317 388.021 78.3024C376.382 66.6635 363.365 56.72 349.353 48.6308M442.706 239.496H349.353M162.647 239.496V48.6308M162.647 239.496H349.353M162.647 48.6308C190.789 32.3844 222.942 23.6174 256 23.6174C289.058 23.6174 321.212 32.3844 349.353 48.6308M349.353 239.496V48.6308";
 
 // ─── marker element factories ─────────────────────────────────────────────────
 
@@ -53,7 +69,7 @@ function createStationElement(): HTMLElement {
     "height:9px",
     "border-radius:50%",
     "background:var(--station-dot-bg,white)",
-    "border:2px solid #11ab75",
+    `border:2px solid ${MARKER_COLOR.ontime}`,
     "flex-shrink:0",
   ].join(";");
 
@@ -78,10 +94,26 @@ function createTrainElement(train: MapTrain): HTMLElement {
   const isDelayed =
     !train.isCanceled &&
     train.delayMinutes !== null &&
-    train.delayMinutes >= 3;
-  const isCanceled = train.isCanceled;
-  const bgColor = isCanceled ? "#888" : isDelayed ? "#E48E25" : "#11ab75";
+    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const bgColor = train.isCanceled
+    ? MARKER_COLOR.canceled
+    : isDelayed
+      ? MARKER_COLOR.delayed
+      : MARKER_COLOR.ontime;
 
+  // Prefer the GTFS-RT bearing (degrees clockwise from north) when available;
+  // fall back to a corridor-aligned angle so the arrow points along the tracks.
+  const bearing =
+    train.bearing != null
+      ? train.bearing
+      : train.directionId === 1
+        ? NORTHBOUND_FALLBACK_BEARING
+        : SOUTHBOUND_FALLBACK_BEARING;
+
+  // Flex column with invisible spacers top and bottom keeps the element's
+  // layout size at 30×44 so Mapbox anchor:center lands exactly on the circle
+  // center (15, 22). This matches the original working layout. The rotating
+  // arrow is an absolute overlay that doesn't affect layout dimensions.
   const wrapper = document.createElement("div");
   wrapper.style.cssText = [
     "display:flex",
@@ -89,19 +121,11 @@ function createTrainElement(train: MapTrain): HTMLElement {
     "align-items:center",
     "gap:0",
     "cursor:pointer",
+    "position:relative",
   ].join(";");
 
-  // direction indicator above
-  const arrowAbove = document.createElement("div");
-  arrowAbove.style.cssText = [
-    "width:0",
-    "height:0",
-    "border-left:5px solid transparent",
-    "border-right:5px solid transparent",
-    `border-bottom:7px solid ${bgColor}`,
-    "visibility:" +
-      (train.directionId === 1 ? "visible" : "hidden"),
-  ].join(";");
+  const spacerTop = document.createElement("div");
+  spacerTop.style.cssText = "width:10px;height:7px;";
 
   const circle = document.createElement("div");
   circle.style.cssText = [
@@ -114,26 +138,45 @@ function createTrainElement(train: MapTrain): HTMLElement {
     "align-items:center",
     "justify-content:center",
     "box-shadow:0 2px 6px rgba(0,0,0,0.3)",
+    "box-sizing:border-box",
   ].join(";");
-
   circle.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="${TRIP_ICON_PATH}"/></svg>`;
 
-  // direction indicator below
-  const arrowBelow = document.createElement("div");
-  arrowBelow.style.cssText = [
+  const spacerBottom = document.createElement("div");
+  spacerBottom.style.cssText = "width:10px;height:7px;";
+
+  // Rotating arrow overlay. Absolute-positioned so it doesn't contribute to
+  // the wrapper's layout box. transform-origin defaults to the center of the
+  // overlay (= wrapper center), so the arrow orbits the circle.
+  const arrowLayer = document.createElement("div");
+  arrowLayer.style.cssText = [
+    "position:absolute",
+    "top:0",
+    "left:0",
+    "width:100%",
+    "height:100%",
+    `transform:rotate(${bearing}deg)`,
+    "pointer-events:none",
+  ].join(";");
+
+  const arrow = document.createElement("div");
+  arrow.style.cssText = [
+    "position:absolute",
+    "top:0",
+    "left:50%",
+    "margin-left:-5px",
     "width:0",
     "height:0",
     "border-left:5px solid transparent",
     "border-right:5px solid transparent",
-    `border-top:7px solid ${bgColor}`,
-    "visibility:" +
-      (train.directionId === 0 ? "visible" : "hidden"),
+    `border-bottom:7px solid ${bgColor}`,
   ].join(";");
+  arrowLayer.appendChild(arrow);
 
-  wrapper.appendChild(arrowAbove);
+  wrapper.appendChild(spacerTop);
   wrapper.appendChild(circle);
-  wrapper.appendChild(arrowBelow);
-
+  wrapper.appendChild(spacerBottom);
+  wrapper.appendChild(arrowLayer);
   return wrapper;
 }
 
@@ -141,17 +184,16 @@ function buildPopupHtml(train: MapTrain): string {
   const isDelayed =
     !train.isCanceled &&
     train.delayMinutes !== null &&
-    train.delayMinutes >= 3;
-  const isCanceled = train.isCanceled;
+    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
 
-  let statusHtml: string;
-  if (isCanceled) {
-    statusHtml = `<span style="background:#888;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">Canceled</span>`;
-  } else if (isDelayed) {
-    statusHtml = `<span style="background:#E48E25;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">${train.delayMinutes}m late</span>`;
-  } else {
-    statusHtml = `<span style="background:#11ab75;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">On time</span>`;
-  }
+  const pill = (bg: string, text: string) =>
+    `<span style="background:${bg};color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">${text}</span>`;
+
+  const statusHtml = train.isCanceled
+    ? pill(MARKER_COLOR.canceled, "Canceled")
+    : isDelayed
+      ? pill(MARKER_COLOR.delayed, `${train.delayMinutes}m late`)
+      : pill(MARKER_COLOR.ontime, "On time");
 
   const directionLabel =
     train.directionId === 1
@@ -179,7 +221,7 @@ function buildPopupHtml(train: MapTrain): string {
       ${speedHtml}
       ${nextStopHtml}
       <div style="margin-top:8px">
-        <a href="/" style="font-size:12px;color:#11ab75;font-weight:600;text-decoration:none">View Schedule →</a>
+        <a href="/" style="font-size:12px;color:${MARKER_COLOR.ontime};font-weight:600;text-decoration:none">View Schedule →</a>
       </div>
     </div>
   `;
@@ -189,8 +231,19 @@ function buildPopupHtml(train: MapTrain): string {
 
 export default function Map() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const backToSchedule = () => {
+    // Prefer history back so we return to the exact URL we came from
+    // (preserving query params and scroll). Fall back to a direct navigate
+    // when the map was opened via a direct link (no prior history entry).
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate({ pathname: "/", search: location.search });
+    }
+  };
   const { theme } = useTheme();
-  const { trains, lastUpdated: _lastUpdated } = useMapTrains();
+  const { trains } = useMapTrains();
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
@@ -207,7 +260,8 @@ export default function Map() {
             Add your Mapbox public token to <code className="text-xs bg-muted px-1 py-0.5 rounded">.env.local</code> as <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_MAPBOX_TOKEN</code> and restart the dev server.
           </p>
           <button
-            onClick={() => navigate("/")}
+            type="button"
+            onClick={backToSchedule}
             className="text-sm font-medium text-smart-train-green"
           >
             ← Back to schedule
@@ -219,19 +273,14 @@ export default function Map() {
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Station markers (created once)
   const stationMarkersRef = useRef<mapboxgl.Marker[]>([]);
-
-  // Train markers keyed by train.key
   const trainMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
     new globalThis.Map()
   );
-
-  // Popup singleton
+  // Singleton — only one popup open at a time.
   const popupRef = useRef<mapboxgl.Popup | null>(null);
-
-  // User-location dot marker
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // ── helper: add route source/layer ─────────────────────────────────────────
@@ -249,7 +298,7 @@ export default function Map() {
         source: "route",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#11ab75",
+          "line-color": MARKER_COLOR.ontime,
           "line-width": 3.5,
           "line-opacity": 0.45,
           "line-dasharray": [2, 1],
@@ -260,7 +309,6 @@ export default function Map() {
 
   // ── helper: add station markers ─────────────────────────────────────────────
   const addStationMarkers = useCallback((map: mapboxgl.Map) => {
-    // Remove existing
     stationMarkersRef.current.forEach((m) => m.remove());
     stationMarkersRef.current = [];
 
@@ -288,6 +336,8 @@ export default function Map() {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: resolved === "dark" ? MAPBOX_STYLE_DARK : MAPBOX_STYLE_LIGHT,
+      bounds: ALL_STATIONS_BOUNDS,
+      fitBoundsOptions: { padding: MAP_FIT_PADDING, animate: false },
       attributionControl: false,
     });
 
@@ -297,9 +347,9 @@ export default function Map() {
     );
 
     map.on("load", () => {
-      map.fitBounds(ALL_STATIONS_BOUNDS, { padding: MAP_FIT_PADDING, animate: false });
       addRouteLayer(map);
       addStationMarkers(map);
+      setMapLoaded(true);
     });
 
     mapRef.current = map;
@@ -322,7 +372,14 @@ export default function Map() {
   }, []);
 
   // ── theme changes → swap style ──────────────────────────────────────────────
+  // Skip first run: the map is already initialized with the correct style.
+  // Only re-run when theme changes after mount.
+  const isFirstThemeRun = useRef(true);
   useEffect(() => {
+    if (isFirstThemeRun.current) {
+      isFirstThemeRun.current = false;
+      return;
+    }
     const map = mapRef.current;
     if (!map) return;
 
@@ -341,7 +398,7 @@ export default function Map() {
   // ── update train markers when trains data changes ───────────────────────────
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
 
     const existingKeys = new Set(trainMarkersRef.current.keys());
     const newKeys = new Set(trains.map((t) => t.key));
@@ -381,7 +438,7 @@ export default function Map() {
 
       trainMarkersRef.current.set(train.key, marker);
     }
-  }, [trains]);
+  }, [trains, mapLoaded]);
 
   // ── user location dot ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -394,7 +451,7 @@ export default function Map() {
         "width:14px",
         "height:14px",
         "border-radius:50%",
-        "background:#4285f4",
+        `background:${MARKER_COLOR.userLocation}`,
         "border:2px solid white",
         "box-shadow:0 0 0 4px rgba(66,133,244,0.25)",
       ].join(";");
@@ -473,7 +530,8 @@ export default function Map() {
 
       {/* Back button – top-left */}
       <button
-        onClick={() => navigate("/")}
+        type="button"
+        onClick={backToSchedule}
         className="absolute left-3 flex items-center gap-1 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
         style={{ top: "calc(12px + var(--safe-area-top))" }}
         aria-label="Back"
@@ -484,13 +542,14 @@ export default function Map() {
 
       {/* Train count pill – top-right */}
       <button
+        type="button"
         onClick={handleFitTrains}
         className="absolute right-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
         style={{ top: "calc(12px + var(--safe-area-top))" }}
         aria-label="Fit trains"
       >
         <span
-          className="inline-block w-2 h-2 rounded-full bg-[#11ab75]"
+          className="inline-block w-2 h-2 rounded-full bg-smart-train-green"
           aria-hidden="true"
         />
         {trains.length} {trains.length === 1 ? "train" : "trains"}

@@ -34,8 +34,7 @@ const MARKER_COLOR = {
 const DELAY_MINUTES_THRESHOLD = 3;
 
 /** Fallback bearings (degrees from north) used when GTFS-RT omits the vehicle
- *  bearing. Chosen to roughly follow the SMART rail corridor so the arrow
- *  points along the tracks even without real-time heading data. */
+ *  bearing. Chosen to roughly follow the SMART rail corridor. */
 const NORTHBOUND_FALLBACK_BEARING = 340;
 const SOUTHBOUND_FALLBACK_BEARING = 160;
 
@@ -101,19 +100,19 @@ function createTrainElement(train: MapTrain): HTMLElement {
       ? MARKER_COLOR.delayed
       : MARKER_COLOR.ontime;
 
-  // Prefer the GTFS-RT bearing (degrees clockwise from north) when available;
-  // fall back to a corridor-aligned angle so the arrow points along the tracks.
-  const bearing =
-    train.bearing != null
-      ? train.bearing
-      : train.directionId === 1
-        ? NORTHBOUND_FALLBACK_BEARING
-        : SOUTHBOUND_FALLBACK_BEARING;
+  // Some feeds send bearing:0 as "unknown" rather than omitting the field;
+  // treat an exact 0 as unset and fall back to a corridor-aligned angle.
+  const hasValidBearing = train.bearing != null && train.bearing !== 0;
+  const bearing = hasValidBearing
+    ? train.bearing!
+    : train.directionId === 1
+      ? NORTHBOUND_FALLBACK_BEARING
+      : SOUTHBOUND_FALLBACK_BEARING;
 
-  // Flex column with invisible spacers top and bottom keeps the element's
-  // layout size at 30×44 so Mapbox anchor:center lands exactly on the circle
-  // center (15, 22). This matches the original working layout. The rotating
-  // arrow is an absolute overlay that doesn't affect layout dimensions.
+  // Outer wrapper preserves the working pattern: flex column with two
+  // invisible border-triangle siblings above/below a square middle. The
+  // structure (not the exact pixel count) is what keeps Mapbox anchor:center
+  // aligned with the disc's center.
   const wrapper = document.createElement("div");
   wrapper.style.cssText = [
     "display:flex",
@@ -121,62 +120,100 @@ function createTrainElement(train: MapTrain): HTMLElement {
     "align-items:center",
     "gap:0",
     "cursor:pointer",
+  ].join(";");
+
+  const spacerAbove = document.createElement("div");
+  spacerAbove.style.cssText = [
+    "width:0",
+    "height:0",
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-bottom:10px solid ${bgColor}`,
+    "visibility:hidden",
+  ].join(";");
+
+  // 46×46 transparent host — defines the layout box Mapbox anchors against.
+  // The disc (30×30 inset) leaves an 8px ring for the direction indicator.
+  const host = document.createElement("div");
+  host.style.cssText = [
+    "width:46px",
+    "height:46px",
     "position:relative",
   ].join(";");
 
-  const spacerTop = document.createElement("div");
-  spacerTop.style.cssText = "width:10px;height:7px;";
-
-  const circle = document.createElement("div");
-  circle.style.cssText = [
+  // Layer 1 (bottom): shadow backdrop. Same size/position as the disc — only
+  // its box-shadow shows, extending outward. Gives the composite its depth.
+  const shadowBackdrop = document.createElement("div");
+  shadowBackdrop.style.cssText = [
+    "position:absolute",
+    "top:8px",
+    "left:8px",
     "width:30px",
     "height:30px",
     "border-radius:50%",
     `background:${bgColor}`,
-    "border:2px solid var(--marker-border,white)",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "box-shadow:0 2px 6px rgba(0,0,0,0.3)",
-    "box-sizing:border-box",
+    "box-shadow:0 3px 8px rgba(0,0,0,0.5)",
   ].join(";");
-  circle.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="${TRIP_ICON_PATH}"/></svg>`;
 
-  const spacerBottom = document.createElement("div");
-  spacerBottom.style.cssText = "width:10px;height:7px;";
-
-  // Rotating arrow overlay. Absolute-positioned so it doesn't contribute to
-  // the wrapper's layout box. transform-origin defaults to the center of the
-  // overlay (= wrapper center), so the arrow orbits the circle.
-  const arrowLayer = document.createElement("div");
-  arrowLayer.style.cssText = [
+  // Layer 2 (middle): rotating indicator. Its drop-shadow follows the
+  // triangle outline so the tick reads as part of the same 3D object.
+  const rotator = document.createElement("div");
+  rotator.style.cssText = [
     "position:absolute",
-    "top:0",
-    "left:0",
-    "width:100%",
-    "height:100%",
+    "inset:0",
     `transform:rotate(${bearing}deg)`,
     "pointer-events:none",
+    "filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
   ].join(";");
-
-  const arrow = document.createElement("div");
-  arrow.style.cssText = [
+  const tick = document.createElement("div");
+  tick.style.cssText = [
     "position:absolute",
     "top:0",
     "left:50%",
-    "margin-left:-5px",
+    "margin-left:-8px",
     "width:0",
     "height:0",
-    "border-left:5px solid transparent",
-    "border-right:5px solid transparent",
-    `border-bottom:7px solid ${bgColor}`,
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-bottom:10px solid ${bgColor}`,
   ].join(";");
-  arrowLayer.appendChild(arrow);
+  rotator.appendChild(tick);
 
-  wrapper.appendChild(spacerTop);
-  wrapper.appendChild(circle);
-  wrapper.appendChild(spacerBottom);
-  wrapper.appendChild(arrowLayer);
+  // Layer 3 (top): the visible disc. No shadow — it covers the shadow
+  // backdrop and the tick's base, leaving only clean edges for the eye.
+  const disc = document.createElement("div");
+  disc.style.cssText = [
+    "position:absolute",
+    "top:8px",
+    "left:8px",
+    "width:30px",
+    "height:30px",
+    "border-radius:50%",
+    `background:${bgColor}`,
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "box-sizing:border-box",
+  ].join(";");
+  disc.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="${TRIP_ICON_PATH}"/></svg>`;
+
+  host.appendChild(shadowBackdrop);
+  host.appendChild(rotator);
+  host.appendChild(disc);
+
+  const spacerBelow = document.createElement("div");
+  spacerBelow.style.cssText = [
+    "width:0",
+    "height:0",
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-top:10px solid ${bgColor}`,
+    "visibility:hidden",
+  ].join(";");
+
+  wrapper.appendChild(spacerAbove);
+  wrapper.appendChild(host);
+  wrapper.appendChild(spacerBelow);
   return wrapper;
 }
 

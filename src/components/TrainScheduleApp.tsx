@@ -49,17 +49,28 @@ export function TrainScheduleApp() {
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
   // Geolocation for closest station
-  const { lat, lng, loading: locationLoading, requestLocation } = useGeolocation({
+  const {
+    lat,
+    lng,
+    loading: locationLoading,
+    requestLocation,
+  } = useGeolocation({
     watch: false,
     autoRequestOnNative: true,
   });
-  const closestStation = lat != null && lng != null ? getClosestStation(lat, lng) : null;
+  const closestStation =
+    lat != null && lng != null ? getClosestStation(lat, lng) : null;
 
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.
   const didAutoSelect = useRef(false);
   useEffect(() => {
-    if (closestStation && !fromStation && !didAutoSelect.current && closestStation !== toStation) {
+    if (
+      closestStation &&
+      !fromStation &&
+      !didAutoSelect.current &&
+      closestStation !== toStation
+    ) {
       didAutoSelect.current = true;
       setFromStation(closestStation);
     }
@@ -71,12 +82,15 @@ export function TrainScheduleApp() {
   // when the location resolves without clobbering the user's own selection otherwise.
   const locationRequestedRef = useRef(false);
 
-  const applyClosestStation = useCallback((station: NonNullable<typeof closestStation>) => {
-    setFromStation(station);
-    if (station === toStation) {
-      setToStation("" as typeof station);
-    }
-  }, [setFromStation, setToStation, toStation]);
+  const applyClosestStation = useCallback(
+    (station: NonNullable<typeof closestStation>) => {
+      setFromStation(station);
+      if (station === toStation) {
+        setToStation("" as typeof station);
+      }
+    },
+    [setFromStation, setToStation, toStation],
+  );
 
   useEffect(() => {
     if (closestStation && locationRequestedRef.current) {
@@ -129,11 +143,14 @@ export function TrainScheduleApp() {
           paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
-        {/* Empty State - No stations selected */}
-        {(!fromStation || !toStation) && <EmptyState />}
+        {/* Live Train Map */}
+        <MapPreviewCard />
 
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
+
+        {/* Empty State - No stations selected */}
+        {(!fromStation || !toStation) && <EmptyState />}
 
         {/* Schedule Results */}
         {filteredTrips.length > 0 && fromStation && toStation && (
@@ -152,9 +169,6 @@ export function TrainScheduleApp() {
         {fromStation && toStation && filteredTrips.length === 0 && (
           <NoTripsFound />
         )}
-
-        {/* Live Train Map */}
-        <MapPreviewCard />
 
         {/* Fare Section */}
         {fromStation && toStation && (

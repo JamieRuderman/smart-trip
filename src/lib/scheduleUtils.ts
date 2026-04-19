@@ -6,6 +6,7 @@ import {
 import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
 import { parseTimeToMinutes, isTimeInPast } from "./timeUtils";
+import { isWeekend } from "./utils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
 import type {
   Station,
@@ -244,6 +245,35 @@ export function getFilteredTrips(
 ): ProcessedTrip[] {
   const key = `${fromStation}-${toStation}-${scheduleType}`;
   return scheduleCache[key] || [];
+}
+
+/**
+ * Look up a full-corridor trip by its GTFS-RT origin startTime and GTFS
+ * directionId (0 = southbound, 1 = northbound). Searches today's active
+ * schedule (weekday or weekend) so weekday/weekend trips that share an
+ * origin time can't collide. Returns the matched ProcessedTrip or null.
+ */
+export function findFullCorridorTrip(
+  directionId: number,
+  startTime: string,
+  tripNumber?: number
+): ProcessedTrip | null {
+  const isSouthbound = directionId === 0;
+  const from = isSouthbound ? stations[0] : stations[stations.length - 1];
+  const to = isSouthbound ? stations[stations.length - 1] : stations[0];
+  const originIndex = isSouthbound ? 0 : stations.length - 1;
+  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const candidates = getFilteredTrips(from, to, scheduleType);
+  if (tripNumber != null) {
+    return (
+      candidates.find(
+        (t) => t.trip === tripNumber && t.times[originIndex] === startTime,
+      ) ??
+      candidates.find((t) => t.trip === tripNumber) ??
+      null
+    );
+  }
+  return candidates.find((t) => t.times[originIndex] === startTime) ?? null;
 }
 
 // Time comparison function is now exported from timeUtils

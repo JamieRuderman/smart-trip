@@ -13,11 +13,11 @@ import {
   Smartphone,
   Train,
 } from "lucide-react";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateFare } from "@/lib/scheduleUtils";
-import { stationIndexMap } from "@/lib/stationUtils";
+import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useAlarmStatus } from "@/hooks/useAlarmStatus";
@@ -154,6 +154,18 @@ export function TripDetailContent({
     : statusLabel ??
       (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
+  const directionLabel = isSouthbound(fromStation, toStation)
+    ? t("tracker.southbound")
+    : t("tracker.northbound");
+
+  // Live speed from the matched vehicle (m/s → mph). Only shown while a
+  // vehicle is actively reporting and moving.
+  const speedMph =
+    vehiclePosition?.position?.speed != null &&
+    vehiclePosition.position.speed > 0
+      ? mpsToMph(vehiclePosition.position.speed)
+      : null;
+
   const alarmStatus = useAlarmStatus({
     tripId: trip.trip,
     minutesUntilDeparture: minutesUntil,
@@ -217,6 +229,8 @@ export function TripDetailContent({
             )}
           >
             {headerStatusLabel ?? "\u00a0"}
+            <span className="text-white/60"> · </span>
+            {directionLabel}
           </p>
           <TimePair
             departure={departureTime}
@@ -281,6 +295,12 @@ export function TripDetailContent({
               <>
                 <span className="mx-1">·</span>
                 <span>${fareInfo.price.toFixed(2)}</span>
+              </>
+            )}
+            {speedMph != null && (
+              <>
+                <span className="mx-1">·</span>
+                <span>{t("tracker.speedMph", { speed: speedMph })}</span>
               </>
             )}
           </span>
@@ -396,11 +416,7 @@ export function TripDetailContent({
                       {vehiclePosition.position.speed != null && (
                         <>
                           {" "}
-                          ·{" "}
-                          {(vehiclePosition.position.speed * 2.237).toFixed(
-                            0,
-                          )}{" "}
-                          mph
+                          · {mpsToMph(vehiclePosition.position.speed)} mph
                         </>
                       )}
                       {distanceToTrainMi != null && (

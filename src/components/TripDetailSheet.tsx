@@ -201,7 +201,7 @@ export function TripDetailSheet({
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-background/40 dark:bg-background/50 backdrop-blur-[8px] transition-opacity",
+          "fixed inset-0 z-40 bg-background/40 dark:bg-background/50 transition-opacity",
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
         style={{ transitionDuration: `${SHEET_TRANSITION_MS}ms` }}

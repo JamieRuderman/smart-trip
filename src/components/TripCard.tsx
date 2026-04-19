@@ -13,9 +13,7 @@ import { stateText, stateCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
-import { SHEET_TRANSITION_MS } from "@/lib/animationConstants";
-
-const SHEET_ENTER_DELAY_MS = 24;
+import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 
 interface TripCardProps {
   trip: ProcessedTrip;

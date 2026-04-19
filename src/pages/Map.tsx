@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ChevronLeft } from "lucide-react";
@@ -13,16 +13,46 @@ import {
   MAPBOX_STYLE_DARK,
   MAP_FIT_PADDING,
 } from "@/lib/mapConstants";
-import { STATION_COORDINATES } from "@/data/stations";
+import stations, { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
+import { TripDetailSheet } from "@/components/TripDetailSheet";
+import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
+import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { Station } from "@/types/smartSchedule";
+
+const WINDSOR = stations[0];
+const LARKSPUR = stations[stations.length - 1];
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+/** Hex colors mirroring the smart-train-green / smart-gold Tailwind tokens.
+ *  Needed because Mapbox marker elements are built with raw inline styles. */
+const MARKER_COLOR = {
+  ontime: "#11ab75",
+  delayed: "#E48E25",
+  canceled: "#888",
+  userLocation: "#4285f4",
+} as const;
+
+/** Soft halo around the user-location dot. Keep in sync with userLocation. */
+const USER_LOCATION_HALO = "rgba(66,133,244,0.25)";
+
+/** Minimum delay (minutes) to flip a marker from ontime → delayed. */
+const DELAY_MINUTES_THRESHOLD = 3;
+
+/** Fallback bearings (degrees from north) used when GTFS-RT omits the vehicle
+ *  bearing. Chosen to roughly follow the SMART rail corridor. */
+const NORTHBOUND_FALLBACK_BEARING = 340;
+const SOUTHBOUND_FALLBACK_BEARING = 160;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function mpsToMph(mps: number): number {
-  return Math.round(mps * 2.237);
-}
 
 function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
   if (theme !== "system") return theme;
@@ -30,11 +60,6 @@ function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
     ? "dark"
     : "light";
 }
-
-// ─── SVG path for TripIcon ────────────────────────────────────────────────────
-
-const TRIP_ICON_PATH =
-  "M185.985 327.015H162.647M326.015 327.015H349.353M162.647 420.368L115.97 490.383M349.353 420.368L396.03 490.383M69.2939 239.496V303.677C69.2939 369.024 120.638 420.368 185.985 420.368H326.015C391.362 420.368 442.706 369.024 442.706 303.677V239.496M69.2939 239.496V210.324C69.2939 160.806 88.9647 113.317 123.979 78.3024C135.618 66.6635 148.635 56.72 162.647 48.6308M69.2939 239.496H162.647M442.706 239.496V210.324C442.706 160.806 423.035 113.317 388.021 78.3024C376.382 66.6635 363.365 56.72 349.353 48.6308M442.706 239.496H349.353M162.647 239.496V48.6308M162.647 239.496H349.353M162.647 48.6308C190.789 32.3844 222.942 23.6174 256 23.6174C289.058 23.6174 321.212 32.3844 349.353 48.6308M349.353 239.496V48.6308";
 
 // ─── marker element factories ─────────────────────────────────────────────────
 
@@ -53,7 +78,7 @@ function createStationElement(): HTMLElement {
     "height:9px",
     "border-radius:50%",
     "background:var(--station-dot-bg,white)",
-    "border:2px solid #11ab75",
+    `border:2px solid ${MARKER_COLOR.ontime}`,
     "flex-shrink:0",
   ].join(";");
 
@@ -74,14 +99,30 @@ function createStationElement(): HTMLElement {
   return wrapper;
 }
 
-function createTrainElement(train: MapTrain): HTMLElement {
+function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
   const isDelayed =
     !train.isCanceled &&
     train.delayMinutes !== null &&
-    train.delayMinutes >= 3;
-  const isCanceled = train.isCanceled;
-  const bgColor = isCanceled ? "#888" : isDelayed ? "#E48E25" : "#11ab75";
+    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const bgColor = train.isCanceled
+    ? MARKER_COLOR.canceled
+    : isDelayed
+      ? MARKER_COLOR.delayed
+      : MARKER_COLOR.ontime;
 
+  // Some feeds send bearing:0 as "unknown" rather than omitting the field;
+  // treat an exact 0 as unset and fall back to a corridor-aligned angle.
+  const hasValidBearing = train.bearing != null && train.bearing !== 0;
+  const bearing = hasValidBearing
+    ? train.bearing!
+    : train.directionId === 1
+      ? NORTHBOUND_FALLBACK_BEARING
+      : SOUTHBOUND_FALLBACK_BEARING;
+
+  // Outer wrapper preserves the working pattern: flex column with two
+  // invisible border-triangle siblings above/below a square middle. The
+  // structure (not the exact pixel count) is what keeps Mapbox anchor:center
+  // aligned with the disc's center.
   const wrapper = document.createElement("div");
   wrapper.style.cssText = [
     "display:flex",
@@ -91,133 +132,317 @@ function createTrainElement(train: MapTrain): HTMLElement {
     "cursor:pointer",
   ].join(";");
 
-  // direction indicator above
-  const arrowAbove = document.createElement("div");
-  arrowAbove.style.cssText = [
+  const spacerAbove = document.createElement("div");
+  spacerAbove.style.cssText = [
     "width:0",
     "height:0",
-    "border-left:5px solid transparent",
-    "border-right:5px solid transparent",
-    `border-bottom:7px solid ${bgColor}`,
-    "visibility:" +
-      (train.directionId === 1 ? "visible" : "hidden"),
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-bottom:10px solid ${bgColor}`,
+    "visibility:hidden",
   ].join(";");
 
-  const circle = document.createElement("div");
-  circle.style.cssText = [
+  // 46×46 transparent host — defines the layout box Mapbox anchors against.
+  // The disc (30×30 inset) leaves an 8px ring for the direction indicator.
+  const host = document.createElement("div");
+  host.style.cssText = [
+    "width:46px",
+    "height:46px",
+    "position:relative",
+  ].join(";");
+
+  // Layer 1 (bottom): shadow backdrop. Same size/position as the disc — only
+  // its box-shadow shows, extending outward. Gives the composite its depth.
+  // When selected, a second spread-only shadow creates a highlight ring.
+  const shadowBackdrop = document.createElement("div");
+  const shadow = selected
+    ? `0 3px 8px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,255,255,0.9), 0 0 0 6px ${bgColor}`
+    : "0 3px 8px rgba(0,0,0,0.5)";
+  shadowBackdrop.style.cssText = [
+    "position:absolute",
+    "top:8px",
+    "left:8px",
     "width:30px",
     "height:30px",
     "border-radius:50%",
     `background:${bgColor}`,
-    "border:2px solid var(--marker-border,white)",
+    `box-shadow:${shadow}`,
+  ].join(";");
+
+  // Layer 2 (middle): rotating indicator. Its drop-shadow follows the
+  // triangle outline so the tick reads as part of the same 3D object.
+  const rotator = document.createElement("div");
+  rotator.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    `transform:rotate(${bearing}deg)`,
+    "pointer-events:none",
+    "filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
+  ].join(";");
+  const tick = document.createElement("div");
+  tick.style.cssText = [
+    "position:absolute",
+    "top:0",
+    "left:50%",
+    "margin-left:-8px",
+    "width:0",
+    "height:0",
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-bottom:10px solid ${bgColor}`,
+  ].join(";");
+  rotator.appendChild(tick);
+
+  // Layer 3 (top): the visible disc. No shadow — it covers the shadow
+  // backdrop and the tick's base, leaving only clean edges for the eye.
+  const disc = document.createElement("div");
+  disc.style.cssText = [
+    "position:absolute",
+    "top:8px",
+    "left:8px",
+    "width:30px",
+    "height:30px",
+    "border-radius:50%",
+    `background:${bgColor}`,
     "display:flex",
     "align-items:center",
     "justify-content:center",
-    "box-shadow:0 2px 6px rgba(0,0,0,0.3)",
+    "box-sizing:border-box",
   ].join(";");
+  disc.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="${TRIP_ICON_PATH}"/></svg>`;
 
-  circle.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="${TRIP_ICON_PATH}"/></svg>`;
+  host.appendChild(shadowBackdrop);
+  host.appendChild(rotator);
+  host.appendChild(disc);
 
-  // direction indicator below
-  const arrowBelow = document.createElement("div");
-  arrowBelow.style.cssText = [
+  const spacerBelow = document.createElement("div");
+  spacerBelow.style.cssText = [
     "width:0",
     "height:0",
-    "border-left:5px solid transparent",
-    "border-right:5px solid transparent",
-    `border-top:7px solid ${bgColor}`,
-    "visibility:" +
-      (train.directionId === 0 ? "visible" : "hidden"),
+    "border-left:8px solid transparent",
+    "border-right:8px solid transparent",
+    `border-top:10px solid ${bgColor}`,
+    "visibility:hidden",
   ].join(";");
 
-  wrapper.appendChild(arrowAbove);
-  wrapper.appendChild(circle);
-  wrapper.appendChild(arrowBelow);
-
+  wrapper.appendChild(spacerAbove);
+  wrapper.appendChild(host);
+  wrapper.appendChild(spacerBelow);
   return wrapper;
 }
 
-function buildPopupHtml(train: MapTrain): string {
-  const isDelayed =
-    !train.isCanceled &&
-    train.delayMinutes !== null &&
-    train.delayMinutes >= 3;
-  const isCanceled = train.isCanceled;
-
-  let statusHtml: string;
-  if (isCanceled) {
-    statusHtml = `<span style="background:#888;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">Canceled</span>`;
-  } else if (isDelayed) {
-    statusHtml = `<span style="background:#E48E25;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">${train.delayMinutes}m late</span>`;
-  } else {
-    statusHtml = `<span style="background:#11ab75;color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">On time</span>`;
+/**
+ * Pick the timeline's "from" station for a tapped train so only upcoming
+ * stops appear (plus one previous stop for the green-current highlight).
+ *
+ * Guarantees the returned station is not the terminus — a zero-length
+ * fromStation→toStation range breaks downstream direction/progress
+ * inference (notably southbound trains stopped at Larkspur).
+ */
+function pickDisplayFromStation(
+  train: MapTrain,
+  isSouthbound: boolean,
+): Station {
+  const origin = isSouthbound ? WINDSOR : LARKSPUR;
+  const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+  const terminusIdx = stationIndexMap[terminus];
+  let anchorStation: Station | null = train.nextStation;
+  let treatAsServed = train.currentStatus === "STOPPED_AT";
+  if (anchorStation == null) {
+    anchorStation = getClosestStation(train.latitude, train.longitude);
+    treatAsServed = true;
   }
+  const anchorIdx = stationIndexMap[anchorStation];
+  if (anchorIdx == null) return origin;
+  const upcomingIdx = treatAsServed
+    ? isSouthbound
+      ? anchorIdx + 1
+      : anchorIdx - 1
+    : anchorIdx;
+  const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
 
-  const directionLabel =
-    train.directionId === 1
-      ? "Northbound"
-      : train.directionId === 0
-        ? "Southbound"
-        : "";
+  const pick = (idx: number): Station | null =>
+    idx >= 0 && idx < stations.length && idx !== terminusIdx
+      ? stations[idx]
+      : null;
 
-  const speedHtml =
-    train.speed !== null && train.speed > 0
-      ? `<div style="font-size:12px;color:#666;margin-top:3px">${mpsToMph(train.speed)} mph</div>`
-      : "";
-
-  const nextStopHtml = train.nextStation
-    ? `<div style="font-size:12px;color:#444;margin-top:3px">Next: <strong>${train.nextStation}</strong></div>`
-    : "";
-
-  // Build the trip query param for the link
-  const tripParam = encodeURIComponent(
-    JSON.stringify({ tripId: train.tripLabel, startTime: train.startTime })
+  return (
+    pick(displayFromIdx) ??
+    pick(upcomingIdx) ??
+    // Last resort: one stop short of the terminus so the trip range is
+    // always non-zero-length.
+    stations[isSouthbound ? terminusIdx - 1 : terminusIdx + 1] ??
+    origin
   );
-  const href = `/?trip=${tripParam}`;
-
-  return `
-    <div style="min-width:160px;padding:4px 2px">
-      <div style="font-weight:700;font-size:13px;margin-bottom:5px">Train ${train.tripLabel ?? train.vehicleId}</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${statusHtml}
-        ${directionLabel ? `<span style="font-size:11px;color:#555">${directionLabel}</span>` : ""}
-      </div>
-      ${speedHtml}
-      ${nextStopHtml}
-      <div style="margin-top:8px">
-        <a href="${href}" style="font-size:12px;color:#11ab75;font-weight:600;text-decoration:none">View Trip Details →</a>
-      </div>
-    </div>
-  `;
 }
 
 // ─── Map page component ───────────────────────────────────────────────────────
 
-export default function Map() {
+/** Navigate back to the schedule, preferring history-back so query params
+ *  and scroll position are preserved. Falls back to a direct navigate when
+ *  the user landed on /map via a direct link. */
+function useBackToSchedule(): () => void {
   const navigate = useNavigate();
+  const location = useLocation();
+  return useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate({ pathname: "/", search: location.search });
+    }
+  }, [navigate, location.search]);
+}
+
+/** Thin wrapper that swaps in a configuration-help screen when the Mapbox
+ *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
+export default function Map() {
+  const backToSchedule = useBackToSchedule();
+  if (!mapboxToken) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-sm space-y-4">
+          <h2 className="text-lg font-semibold">Mapbox Token Required</h2>
+          <p className="text-sm text-muted-foreground">
+            Add your Mapbox public token to <code className="text-xs bg-muted px-1 py-0.5 rounded">.env.local</code> as <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_MAPBOX_TOKEN</code> and restart the dev server.
+          </p>
+          <button
+            type="button"
+            onClick={backToSchedule}
+            className="text-sm font-medium text-smart-train-green"
+          >
+            ← Back to schedule
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return <MapContents />;
+}
+
+function MapContents() {
+  const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
-  const { trains, lastUpdated: _lastUpdated } = useMapTrains();
+  const { trains } = useMapTrains();
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
     autoRequestOnWeb: true,
   });
+  const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
+  const [detailTrip, setDetailTrip] = useState<{
+    trip: ProcessedTrip;
+    fromStation: Station;
+    toStation: Station;
+    realtimeStatus: TripRealtimeStatus | null;
+  } | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Realtime status keyed by full-corridor scheduled departure (origin time).
+  // Computed for both directions so a tapped train of either direction can
+  // surface live delay/cancellation state in the detail sheet.
+  const allSouthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekday"),
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekend"),
+    ],
+    [],
+  );
+  const allNorthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekday"),
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekend"),
+    ],
+    [],
+  );
+  const sbStatusMaps = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, allSouthboundTrips);
+  const nbStatusMaps = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, allNorthboundTrips);
+
+  const handleTrainClick = useCallback((train: MapTrain) => {
+    setSelectedTrainKey(train.key);
+
+    if (
+      train.tripNumber == null ||
+      train.directionId == null ||
+      train.startTime == null
+    ) {
+      return;
+    }
+
+    const isSouthbound = train.directionId === 0;
+    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+    const match = findFullCorridorTrip(
+      train.directionId,
+      train.startTime,
+      train.tripNumber,
+    );
+    if (!match) return;
+
+    const displayFrom = pickDisplayFromStation(train, isSouthbound);
+    // Override from/to so StopTimeline slices `times` to only upcoming stops;
+    // keep match's full-corridor departure/arrival times so the header still
+    // reads as the trip's origin → terminus (e.g. "11:31 AM → 12:55 PM"
+    // rather than a narrowed leg's times).
+    const displayTrip: ProcessedTrip = {
+      ...match,
+      fromStation: displayFrom,
+      toStation: terminus,
+    };
+    // Pull live delay/cancellation state for this specific run. The status
+    // map is keyed by scheduled departure at the full-corridor origin, which
+    // is exactly match.departureTime here.
+    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
+    const realtimeStatus =
+      statusMaps.statusMap.get(match.departureTime) ?? null;
+    setDetailTrip({
+      trip: displayTrip,
+      fromStation: displayFrom,
+      toStation: terminus,
+      realtimeStatus,
+    });
+  }, [sbStatusMaps, nbStatusMaps]);
+
+  useEffect(() => {
+    if (detailTrip) {
+      const id = window.setTimeout(
+        () => setDetailOpen(true),
+        SHEET_ENTER_DELAY_MS,
+      );
+      return () => window.clearTimeout(id);
+    } else {
+      setDetailOpen(false);
+    }
+  }, [detailTrip]);
+
+  // Tracked so we can cancel the deferred unmount if the sheet re-opens
+  // mid-transition or the page unmounts.
+  const closeTimerRef = useRef<number | null>(null);
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setDetailTrip(null);
+      setSelectedTrainKey(null);
+      closeTimerRef.current = null;
+    }, SHEET_TRANSITION_MS);
+  }, []);
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current != null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-
-  // Station markers (created once)
+  const [mapLoaded, setMapLoaded] = useState(false);
   const stationMarkersRef = useRef<mapboxgl.Marker[]>([]);
-
-  // Train markers keyed by train.key
   const trainMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
     new globalThis.Map()
   );
-
-  // Popup singleton
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
-
-  // User-location dot marker
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // ── helper: add route source/layer ─────────────────────────────────────────
@@ -235,7 +460,7 @@ export default function Map() {
         source: "route",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#11ab75",
+          "line-color": MARKER_COLOR.ontime,
           "line-width": 3.5,
           "line-opacity": 0.45,
           "line-dasharray": [2, 1],
@@ -246,7 +471,6 @@ export default function Map() {
 
   // ── helper: add station markers ─────────────────────────────────────────────
   const addStationMarkers = useCallback((map: mapboxgl.Map) => {
-    // Remove existing
     stationMarkersRef.current.forEach((m) => m.remove());
     stationMarkersRef.current = [];
 
@@ -274,6 +498,8 @@ export default function Map() {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: resolved === "dark" ? MAPBOX_STYLE_DARK : MAPBOX_STYLE_LIGHT,
+      bounds: ALL_STATIONS_BOUNDS,
+      fitBoundsOptions: { padding: MAP_FIT_PADDING, animate: false },
       attributionControl: false,
     });
 
@@ -283,9 +509,9 @@ export default function Map() {
     );
 
     map.on("load", () => {
-      map.fitBounds(ALL_STATIONS_BOUNDS, { padding: MAP_FIT_PADDING, animate: false });
       addRouteLayer(map);
       addStationMarkers(map);
+      setMapLoaded(true);
     });
 
     mapRef.current = map;
@@ -298,8 +524,6 @@ export default function Map() {
       trainMarkersRef.current.clear();
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
-      popupRef.current?.remove();
-      popupRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -308,7 +532,14 @@ export default function Map() {
   }, []);
 
   // ── theme changes → swap style ──────────────────────────────────────────────
+  // Skip first run: the map is already initialized with the correct style.
+  // Only re-run when theme changes after mount.
+  const isFirstThemeRun = useRef(true);
   useEffect(() => {
+    if (isFirstThemeRun.current) {
+      isFirstThemeRun.current = false;
+      return;
+    }
     const map = mapRef.current;
     if (!map) return;
 
@@ -327,7 +558,7 @@ export default function Map() {
   // ── update train markers when trains data changes ───────────────────────────
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
 
     const existingKeys = new Set(trainMarkersRef.current.keys());
     const newKeys = new Set(trains.map((t) => t.key));
@@ -348,15 +579,10 @@ export default function Map() {
         trainMarkersRef.current.delete(train.key);
       }
 
-      const el = createTrainElement(train);
-      const popup = new mapboxgl.Popup({ offset: 16, closeButton: true, maxWidth: "240px" }).setHTML(
-        buildPopupHtml(train)
-      );
-
-      el.addEventListener("click", () => {
-        popupRef.current?.remove();
-        popupRef.current = popup;
-        popup.addTo(map);
+      const el = createTrainElement(train, train.key === selectedTrainKey);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleTrainClick(train);
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
@@ -365,7 +591,7 @@ export default function Map() {
 
       trainMarkersRef.current.set(train.key, marker);
     }
-  }, [trains]);
+  }, [trains, mapLoaded, selectedTrainKey, handleTrainClick]);
 
   // ── user location dot ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -378,9 +604,9 @@ export default function Map() {
         "width:14px",
         "height:14px",
         "border-radius:50%",
-        "background:#4285f4",
+        `background:${MARKER_COLOR.userLocation}`,
         "border:2px solid white",
-        "box-shadow:0 0 0 4px rgba(66,133,244,0.25)",
+        `box-shadow:0 0 0 4px ${USER_LOCATION_HALO}`,
       ].join(";");
 
       userMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
@@ -390,24 +616,6 @@ export default function Map() {
       userMarkerRef.current.setLngLat([userLng, userLat]);
     }
   }, [userLat, userLng]);
-
-  // ── intercept callout <a href="/?trip=..."> clicks ──────────────────────────
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
-      if (!anchor) return;
-
-      const href = anchor.getAttribute("href") ?? "";
-      if (href.startsWith("/?trip=") || href.startsWith("?trip=")) {
-        e.preventDefault();
-        navigate(href);
-      }
-    };
-
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [navigate]);
 
   // ── fit-to-trains handler ───────────────────────────────────────────────────
   const handleFitTrains = useCallback(() => {
@@ -457,7 +665,8 @@ export default function Map() {
 
       {/* Back button – top-left */}
       <button
-        onClick={() => navigate("/")}
+        type="button"
+        onClick={backToSchedule}
         className="absolute left-3 flex items-center gap-1 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
         style={{ top: "calc(12px + var(--safe-area-top))" }}
         aria-label="Back"
@@ -468,17 +677,40 @@ export default function Map() {
 
       {/* Train count pill – top-right */}
       <button
+        type="button"
         onClick={handleFitTrains}
         className="absolute right-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
         style={{ top: "calc(12px + var(--safe-area-top))" }}
         aria-label="Fit trains"
       >
         <span
-          className="inline-block w-2 h-2 rounded-full bg-[#11ab75]"
+          className="inline-block w-2 h-2 rounded-full bg-smart-train-green"
           aria-hidden="true"
         />
         {trains.length} {trains.length === 1 ? "train" : "trains"}
       </button>
+
+      {/* Full trip detail sheet — opens over the map when a marker is tapped.
+          Renders nothing until a trip has been resolved. isNextTrip=true so
+          the header reads as an active, on-time trip when all displayed
+          stops are still in the future (the narrowed view hides past stops,
+          which would otherwise flip the header into the neutral "future"
+          state). */}
+      {detailTrip && (
+        <TripDetailSheet
+          isOpen={detailOpen}
+          onClose={closeDetail}
+          trip={detailTrip.trip}
+          fromStation={detailTrip.fromStation}
+          toStation={detailTrip.toStation}
+          currentTime={new Date()}
+          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
+          realtimeStatus={detailTrip.realtimeStatus}
+          timeFormat="12h"
+          isNextTrip={true}
+          showFerry={false}
+        />
+      )}
     </div>
   );
 }

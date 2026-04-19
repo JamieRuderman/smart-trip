@@ -28,3 +28,6 @@ public/data/schedules.json
 .vercel
 .env*.local
 .worktrees
+
+# Superpowers brainstorming session artifacts
+.superpowers/

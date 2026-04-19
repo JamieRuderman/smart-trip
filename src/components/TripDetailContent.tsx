@@ -154,6 +154,23 @@ export function TripDetailContent({
     : statusLabel ??
       (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
+  // Direction derived from the selected station pair. Windsor (idx 0) is the
+  // northern terminus; Larkspur (idx 13) the southern. Lower idx → higher
+  // means southbound.
+  const isSouthboundTravel =
+    (stationIndexMap[fromStation] ?? 0) < (stationIndexMap[toStation] ?? 0);
+  const directionLabel = isSouthboundTravel
+    ? t("tracker.southbound")
+    : t("tracker.northbound");
+
+  // Live speed from the matched vehicle (m/s → mph). Only shown while a
+  // vehicle is actively reporting and moving.
+  const speedMph =
+    vehiclePosition?.position?.speed != null &&
+    vehiclePosition.position.speed > 0
+      ? Math.round(vehiclePosition.position.speed * 2.237)
+      : null;
+
   const alarmStatus = useAlarmStatus({
     tripId: trip.trip,
     minutesUntilDeparture: minutesUntil,
@@ -217,6 +234,8 @@ export function TripDetailContent({
             )}
           >
             {headerStatusLabel ?? "\u00a0"}
+            <span className="text-white/60"> · </span>
+            {directionLabel}
           </p>
           <TimePair
             departure={departureTime}
@@ -281,6 +300,12 @@ export function TripDetailContent({
               <>
                 <span className="mx-1">·</span>
                 <span>${fareInfo.price.toFixed(2)}</span>
+              </>
+            )}
+            {speedMph != null && (
+              <>
+                <span className="mx-1">·</span>
+                <span>{t("tracker.speedMph", { speed: speedMph })}</span>
               </>
             )}
           </span>

@@ -13,11 +13,17 @@ import {
   MAPBOX_STYLE_DARK,
   MAP_FIT_PADDING,
 } from "@/lib/mapConstants";
-import { STATION_COORDINATES } from "@/data/stations";
+import stations, { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
+import { useScheduleData } from "@/hooks/useScheduleData";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
+import { TripDetailSheet } from "@/components/TripDetailSheet";
+import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import type { Station } from "@/types/smartSchedule";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -39,10 +45,6 @@ const NORTHBOUND_FALLBACK_BEARING = 340;
 const SOUTHBOUND_FALLBACK_BEARING = 160;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function mpsToMph(mps: number): number {
-  return Math.round(mps * 2.237);
-}
 
 function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
   if (theme !== "system") return theme;
@@ -89,7 +91,7 @@ function createStationElement(): HTMLElement {
   return wrapper;
 }
 
-function createTrainElement(train: MapTrain): HTMLElement {
+function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
   const isDelayed =
     !train.isCanceled &&
     train.delayMinutes !== null &&
@@ -143,7 +145,11 @@ function createTrainElement(train: MapTrain): HTMLElement {
 
   // Layer 1 (bottom): shadow backdrop. Same size/position as the disc — only
   // its box-shadow shows, extending outward. Gives the composite its depth.
+  // When selected, a second spread-only shadow creates a highlight ring.
   const shadowBackdrop = document.createElement("div");
+  const shadow = selected
+    ? `0 3px 8px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,255,255,0.9), 0 0 0 6px ${bgColor}`
+    : "0 3px 8px rgba(0,0,0,0.5)";
   shadowBackdrop.style.cssText = [
     "position:absolute",
     "top:8px",
@@ -152,7 +158,7 @@ function createTrainElement(train: MapTrain): HTMLElement {
     "height:30px",
     "border-radius:50%",
     `background:${bgColor}`,
-    "box-shadow:0 3px 8px rgba(0,0,0,0.5)",
+    `box-shadow:${shadow}`,
   ].join(";");
 
   // Layer 2 (middle): rotating indicator. Its drop-shadow follows the
@@ -217,53 +223,6 @@ function createTrainElement(train: MapTrain): HTMLElement {
   return wrapper;
 }
 
-function buildPopupHtml(train: MapTrain): string {
-  const isDelayed =
-    !train.isCanceled &&
-    train.delayMinutes !== null &&
-    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
-
-  const pill = (bg: string, text: string) =>
-    `<span style="background:${bg};color:white;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600">${text}</span>`;
-
-  const statusHtml = train.isCanceled
-    ? pill(MARKER_COLOR.canceled, "Canceled")
-    : isDelayed
-      ? pill(MARKER_COLOR.delayed, `${train.delayMinutes}m late`)
-      : pill(MARKER_COLOR.ontime, "On time");
-
-  const directionLabel =
-    train.directionId === 1
-      ? "Northbound"
-      : train.directionId === 0
-        ? "Southbound"
-        : "";
-
-  const speedHtml =
-    train.speed !== null && train.speed > 0
-      ? `<div style="font-size:12px;color:#666;margin-top:3px">${mpsToMph(train.speed)} mph</div>`
-      : "";
-
-  const nextStopHtml = train.nextStation
-    ? `<div style="font-size:12px;color:#444;margin-top:3px">Next: <strong>${train.nextStation}</strong></div>`
-    : "";
-
-  return `
-    <div style="min-width:160px;padding:4px 2px">
-      <div style="font-weight:700;font-size:13px;margin-bottom:5px">Train ${train.tripLabel ?? train.vehicleId}</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${statusHtml}
-        ${directionLabel ? `<span style="font-size:11px;color:#555">${directionLabel}</span>` : ""}
-      </div>
-      ${speedHtml}
-      ${nextStopHtml}
-      <div style="margin-top:8px">
-        <a href="/" style="font-size:12px;color:${MARKER_COLOR.ontime};font-weight:600;text-decoration:none">View Schedule →</a>
-      </div>
-    </div>
-  `;
-}
-
 // ─── Map page component ───────────────────────────────────────────────────────
 
 export default function Map() {
@@ -286,6 +245,124 @@ export default function Map() {
     autoRequestOnNative: true,
     autoRequestOnWeb: true,
   });
+  const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
+  const [detailTrip, setDetailTrip] = useState<{
+    trip: ProcessedTrip;
+    fromStation: Station;
+    toStation: Station;
+  } | null>(null);
+  // Toggled one frame after detailTrip mounts so the sheet animates in.
+  const [detailOpen, setDetailOpen] = useState(false);
+  // Pull schedule version so the detail lookup re-runs when schedule data
+  // swaps in.
+  useScheduleData();
+
+  const handleTrainClick = useCallback((train: MapTrain) => {
+    // Always highlight the tapped marker.
+    setSelectedTrainKey(train.key);
+
+    if (train.tripNumber == null || train.directionId == null) return;
+
+    const isSouthbound = train.directionId === 0;
+    const WINDSOR = stations[0];
+    const LARKSPUR = stations[stations.length - 1];
+    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+    const origin = isSouthbound ? WINDSOR : LARKSPUR;
+    const originIndex = isSouthbound ? 0 : stations.length - 1;
+
+    // Look up the full-corridor trip (always a valid station pair).
+    // Try progressively looser matches so we get *some* trip rather than
+    // failing silently.
+    const candidates = [
+      ...getFilteredTrips(origin, terminus, "weekday"),
+      ...getFilteredTrips(origin, terminus, "weekend"),
+    ];
+    const match =
+      candidates.find(
+        (t) =>
+          t.trip === train.tripNumber &&
+          train.startTime != null &&
+          t.times[originIndex] === train.startTime,
+      ) ?? candidates.find((t) => t.trip === train.tripNumber);
+    if (!match) return;
+
+    // Pick the display "from" station. We start ONE STOP BEFORE the next
+    // upcoming stop so that the previous stop appears in the timeline as
+    // "past", which triggers the green "current" highlight on the next
+    // upcoming stop.
+    //
+    //   - STOPPED_AT X: X has been served. Upcoming = stop after X.
+    //     Display from = X (so X appears as past, next stop as current).
+    //   - IN_TRANSIT_TO X / INCOMING_AT X: X is the next upcoming stop.
+    //     Display from = stop before X.
+    //   - No status + no stopId: fall back to the nearest station by GPS
+    //     (likely just passed) and treat as served.
+    const pickDisplayFrom = (): Station => {
+      let anchorStation: Station | null = train.nextStation;
+      let treatAsServed = train.currentStatus === "STOPPED_AT";
+      if (anchorStation == null) {
+        anchorStation = getClosestStation(train.latitude, train.longitude);
+        treatAsServed = true;
+      }
+      const anchorIdx = stations.indexOf(anchorStation);
+      if (anchorIdx === -1) return origin;
+      // Index of the first upcoming stop.
+      const upcomingIdx = treatAsServed
+        ? (isSouthbound ? anchorIdx + 1 : anchorIdx - 1)
+        : anchorIdx;
+      // One stop before that (shown as "past" to give context).
+      const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
+      if (displayFromIdx >= 0 && displayFromIdx < stations.length) {
+        return stations[displayFromIdx];
+      }
+      // Can't back up further (train is still at/near the origin); just
+      // use the upcoming stop as-is.
+      if (upcomingIdx >= 0 && upcomingIdx < stations.length) {
+        return stations[upcomingIdx];
+      }
+      return anchorStation;
+    };
+
+    const displayFrom = pickDisplayFrom();
+    // Build an overridden trip that pretends the journey starts at the
+    // next-upcoming stop. times stays full so all station indices remain
+    // valid; StopTimeline slices by station index so only upcoming stops
+    // appear.
+    const displayTrip: ProcessedTrip = {
+      ...match,
+      fromStation: displayFrom,
+      toStation: terminus,
+      departureTime: match.times[stationIndexMap[displayFrom]] ?? match.departureTime,
+      arrivalTime: match.times[stationIndexMap[terminus]] ?? match.arrivalTime,
+    };
+    setDetailTrip({
+      trip: displayTrip,
+      fromStation: displayFrom,
+      toStation: terminus,
+    });
+  }, []);
+
+  // Drive the animate-in: mount with detailOpen=false, flip to true AFTER
+  // a short delay so the browser paints the initial off-screen state before
+  // the CSS transition runs. Same pattern used by TripCard for its sheet.
+  useEffect(() => {
+    if (detailTrip) {
+      const id = window.setTimeout(() => setDetailOpen(true), 24);
+      return () => window.clearTimeout(id);
+    } else {
+      setDetailOpen(false);
+    }
+  }, [detailTrip]);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    // Keep the trip mounted until the exit transition finishes so the sheet
+    // animates out instead of snapping away.
+    setTimeout(() => {
+      setDetailTrip(null);
+      setSelectedTrainKey(null);
+    }, 520);
+  }, []);
 
   // Guard: if no Mapbox token, show a helpful message instead of crashing
   if (!mapboxToken) {
@@ -316,8 +393,6 @@ export default function Map() {
   const trainMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
     new globalThis.Map()
   );
-  // Singleton — only one popup open at a time.
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // ── helper: add route source/layer ─────────────────────────────────────────
@@ -399,8 +474,6 @@ export default function Map() {
       trainMarkersRef.current.clear();
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
-      popupRef.current?.remove();
-      popupRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -456,26 +529,19 @@ export default function Map() {
         trainMarkersRef.current.delete(train.key);
       }
 
-      const el = createTrainElement(train);
-      const popup = new mapboxgl.Popup({ offset: 16, closeButton: true, maxWidth: "240px" })
-        .setHTML(buildPopupHtml(train));
-
-      // Close any other open popup when this one opens
-      popup.on("open", () => {
-        if (popupRef.current && popupRef.current !== popup) {
-          popupRef.current.remove();
-        }
-        popupRef.current = popup;
+      const el = createTrainElement(train, train.key === selectedTrainKey);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleTrainClick(train);
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([train.longitude, train.latitude])
-        .setPopup(popup)
         .addTo(map);
 
       trainMarkersRef.current.set(train.key, marker);
     }
-  }, [trains, mapLoaded]);
+  }, [trains, mapLoaded, selectedTrainKey, handleTrainClick]);
 
   // ── user location dot ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -500,24 +566,6 @@ export default function Map() {
       userMarkerRef.current.setLngLat([userLng, userLat]);
     }
   }, [userLat, userLng]);
-
-  // ── intercept callout <a href="/?trip=..."> clicks ──────────────────────────
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
-      if (!anchor) return;
-
-      const href = anchor.getAttribute("href") ?? "";
-      if (href.startsWith("/?trip=") || href.startsWith("?trip=")) {
-        e.preventDefault();
-        navigate(href);
-      }
-    };
-
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [navigate]);
 
   // ── fit-to-trains handler ───────────────────────────────────────────────────
   const handleFitTrains = useCallback(() => {
@@ -591,6 +639,28 @@ export default function Map() {
         />
         {trains.length} {trains.length === 1 ? "train" : "trains"}
       </button>
+
+      {/* Full trip detail sheet — opens over the map when a marker is tapped.
+          Renders nothing until a trip has been resolved. isNextTrip=true so
+          the header reads as an active, on-time trip when all displayed
+          stops are still in the future (the narrowed view hides past stops,
+          which would otherwise flip the header into the neutral "future"
+          state). */}
+      {detailTrip && (
+        <TripDetailSheet
+          isOpen={detailOpen}
+          onClose={closeDetail}
+          trip={detailTrip.trip}
+          fromStation={detailTrip.fromStation}
+          toStation={detailTrip.toStation}
+          currentTime={new Date()}
+          lastUpdated={null}
+          realtimeStatus={null}
+          timeFormat="12h"
+          isNextTrip={true}
+          showFerry={false}
+        />
+      )}
     </div>
   );
 }

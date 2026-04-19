@@ -4,6 +4,11 @@ import { FARE_CONSTANTS } from "./fareConstants";
  * Time-related utility functions
  */
 
+/** Convert meters-per-second to whole-number miles-per-hour. */
+export function mpsToMph(mps: number): number {
+  return Math.round(mps * 2.237);
+}
+
 /**
  * Parse a time string into minutes since midnight
  * Handles special characters like * and ~

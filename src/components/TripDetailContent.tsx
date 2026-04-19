@@ -13,11 +13,11 @@ import {
   Smartphone,
   Train,
 } from "lucide-react";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateFare } from "@/lib/scheduleUtils";
-import { stationIndexMap } from "@/lib/stationUtils";
+import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useAlarmStatus } from "@/hooks/useAlarmStatus";
@@ -154,12 +154,7 @@ export function TripDetailContent({
     : statusLabel ??
       (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
-  // Direction derived from the selected station pair. Windsor (idx 0) is the
-  // northern terminus; Larkspur (idx 13) the southern. Lower idx → higher
-  // means southbound.
-  const isSouthboundTravel =
-    (stationIndexMap[fromStation] ?? 0) < (stationIndexMap[toStation] ?? 0);
-  const directionLabel = isSouthboundTravel
+  const directionLabel = isSouthbound(fromStation, toStation)
     ? t("tracker.southbound")
     : t("tracker.northbound");
 
@@ -168,7 +163,7 @@ export function TripDetailContent({
   const speedMph =
     vehiclePosition?.position?.speed != null &&
     vehiclePosition.position.speed > 0
-      ? Math.round(vehiclePosition.position.speed * 2.237)
+      ? mpsToMph(vehiclePosition.position.speed)
       : null;
 
   const alarmStatus = useAlarmStatus({
@@ -421,11 +416,7 @@ export function TripDetailContent({
                       {vehiclePosition.position.speed != null && (
                         <>
                           {" "}
-                          ·{" "}
-                          {(vehiclePosition.position.speed * 2.237).toFixed(
-                            0,
-                          )}{" "}
-                          mph
+                          · {mpsToMph(vehiclePosition.position.speed)} mph
                         </>
                       )}
                       {distanceToTrainMi != null && (

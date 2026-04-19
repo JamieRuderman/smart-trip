@@ -15,15 +15,18 @@ import {
 } from "@/lib/mapConstants";
 import stations, { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
-import { useScheduleData } from "@/hooks/useScheduleData";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
+
+const WINDSOR = stations[0];
+const LARKSPUR = stations[stations.length - 1];
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -223,9 +226,75 @@ function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
   return wrapper;
 }
 
+/**
+ * Pick the timeline's "from" station for a tapped train so only upcoming
+ * stops appear (plus one previous stop for the green-current highlight).
+ */
+function pickDisplayFromStation(
+  train: MapTrain,
+  isSouthbound: boolean,
+): Station {
+  const origin = isSouthbound ? WINDSOR : LARKSPUR;
+  let anchorStation: Station | null = train.nextStation;
+  let treatAsServed = train.currentStatus === "STOPPED_AT";
+  if (anchorStation == null) {
+    anchorStation = getClosestStation(train.latitude, train.longitude);
+    treatAsServed = true;
+  }
+  const anchorIdx = stationIndexMap[anchorStation];
+  if (anchorIdx == null) return origin;
+  const upcomingIdx = treatAsServed
+    ? isSouthbound
+      ? anchorIdx + 1
+      : anchorIdx - 1
+    : anchorIdx;
+  const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
+  if (displayFromIdx >= 0 && displayFromIdx < stations.length) {
+    return stations[displayFromIdx];
+  }
+  if (upcomingIdx >= 0 && upcomingIdx < stations.length) {
+    return stations[upcomingIdx];
+  }
+  return anchorStation;
+}
+
 // ─── Map page component ───────────────────────────────────────────────────────
 
+/** Thin wrapper that swaps in a configuration-help screen when the Mapbox
+ *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
 export default function Map() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const backToSchedule = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate({ pathname: "/", search: location.search });
+    }
+  };
+  if (!mapboxToken) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-sm space-y-4">
+          <h2 className="text-lg font-semibold">Mapbox Token Required</h2>
+          <p className="text-sm text-muted-foreground">
+            Add your Mapbox public token to <code className="text-xs bg-muted px-1 py-0.5 rounded">.env.local</code> as <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_MAPBOX_TOKEN</code> and restart the dev server.
+          </p>
+          <button
+            type="button"
+            onClick={backToSchedule}
+            className="text-sm font-medium text-smart-train-green"
+          >
+            ← Back to schedule
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return <MapContents />;
+}
+
+function MapContents() {
   const navigate = useNavigate();
   const location = useLocation();
   const backToSchedule = () => {
@@ -251,89 +320,37 @@ export default function Map() {
     fromStation: Station;
     toStation: Station;
   } | null>(null);
-  // Toggled one frame after detailTrip mounts so the sheet animates in.
   const [detailOpen, setDetailOpen] = useState(false);
-  // Pull schedule version so the detail lookup re-runs when schedule data
-  // swaps in.
-  useScheduleData();
 
   const handleTrainClick = useCallback((train: MapTrain) => {
-    // Always highlight the tapped marker.
     setSelectedTrainKey(train.key);
 
-    if (train.tripNumber == null || train.directionId == null) return;
+    if (
+      train.tripNumber == null ||
+      train.directionId == null ||
+      train.startTime == null
+    ) {
+      return;
+    }
 
     const isSouthbound = train.directionId === 0;
-    const WINDSOR = stations[0];
-    const LARKSPUR = stations[stations.length - 1];
     const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-    const origin = isSouthbound ? WINDSOR : LARKSPUR;
-    const originIndex = isSouthbound ? 0 : stations.length - 1;
-
-    // Look up the full-corridor trip (always a valid station pair).
-    // Try progressively looser matches so we get *some* trip rather than
-    // failing silently.
-    const candidates = [
-      ...getFilteredTrips(origin, terminus, "weekday"),
-      ...getFilteredTrips(origin, terminus, "weekend"),
-    ];
-    const match =
-      candidates.find(
-        (t) =>
-          t.trip === train.tripNumber &&
-          train.startTime != null &&
-          t.times[originIndex] === train.startTime,
-      ) ?? candidates.find((t) => t.trip === train.tripNumber);
+    const match = findFullCorridorTrip(
+      train.directionId,
+      train.startTime,
+      train.tripNumber,
+    );
     if (!match) return;
 
-    // Pick the display "from" station. We start ONE STOP BEFORE the next
-    // upcoming stop so that the previous stop appears in the timeline as
-    // "past", which triggers the green "current" highlight on the next
-    // upcoming stop.
-    //
-    //   - STOPPED_AT X: X has been served. Upcoming = stop after X.
-    //     Display from = X (so X appears as past, next stop as current).
-    //   - IN_TRANSIT_TO X / INCOMING_AT X: X is the next upcoming stop.
-    //     Display from = stop before X.
-    //   - No status + no stopId: fall back to the nearest station by GPS
-    //     (likely just passed) and treat as served.
-    const pickDisplayFrom = (): Station => {
-      let anchorStation: Station | null = train.nextStation;
-      let treatAsServed = train.currentStatus === "STOPPED_AT";
-      if (anchorStation == null) {
-        anchorStation = getClosestStation(train.latitude, train.longitude);
-        treatAsServed = true;
-      }
-      const anchorIdx = stations.indexOf(anchorStation);
-      if (anchorIdx === -1) return origin;
-      // Index of the first upcoming stop.
-      const upcomingIdx = treatAsServed
-        ? (isSouthbound ? anchorIdx + 1 : anchorIdx - 1)
-        : anchorIdx;
-      // One stop before that (shown as "past" to give context).
-      const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
-      if (displayFromIdx >= 0 && displayFromIdx < stations.length) {
-        return stations[displayFromIdx];
-      }
-      // Can't back up further (train is still at/near the origin); just
-      // use the upcoming stop as-is.
-      if (upcomingIdx >= 0 && upcomingIdx < stations.length) {
-        return stations[upcomingIdx];
-      }
-      return anchorStation;
-    };
-
-    const displayFrom = pickDisplayFrom();
-    // Build an overridden trip that pretends the journey starts at the
-    // next-upcoming stop. times stays full so all station indices remain
-    // valid; StopTimeline slices by station index so only upcoming stops
-    // appear.
+    const displayFrom = pickDisplayFromStation(train, isSouthbound);
+    // Override from/to so StopTimeline slices `times` to only upcoming stops;
+    // keep match's full-corridor departure/arrival times so the header still
+    // reads as the trip's origin → terminus (e.g. "11:31 AM → 12:55 PM"
+    // rather than a narrowed leg's times).
     const displayTrip: ProcessedTrip = {
       ...match,
       fromStation: displayFrom,
       toStation: terminus,
-      departureTime: match.times[stationIndexMap[displayFrom]] ?? match.departureTime,
-      arrivalTime: match.times[stationIndexMap[terminus]] ?? match.arrivalTime,
     };
     setDetailTrip({
       trip: displayTrip,
@@ -342,12 +359,12 @@ export default function Map() {
     });
   }, []);
 
-  // Drive the animate-in: mount with detailOpen=false, flip to true AFTER
-  // a short delay so the browser paints the initial off-screen state before
-  // the CSS transition runs. Same pattern used by TripCard for its sheet.
   useEffect(() => {
     if (detailTrip) {
-      const id = window.setTimeout(() => setDetailOpen(true), 24);
+      const id = window.setTimeout(
+        () => setDetailOpen(true),
+        SHEET_ENTER_DELAY_MS,
+      );
       return () => window.clearTimeout(id);
     } else {
       setDetailOpen(false);
@@ -361,34 +378,12 @@ export default function Map() {
     setTimeout(() => {
       setDetailTrip(null);
       setSelectedTrainKey(null);
-    }, 520);
+    }, SHEET_TRANSITION_MS);
   }, []);
-
-  // Guard: if no Mapbox token, show a helpful message instead of crashing
-  if (!mapboxToken) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
-        <div className="text-center max-w-sm space-y-4">
-          <h2 className="text-lg font-semibold">Mapbox Token Required</h2>
-          <p className="text-sm text-muted-foreground">
-            Add your Mapbox public token to <code className="text-xs bg-muted px-1 py-0.5 rounded">.env.local</code> as <code className="text-xs bg-muted px-1 py-0.5 rounded">VITE_MAPBOX_TOKEN</code> and restart the dev server.
-          </p>
-          <button
-            type="button"
-            onClick={backToSchedule}
-            className="text-sm font-medium text-smart-train-green"
-          >
-            ← Back to schedule
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-
   const stationMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const trainMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
     new globalThis.Map()

@@ -8,10 +8,6 @@ import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { VehicleStopStatus } from "@/types/gtfsRt";
 
-const WINDSOR = stations[0];
-const LARKSPUR = stations[stations.length - 1];
-const LAST_STATION_INDEX = stations.length - 1;
-
 export interface MapTrain {
   key: string;
   vehicleId: string;
@@ -33,34 +29,46 @@ export interface MapTrain {
   startTime: string | null;
 }
 
+/** Map key encoding trip direction + origin start time → human trip number. */
+const tripNumberKey = (directionId: number, startTime: string) =>
+  `${directionId}|${startTime}`;
+
 /**
- * Look up a trip's human number (e.g. 41) by matching the vehicle's origin
- * start time against the static schedule. Searches both weekday and weekend
- * schedules so callers don't need to know which day the vehicle is running.
+ * Build a lookup map from "directionId|startTime" to the trip's human
+ * number, covering both weekday and weekend schedules. One-time O(M) work
+ * per schedule swap; per-vehicle lookups become O(1).
  */
-function findTripNumber(
-  startTime: string | null,
-  directionId: number | null
-): number | null {
-  if (!startTime || directionId == null) return null;
-  const isSouthbound = directionId === 0;
-  const from = isSouthbound ? WINDSOR : LARKSPUR;
-  const to = isSouthbound ? LARKSPUR : WINDSOR;
-  const originIndex = isSouthbound ? 0 : LAST_STATION_INDEX;
-  const candidates = [
-    ...getFilteredTrips(from, to, "weekday"),
-    ...getFilteredTrips(from, to, "weekend"),
-  ];
-  const match = candidates.find((t) => t.times[originIndex] === startTime);
-  return match?.trip ?? null;
+function buildTripNumberIndex(): Map<string, number> {
+  const index = new Map<string, number>();
+  const north = stations[0];
+  const south = stations[stations.length - 1];
+  const lastIdx = stations.length - 1;
+  for (const scheduleType of ["weekday", "weekend"] as const) {
+    for (const sb of [true, false]) {
+      const from = sb ? north : south;
+      const to = sb ? south : north;
+      const originIdx = sb ? 0 : lastIdx;
+      const dirId = sb ? 0 : 1;
+      for (const trip of getFilteredTrips(from, to, scheduleType)) {
+        const origin = trip.times[originIdx];
+        if (origin) index.set(tripNumberKey(dirId, origin), trip.trip);
+      }
+    }
+  }
+  return index;
 }
 
 export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null } {
   const { data: vehicleData } = useVehiclePositions();
   const { data: tripData } = useTripUpdates();
-  // Re-run the memo when cached/remote schedule data swaps in so trip-number
-  // lookups pick up the latest schedule.
+  // Re-run lookups when cached/remote schedule data swaps in.
   const { version: scheduleVersion } = useScheduleData();
+
+  const tripNumberIndex = useMemo(
+    () => buildTripNumberIndex(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when schedule data swaps in
+    [scheduleVersion],
+  );
 
   return useMemo(() => {
     const lastUpdated =
@@ -108,7 +116,11 @@ export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null }
         speed: vehicle.position.speed ?? null,
         directionId,
         tripLabel: vehicle.trip.tripId ?? null,
-        tripNumber: findTripNumber(startTime, directionId),
+        tripNumber:
+          startTime != null && directionId != null
+            ? (tripNumberIndex.get(tripNumberKey(directionId, startTime)) ??
+              null)
+            : null,
         nextStation,
         currentStatus: vehicle.currentStatus ?? null,
         delayMinutes: tripInfo?.delayMinutes ?? null,
@@ -118,8 +130,5 @@ export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null }
     }
 
     return { trains, lastUpdated };
-    // scheduleVersion intentionally included so trip-number lookups refresh
-    // when cached/remote schedule data is swapped in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleData, tripData, scheduleVersion]);
+  }, [vehicleData, tripData, tripNumberIndex]);
 }

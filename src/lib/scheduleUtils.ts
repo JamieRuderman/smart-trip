@@ -246,6 +246,39 @@ export function getFilteredTrips(
   return scheduleCache[key] || [];
 }
 
+/**
+ * Look up a full-corridor trip by its GTFS-RT origin startTime and GTFS
+ * directionId (0 = southbound, 1 = northbound). Searches both weekday and
+ * weekend schedules so callers don't need to know which service day the
+ * vehicle is running. Returns the matched ProcessedTrip or null.
+ */
+export function findFullCorridorTrip(
+  directionId: number,
+  startTime: string,
+  tripNumber?: number
+): ProcessedTrip | null {
+  const isSouthbound = directionId === 0;
+  const from = isSouthbound ? stations[0] : stations[stations.length - 1];
+  const to = isSouthbound ? stations[stations.length - 1] : stations[0];
+  const originIndex = isSouthbound ? 0 : stations.length - 1;
+  const candidates = [
+    ...getFilteredTrips(from, to, "weekday"),
+    ...getFilteredTrips(from, to, "weekend"),
+  ];
+  // When a trip number is provided, disambiguate between reused numbers
+  // (e.g. trip 6 runs multiple times a day) by matching startTime as well.
+  if (tripNumber != null) {
+    return (
+      candidates.find(
+        (t) => t.trip === tripNumber && t.times[originIndex] === startTime,
+      ) ??
+      candidates.find((t) => t.trip === tripNumber) ??
+      null
+    );
+  }
+  return candidates.find((t) => t.times[originIndex] === startTime) ?? null;
+}
+
 // Time comparison function is now exported from timeUtils
 export { isTimeInPast } from "./timeUtils";
 

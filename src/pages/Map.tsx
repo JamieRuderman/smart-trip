@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -17,12 +17,14 @@ import stations, { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
@@ -38,6 +40,9 @@ const MARKER_COLOR = {
   canceled: "#888",
   userLocation: "#4285f4",
 } as const;
+
+/** Soft halo around the user-location dot. Keep in sync with userLocation. */
+const USER_LOCATION_HALO = "rgba(66,133,244,0.25)";
 
 /** Minimum delay (minutes) to flip a marker from ontime → delayed. */
 const DELAY_MINUTES_THRESHOLD = 3;
@@ -229,12 +234,18 @@ function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
 /**
  * Pick the timeline's "from" station for a tapped train so only upcoming
  * stops appear (plus one previous stop for the green-current highlight).
+ *
+ * Guarantees the returned station is not the terminus — a zero-length
+ * fromStation→toStation range breaks downstream direction/progress
+ * inference (notably southbound trains stopped at Larkspur).
  */
 function pickDisplayFromStation(
   train: MapTrain,
   isSouthbound: boolean,
 ): Station {
   const origin = isSouthbound ? WINDSOR : LARKSPUR;
+  const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+  const terminusIdx = stationIndexMap[terminus];
   let anchorStation: Station | null = train.nextStation;
   let treatAsServed = train.currentStatus === "STOPPED_AT";
   if (anchorStation == null) {
@@ -249,29 +260,43 @@ function pickDisplayFromStation(
       : anchorIdx - 1
     : anchorIdx;
   const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
-  if (displayFromIdx >= 0 && displayFromIdx < stations.length) {
-    return stations[displayFromIdx];
-  }
-  if (upcomingIdx >= 0 && upcomingIdx < stations.length) {
-    return stations[upcomingIdx];
-  }
-  return anchorStation;
+
+  const pick = (idx: number): Station | null =>
+    idx >= 0 && idx < stations.length && idx !== terminusIdx
+      ? stations[idx]
+      : null;
+
+  return (
+    pick(displayFromIdx) ??
+    pick(upcomingIdx) ??
+    // Last resort: one stop short of the terminus so the trip range is
+    // always non-zero-length.
+    stations[isSouthbound ? terminusIdx - 1 : terminusIdx + 1] ??
+    origin
+  );
 }
 
 // ─── Map page component ───────────────────────────────────────────────────────
 
-/** Thin wrapper that swaps in a configuration-help screen when the Mapbox
- *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
-export default function Map() {
+/** Navigate back to the schedule, preferring history-back so query params
+ *  and scroll position are preserved. Falls back to a direct navigate when
+ *  the user landed on /map via a direct link. */
+function useBackToSchedule(): () => void {
   const navigate = useNavigate();
   const location = useLocation();
-  const backToSchedule = () => {
+  return useCallback(() => {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
       navigate({ pathname: "/", search: location.search });
     }
-  };
+  }, [navigate, location.search]);
+}
+
+/** Thin wrapper that swaps in a configuration-help screen when the Mapbox
+ *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
+export default function Map() {
+  const backToSchedule = useBackToSchedule();
   if (!mapboxToken) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
@@ -295,18 +320,7 @@ export default function Map() {
 }
 
 function MapContents() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const backToSchedule = () => {
-    // Prefer history back so we return to the exact URL we came from
-    // (preserving query params and scroll). Fall back to a direct navigate
-    // when the map was opened via a direct link (no prior history entry).
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  };
+  const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
   const { trains } = useMapTrains();
   const { lat: userLat, lng: userLng } = useGeolocation({
@@ -319,8 +333,29 @@ function MapContents() {
     trip: ProcessedTrip;
     fromStation: Station;
     toStation: Station;
+    realtimeStatus: TripRealtimeStatus | null;
   } | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Realtime status keyed by full-corridor scheduled departure (origin time).
+  // Computed for both directions so a tapped train of either direction can
+  // surface live delay/cancellation state in the detail sheet.
+  const allSouthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekday"),
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekend"),
+    ],
+    [],
+  );
+  const allNorthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekday"),
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekend"),
+    ],
+    [],
+  );
+  const sbStatusMaps = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, allSouthboundTrips);
+  const nbStatusMaps = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, allNorthboundTrips);
 
   const handleTrainClick = useCallback((train: MapTrain) => {
     setSelectedTrainKey(train.key);
@@ -352,12 +387,19 @@ function MapContents() {
       fromStation: displayFrom,
       toStation: terminus,
     };
+    // Pull live delay/cancellation state for this specific run. The status
+    // map is keyed by scheduled departure at the full-corridor origin, which
+    // is exactly match.departureTime here.
+    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
+    const realtimeStatus =
+      statusMaps.statusMap.get(match.departureTime) ?? null;
     setDetailTrip({
       trip: displayTrip,
       fromStation: displayFrom,
       toStation: terminus,
+      realtimeStatus,
     });
-  }, []);
+  }, [sbStatusMaps, nbStatusMaps]);
 
   useEffect(() => {
     if (detailTrip) {
@@ -371,15 +413,28 @@ function MapContents() {
     }
   }, [detailTrip]);
 
+  // Tracked so we can cancel the deferred unmount if the sheet re-opens
+  // mid-transition or the page unmounts.
+  const closeTimerRef = useRef<number | null>(null);
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
-    // Keep the trip mounted until the exit transition finishes so the sheet
-    // animates out instead of snapping away.
-    setTimeout(() => {
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
       setDetailTrip(null);
       setSelectedTrainKey(null);
+      closeTimerRef.current = null;
     }, SHEET_TRANSITION_MS);
   }, []);
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current != null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -551,7 +606,7 @@ function MapContents() {
         "border-radius:50%",
         `background:${MARKER_COLOR.userLocation}`,
         "border:2px solid white",
-        "box-shadow:0 0 0 4px rgba(66,133,244,0.25)",
+        `box-shadow:0 0 0 4px ${USER_LOCATION_HALO}`,
       ].join(";");
 
       userMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
@@ -649,8 +704,8 @@ function MapContents() {
           fromStation={detailTrip.fromStation}
           toStation={detailTrip.toStation}
           currentTime={new Date()}
-          lastUpdated={null}
-          realtimeStatus={null}
+          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
+          realtimeStatus={detailTrip.realtimeStatus}
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}

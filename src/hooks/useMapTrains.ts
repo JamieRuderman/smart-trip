@@ -4,6 +4,7 @@ import { useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { isWeekend } from "@/lib/utils";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { VehicleStopStatus } from "@/types/gtfsRt";
@@ -35,24 +36,25 @@ const tripNumberKey = (directionId: number, startTime: string) =>
 
 /**
  * Build a lookup map from "directionId|startTime" to the trip's human
- * number, covering both weekday and weekend schedules. One-time O(M) work
- * per schedule swap; per-vehicle lookups become O(1).
+ * number for today's active schedule (weekday or weekend). Vehicles in the
+ * GTFS-RT feed are always running today, so biasing to today avoids the
+ * collision case where weekday and weekend share an origin time and would
+ * otherwise overwrite each other.
  */
 function buildTripNumberIndex(): Map<string, number> {
   const index = new Map<string, number>();
   const north = stations[0];
   const south = stations[stations.length - 1];
   const lastIdx = stations.length - 1;
-  for (const scheduleType of ["weekday", "weekend"] as const) {
-    for (const sb of [true, false]) {
-      const from = sb ? north : south;
-      const to = sb ? south : north;
-      const originIdx = sb ? 0 : lastIdx;
-      const dirId = sb ? 0 : 1;
-      for (const trip of getFilteredTrips(from, to, scheduleType)) {
-        const origin = trip.times[originIdx];
-        if (origin) index.set(tripNumberKey(dirId, origin), trip.trip);
-      }
+  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  for (const sb of [true, false]) {
+    const from = sb ? north : south;
+    const to = sb ? south : north;
+    const originIdx = sb ? 0 : lastIdx;
+    const dirId = sb ? 0 : 1;
+    for (const trip of getFilteredTrips(from, to, scheduleType)) {
+      const origin = trip.times[originIdx];
+      if (origin) index.set(tripNumberKey(dirId, origin), trip.trip);
     }
   }
   return index;

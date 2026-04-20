@@ -1,21 +1,8 @@
-// Number of stations (keep in sync with stations.json)
-export type Station =
-  | "Windsor"
-  | "Sonoma County Airport"
-  | "Santa Rosa North"
-  | "Santa Rosa Downtown"
-  | "Rohnert Park"
-  | "Cotati"
-  | "Petaluma North"
-  | "Petaluma Downtown"
-  | "Novato San Marin"
-  | "Novato Downtown"
-  | "Novato Hamilton"
-  | "Marin Civic Center"
-  | "San Rafael"
-  | "Larkspur";
-
-export const STATION_COUNT = 14;
+// The Station union + count are generated from the SMART GTFS feed by
+// scripts/updateTransitFeeds.ts. Edit CURATED_STATION_ZONES there (not here)
+// when stations are added or fare zones reshuffle.
+export type { Station } from "@/data/generated/stations.generated";
+export { STATION_COUNT } from "@/data/generated/stations.generated";
 
 // Fare-related types
 export type FareType = 

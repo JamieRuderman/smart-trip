@@ -194,24 +194,26 @@ function buildStations(gtfs: GtfsFiles): StationParent[] {
     );
   }
 
+  // From here every `r.platformZones` has exactly one element.
+  const resolved = raw.map((r) => ({
+    ...r,
+    zoneId: r.platformZones.values().next().value as string,
+  }));
+
   const zoneNumberById = new Map<string, number>();
-  for (const r of raw) {
-    const zoneId = [...r.platformZones][0];
-    if (!zoneNumberById.has(zoneId)) {
-      zoneNumberById.set(zoneId, zoneNumberById.size + 1);
+  for (const r of resolved) {
+    if (!zoneNumberById.has(r.zoneId)) {
+      zoneNumberById.set(r.zoneId, zoneNumberById.size + 1);
     }
   }
 
-  return raw.map((r) => {
-    const zoneId = [...r.platformZones][0];
-    return {
-      stopId: r.stopId,
-      name: r.name,
-      lat: r.lat,
-      lng: r.lng,
-      zone: zoneNumberById.get(zoneId)!,
-    };
-  });
+  return resolved.map((r) => ({
+    stopId: r.stopId,
+    name: r.name,
+    lat: r.lat,
+    lng: r.lng,
+    zone: zoneNumberById.get(r.zoneId)!,
+  }));
 }
 
 function emitStationsFile(stations: StationParent[]): void {
@@ -327,7 +329,8 @@ function buildTrainSchedules(
   gtfs: GtfsFiles,
   stations: StationParent[],
 ): TrainSchedulesOutput {
-  const stationOrder = stations.map((s) => s.name);
+  const stationCount = stations.length;
+  const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
   const stopToStation = buildStopIdToStationMap(gtfs.stops, stations);
 
@@ -357,7 +360,7 @@ function buildTrainSchedules(
       (a, b) => Number(a.stop_sequence) - Number(b.stop_sequence)
     );
 
-    const stationTimes = new Array<string | undefined>(stationOrder.length).fill(undefined);
+    const stationTimes = new Array<string | undefined>(stationCount).fill(undefined);
     let firstStationIndex: number | undefined;
     let lastStationIndex: number | undefined;
 
@@ -365,8 +368,8 @@ function buildTrainSchedules(
       const stationName = stopToStation.get(stopTime.stop_id);
       if (!stationName) continue;
 
-      const stationIndex = stationOrder.indexOf(stationName);
-      if (stationIndex === -1) continue;
+      const stationIndex = stationIndexByName.get(stationName);
+      if (stationIndex === undefined) continue;
 
       const timeRaw = stopTime.departure_time || stopTime.arrival_time;
       if (!timeRaw) continue;
@@ -413,7 +416,7 @@ function buildTrainSchedules(
   for (const scheduleType of Object.keys(schedules) as ScheduleType[]) {
     for (const direction of ["northbound", "southbound"] as TrainDirection[]) {
       schedules[scheduleType][direction].sort((a, b) => {
-        const index = direction === "southbound" ? 0 : stationOrder.length - 1;
+        const index = direction === "southbound" ? 0 : stationCount - 1;
         const [aHours, aMinutes] = a.times[index].split(":").map(Number);
         const [bHours, bMinutes] = b.times[index].split(":").map(Number);
         return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
@@ -537,15 +540,14 @@ function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   return ferrySchedules;
 }
 
+const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
+
 function extractStationCoordinates(
   parents: StationParent[],
 ): Record<string, { lat: number; lng: number }> {
   const coords: Record<string, { lat: number; lng: number }> = {};
   for (const p of parents) {
-    coords[p.name] = {
-      lat: parseFloat(p.lat.toFixed(4)),
-      lng: parseFloat(p.lng.toFixed(4)),
-    };
+    coords[p.name] = { lat: round4(p.lat), lng: round4(p.lng) };
   }
   return coords;
 }
@@ -653,9 +655,14 @@ async function updateFeeds(): Promise<void> {
 
   assertOutputDir();
 
-  console.log("Fetching SMART GTFS feed...");
-  const smartZip = await fetchZip(SMART_FEED_URL(apiKey));
+  console.log("Fetching SMART + Golden Gate Ferry GTFS feeds...");
+  const [smartZip, ferryZip] = await Promise.all([
+    fetchZip(SMART_FEED_URL(apiKey)),
+    fetchZip(FERRY_FEED_URL(apiKey)),
+  ]);
   const smartGtfs = loadGtfs(smartZip);
+  const ferryGtfs = loadGtfs(ferryZip);
+
   console.log("Processing SMART GTFS feed...");
   const stations = buildStations(smartGtfs);
   emitStationsFile(stations);
@@ -667,9 +674,6 @@ async function updateFeeds(): Promise<void> {
   const stationCoords = extractStationCoordinates(stations);
   emitStationCoordinatesFile(stationCoords);
 
-  console.log("Fetching Golden Gate Ferry GTFS feed...");
-  const ferryZip = await fetchZip(FERRY_FEED_URL(apiKey));
-  const ferryGtfs = loadGtfs(ferryZip);
   console.log("Processing Golden Gate Ferry GTFS feed...");
   const ferrySchedules = buildFerrySchedules(ferryGtfs);
   emitFerrySchedulesFile(ferrySchedules);

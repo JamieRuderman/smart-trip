@@ -6,9 +6,7 @@ import {
 
 export { STATION_COORDINATES } from "@/data/generated/stationCoordinates.generated";
 
-// The generated file is `readonly`; widen to the public `StationZone[]` /
-// `Station[]` shape callers already expect. Same reference — nothing mutates
-// these at runtime.
+// Widen the generated readonly arrays to the mutable shapes callers expect.
 export const stationZones = STATION_ZONES as readonly StationZone[] as StationZone[];
 
 const stations = STATION_ORDER as readonly Station[] as Station[];

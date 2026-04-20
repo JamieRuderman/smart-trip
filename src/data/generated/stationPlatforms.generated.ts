@@ -35,37 +35,5 @@ export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = {
   "71131": "Sonoma County Airport",
   "71132": "Sonoma County Airport",
   "71141": "Windsor",
-  "71142": "Windsor",
+  "71142": "Windsor"
 };
-
-/** Set of known SMART platform stop_ids, for validating realtime feeds. */
-export const KNOWN_STOP_IDS: Set<string> = new Set([
-  "71011",
-  "71012",
-  "71021",
-  "71022",
-  "71031",
-  "71032",
-  "71041",
-  "71042",
-  "71051",
-  "71052",
-  "71061",
-  "71062",
-  "71071",
-  "71072",
-  "71081",
-  "71082",
-  "71091",
-  "71092",
-  "71101",
-  "71102",
-  "71111",
-  "71112",
-  "71121",
-  "71122",
-  "71131",
-  "71132",
-  "71141",
-  "71142",
-]);

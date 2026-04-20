@@ -1,10 +1,12 @@
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 import { createGtfsRtHandler, warnIfStaleTimestamp, warnIfUnknownStopId, warnIfUnknownEnum } from "../_handler.js";
 import { VEHICLE_STOP_STATUS, KNOWN_VEHICLE_STOP_STATUS_VALUES } from "../_gtfsrt.js";
-import { KNOWN_STOP_IDS } from "../../src/data/generated/stationPlatforms.generated.js";
+import { GTFS_STOP_ID_TO_STATION } from "../../src/data/generated/stationPlatforms.generated.js";
 
 type FeedEntity = GtfsRealtime.IFeedEntity;
 type VehicleData = GtfsRealtime.IVehiclePosition;
+
+const KNOWN_STOP_IDS = new Set(Object.keys(GTFS_STOP_ID_TO_STATION));
 
 export default createGtfsRtHandler({
   feed: "vehiclepositions",

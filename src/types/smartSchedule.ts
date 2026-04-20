@@ -1,6 +1,5 @@
-// The Station union + count are generated from the SMART GTFS feed by
-// scripts/updateTransitFeeds.ts. Edit CURATED_STATION_ZONES there (not here)
-// when stations are added or fare zones reshuffle.
+// Station list, count, and zone numbers are generated from the SMART GTFS
+// feed (parent stops + platform zone_ids) by scripts/updateTransitFeeds.ts.
 export type { Station } from "@/data/generated/stations.generated";
 export { STATION_COUNT } from "@/data/generated/stations.generated";
 

@@ -4,12 +4,13 @@ import {
   STATION_ZONES,
 } from "@/data/generated/stations.generated";
 
-// Station metadata is generated from the SMART GTFS feed by
-// scripts/updateTransitFeeds.ts. Run `npm run update-transit` to refresh.
 export { STATION_COORDINATES } from "@/data/generated/stationCoordinates.generated";
 
-export const stationZones: StationZone[] = STATION_ZONES.map((z) => ({ ...z }));
+// The generated file is `readonly`; widen to the public `StationZone[]` /
+// `Station[]` shape callers already expect. Same reference — nothing mutates
+// these at runtime.
+export const stationZones = STATION_ZONES as readonly StationZone[] as StationZone[];
 
-const stations: Station[] = [...STATION_ORDER];
+const stations = STATION_ORDER as readonly Station[] as Station[];
 
 export default stations;

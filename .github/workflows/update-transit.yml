@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   refresh:
@@ -34,3 +35,46 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "chore: refresh transit feeds"
           git push
+
+      # If any step above failed, open (or bump) a GitHub issue so the
+      # repo owner gets an email notification. Issues persist past the
+      # Actions log retention window.
+      - name: Report failure as issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "Transit feed refresh failed";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `The scheduled **Update Transit Feeds** workflow failed.`,
+              ``,
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              ``,
+              `Likely causes: upstream 511 GTFS format change, API key expired, or sanity-floor check tripped (see the "Refresh GTFS snapshots" step).`,
+            ].join("\n");
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "transit-refresh",
+            });
+            const match = existing.data.find((i) => i.title === title);
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["transit-refresh", "automated"],
+              });
+            }

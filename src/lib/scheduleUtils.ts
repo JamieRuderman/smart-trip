@@ -219,9 +219,65 @@ try {
   scheduleCache = {};
 }
 
+/**
+ * Monotonic counter incremented each time `setScheduleData` rebuilds the
+ * cache. Downstream consumers (e.g. trainMotion's per-trip memo) can watch
+ * this to invalidate their own caches without a circular import.
+ */
+let scheduleVersion = 0;
+export function getScheduleVersion(): number {
+  return scheduleVersion;
+}
+
+/**
+ * Next outbound ferry departure from Larkspur, after `now`. Derived from
+ * the processed southbound trips' `outboundFerry` — dedup'd by depart time
+ * so repeated connections from back-to-back trains collapse to one entry.
+ * Returns null when no more ferries today.
+ *
+ * Sorted list is cached per schedule type; re-scanning the full trip array
+ * every diagram tick (once per second) is wasteful when the timetable is
+ * static.
+ */
+type FerryCache = { scheduleType: ScheduleType; sorted: FerryConnection[] };
+let ferryCache: FerryCache | null = null;
+
+function sortedFerries(scheduleType: ScheduleType): FerryConnection[] {
+  if (ferryCache && ferryCache.scheduleType === scheduleType) {
+    return ferryCache.sorted;
+  }
+  const windsor = stations[0];
+  const larkspur = stations[stations.length - 1];
+  const seen = new Set<string>();
+  const ferries: FerryConnection[] = [];
+  for (const trip of getFilteredTrips(windsor, larkspur, scheduleType)) {
+    const f = trip.outboundFerry;
+    if (!f || seen.has(f.depart)) continue;
+    seen.add(f.depart);
+    ferries.push(f);
+  }
+  ferries.sort(
+    (a, b) => parseTimeToMinutes(a.depart) - parseTimeToMinutes(b.depart),
+  );
+  ferryCache = { scheduleType, sorted: ferries };
+  return ferries;
+}
+
+export function getNextFerryDeparture(now: Date): FerryConnection | null {
+  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const ferries = sortedFerries(scheduleType);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return (
+    ferries.find((f) => parseTimeToMinutes(f.depart) >= nowMinutes) ?? null
+  );
+}
+
 export function setScheduleData(payload: SchedulePayload): void {
   try {
     scheduleCache = processScheduleData(payload);
+    scheduleVersion += 1;
+    // Downstream caches were built from the previous payload — evict them.
+    ferryCache = null;
   } catch (error) {
     console.error("[ScheduleUtils] Error processing schedule data:", error);
   }

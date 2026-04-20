@@ -50,9 +50,12 @@ export function ScheduleHeader({
             ? t("schedule.southboundSchedule")
             : t("schedule.northboundSchedule")}
         </span>
-        <div className="max-w-[8.5rem] shrink-0 flex items-center gap-1 text-xs sm:text-sm text-muted-foreground leading-tight text-right whitespace-normal break-words">
+        <div className="max-w-[8.5rem] shrink-0 flex items-center gap-1 text-xs sm:text-sm text-muted-foreground text-right whitespace-normal break-words tracking-normal">
           <span>{updatedLabel}</span>
-          <RefreshCw className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <RefreshCw
+            className="h-4 w-4 shrink-0 text-primary"
+            aria-hidden="true"
+          />
         </div>
       </CardTitle>
       {nextTripIndex > 0 && !showAllTrips && (

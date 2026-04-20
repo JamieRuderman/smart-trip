@@ -85,10 +85,19 @@ export default {
           green: "hsl(var(--smart-green))" /* #114533 - logo only */,
           "train-green":
             "hsl(var(--smart-train-green))" /* #11ab75 - main UI */,
-          gold: "hsl(var(--smart-gold))" /* #E48E25 */,
+          gold: "hsl(var(--smart-gold))" /* rgb(216, 146, 63) */,
           "dark-green": "hsl(var(--smart-dark-green))",
           "light-green": "hsl(var(--smart-light-green))",
           neutral: "hsl(228deg 2.65% 45%)" /* default sheet header */,
+        },
+        // Fare-zone palette — used by the line diagram's per-zone track
+        // tint. Zone 2 mirrors smart-train-green; zone 3 mirrors smart-gold.
+        zone: {
+          1: "hsl(var(--zone-1))",
+          2: "hsl(var(--smart-train-green))",
+          3: "hsl(var(--smart-gold))",
+          4: "hsl(var(--zone-4))",
+          5: "hsl(var(--zone-5))",
         },
         // Transit-specific colors
         transit: {

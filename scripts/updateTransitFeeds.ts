@@ -17,24 +17,17 @@ import { fileURLToPath } from "node:url";
 import AdmZip from "adm-zip";
 import { parse } from "csv-parse/sync";
 
-import stations from "@/data/stations";
-import { STATION_COUNT } from "@/types/smartSchedule";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const OUTPUT_DIR = path.resolve(__dirname, "../src/data/generated");
 const PUBLIC_DATA_DIR = path.resolve(__dirname, "../public/data");
 
-if (stations.length !== STATION_COUNT) {
-  throw new Error(
-    `Station count mismatch: expected ${STATION_COUNT}, got ${stations.length}. Ensure stations.ts stays in sync with types.`
-  );
-}
-
 const BASE_GTFS_URL = "https://api.511.org/transit/datafeeds";
 const SMART_OPERATOR_ID = "SA"; // Sonoma Marin Area Rail Transit
 const GOLDEN_GATE_FERRY_OPERATOR_ID = "GF";
+/** GGF's stable route_id for the Larkspur ↔ San Francisco ferry. */
+const LARKSPUR_SF_ROUTE_ID = "LSSF";
 
 const SMART_FEED_URL = (token: string) =>
   `${BASE_GTFS_URL}?api_key=${token}&operator_id=${SMART_OPERATOR_ID}`;
@@ -78,12 +71,19 @@ type GtfsFiles = {
   routes: CsvRow[];
 };
 
-const EXPECTED_TRAIN_STATIONS = stations.length;
+type StationParent = {
+  /** GTFS `stop_id` of the parent station (location_type=1). */
+  stopId: string;
+  /** Display name (GTFS stop_name with the "SMART " prefix stripped). */
+  name: string;
+  lat: number;
+  lng: number;
+  /** Fare-zone number (1 at the north end, ascending southward). */
+  zone: number;
+};
 
 function assertOutputDir(): void {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
 async function fetchZip(url: string): Promise<AdmZip> {
@@ -132,13 +132,118 @@ function loadGtfs(zip: AdmZip): GtfsFiles {
   };
 }
 
-function normalise(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/\(.*?\)/g, "")
-    .replace(/smart|station|ctr|center|platform|northbound|southbound|north|south|nb|sb|bound|terminal/g, "")
-    .replace(/[^a-z]/g, "")
-    .trim();
+/**
+ * Derive SMART stations from the GTFS feed.
+ *
+ * - Stations = parent stops (`location_type=1`); display name strips the
+ *   "SMART " prefix.
+ * - Order is N→S by latitude.
+ * - Fare zones come from the *platform* rows (`location_type=0`). Parent
+ *   rows carry an inconsistent `zone_id` that disagrees with their own
+ *   platforms, and fares are keyed to the platform zone.
+ * - Zone numbers 1..N are assigned in the order each `zone_id` first appears
+ *   going N→S, giving the app's canonical "1 = north, N = south" numbering.
+ *
+ * Throws if a station has conflicting or missing platform zones — the CI
+ * sanity check then fails loud instead of emitting a subtly broken file.
+ */
+function buildStations(gtfs: GtfsFiles): StationParent[] {
+  const displayName = (raw: string): string =>
+    raw.replace(/^SMART\s+/i, "").trim();
+
+  const platformZonesByParent = new Map<string, Set<string>>();
+  for (const s of gtfs.stops) {
+    if (s.location_type !== "0") continue;
+    const parent = s.parent_station ?? "";
+    const zone = s.zone_id ?? "";
+    if (!parent || !zone) continue;
+    const set = platformZonesByParent.get(parent) ?? new Set();
+    set.add(zone);
+    platformZonesByParent.set(parent, set);
+  }
+
+  const raw = gtfs.stops
+    .filter((s) => s.location_type === "1")
+    .map((s) => ({
+      stopId: s.stop_id ?? "",
+      name: displayName(s.stop_name ?? ""),
+      lat: Number(s.stop_lat),
+      lng: Number(s.stop_lon),
+      platformZones:
+        platformZonesByParent.get(s.stop_id ?? "") ?? new Set<string>(),
+    }))
+    .filter(
+      (s) =>
+        s.stopId && s.name && Number.isFinite(s.lat) && Number.isFinite(s.lng),
+    )
+    .sort((a, b) => b.lat - a.lat);
+
+  if (raw.length === 0) {
+    throw new Error("SMART GTFS feed has no parent stops (location_type=1).");
+  }
+
+  const unzoned = raw.filter((r) => r.platformZones.size !== 1);
+  if (unzoned.length > 0) {
+    const detail = unzoned
+      .map(
+        (r) => `${r.name} (${[...r.platformZones].join(",") || "<none>"})`,
+      )
+      .join(", ");
+    throw new Error(
+      `SMART feed has stations whose platform zone_ids are missing or disagree: ${detail}`,
+    );
+  }
+
+  // From here every `r.platformZones` has exactly one element.
+  const resolved = raw.map((r) => ({
+    ...r,
+    zoneId: r.platformZones.values().next().value as string,
+  }));
+
+  const zoneNumberById = new Map<string, number>();
+  for (const r of resolved) {
+    if (!zoneNumberById.has(r.zoneId)) {
+      zoneNumberById.set(r.zoneId, zoneNumberById.size + 1);
+    }
+  }
+
+  return resolved.map((r) => ({
+    stopId: r.stopId,
+    name: r.name,
+    lat: r.lat,
+    lng: r.lng,
+    zone: zoneNumberById.get(r.zoneId)!,
+  }));
+}
+
+function emitStationsFile(stations: StationParent[]): void {
+  const outputPath = path.resolve(OUTPUT_DIR, "stations.generated.ts");
+  const orderLiteral = stations
+    .map((s) => `  ${JSON.stringify(s.name)},`)
+    .join("\n");
+  const zonesLiteral = stations
+    .map((s) => `  { station: ${JSON.stringify(s.name)}, zone: ${s.zone} },`)
+    .join("\n");
+  const content = `// Auto-generated by scripts/updateTransitFeeds.ts
+// Do not edit manually.
+
+/** Canonical SMART station order, north → south. */
+export const STATION_ORDER = [
+${orderLiteral}
+] as const;
+
+/** The Station string-literal union, sourced from the GTFS feed. */
+export type Station = (typeof STATION_ORDER)[number];
+
+/** Number of SMART stations. Literal-typed so it can drive tuple lengths. */
+export const STATION_COUNT = ${stations.length} as const;
+
+/** Fare zone per station. Zone numbers ascend going south. */
+export const STATION_ZONES: readonly { station: Station; zone: number }[] = [
+${zonesLiteral}
+];
+`;
+  fs.writeFileSync(outputPath, content, "utf-8");
 }
 
 function toTimeString(raw: string): string {
@@ -199,41 +304,35 @@ function allTimesPresent(times: (string | undefined)[]): times is string[] {
   return times.every((time): time is string => typeof time === "string");
 }
 
-function buildStopIdToStationMap(stops: CsvRow[]): Map<string, string> {
+/**
+ * Resolve every platform `stop_id` to its station display name via GTFS's
+ * `parent_station` relationship. Parent rows also map to themselves so
+ * stop_times that reference a parent directly still resolve.
+ */
+function buildStopIdToStationMap(
+  stops: CsvRow[],
+  stations: StationParent[],
+): Map<string, string> {
+  const nameByParentId = new Map(stations.map((s) => [s.stopId, s.name]));
   const stationMap = new Map<string, string>();
-  const normalizedStations = new Map<string, string>();
-
-  for (const station of stations) {
-    normalizedStations.set(normalise(station), station);
-  }
-
   for (const stop of stops) {
-    const { stop_id: stopId, stop_name: stopName } = stop;
-    if (!stopId || !stopName) continue;
-
-    const normalizedStop = normalise(stopName);
-    const match = normalizedStations.get(normalizedStop);
-
-    if (match) {
-      stationMap.set(stopId, match);
-      continue;
-    }
-
-    // Fallback: try to match if station name is contained in stop name (handles NB/SB variants).
-    for (const [normalizedStation, originalStation] of normalizedStations.entries()) {
-      if (normalizedStop.includes(normalizedStation)) {
-        stationMap.set(stopId, originalStation);
-        break;
-      }
-    }
+    const stopId = stop.stop_id;
+    if (!stopId) continue;
+    const parentId = stop.location_type === "1" ? stopId : stop.parent_station ?? "";
+    const name = nameByParentId.get(parentId);
+    if (name) stationMap.set(stopId, name);
   }
-
   return stationMap;
 }
 
-function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
+function buildTrainSchedules(
+  gtfs: GtfsFiles,
+  stations: StationParent[],
+  stopToStation: Map<string, string>,
+): TrainSchedulesOutput {
+  const stationCount = stations.length;
+  const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
-  const stopToStation = buildStopIdToStationMap(gtfs.stops);
 
   const stopTimesByTrip = new Map<string, CsvRow[]>();
   for (const stopTime of gtfs.stopTimes) {
@@ -261,7 +360,7 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
       (a, b) => Number(a.stop_sequence) - Number(b.stop_sequence)
     );
 
-    const stationTimes = new Array<string | undefined>(EXPECTED_TRAIN_STATIONS).fill(undefined);
+    const stationTimes = new Array<string | undefined>(stationCount).fill(undefined);
     let firstStationIndex: number | undefined;
     let lastStationIndex: number | undefined;
 
@@ -269,8 +368,8 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
       const stationName = stopToStation.get(stopTime.stop_id);
       if (!stationName) continue;
 
-      const stationIndex = stations.indexOf(stationName);
-      if (stationIndex === -1) continue;
+      const stationIndex = stationIndexByName.get(stationName);
+      if (stationIndex === undefined) continue;
 
       const timeRaw = stopTime.departure_time || stopTime.arrival_time;
       if (!timeRaw) continue;
@@ -317,7 +416,7 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
   for (const scheduleType of Object.keys(schedules) as ScheduleType[]) {
     for (const direction of ["northbound", "southbound"] as TrainDirection[]) {
       schedules[scheduleType][direction].sort((a, b) => {
-        const index = direction === "southbound" ? 0 : stations.length - 1;
+        const index = direction === "southbound" ? 0 : stationCount - 1;
         const [aHours, aMinutes] = a.times[index].split(":").map(Number);
         const [bHours, bMinutes] = b.times[index].split(":").map(Number);
         return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
@@ -331,22 +430,47 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
 function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
 
-  const stopRoleMap = new Map<string, "larkspur" | "sf">();
-
-  for (const stop of gtfs.stops) {
-    const stopName = stop.stop_name?.toLowerCase() ?? "";
-    if (stopName.includes("larkspur") && stopName.includes("ferry")) {
-      stopRoleMap.set(stop.stop_id, "larkspur");
-    } else if (stopName.includes("san francisco") && stopName.includes("ferry")) {
-      stopRoleMap.set(stop.stop_id, "sf");
-    }
+  // Anchor on the route_id so the trip set doesn't depend on stop names.
+  // If the route disappears the sanity floor fails the run.
+  if (!gtfs.routes.some((r) => r.route_id === LARKSPUR_SF_ROUTE_ID)) {
+    console.warn(
+      `Golden Gate Ferry feed has no route_id="${LARKSPUR_SF_ROUTE_ID}"; ferry schedule will be empty.`,
+    );
+    return {
+      weekdayFerries: [],
+      weekendFerries: [],
+      weekdayInboundFerries: [],
+      weekendInboundFerries: [],
+    };
   }
 
+  // Within that route only two stops appear (Larkspur and one SF gate).
+  // Classify them by latitude — Larkspur is ~20 km north of SF, so the
+  // northernmost stop is always Larkspur.
+  const stopLatById = new Map<string, number>();
+  for (const s of gtfs.stops) {
+    const lat = Number(s.stop_lat);
+    if (Number.isFinite(lat)) stopLatById.set(s.stop_id, lat);
+  }
+  const stopRoleMap = new Map<string, "larkspur" | "sf">();
   const stopTimesByTrip = new Map<string, CsvRow[]>();
   for (const stopTime of gtfs.stopTimes) {
     const list = stopTimesByTrip.get(stopTime.trip_id) ?? [];
     list.push(stopTime);
     stopTimesByTrip.set(stopTime.trip_id, list);
+  }
+
+  const relevantStopIds = new Set<string>();
+  for (const trip of gtfs.trips) {
+    if (trip.route_id !== LARKSPUR_SF_ROUTE_ID) continue;
+    const list = stopTimesByTrip.get(trip.trip_id ?? "") ?? [];
+    for (const st of list) relevantStopIds.add(st.stop_id);
+  }
+  for (const id of relevantStopIds) {
+    const lat = stopLatById.get(id);
+    if (lat == null) continue;
+    // ~37.85° splits Marin (Larkspur 37.94) from SF waterfront (37.79).
+    stopRoleMap.set(id, lat > 37.85 ? "larkspur" : "sf");
   }
 
   const ferrySchedules: FerrySchedulesOutput = {
@@ -357,6 +481,7 @@ function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   };
 
   for (const trip of gtfs.trips) {
+    if (trip.route_id !== LARKSPUR_SF_ROUTE_ID) continue;
     const serviceType = serviceTypes.get(trip.service_id ?? "");
     if (!serviceType) continue;
 
@@ -415,28 +540,54 @@ function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   return ferrySchedules;
 }
 
-function extractStationCoordinates(stops: CsvRow[]): Record<string, { lat: number; lng: number }> {
-  // Parent stations have location_type=1 and contain the authoritative coordinates.
-  const parentStops = stops.filter((s) => s.location_type === "1");
+const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
+
+function extractStationCoordinates(
+  parents: StationParent[],
+): Record<string, { lat: number; lng: number }> {
   const coords: Record<string, { lat: number; lng: number }> = {};
-
-  for (const station of stations) {
-    const normalizedStation = normalise(station);
-    const match = parentStops.find((s) => normalise(s.stop_name ?? "") === normalizedStation);
-    if (match && match.stop_lat && match.stop_lon) {
-      coords[station] = {
-        lat: parseFloat(parseFloat(match.stop_lat).toFixed(4)),
-        lng: parseFloat(parseFloat(match.stop_lon).toFixed(4)),
-      };
-    }
+  for (const p of parents) {
+    coords[p.name] = { lat: round4(p.lat), lng: round4(p.lng) };
   }
-
-  if (Object.keys(coords).length !== stations.length) {
-    const missing = stations.filter((s) => !(s in coords));
-    console.warn(`Warning: could not find GTFS parent station coordinates for: ${missing.join(", ")}`);
-  }
-
   return coords;
+}
+
+/**
+ * Emit the platform-level stop_id map used by client and server code to
+ * resolve realtime `stop_id` references to station names. Every GTFS stop
+ * with `location_type=0` is emitted; parent rows are excluded so a feed that
+ * drops platforms trips the sanity floor below instead of silently shrinking.
+ * Returns the count of platform entries written.
+ */
+function emitStationPlatformsFile(
+  stopIdToStation: Map<string, string>,
+  stations: StationParent[],
+): number {
+  const parentIds = new Set(stations.map((s) => s.stopId));
+  const platforms = Object.fromEntries(
+    [...stopIdToStation.entries()]
+      .filter(([stopId]) => !parentIds.has(stopId))
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+
+  const outputPath = path.resolve(OUTPUT_DIR, "stationPlatforms.generated.ts");
+  const content = `// Auto-generated by scripts/updateTransitFeeds.ts
+// Do not edit manually.
+import type { Station } from "./stations.generated.js";
+
+/**
+ * Every SMART platform stop_id (GTFS location_type=0) mapped to its parent
+ * station's display name. Used by both client hooks and the /api/gtfsrt
+ * transforms to resolve realtime stop_id references.
+ */
+export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = ${JSON.stringify(
+    platforms,
+    null,
+    2,
+  )};
+`;
+  fs.writeFileSync(outputPath, content, "utf-8");
+  return Object.keys(platforms).length;
 }
 
 function emitStationCoordinatesFile(coords: Record<string, { lat: number; lng: number }>): void {
@@ -542,20 +693,28 @@ async function updateFeeds(): Promise<void> {
 
   assertOutputDir();
 
-  console.log("Fetching SMART GTFS feed...");
-  const smartZip = await fetchZip(SMART_FEED_URL(apiKey));
+  console.log("Fetching SMART + Golden Gate Ferry GTFS feeds...");
+  const [smartZip, ferryZip] = await Promise.all([
+    fetchZip(SMART_FEED_URL(apiKey)),
+    fetchZip(FERRY_FEED_URL(apiKey)),
+  ]);
   const smartGtfs = loadGtfs(smartZip);
+  const ferryGtfs = loadGtfs(ferryZip);
+
   console.log("Processing SMART GTFS feed...");
-  const trainSchedules = buildTrainSchedules(smartGtfs);
+  const stations = buildStations(smartGtfs);
+  emitStationsFile(stations);
+
+  const stopIdToStation = buildStopIdToStationMap(smartGtfs.stops, stations);
+  const platformCount = emitStationPlatformsFile(stopIdToStation, stations);
+
+  const trainSchedules = buildTrainSchedules(smartGtfs, stations, stopIdToStation);
   emitTrainSchedulesFile(trainSchedules);
 
   console.log("Extracting station coordinates...");
-  const stationCoords = extractStationCoordinates(smartGtfs.stops);
+  const stationCoords = extractStationCoordinates(stations);
   emitStationCoordinatesFile(stationCoords);
 
-  console.log("Fetching Golden Gate Ferry GTFS feed...");
-  const ferryZip = await fetchZip(FERRY_FEED_URL(apiKey));
-  const ferryGtfs = loadGtfs(ferryZip);
   console.log("Processing Golden Gate Ferry GTFS feed...");
   const ferrySchedules = buildFerrySchedules(ferryGtfs);
   emitFerrySchedulesFile(ferrySchedules);
@@ -568,13 +727,59 @@ async function updateFeeds(): Promise<void> {
     weekendNorthbound: trainSchedules.weekend.northbound.length,
   };
 
+  const zoneCount = new Set(stations.map((s) => s.zone)).size;
+  console.log(
+    `Derived ${stations.length} SMART stations with ${zoneCount} fare zones.`,
+  );
   console.log("Generated SMART train schedules", trainTripCounts);
-  console.log("Generated ferry schedules", {
+  const ferryCounts = {
     weekday: ferrySchedules.weekdayFerries.length,
     weekend: ferrySchedules.weekendFerries.length,
     weekdayInbound: ferrySchedules.weekdayInboundFerries.length,
     weekendInbound: ferrySchedules.weekendInboundFerries.length,
-  });
+  };
+  console.log("Generated ferry schedules", ferryCounts);
+
+  // Sanity floors — if the feed's shape shifts and we silently emit empty
+  // arrays (as happened when GGF renamed their stops), the workflow catches
+  // it instead of committing a broken file. Numbers are well below typical
+  // daily counts so seasonal thinning won't trip them.
+  const MIN_TRIPS = {
+    weekdaySouthbound: 10,
+    weekdayNorthbound: 10,
+    weekendSouthbound: 4,
+    weekendNorthbound: 4,
+  };
+  const MIN_FERRIES = {
+    weekday: 5,
+    weekend: 2,
+    weekdayInbound: 5,
+    weekendInbound: 2,
+  };
+  const MIN_STATIONS = 14;
+  const MIN_PLATFORMS = 28;
+  const failures: string[] = [];
+  if (stations.length < MIN_STATIONS) {
+    failures.push(`stations: got ${stations.length}, expected ≥ ${MIN_STATIONS}`);
+  }
+  if (platformCount < MIN_PLATFORMS) {
+    failures.push(`platforms: got ${platformCount}, expected ≥ ${MIN_PLATFORMS}`);
+  }
+  for (const [key, min] of Object.entries(MIN_TRIPS)) {
+    const got = trainTripCounts[key as keyof typeof trainTripCounts];
+    if (got < min) failures.push(`train.${key}: got ${got}, expected ≥ ${min}`);
+  }
+  for (const [key, min] of Object.entries(MIN_FERRIES)) {
+    const got = ferryCounts[key as keyof typeof ferryCounts];
+    if (got < min) failures.push(`ferry.${key}: got ${got}, expected ≥ ${min}`);
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      "Transit feed refresh produced suspiciously low counts — upstream " +
+        "feed format may have changed. Inspect the generator:\n  - " +
+        failures.join("\n  - "),
+    );
+  }
 }
 
 updateFeeds().catch((error) => {

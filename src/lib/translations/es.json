@@ -130,6 +130,32 @@
     "noMoreTrainsToday": "No hay más trenes hoy",
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
   },
+  "mapDiagram": {
+    "tapHint": "Toca una estación o tren para ver detalles",
+    "zones": "Zonas",
+    "toggleZones": "Alternar zonas tarifarias",
+    "closeMap": "Cerrar mapa",
+    "zoneLabel": "Zona {{zone}}",
+    "sanFrancisco": "San Francisco",
+    "ferryBadgeLabel": "FERRY · {{minutes}} MIN",
+    "nextFerryBadge": "PRÓXIMO FERRY · {{minutes}} MIN",
+    "noMoreFerries": "NO HAY MÁS FERRIES HOY",
+    "previewTitle": "Diagrama de línea (beta)",
+    "previewSubtitle": "Vista esquemática de todos los trenes",
+    "activeTrains_one": "{{count}} activo",
+    "activeTrains_other": "{{count}} activos"
+  },
+  "stationInfo": {
+    "stationInfoAria": "Información de la estación {{station}}",
+    "close": "Cerrar información de la estación",
+    "zoneLabel": "Zona {{zone}}",
+    "nextArrivals": "Próximas llegadas",
+    "noUpcoming": "No hay llegadas próximas.",
+    "toTerminus": "a {{terminus}}",
+    "canceledSuffix": "· Cancelado",
+    "delaySuffix": "· +{{minutes}} min de retraso",
+    "minUnit": "min"
+  },
   "tracker": {
     "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Llega en {{minutes}} min",

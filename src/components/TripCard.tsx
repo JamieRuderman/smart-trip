@@ -19,7 +19,6 @@ interface TripCardProps {
   trip: ProcessedTrip;
   isNextTrip: boolean;
   isPastTrip: boolean;
-  showAllTrips: boolean;
   showFerry: boolean;
   timeFormat: "12h" | "24h";
   realtimeStatus?: TripRealtimeStatus | null;
@@ -35,7 +34,6 @@ export const TripCard = memo(function TripCard({
   trip,
   isNextTrip,
   isPastTrip,
-  showAllTrips,
   showFerry,
   timeFormat,
   realtimeStatus,
@@ -186,7 +184,6 @@ export const TripCard = memo(function TripCard({
           tripNumber={trip.trip}
           isNextTrip={isNextTrip}
           isPastTrip={isPastTrip}
-          showAllTrips={showAllTrips}
           isCanceled={isCanceled}
           isSkipped={isOriginSkipped}
           isDelayed={isDelayed}

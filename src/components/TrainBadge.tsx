@@ -6,7 +6,6 @@ interface TrainBadgeProps {
   tripNumber: number;
   isNextTrip?: boolean;
   isPastTrip?: boolean;
-  showAllTrips?: boolean;
   isCanceled?: boolean;
   isSkipped?: boolean;
   isDelayed?: boolean;
@@ -17,7 +16,6 @@ export function TrainBadge({
   tripNumber,
   isNextTrip = false,
   isPastTrip = false,
-  showAllTrips = false,
   isCanceled = false,
   isSkipped = false,
   isDelayed = false,

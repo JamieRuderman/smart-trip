@@ -121,7 +121,6 @@ export function ScheduleResults({
                 trip={trip}
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
-                showAllTrips={showAllTrips}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}

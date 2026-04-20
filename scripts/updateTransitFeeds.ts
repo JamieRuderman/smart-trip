@@ -437,19 +437,13 @@ function buildTrainSchedules(
 function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
 
-  // Find the Larkspur ↔ SF route by route_id, falling back to the long name.
-  // Stop names in the feed have shifted (e.g. "Larkspur Ferry Terminal" →
-  // "Larkspur"; multiple SF "Gate B/C" stops) so we anchor on the route
-  // instead. GGF's `LSSF` short code has been stable for years.
-  const larkspurRoute = gtfs.routes.find(
-    (r) =>
-      r.route_id === "LSSF" ||
-      (r.route_long_name?.toLowerCase().includes("larkspur") &&
-        r.route_long_name?.toLowerCase().includes("san francisco")),
-  );
-  if (!larkspurRoute) {
+  // Anchor on the `LSSF` route_id so the Larkspur↔SF trip set doesn't depend
+  // on stop names (which drift — e.g. "Larkspur Ferry Terminal" → "Larkspur"
+  // in 2026). If the code ever disappears the sanity floor will fail the run.
+  const larkspurRouteId = "LSSF";
+  if (!gtfs.routes.some((r) => r.route_id === larkspurRouteId)) {
     console.warn(
-      "No Larkspur↔SF ferry route found in GGF feed; ferry schedule will be empty.",
+      `Golden Gate Ferry feed has no route_id="${larkspurRouteId}"; ferry schedule will be empty.`,
     );
     return {
       weekdayFerries: [],
@@ -458,7 +452,6 @@ function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
       weekendInboundFerries: [],
     };
   }
-  const larkspurRouteId = larkspurRoute.route_id;
 
   // Within that route only two stops appear (Larkspur and one SF gate).
   // Classify them by latitude — Larkspur is ~20 km north of SF, so the

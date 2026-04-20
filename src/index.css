@@ -46,6 +46,13 @@ All colors MUST be HSL.
     --smart-dark-green: 143 72% 10%; /* Darker green for depth */
     --smart-light-green: 143 72% 20%; /* Lighter green for accents */
 
+    /* Fare zone colors — used by the line diagram. Zone 2 reuses
+       --smart-train-green and zone 3 reuses --smart-gold so the brand
+       identity stays consistent across the app. */
+    --zone-1: 163 82% 30%; /* deeper green */
+    --zone-4: 12 65% 55%; /* terracotta */
+    --zone-5: 222 51% 47%; /* blue */
+
     /* Transit-specific colors */
     --transit-primary: var(--smart-train-green);
     --transit-secondary: var(--smart-gold);

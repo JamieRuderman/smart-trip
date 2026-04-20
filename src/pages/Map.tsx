@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ChevronLeft } from "lucide-react";
-
 import { mapboxToken } from "@/lib/env";
 import {
   STATION_ORDER,
@@ -23,6 +22,7 @@ import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
+import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -43,9 +43,6 @@ const MARKER_COLOR = {
 
 /** Soft halo around the user-location dot. Keep in sync with userLocation. */
 const USER_LOCATION_HALO = "rgba(66,133,244,0.25)";
-
-/** Minimum delay (minutes) to flip a marker from ontime → delayed. */
-const DELAY_MINUTES_THRESHOLD = 3;
 
 /** Fallback bearings (degrees from north) used when GTFS-RT omits the vehicle
  *  bearing. Chosen to roughly follow the SMART rail corridor. */

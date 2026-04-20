@@ -17,6 +17,7 @@ import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
+import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
@@ -145,6 +146,7 @@ export function TrainScheduleApp() {
       >
         {/* Live Train Map */}
         <MapPreviewCard />
+        <MapDiagramPreviewCard />
 
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />

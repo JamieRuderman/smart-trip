@@ -13,6 +13,11 @@ export function mpsToMph(mps: number): number {
  * Parse a time string into minutes since midnight
  * Handles special characters like * and ~
  */
+/** Minutes elapsed since midnight for a Date (0–1439). */
+export function minutesOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
 export function parseTimeToMinutes(timeStr: string): number {
   const cleaned = timeStr.replace(/[*~]/g, "");
   const [h, m] = cleaned.split(":").map(Number);

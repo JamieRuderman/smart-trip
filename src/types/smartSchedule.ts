@@ -1,6 +1,7 @@
 // Station list, count, and zone numbers are generated from the SMART GTFS
 // feed (parent stops + platform zone_ids) by scripts/updateTransitFeeds.ts.
-export { type Station, STATION_COUNT } from "@/data/generated/stations.generated";
+import { STATION_COUNT, type Station } from "@/data/generated/stations.generated";
+export { STATION_COUNT, type Station };
 
 // Fare-related types
 export type FareType = 

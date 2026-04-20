@@ -1,28 +1,10 @@
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 import { createGtfsRtHandler, warnIfStaleTimestamp, warnIfUnknownStopId, warnIfUnknownEnum } from "../_handler.js";
 import { VEHICLE_STOP_STATUS, KNOWN_VEHICLE_STOP_STATUS_VALUES } from "../_gtfsrt.js";
+import { KNOWN_STOP_IDS } from "../../src/data/generated/stationPlatforms.generated.js";
 
 type FeedEntity = GtfsRealtime.IFeedEntity;
 type VehicleData = GtfsRealtime.IVehiclePosition;
-
-// Known SMART platform stop IDs — mirrors GTFS_STOP_ID_TO_STATION in the client.
-// Used server-side to warn about unexpected stop IDs in the feed.
-const KNOWN_STOP_IDS = new Set([
-  "71011", "71012", // Larkspur
-  "71021", "71022", // San Rafael
-  "71031", "71032", // Marin Civic Center
-  "71041", "71042", // Novato Hamilton
-  "71051", "71052", // Novato Downtown
-  "71061", "71062", // Novato San Marin
-  "71071", "71072", // Petaluma Downtown
-  "71081", "71082", // Petaluma North
-  "71091", "71092", // Cotati
-  "71101", "71102", // Rohnert Park
-  "71111", "71112", // Santa Rosa Downtown
-  "71121", "71122", // Santa Rosa North
-  "71131", "71132", // Sonoma County Airport
-  "71141", "71142", // Windsor
-]);
 
 export default createGtfsRtHandler({
   feed: "vehiclepositions",

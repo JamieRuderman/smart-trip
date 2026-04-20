@@ -516,12 +516,16 @@ function MapContents() {
 
     mapRef.current = map;
 
+    // Capture the train-marker Map object so cleanup uses the same reference
+    // React hooks saw at effect time (the ref is populated by other effects).
+    const trainMarkers = trainMarkersRef.current;
+
     return () => {
       // clean up markers
       stationMarkersRef.current.forEach((m) => m.remove());
       stationMarkersRef.current = [];
-      trainMarkersRef.current.forEach((m) => m.remove());
-      trainMarkersRef.current.clear();
+      trainMarkers.forEach((m) => m.remove());
+      trainMarkers.clear();
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
       map.remove();

@@ -331,15 +331,49 @@ function buildTrainSchedules(gtfs: GtfsFiles): TrainSchedulesOutput {
 function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
 
-  const stopRoleMap = new Map<string, "larkspur" | "sf">();
+  // Find the Larkspur ↔ SF route by route_id, falling back to the long name.
+  // Stop names in the feed have shifted (e.g. "Larkspur Ferry Terminal" →
+  // "Larkspur"; multiple SF "Gate B/C" stops) so we anchor on the route
+  // instead. GGF's `LSSF` short code has been stable for years.
+  const larkspurRoute = gtfs.routes.find(
+    (r) =>
+      r.route_id === "LSSF" ||
+      (r.route_long_name?.toLowerCase().includes("larkspur") &&
+        r.route_long_name?.toLowerCase().includes("san francisco")),
+  );
+  if (!larkspurRoute) {
+    console.warn(
+      "No Larkspur↔SF ferry route found in GGF feed; ferry schedule will be empty.",
+    );
+    return {
+      weekdayFerries: [],
+      weekendFerries: [],
+      weekdayInboundFerries: [],
+      weekendInboundFerries: [],
+    };
+  }
+  const larkspurRouteId = larkspurRoute.route_id;
 
-  for (const stop of gtfs.stops) {
-    const stopName = stop.stop_name?.toLowerCase() ?? "";
-    if (stopName.includes("larkspur") && stopName.includes("ferry")) {
-      stopRoleMap.set(stop.stop_id, "larkspur");
-    } else if (stopName.includes("san francisco") && stopName.includes("ferry")) {
-      stopRoleMap.set(stop.stop_id, "sf");
-    }
+  // Within that route only two stops appear (Larkspur and one SF gate).
+  // Classify them by latitude — Larkspur is ~20 km north of SF, so the
+  // northernmost stop is always Larkspur.
+  const stopLatById = new Map<string, number>();
+  for (const s of gtfs.stops) {
+    const lat = Number(s.stop_lat);
+    if (Number.isFinite(lat)) stopLatById.set(s.stop_id, lat);
+  }
+  const stopRoleMap = new Map<string, "larkspur" | "sf">();
+  const relevantStopIds = new Set<string>();
+  for (const trip of gtfs.trips) {
+    if (trip.route_id !== larkspurRouteId) continue;
+    const list = gtfs.stopTimes.filter((st) => st.trip_id === trip.trip_id);
+    for (const st of list) relevantStopIds.add(st.stop_id);
+  }
+  for (const id of relevantStopIds) {
+    const lat = stopLatById.get(id);
+    if (lat == null) continue;
+    // ~37.85° splits Marin (Larkspur 37.94) from SF waterfront (37.79).
+    stopRoleMap.set(id, lat > 37.85 ? "larkspur" : "sf");
   }
 
   const stopTimesByTrip = new Map<string, CsvRow[]>();
@@ -357,6 +391,7 @@ function buildFerrySchedules(gtfs: GtfsFiles): FerrySchedulesOutput {
   };
 
   for (const trip of gtfs.trips) {
+    if (trip.route_id !== larkspurRouteId) continue;
     const serviceType = serviceTypes.get(trip.service_id ?? "");
     if (!serviceType) continue;
 
@@ -569,12 +604,46 @@ async function updateFeeds(): Promise<void> {
   };
 
   console.log("Generated SMART train schedules", trainTripCounts);
-  console.log("Generated ferry schedules", {
+  const ferryCounts = {
     weekday: ferrySchedules.weekdayFerries.length,
     weekend: ferrySchedules.weekendFerries.length,
     weekdayInbound: ferrySchedules.weekdayInboundFerries.length,
     weekendInbound: ferrySchedules.weekendInboundFerries.length,
-  });
+  };
+  console.log("Generated ferry schedules", ferryCounts);
+
+  // Sanity floors — if the feed's shape shifts and we silently emit empty
+  // arrays (as happened when GGF renamed their stops), the workflow catches
+  // it instead of committing a broken file. Numbers are well below typical
+  // daily counts so seasonal thinning won't trip them.
+  const MIN_TRIPS = {
+    weekdaySouthbound: 10,
+    weekdayNorthbound: 10,
+    weekendSouthbound: 4,
+    weekendNorthbound: 4,
+  };
+  const MIN_FERRIES = {
+    weekday: 5,
+    weekend: 2,
+    weekdayInbound: 5,
+    weekendInbound: 2,
+  };
+  const failures: string[] = [];
+  for (const [key, min] of Object.entries(MIN_TRIPS)) {
+    const got = trainTripCounts[key as keyof typeof trainTripCounts];
+    if (got < min) failures.push(`train.${key}: got ${got}, expected ≥ ${min}`);
+  }
+  for (const [key, min] of Object.entries(MIN_FERRIES)) {
+    const got = ferryCounts[key as keyof typeof ferryCounts];
+    if (got < min) failures.push(`ferry.${key}: got ${got}, expected ≥ ${min}`);
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      "Transit feed refresh produced suspiciously low counts — upstream " +
+        "feed format may have changed. Inspect the generator:\n  - " +
+        failures.join("\n  - "),
+    );
+  }
 }
 
 updateFeeds().catch((error) => {

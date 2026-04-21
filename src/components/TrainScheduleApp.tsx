@@ -144,12 +144,12 @@ export function TrainScheduleApp() {
           paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
-        {/* Live Train Map */}
-        <MapPreviewCard />
-        <MapDiagramPreviewCard />
-
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
+
+        {/* Live Train Map */}
+        <MapDiagramPreviewCard />
+        <MapPreviewCard />
 
         {/* Empty State - No stations selected */}
         {(!fromStation || !toStation) && <EmptyState />}

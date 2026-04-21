@@ -15,7 +15,7 @@ export function MapDiagramPreviewCard() {
   const activeCount = data?.vehicles?.filter((v) => v.trip != null).length ?? 0;
 
   return (
-    <SectionCard className="overflow-hidden bg-smart-gold/5 hover:bg-smart-gold/10 transition-colors md:border-smart-gold/30">
+    <SectionCard className="overflow-hidden bg-smart-train-green/5 hover:bg-smart-train-green/10 transition-colors md:border-smart-train-green/30">
       <button
         type="button"
         onClick={() =>
@@ -24,21 +24,21 @@ export function MapDiagramPreviewCard() {
         className="w-full px-5 py-4 md:px-6 flex items-center justify-between gap-3 text-left"
       >
         <div className="flex items-center gap-2.5">
-          <GitCommitVertical className="h-5 w-5 text-smart-gold flex-shrink-0" />
+          <GitCommitVertical className="h-5 w-5 text-smart-train-green flex-shrink-0" />
           <div>
-            <div className="font-semibold text-sm text-smart-gold">
+            <div className="font-semibold text-sm text-smart-train-green">
               {t("mapDiagram.previewTitle")}
             </div>
-            <div className="text-xs text-smart-gold/70">
+            <div className="text-xs text-smart-train-green/70">
               {t("mapDiagram.previewSubtitle")}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold bg-smart-gold text-white rounded-full px-2.5 py-0.5 whitespace-nowrap">
-            {t("mapDiagram.activeTrains", { count: activeCount })}
+          <span className="text-xs font-semibold bg-smart-train-green text-white rounded-full px-2.5 py-0.5 whitespace-nowrap">
+            {t("mapDiagram.trainsCount", { count: activeCount })}
           </span>
-          <span className="text-smart-gold text-lg">→</span>
+          <span className="text-smart-train-green text-lg">→</span>
         </div>
       </button>
     </SectionCard>

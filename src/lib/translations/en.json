@@ -143,7 +143,9 @@
     "previewTitle": "Line Diagram (beta)",
     "previewSubtitle": "Schematic view of all trains",
     "activeTrains_one": "{{count}} active",
-    "activeTrains_other": "{{count}} active"
+    "activeTrains_other": "{{count}} active",
+    "trainsCount_one": "{{count}} Train",
+    "trainsCount_other": "{{count}} Trains"
   },
   "stationInfo": {
     "stationInfoAria": "{{station}} station info",

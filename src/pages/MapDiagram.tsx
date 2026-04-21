@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Hand, Palette } from "lucide-react";
 
 import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import {
@@ -68,6 +69,23 @@ export default function MapDiagram() {
   };
 
   const { trains } = useMapTrains();
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get("from") as Station | null;
+  const toParam = searchParams.get("to") as Station | null;
+  const fromStation =
+    fromParam && stationIndexMap[fromParam] != null ? fromParam : null;
+  const toStation =
+    toParam && stationIndexMap[toParam] != null ? toParam : null;
+
+  const { lat: userLat, lng: userLng } = useGeolocation({
+    watch: true,
+    autoRequestOnNative: true,
+    autoRequestOnWeb: true,
+  });
+  const userStation = useMemo<Station | null>(() => {
+    if (userLat == null || userLng == null) return null;
+    return getClosestStation(userLat, userLng);
+  }, [userLat, userLng]);
 
   // Stable Date that only advances on minute boundaries, so child sheets'
   // memos (arrivals/ETA) don't invalidate on every parent render.
@@ -174,6 +192,9 @@ export default function MapDiagram() {
           <Hand className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{t("mapDiagram.tapHint")}</span>
         </div>
+        <span className="text-xs font-semibold bg-white/15 text-white rounded-full px-2.5 py-1 whitespace-nowrap">
+          {t("mapDiagram.trainsCount", { count: trains.length })}
+        </span>
         <button
           type="button"
           onClick={() => setColorTrackByZone((v) => !v)}
@@ -202,6 +223,9 @@ export default function MapDiagram() {
           onTrainClick={handleTrainClick}
           onStationClick={handleStationClick}
           colorTrackByZone={colorTrackByZone}
+          fromStation={fromStation}
+          toStation={toStation}
+          userStation={userStation}
           className="min-h-full"
         />
       </div>

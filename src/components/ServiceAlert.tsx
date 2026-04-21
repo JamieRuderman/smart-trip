@@ -91,9 +91,9 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
               type="button"
               aria-label={t("serviceAlert.dismiss")}
               onClick={() => dismissAlert(alert)}
-              className="shrink-0 mt-0.5 text-smart-gold/60 hover:text-smart-gold transition-colors"
+              className="shrink-0 -mr-2 -mt-2 -mb-2 p-3 rounded-lg text-smart-gold/70 hover:text-smart-gold hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </SectionCard>

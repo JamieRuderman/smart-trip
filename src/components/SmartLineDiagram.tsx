@@ -62,9 +62,17 @@ export interface SmartLineDiagramProps {
   colorTrackByZone?: boolean;
   /** Show the dashed ferry extension from Larkspur to the SF Ferry Building. */
   showFerry?: boolean;
+  /** User's selected origin station — enlarged in place of the north terminus. */
+  fromStation?: Station | null;
+  /** User's selected destination station — enlarged in place of the south terminus. */
+  toStation?: Station | null;
+  /** Station closest to the user's current location — shows a pulsing blue dot. */
+  userStation?: Station | null;
   /** Optional wrapper class (e.g. for max-width or padding). */
   className?: string;
 }
+
+const USER_LOCATION_COLOR = "#1e88ff";
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -75,8 +83,18 @@ export function SmartLineDiagram({
   onStationClick,
   colorTrackByZone = false,
   showFerry = true,
+  fromStation = null,
+  toStation = null,
+  userStation = null,
   className,
 }: SmartLineDiagramProps) {
+  // When the user has picked either endpoint, enlarge whichever are set in
+  // place of the corridor terminals. Falls back to first/last only when
+  // neither is selected, so the diagram always has emphasized anchor points.
+  const selected: Station[] = [];
+  if (fromStation) selected.push(fromStation);
+  if (toStation) selected.push(toStation);
+  const enlargedStations = selected.length > 0 ? new Set<Station>(selected) : null;
   const pathRef = useRef<SVGPathElement | null>(null);
   const [snap, setSnap] = useState<{
     stations: { station: Station; x: number; y: number }[];
@@ -171,17 +189,33 @@ export function SmartLineDiagram({
 
         {colorTrackByZone && <ZoneLabels />}
 
-        {(snap?.stations ?? DIAGRAM_STATIONS).map((st, i, arr) => (
-          <StationMarker
-            key={st.station}
-            station={st.station}
-            x={st.x}
-            y={st.y}
-            isTerminal={i === 0 || i === arr.length - 1}
-            colorTrackByZone={colorTrackByZone}
-            onClick={onStationClick}
-          />
-        ))}
+        {(snap?.stations ?? DIAGRAM_STATIONS).map((st, i, arr) => {
+          const isEnlarged = enlargedStations
+            ? enlargedStations.has(st.station)
+            : i === 0 || i === arr.length - 1;
+          return (
+            <StationMarker
+              key={st.station}
+              station={st.station}
+              x={st.x}
+              y={st.y}
+              isTerminal={isEnlarged}
+              colorTrackByZone={colorTrackByZone}
+              onClick={onStationClick}
+            />
+          );
+        })}
+
+        {userStation &&
+          (snap?.stations ?? DIAGRAM_STATIONS)
+            .filter((st) => st.station === userStation)
+            .map((st) => (
+              <UserLocationMarker
+                key={`user-${st.station}`}
+                x={st.x}
+                y={st.y}
+              />
+            ))}
 
         {pathRef.current &&
           snap &&
@@ -257,6 +291,33 @@ function StationMarker({
         x={labelX}
         y={y}
         isTerminal={isTerminal}
+      />
+    </g>
+  );
+}
+
+// ── User location marker ─────────────────────────────────────────────────
+//
+// Pulsing blue dot overlaying the station closest to the user. Matches the
+// train-marker pulse cadence so the two animations read as related.
+
+function UserLocationMarker({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x}, ${y})`} pointerEvents="none">
+      <circle r={30} fill={USER_LOCATION_COLOR} opacity={0.3}>
+        <animate attributeName="r" values="22;36;22" dur="2s" repeatCount="indefinite" />
+        <animate
+          attributeName="opacity"
+          values="0.4;0.08;0.4"
+          dur="2s"
+          repeatCount="indefinite"
+        />
+      </circle>
+      <circle
+        r={11}
+        fill={USER_LOCATION_COLOR}
+        stroke={TOKEN.stationFill}
+        strokeWidth={4}
       />
     </g>
   );

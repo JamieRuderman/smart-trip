@@ -143,7 +143,9 @@
     "previewTitle": "Diagrama de línea (beta)",
     "previewSubtitle": "Vista esquemática de todos los trenes",
     "activeTrains_one": "{{count}} activo",
-    "activeTrains_other": "{{count}} activos"
+    "activeTrains_other": "{{count}} activos",
+    "trainsCount_one": "{{count}} Tren",
+    "trainsCount_other": "{{count}} Trenes"
   },
   "stationInfo": {
     "stationInfoAria": "Información de la estación {{station}}",

@@ -14,6 +14,10 @@ interface StationLabelProps {
   tx: number;
   ty: number;
   scale: number;
+  /** Optional click handler — when provided, the label becomes tappable
+   *  (same affordance as the dot itself). Pan/zoom drags are still
+   *  suppressed via the document-capture handler in `usePanZoom`. */
+  onClick?: (station: Station) => void;
 }
 
 /**
@@ -30,6 +34,7 @@ export function StationLabel({
   tx,
   ty,
   scale,
+  onClick,
 }: StationLabelProps) {
   const baseSize = isTerminal ? TOKEN.terminalSize : TOKEN.labelSize;
   const fontSize = baseSize / screenScale;
@@ -49,11 +54,19 @@ export function StationLabel({
       y={labelY}
       textAnchor="end"
       dominantBaseline="central"
-      pointerEvents="none"
+      pointerEvents={onClick ? "auto" : "none"}
       fontSize={fontSize}
       fontWeight={fontWeight}
       className="fill-foreground"
-      style={{ fontFamily: FONT_FAMILY }}
+      style={{ fontFamily: FONT_FAMILY, cursor: onClick ? "pointer" : "default" }}
+      onClick={
+        onClick
+          ? (e) => {
+              e.stopPropagation();
+              onClick(station);
+            }
+          : undefined
+      }
     >
       {wrapped ? (
         <>

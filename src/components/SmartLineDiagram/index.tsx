@@ -265,6 +265,7 @@ export function SmartLineDiagram({
               tx={tx}
               ty={ty}
               scale={scale}
+              onClick={onStationClick}
             />
           );
         })}

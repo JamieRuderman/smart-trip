@@ -145,7 +145,8 @@
     "activeTrains_one": "{{count}} active",
     "activeTrains_other": "{{count}} active",
     "trainsCount_one": "{{count}} Train",
-    "trainsCount_other": "{{count}} Trains"
+    "trainsCount_other": "{{count}} Trains",
+    "resetZoom": "Reset zoom"
   },
   "stationInfo": {
     "stationInfoAria": "{{station}} station info",

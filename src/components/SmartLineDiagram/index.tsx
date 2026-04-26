@@ -1,15 +1,27 @@
 /**
  * SmartLineDiagram — Mini-Metro style SVG schematic.
  *
- * The SVG itself draws with literal HSL token colors (so trains stay legible
- * on any background); Tailwind tokens are reserved for text and chrome so
- * light/dark mode still works. All sizes/animations live in `./tokens`.
+ * Layout has two sibling SVG groups:
+ *
+ *   1. Zoomable group — wraps the path, zone segments, station dots, train
+ *      markers, user-location dot, and ferry glyph. Pan/zoom transform on
+ *      this `<g>` makes everything inside scale together.
+ *   2. Label layer — station labels, zone labels, and ferry text. Lives
+ *      outside the zoomable group so its font sizes can stay at constant
+ *      CSS pixel targets regardless of zoom; each label hand-applies the
+ *      pan/zoom transform to its anchor coords.
+ *
+ * Colors come from `hsl(var(--token))` so the diagram inverts cleanly in
+ * dark mode. All sizes/animations live in `./tokens`.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Maximize2 } from "lucide-react";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import type { Station } from "@/types/smartSchedule";
 import { useSvgScreenScale } from "@/hooks/useSvgScreenScale";
+import { usePanZoom } from "@/hooks/usePanZoom";
 import {
   DIAGRAM_STATIONS,
   FERRY_WAYPOINTS,
@@ -20,12 +32,14 @@ import { snapToPath } from "@/lib/pathSnap";
 import { TOKEN, MOTION_TICK_MS } from "./tokens";
 import { useClockTick } from "./useClockTick";
 import { buildSmoothPath } from "./buildSmoothPath";
-import { StationMarker } from "./StationMarker";
+import { StationDot } from "./StationDot";
+import { StationLabel } from "./StationLabel";
 import { UserLocationMarker } from "./UserLocationMarker";
 import { TrainMarker } from "./TrainMarker";
 import { ZoneLabels } from "./ZoneLabels";
 import { ZoneSegments } from "./ZoneSegments";
 import { FerryTerminus } from "./FerryTerminus";
+import { FerryLabels } from "./FerryLabels";
 
 // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -74,6 +88,8 @@ export function SmartLineDiagram({
   userRidingTrainKey = null,
   className,
 }: SmartLineDiagramProps) {
+  const { t } = useTranslation();
+
   // When the user has picked either endpoint, enlarge whichever are set in
   // place of the corridor terminals. Falls back to first/last only when
   // neither is selected, so the diagram always has emphasized anchor points.
@@ -111,12 +127,17 @@ export function SmartLineDiagram({
 
   const ferryD = useMemo(() => buildSmoothPath(FERRY_WAYPOINTS, 28), []);
   const now = useClockTick(MOTION_TICK_MS);
-  const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width);
+  const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width, VIEW_BOX.height);
+  const { tx, ty, scale, transform, reset } = usePanZoom(svgRef, {
+    viewBox: VIEW_BOX,
+  });
+  const stationList = snap?.stations ?? DIAGRAM_STATIONS;
 
   return (
     <div
       className={className}
       style={{
+        position: "relative",
         width: "100%",
         height: "100%",
         display: "flex",
@@ -128,93 +149,149 @@ export function SmartLineDiagram({
         ref={svgRef}
         viewBox={`${VIEW_BOX.x} ${VIEW_BOX.y} ${VIEW_BOX.width} ${VIEW_BOX.height}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ width: "100%", height: "100%", display: "block" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          touchAction: "none",
+        }}
       >
-        {/* Ferry extension (below main line so it tucks under Larkspur) */}
-        {showFerry && (
-          <g opacity={0.9}>
-            <path
-              d={ferryD}
-              stroke={TOKEN.detailStroke}
-              strokeWidth={TOKEN.lineW * 0.55}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={`${TOKEN.lineW * 0.9} ${TOKEN.lineW * 1.0}`}
-              fill="none"
-            />
-            <FerryTerminus
-              x={FERRY_WAYPOINTS[2].x}
-              y={FERRY_WAYPOINTS[2].y}
-              now={now}
-              screenScale={screenScale}
-            />
-          </g>
-        )}
+        {/* Zoomable group — track, zone segments, station dots, train
+            markers, user-location dot, ferry glyph. */}
+        <g transform={transform}>
+          {showFerry && (
+            <g opacity={0.9}>
+              <path
+                d={ferryD}
+                stroke={TOKEN.detailStroke}
+                strokeWidth={TOKEN.lineW * 0.55}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={`${TOKEN.lineW * 0.9} ${TOKEN.lineW * 1.0}`}
+                fill="none"
+              />
+              <FerryTerminus
+                x={FERRY_WAYPOINTS[2].x}
+                y={FERRY_WAYPOINTS[2].y}
+              />
+            </g>
+          )}
 
-        <path
-          ref={pathRef}
-          d={ROUTE_PATH_D}
-          stroke={colorTrackByZone ? TOKEN.mutedTrack : BRAND_LINE_COLOR}
-          strokeWidth={TOKEN.lineW}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
+          <path
+            ref={pathRef}
+            d={ROUTE_PATH_D}
+            stroke={colorTrackByZone ? TOKEN.mutedTrack : BRAND_LINE_COLOR}
+            strokeWidth={TOKEN.lineW}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
 
-        {colorTrackByZone && snap && (
-          <ZoneSegments
-            pathD={ROUTE_PATH_D}
-            totalLength={snap.totalLength}
-            stationArcs={snap.arcs}
+          {colorTrackByZone && snap && (
+            <ZoneSegments
+              pathD={ROUTE_PATH_D}
+              totalLength={snap.totalLength}
+              stationArcs={snap.arcs}
+            />
+          )}
+
+          {stationList.map((st, i, arr) => {
+            const isEnlarged = enlargedStations
+              ? enlargedStations.has(st.station)
+              : i === 0 || i === arr.length - 1;
+            return (
+              <StationDot
+                key={st.station}
+                station={st.station}
+                x={st.x}
+                y={st.y}
+                isTerminal={isEnlarged}
+                colorTrackByZone={colorTrackByZone}
+                onClick={onStationClick}
+              />
+            );
+          })}
+
+          {userStation &&
+            stationList
+              .filter((st) => st.station === userStation)
+              .map((st) => (
+                <UserLocationMarker
+                  key={`user-${st.station}`}
+                  x={st.x}
+                  y={st.y}
+                />
+              ))}
+
+          {pathRef.current &&
+            snap &&
+            trains.map((train) => (
+              <TrainMarker
+                key={train.key}
+                train={train}
+                pathEl={pathRef.current!}
+                stationArcs={snap.arcs}
+                selected={train.key === selectedTrainKey}
+                userRiding={train.key === userRidingTrainKey}
+                onClick={onTrainClick}
+                now={now}
+              />
+            ))}
+        </g>
+
+        {/* Label layer — constant CSS-pixel font sizes, hand-affined
+            positions. Render above the zoomed group so labels paint on top. */}
+        {colorTrackByZone && (
+          <ZoneLabels
+            screenScale={screenScale}
+            tx={tx}
+            ty={ty}
+            scale={scale}
           />
         )}
 
-        {colorTrackByZone && <ZoneLabels screenScale={screenScale} />}
-
-        {(snap?.stations ?? DIAGRAM_STATIONS).map((st, i, arr) => {
+        {stationList.map((st, i, arr) => {
           const isEnlarged = enlargedStations
             ? enlargedStations.has(st.station)
             : i === 0 || i === arr.length - 1;
           return (
-            <StationMarker
-              key={st.station}
+            <StationLabel
+              key={`label-${st.station}`}
               station={st.station}
               x={st.x}
               y={st.y}
               isTerminal={isEnlarged}
-              colorTrackByZone={colorTrackByZone}
               screenScale={screenScale}
-              onClick={onStationClick}
+              tx={tx}
+              ty={ty}
+              scale={scale}
             />
           );
         })}
 
-        {userStation &&
-          (snap?.stations ?? DIAGRAM_STATIONS)
-            .filter((st) => st.station === userStation)
-            .map((st) => (
-              <UserLocationMarker
-                key={`user-${st.station}`}
-                x={st.x}
-                y={st.y}
-              />
-            ))}
-
-        {pathRef.current &&
-          snap &&
-          trains.map((train) => (
-            <TrainMarker
-              key={train.key}
-              train={train}
-              pathEl={pathRef.current!}
-              stationArcs={snap.arcs}
-              selected={train.key === selectedTrainKey}
-              userRiding={train.key === userRidingTrainKey}
-              onClick={onTrainClick}
-              now={now}
-            />
-          ))}
+        {showFerry && (
+          <FerryLabels
+            x={FERRY_WAYPOINTS[2].x}
+            y={FERRY_WAYPOINTS[2].y}
+            now={now}
+            screenScale={screenScale}
+            tx={tx}
+            ty={ty}
+            scale={scale}
+          />
+        )}
       </svg>
+
+      {(scale > 1.001 || tx !== 0 || ty !== 0) && (
+        <button
+          type="button"
+          onClick={reset}
+          aria-label={t("mapDiagram.resetZoom", "Reset zoom")}
+          className="absolute top-3 right-3 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-card border border-border text-foreground shadow-card hover:bg-accent"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }

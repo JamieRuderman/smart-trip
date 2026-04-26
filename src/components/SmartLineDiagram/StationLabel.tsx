@@ -3,32 +3,53 @@ import { FONT_FAMILY, MULTILINE_LABELS, TOKEN } from "./tokens";
 
 interface StationLabelProps {
   station: Station;
+  /** Dot center, in viewBox units (pre-zoom). */
   x: number;
   y: number;
   isTerminal: boolean;
-  /** screenScale = svgWidth / viewBoxWidth. Font size is divided by this so
-   *  the label renders at a constant CSS pixel size. */
+  /** screenScale = svgWidth / viewBoxWidth. */
   screenScale: number;
+  /** Pan-zoom transform applied to the matching dot. The label sits in the
+   *  outer (non-zoomed) group, so we apply the affine ourselves. */
+  tx: number;
+  ty: number;
+  scale: number;
 }
 
+/**
+ * Station name label. Renders OUTSIDE the zoomable group so the font size
+ * stays at a constant CSS pixel target. Position is hand-affined from the
+ * dot's pre-zoom (x, y) so the label tracks the dot through pan/zoom.
+ */
 export function StationLabel({
   station,
   x,
   y,
   isTerminal,
   screenScale,
+  tx,
+  ty,
+  scale,
 }: StationLabelProps) {
   const baseSize = isTerminal ? TOKEN.terminalSize : TOKEN.labelSize;
   const fontSize = baseSize / screenScale;
   const fontWeight = isTerminal ? TOKEN.terminalWeight : TOKEN.labelWeight;
   const wrapped = MULTILINE_LABELS[station];
+  const r = isTerminal ? TOKEN.terminalR : TOKEN.stationR;
+
+  // Apply the affine the matching dot would receive, then back off to the
+  // left of the (now potentially-zoomed) dot. Multiplying the gap by `scale`
+  // keeps the label's distance proportional to the rendered dot.
+  const labelX = x * scale + tx - (r + TOKEN.labelGap) * scale;
+  const labelY = y * scale + ty;
 
   return (
     <text
-      x={x}
-      y={y}
+      x={labelX}
+      y={labelY}
       textAnchor="end"
       dominantBaseline="central"
+      pointerEvents="none"
       fontSize={fontSize}
       fontWeight={fontWeight}
       className="fill-foreground"
@@ -36,10 +57,10 @@ export function StationLabel({
     >
       {wrapped ? (
         <>
-          <tspan x={x} dy={-fontSize * 0.55}>
+          <tspan x={labelX} dy={-fontSize * 0.55}>
             {wrapped[0]}
           </tspan>
-          <tspan x={x} dy={fontSize * 1.1}>
+          <tspan x={labelX} dy={fontSize * 1.1}>
             {wrapped[1]}
           </tspan>
         </>

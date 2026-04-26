@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { X, ArrowUp, ArrowDown, Check, LogIn, LogOut } from "lucide-react";
+import { X, ArrowUp, ArrowDown, Check, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
@@ -11,7 +11,6 @@ import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
-import { Button } from "@/components/ui/button";
 import { AppSheet } from "@/components/ui/app-sheet";
 import type { Station } from "@/types/smartSchedule";
 
@@ -163,7 +162,7 @@ export function StationInfoSheet({
       </div>
 
       {(onSetFrom || onSetTo) && (
-        <div className="px-5 pb-4 flex gap-2">
+        <div className="px-5 pt-4 pb-4 flex gap-3">
           {onSetFrom && (
             <FromToButton
               role="from"
@@ -216,23 +215,38 @@ function FromToButton({
   onClick: () => void;
 }) {
   const { t } = useTranslation();
-  const Icon = isCurrent ? Check : role === "from" ? LogIn : LogOut;
+  const RoleIcon = role === "from" ? MapPin : Flag;
   const label = isCurrent
     ? t(role === "from" ? "stationInfo.currentFrom" : "stationInfo.currentTo")
     : t(role === "from" ? "stationInfo.setAsFrom" : "stationInfo.setAsTo");
 
   return (
-    <Button
+    <button
       type="button"
-      variant={isCurrent ? "secondary" : "outline"}
-      size="sm"
-      disabled={isCurrent}
       onClick={onClick}
-      className="flex-1"
+      disabled={isCurrent}
+      aria-pressed={isCurrent}
+      className={cn(
+        // Card-style tappable tile — taller hit area than the previous
+        // pill; clearly grouped icon + label so the role reads at a glance.
+        "flex-1 h-14 rounded-xl border-2 px-4 flex items-center gap-3",
+        "transition-colors text-left",
+        isCurrent
+          ? "border-primary bg-primary/10 text-primary cursor-default"
+          : "border-border bg-card text-foreground hover:bg-accent hover:border-primary/40",
+      )}
     >
-      <Icon className="w-4 h-4" aria-hidden="true" />
-      {label}
-    </Button>
+      <span
+        className={cn(
+          "shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
+          isCurrent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+        )}
+        aria-hidden="true"
+      >
+        {isCurrent ? <Check className="w-4 h-4" /> : <RoleIcon className="w-4 h-4" />}
+      </span>
+      <span className="text-sm font-semibold leading-tight">{label}</span>
+    </button>
   );
 }
 

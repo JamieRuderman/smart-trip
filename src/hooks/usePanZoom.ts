@@ -248,7 +248,12 @@ export function usePanZoom(
     const onPointerDown = (e: PointerEvent) => {
       // Ignore non-primary mouse buttons.
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      el.setPointerCapture?.(e.pointerId);
+      // Capture only for touch / pen — for mouse, capture retargets the
+      // subsequent `click` event to the SVG instead of the original target,
+      // which would prevent station/train onClick from ever firing.
+      if (e.pointerType !== "mouse") {
+        el.setPointerCapture?.(e.pointerId);
+      }
       recordPointer(e);
       totalMoveRef.current = 0;
       downPosRef.current = { x: e.clientX, y: e.clientY };

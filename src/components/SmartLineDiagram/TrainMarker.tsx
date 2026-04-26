@@ -1,9 +1,16 @@
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { positionOnPath } from "@/lib/pathSnap";
 import { trainStationProgress } from "@/lib/trainProgress";
+import { gpsStationProgress } from "@/lib/trainGpsProgress";
 import { scheduledProgress } from "@/lib/trainMotion";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
+
+/** When schedule and GPS disagree by more than this many station-segments,
+ *  pull the schedule progress halfway toward GPS so big real deviations
+ *  surface without per-tick jitter from raw GPS. */
+const SCHEDULE_GPS_DRIFT_THRESHOLD = 1.0;
+const SCHEDULE_GPS_BLEND = 0.5;
 
 interface TrainMarkerProps {
   train: MapTrain;
@@ -22,11 +29,33 @@ export function TrainMarker({
   onClick,
   now,
 }: TrainMarkerProps) {
+  // Resolve progress in this order:
+  //  1. Schedule-driven interpolation — smooth motion, absorbs delayMinutes.
+  //  2. GPS projection (corrects schedule when reality has drifted; also the
+  //     primary source when the schedule can't match the trip).
+  //  3. Station-midpoint fallback — last resort.
   const scheduled = scheduledProgress(train, now);
+  const gps = gpsStationProgress(train);
   const fallback = trainStationProgress(train);
-  const progress = scheduled?.progress ?? fallback.progress;
-  const direction = scheduled?.direction ?? fallback.direction;
-  const pos = positionOnPath(progress, pathEl, stationArcs, direction);
+
+  let resolved = scheduled ?? gps ?? fallback;
+
+  if (scheduled && gps) {
+    const drift = gps.progress - scheduled.progress;
+    if (Math.abs(drift) > SCHEDULE_GPS_DRIFT_THRESHOLD) {
+      resolved = {
+        ...scheduled,
+        progress: scheduled.progress + drift * SCHEDULE_GPS_BLEND,
+      };
+    }
+  }
+
+  const pos = positionOnPath(
+    resolved.progress,
+    pathEl,
+    stationArcs,
+    resolved.direction,
+  );
 
   const isDelayed =
     !train.isCanceled &&

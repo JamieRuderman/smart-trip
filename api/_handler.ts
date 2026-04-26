@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 import { applyCors } from "./_cors.js";
-import { fetchGtfsRt } from "./_gtfsrt.js";
+import { fetchGtfsRt, UpstreamGtfsRtError } from "./_gtfsrt.js";
 
 type Feed = "vehiclepositions" | "tripupdates" | "servicealerts";
 type FeedMessage = GtfsRealtime.IFeedMessage;
@@ -52,6 +52,17 @@ export function createGtfsRtHandler<T>(options: GtfsRtHandlerOptions<T>) {
       res.setHeader("Cache-Control", cacheControl);
       return res.json(result);
     } catch (err) {
+      // Distinguish upstream 511.org failures (rate limit, outage) from real
+      // server errors in our own code: 502 Bad Gateway with the upstream
+      // status, no caching. Lets clients (and humans reading the console)
+      // tell "transit feed is throttling us" apart from "we have a bug".
+      if (err instanceof UpstreamGtfsRtError) {
+        res.setHeader("Cache-Control", "no-store");
+        return res.status(502).json({
+          error: err.message,
+          upstreamStatus: err.upstreamStatus,
+        });
+      }
       const message = err instanceof Error ? err.message : "Unknown error";
       return res.status(500).json({ error: message });
     }

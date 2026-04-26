@@ -13,6 +13,20 @@ export const transit_realtime = (GtfsRealtimeBindings as GtfsRealtimeModule).tra
 
 const BASE = "http://api.511.org/transit";
 
+/** Thrown when the upstream 511.org feed responds non-OK (e.g. 429 rate limit,
+ *  503 maintenance). The handler maps these to 502 Bad Gateway so clients can
+ *  tell upstream issues apart from real bugs in our own code. */
+export class UpstreamGtfsRtError extends Error {
+  readonly feed: string;
+  readonly upstreamStatus: number;
+  constructor(feed: string, upstreamStatus: number) {
+    super(`511.org ${feed} responded ${upstreamStatus}`);
+    this.name = "UpstreamGtfsRtError";
+    this.feed = feed;
+    this.upstreamStatus = upstreamStatus;
+  }
+}
+
 export async function fetchGtfsRt(
   feed: "servicealerts" | "vehiclepositions" | "tripupdates"
 ): Promise<transitRealtimeTypes.FeedMessage> {
@@ -21,7 +35,7 @@ export async function fetchGtfsRt(
 
   const url = `${BASE}/${feed}?api_key=${apiKey}&agency=SA`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`511.org ${feed} responded ${res.status}`);
+  if (!res.ok) throw new UpstreamGtfsRtError(feed, res.status);
 
   const buffer = await res.arrayBuffer();
   return transit_realtime.FeedMessage.decode(new Uint8Array(buffer));

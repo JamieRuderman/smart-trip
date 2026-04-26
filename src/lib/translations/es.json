@@ -140,7 +140,7 @@
     "ferryBadgeLabel": "FERRY · {{minutes}} MIN",
     "nextFerryBadge": "PRÓXIMO FERRY · {{minutes}} MIN",
     "noMoreFerries": "NO HAY MÁS FERRIES HOY",
-    "previewTitle": "Diagrama de línea (beta)",
+    "previewTitle": "Diagrama del Mapa",
     "previewSubtitle": "Vista esquemática de todos los trenes",
     "activeTrains_one": "{{count}} activo",
     "activeTrains_other": "{{count}} activos",

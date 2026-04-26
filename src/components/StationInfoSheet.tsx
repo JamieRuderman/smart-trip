@@ -131,31 +131,34 @@ export function StationInfoSheet({
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel={t("stationInfo.stationInfoAria", { station })}
+      handleSlot={
+        // Colored drag-handle band keyed off the station's zone color, so
+        // handle and the colored title row below read as one continuous band.
+        <div
+          className="flex justify-center pt-3 pb-1 shrink-0"
+          style={{ backgroundColor: zoneColor }}
+        >
+          <div className="w-10 h-1 rounded-full bg-white/40" />
+        </div>
+      }
     >
-      <div className="px-5 pb-4 flex items-start justify-between gap-4">
+      <div
+        className="px-5 pt-2 pb-4 flex items-start justify-between gap-4 shrink-0"
+        style={{ backgroundColor: zoneColor }}
+      >
         <div>
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ background: zoneColor }}
-              aria-hidden="true"
-            />
-            <span
-              className="text-xs font-bold tracking-widest uppercase"
-              style={{ color: zoneColor }}
-            >
-              {t("stationInfo.zoneLabel", { zone })}
-            </span>
-          </div>
-          <h2 className="mt-1 text-2xl font-bold text-foreground">{station}</h2>
+          <p className="text-xs font-bold tracking-widest uppercase text-white/80">
+            {t("stationInfo.zoneLabel", { zone })}
+          </p>
+          <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 -mr-1 text-muted-foreground hover:text-foreground"
+          className="p-2 -mr-1 rounded-full text-white hover:bg-white/20 transition-colors shrink-0"
           aria-label={t("stationInfo.close")}
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 

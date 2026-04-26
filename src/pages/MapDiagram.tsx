@@ -69,7 +69,7 @@ export default function MapDiagram() {
   };
 
   const { trains } = useMapTrains();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fromParam = searchParams.get("from") as Station | null;
   const toParam = searchParams.get("to") as Station | null;
   const fromStation =
@@ -174,6 +174,31 @@ export default function MapDiagram() {
     setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
   }, []);
 
+  // Picking the same station for both endpoints would produce an empty trip;
+  // when the new endpoint collides with the other one, drop the other. This
+  // makes the "swap origin & destination" gesture a one-tap flow.
+  const handleSetFrom = useCallback(
+    (s: Station) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("from", s);
+      if (params.get("to") === s) params.delete("to");
+      setSearchParams(params, { replace: true });
+      closeStationSheet();
+    },
+    [searchParams, setSearchParams, closeStationSheet],
+  );
+
+  const handleSetTo = useCallback(
+    (s: Station) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("to", s);
+      if (params.get("from") === s) params.delete("from");
+      setSearchParams(params, { replace: true });
+      closeStationSheet();
+    },
+    [searchParams, setSearchParams, closeStationSheet],
+  );
+
   return (
     <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
       <header
@@ -236,6 +261,10 @@ export default function MapDiagram() {
           onClose={closeStationSheet}
           station={stationSheet}
           currentTime={currentTime}
+          fromStation={fromStation}
+          toStation={toStation}
+          onSetFrom={handleSetFrom}
+          onSetTo={handleSetTo}
         />
       )}
 

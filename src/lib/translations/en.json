@@ -156,7 +156,11 @@
     "toTerminus": "to {{terminus}}",
     "canceledSuffix": "· Canceled",
     "delaySuffix": "· +{{minutes}}m delay",
-    "minUnit": "min"
+    "minUnit": "min",
+    "setAsFrom": "Set as From",
+    "setAsTo": "Set as To",
+    "currentFrom": "Current From",
+    "currentTo": "Current To"
   },
   "tracker": {
     "departsInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",

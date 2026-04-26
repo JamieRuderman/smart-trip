@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, ArrowUp, ArrowDown } from "lucide-react";
+import { X, ArrowUp, ArrowDown, Check, LogIn, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
@@ -13,6 +13,7 @@ import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import { Button } from "@/components/ui/button";
 import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
@@ -34,6 +35,14 @@ export interface StationInfoSheetProps {
   onClose: () => void;
   station: Station;
   currentTime: Date;
+  /** Currently-selected origin (for the active trip). */
+  fromStation?: Station | null;
+  /** Currently-selected destination (for the active trip). */
+  toStation?: Station | null;
+  /** Set the tapped station as the trip origin. */
+  onSetFrom?: (station: Station) => void;
+  /** Set the tapped station as the trip destination. */
+  onSetTo?: (station: Station) => void;
 }
 
 export function StationInfoSheet({
@@ -41,6 +50,10 @@ export function StationInfoSheet({
   onClose,
   station,
   currentTime,
+  fromStation = null,
+  toStation = null,
+  onSetFrom,
+  onSetTo,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = isWeekend() ? "weekend" : "weekday";
@@ -179,6 +192,25 @@ export function StationInfoSheet({
           </button>
         </div>
 
+        {(onSetFrom || onSetTo) && (
+          <div className="px-5 pb-4 flex gap-2">
+            {onSetFrom && (
+              <FromToButton
+                role="from"
+                isCurrent={fromStation === station}
+                onClick={() => onSetFrom(station)}
+              />
+            )}
+            {onSetTo && (
+              <FromToButton
+                role="to"
+                isCurrent={toStation === station}
+                onClick={() => onSetTo(station)}
+              />
+            )}
+          </div>
+        )}
+
         <div className="border-t border-border" />
 
         <div className="px-5 pt-4 pb-6 overflow-auto">
@@ -200,6 +232,36 @@ export function StationInfoSheet({
       </div>
     </>,
     document.body,
+  );
+}
+
+function FromToButton({
+  role,
+  isCurrent,
+  onClick,
+}: {
+  role: "from" | "to";
+  isCurrent: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const Icon = isCurrent ? Check : role === "from" ? LogIn : LogOut;
+  const label = isCurrent
+    ? t(role === "from" ? "stationInfo.currentFrom" : "stationInfo.currentTo")
+    : t(role === "from" ? "stationInfo.setAsFrom" : "stationInfo.setAsTo");
+
+  return (
+    <Button
+      type="button"
+      variant={isCurrent ? "secondary" : "outline"}
+      size="sm"
+      disabled={isCurrent}
+      onClick={onClick}
+      className="flex-1"
+    >
+      <Icon className="w-4 h-4" aria-hidden="true" />
+      {label}
+    </Button>
   );
 }
 

@@ -130,6 +130,7 @@ export function SmartLineDiagram({
   const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width, VIEW_BOX.height);
   const { tx, ty, scale, transform, reset } = usePanZoom(svgRef, {
     viewBox: VIEW_BOX,
+    maxScale: 3,
   });
   const stationList = snap?.stations ?? DIAGRAM_STATIONS;
 

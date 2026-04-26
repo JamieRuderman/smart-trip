@@ -132,7 +132,12 @@ export function usePanZoom(
     tx: number;
     ty: number;
   } | null>(null);
-  /** Total movement (px) since pointerdown — used for tap-vs-drag. */
+  /** Pointer position (CSS px) at pointerdown, for tap-vs-drag distance. */
+  const downPosRef = useRef<{ x: number; y: number } | null>(null);
+  /** Straight-line distance (CSS px) from the pointerdown position to the
+   *  current pointer position. Used for tap-vs-drag — straight-line beats
+   *  accumulated path length so mouse jitter / trackpad quantization can't
+   *  push a stationary click over the threshold. */
   const totalMoveRef = useRef(0);
 
   /** Convert client (screen) coords to viewBox coords. The SVG fits via
@@ -246,6 +251,7 @@ export function usePanZoom(
       el.setPointerCapture?.(e.pointerId);
       recordPointer(e);
       totalMoveRef.current = 0;
+      downPosRef.current = { x: e.clientX, y: e.clientY };
       const points = [...pointersRef.current.values()];
 
       if (points.length === 1) {
@@ -278,12 +284,17 @@ export function usePanZoom(
 
     const onPointerMove = (e: PointerEvent) => {
       if (!pointersRef.current.has(e.pointerId)) return;
-      const prev = pointersRef.current.get(e.pointerId)!;
-      totalMoveRef.current += Math.hypot(
-        e.clientX - prev.x,
-        e.clientY - prev.y,
-      );
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // Track straight-line distance from pointerdown — robust to mouse
+      // jitter / trackpad pixel-snap that would balloon an accumulated
+      // path-length and falsely flag a stationary click as a drag.
+      if (downPosRef.current) {
+        const d = Math.hypot(
+          e.clientX - downPosRef.current.x,
+          e.clientY - downPosRef.current.y,
+        );
+        if (d > totalMoveRef.current) totalMoveRef.current = d;
+      }
 
       const points = [...pointersRef.current.values()];
 
@@ -295,9 +306,7 @@ export function usePanZoom(
         const c = clampPan(start.tx + dx, start.ty + dy, cur.scale);
         // Below tap threshold? Don't show the panning state yet so taps
         // don't temporarily de-render the click target.
-        const moved =
-          totalMoveRef.current * screenScale() > tapThresholdPx ||
-          totalMoveRef.current > tapThresholdPx;
+        const moved = totalMoveRef.current > tapThresholdPx;
         queue({
           tx: c.tx,
           ty: c.ty,

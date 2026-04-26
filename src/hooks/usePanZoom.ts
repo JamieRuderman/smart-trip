@@ -135,27 +135,40 @@ export function usePanZoom(
   /** Total movement (px) since pointerdown — used for tap-vs-drag. */
   const totalMoveRef = useRef(0);
 
-  /** Convert client (screen) coords to viewBox coords. */
+  /** Convert client (screen) coords to viewBox coords. The SVG fits via
+   *  `xMidYMid meet`, so the rendered content is letterboxed on whichever
+   *  axis isn't the constraint — must back out the offset before mapping. */
   const clientToViewBox = useCallback(
     (clientX: number, clientY: number) => {
       const el = svgRef.current;
       if (!el) return { x: 0, y: 0 };
       const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+      const scale = Math.min(
+        rect.width / viewBox.width,
+        rect.height / viewBox.height,
+      );
+      const offsetX = (rect.width - viewBox.width * scale) / 2;
+      const offsetY = (rect.height - viewBox.height * scale) / 2;
       return {
-        x: ((clientX - rect.left) / rect.width) * viewBox.width + viewBox.x,
-        y: ((clientY - rect.top) / rect.height) * viewBox.height + viewBox.y,
+        x: (clientX - rect.left - offsetX) / scale + viewBox.x,
+        y: (clientY - rect.top - offsetY) / scale + viewBox.y,
       };
     },
     [svgRef, viewBox],
   );
 
-  /** Convert viewBox-units delta to screen px (for tap-threshold checks). */
+  /** Live CSS-px-per-viewBox-unit ratio for the **rendered** content. With
+   *  `meet`, this is the smaller of (width/vbW, height/vbH) — the same
+   *  scale the SVG actually draws at. Pan-delta and tap-threshold math both
+   *  use this so the cursor tracks at 1:1 on any viewport. */
   const screenScale = useCallback(() => {
     const el = svgRef.current;
     if (!el) return 1;
     const rect = el.getBoundingClientRect();
-    return rect.width / viewBox.width;
-  }, [svgRef, viewBox.width]);
+    if (rect.width <= 0 || rect.height <= 0) return 1;
+    return Math.min(rect.width / viewBox.width, rect.height / viewBox.height);
+  }, [svgRef, viewBox.width, viewBox.height]);
 
   /** Clamp pan so at least 25% of the content stays in view. */
   const clampPan = useCallback(

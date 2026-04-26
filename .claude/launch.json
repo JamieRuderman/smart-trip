@@ -3,8 +3,15 @@
   "configurations": [
     {
       "name": "dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5180", "--strictPort"],
+      "port": 5180,
+      "autoPort": true
+    },
+    {
+      "name": "dev-vercel",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev-vercel"],
       "port": 3210
     }
   ]

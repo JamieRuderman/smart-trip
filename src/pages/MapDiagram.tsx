@@ -5,6 +5,7 @@ import { ChevronLeft, Hand, Palette } from "lucide-react";
 import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useUserRiding } from "@/hooks/useUserRiding";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import {
@@ -77,15 +78,27 @@ export default function MapDiagram() {
   const toStation =
     toParam && stationIndexMap[toParam] != null ? toParam : null;
 
-  const { lat: userLat, lng: userLng } = useGeolocation({
+  const {
+    lat: userLat,
+    lng: userLng,
+    speedMps: userSpeedMps,
+  } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
     autoRequestOnWeb: true,
   });
+  const { ridingTrainKey } = useUserRiding({
+    userLat,
+    userLng,
+    userSpeedMps,
+    trains,
+  });
   const userStation = useMemo<Station | null>(() => {
-    if (userLat == null || userLng == null) return null;
+    // While riding, the user-location dot rides the train marker — suppress
+    // the duplicate station-anchored dot so we don't show two blue dots.
+    if (ridingTrainKey || userLat == null || userLng == null) return null;
     return getClosestStation(userLat, userLng);
-  }, [userLat, userLng]);
+  }, [userLat, userLng, ridingTrainKey]);
 
   // Stable Date that only advances on minute boundaries, so child sheets'
   // memos (arrivals/ETA) don't invalidate on every parent render.
@@ -251,6 +264,7 @@ export default function MapDiagram() {
           fromStation={fromStation}
           toStation={toStation}
           userStation={userStation}
+          userRidingTrainKey={ridingTrainKey}
           className="min-h-full"
         />
       </div>

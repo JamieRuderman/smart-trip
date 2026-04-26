@@ -47,6 +47,9 @@ export interface SmartLineDiagramProps {
   toStation?: Station | null;
   /** Station closest to the user's current location — shows a pulsing blue dot. */
   userStation?: Station | null;
+  /** Key (matches `MapTrain.key`) of the train the user is currently riding,
+   *  if any. Renders an inset blue dot on that train's marker. */
+  userRidingTrainKey?: string | null;
   /** Optional wrapper class (e.g. for max-width or padding). */
   className?: string;
 }
@@ -68,6 +71,7 @@ export function SmartLineDiagram({
   fromStation = null,
   toStation = null,
   userStation = null,
+  userRidingTrainKey = null,
   className,
 }: SmartLineDiagramProps) {
   // When the user has picked either endpoint, enlarge whichever are set in
@@ -205,6 +209,7 @@ export function SmartLineDiagram({
               pathEl={pathRef.current!}
               stationArcs={snap.arcs}
               selected={train.key === selectedTrainKey}
+              userRiding={train.key === userRidingTrainKey}
               onClick={onTrainClick}
               now={now}
             />

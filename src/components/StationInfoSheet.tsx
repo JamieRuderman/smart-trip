@@ -1,5 +1,4 @@
-import { useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
+import { useMemo } from "react";
 import { X, ArrowUp, ArrowDown, Check, LogIn, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -10,10 +9,10 @@ import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
 import { isWeekend } from "@/lib/utils";
 import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
-import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { Button } from "@/components/ui/button";
+import { AppSheet } from "@/components/ui/app-sheet";
 import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
@@ -45,6 +44,12 @@ export interface StationInfoSheetProps {
   onSetTo?: (station: Station) => void;
 }
 
+/**
+ * StationInfoSheet — station-detail content (zone badge, From/To buttons,
+ * upcoming arrivals) rendered inside the shared {@link AppSheet} chrome,
+ * so it presents identically to TripDetailSheet on both mobile (bottom
+ * sheet w/ swipe-to-dismiss) and desktop (centered Dialog).
+ */
 export function StationInfoSheet({
   isOpen,
   onClose,
@@ -118,120 +123,83 @@ export function StationInfoSheet({
     return merged;
   }, [station, currentTime, southboundTrips, northboundTrips, sbStatus, nbStatus]);
 
-  // Body scroll lock while the sheet is open (mobile ergonomics).
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
-
   const zone = stationZoneMap[station];
   const zoneColor = ZONE_TRACK_COLORS[zone];
 
-  return createPortal(
-    <>
-      <div
-        className={cn(
-          "fixed inset-0 z-40 bg-background/40 dark:bg-background/50 transition-opacity",
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-        )}
-        style={{ transitionDuration: `${SHEET_TRANSITION_MS}ms` }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("stationInfo.stationInfoAria", { station })}
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50",
-          "bg-card rounded-t-2xl overflow-hidden",
-          "[box-shadow:0_0_8px_rgba(0,0,0,0.35)]",
-          "max-h-[92dvh] flex flex-col",
-          "transition-transform",
-          isOpen ? "translate-y-0" : "translate-y-full",
-        )}
-        style={{
-          transitionDuration: `${SHEET_TRANSITION_MS}ms`,
-          transitionTimingFunction: SHEET_EASING,
-        }}
-      >
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <div className="px-5 pb-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-full"
-                style={{ background: zoneColor }}
-                aria-hidden="true"
-              />
-              <span
-                className="text-xs font-bold tracking-widest uppercase"
-                style={{ color: zoneColor }}
-              >
-                {t("stationInfo.zoneLabel", { zone })}
-              </span>
-            </div>
-            <h2 className="mt-1 text-2xl font-bold text-foreground">
-              {station}
-            </h2>
+  return (
+    <AppSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={t("stationInfo.stationInfoAria", { station })}
+    >
+      <div className="px-5 pb-4 flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ background: zoneColor }}
+              aria-hidden="true"
+            />
+            <span
+              className="text-xs font-bold tracking-widest uppercase"
+              style={{ color: zoneColor }}
+            >
+              {t("stationInfo.zoneLabel", { zone })}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 -mr-1 text-muted-foreground hover:text-foreground"
-            aria-label={t("stationInfo.close")}
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <h2 className="mt-1 text-2xl font-bold text-foreground">{station}</h2>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 -mr-1 text-muted-foreground hover:text-foreground"
+          aria-label={t("stationInfo.close")}
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-        {(onSetFrom || onSetTo) && (
-          <div className="px-5 pb-4 flex gap-2">
-            {onSetFrom && (
-              <FromToButton
-                role="from"
-                isCurrent={fromStation === station}
-                onClick={() => onSetFrom(station)}
-              />
-            )}
-            {onSetTo && (
-              <FromToButton
-                role="to"
-                isCurrent={toStation === station}
-                onClick={() => onSetTo(station)}
-              />
-            )}
-          </div>
-        )}
-
-        <div className="border-t border-border" />
-
-        <div className="px-5 pt-4 pb-6 overflow-auto">
-          <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">
-            {t("stationInfo.nextArrivals")}
-          </h3>
-          {arrivals.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              {t("stationInfo.noUpcoming")}
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {arrivals.map((a) => (
-                <ArrivalRow key={`${a.tripNumber}-${a.isSouthbound}`} arrival={a} />
-              ))}
-            </ul>
+      {(onSetFrom || onSetTo) && (
+        <div className="px-5 pb-4 flex gap-2">
+          {onSetFrom && (
+            <FromToButton
+              role="from"
+              isCurrent={fromStation === station}
+              onClick={() => onSetFrom(station)}
+            />
+          )}
+          {onSetTo && (
+            <FromToButton
+              role="to"
+              isCurrent={toStation === station}
+              onClick={() => onSetTo(station)}
+            />
           )}
         </div>
+      )}
+
+      <div className="border-t border-border" />
+
+      <div
+        className="px-5 pt-4 pb-6 overflow-auto"
+        data-sheet-scroll-area="true"
+      >
+        <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">
+          {t("stationInfo.nextArrivals")}
+        </h3>
+        {arrivals.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            {t("stationInfo.noUpcoming")}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {arrivals.map((a) => (
+              <ArrivalRow key={`${a.tripNumber}-${a.isSouthbound}`} arrival={a} />
+            ))}
+          </ul>
+        )}
       </div>
-    </>,
-    document.body,
+    </AppSheet>
   );
 }
 

@@ -31,26 +31,29 @@ export default defineConfig(({ mode }) => {
         useSampleData && {
           name: "sample-api-mock",
           configureServer(server: ViteDevServer) {
-            server.middlewares.use("/api/gtfsrt/tripupdates", (req: IncomingMessage, res: ServerResponse) => {
-              void req;
-              const data = readFileSync(
-                resolve(__dirname, "sample/tripupdates.json"),
-                "utf-8"
-              );
-              res.setHeader("Content-Type", "application/json");
-              res.setHeader("Cache-Control", "no-store");
-              res.end(data);
-            });
-            server.middlewares.use("/api/gtfsrt/alerts", (req: IncomingMessage, res: ServerResponse) => {
-              void req;
-              const data = readFileSync(
-                resolve(__dirname, "sample/alert.json"),
-                "utf-8"
-              );
-              res.setHeader("Content-Type", "application/json");
-              res.setHeader("Cache-Control", "no-store");
-              res.end(data);
-            });
+            const serveSample = (samplePath: string) =>
+              (req: IncomingMessage, res: ServerResponse) => {
+                void req;
+                const data = readFileSync(
+                  resolve(__dirname, samplePath),
+                  "utf-8"
+                );
+                res.setHeader("Content-Type", "application/json");
+                res.setHeader("Cache-Control", "no-store");
+                res.end(data);
+              };
+            server.middlewares.use(
+              "/api/gtfsrt/vehiclepositions",
+              serveSample("sample/vehiclepositions.json")
+            );
+            server.middlewares.use(
+              "/api/gtfsrt/tripupdates",
+              serveSample("sample/tripupdates.json")
+            );
+            server.middlewares.use(
+              "/api/gtfsrt/alerts",
+              serveSample("sample/alert.json")
+            );
           },
         },
     ].filter(Boolean),

@@ -99,6 +99,8 @@ export default {
           4: "hsl(var(--zone-4))",
           5: "hsl(var(--zone-5))",
         },
+        // User-location dot on the line diagram (matches --user-location).
+        "user-location": "hsl(var(--user-location))",
         // Transit-specific colors
         transit: {
           primary: "hsl(var(--transit-primary))",

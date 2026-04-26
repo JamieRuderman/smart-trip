@@ -53,6 +53,9 @@ All colors MUST be HSL.
     --zone-4: 12 65% 55%; /* terracotta */
     --zone-5: 222 51% 47%; /* blue */
 
+    /* User location dot on the line diagram. */
+    --user-location: 211 81% 55%;
+
     /* Transit-specific colors */
     --transit-primary: var(--smart-train-green);
     --transit-secondary: var(--smart-gold);
@@ -128,6 +131,9 @@ All colors MUST be HSL.
     --ring: 27 85% 60%; /* Use SMART gold for focus ring in dark mode */
 
     /* SMART Train dark theme colors */
+
+    /* Brighter user-location dot so it stays vivid against dark backgrounds. */
+    --user-location: 211 90% 60%;
 
     /* Transit-specific dark colors */
     --transit-primary: var(--smart-train-green);

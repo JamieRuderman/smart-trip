@@ -161,7 +161,8 @@
     "setAsFrom": "Usar como Origen",
     "setAsTo": "Usar como Destino",
     "currentFrom": "Origen actual",
-    "currentTo": "Destino actual"
+    "currentTo": "Destino actual",
+    "openTripAria": "Abrir tren {{trip}} a {{terminus}}"
   },
   "tracker": {
     "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",

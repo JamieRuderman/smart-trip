@@ -161,7 +161,8 @@
     "setAsFrom": "Set as From",
     "setAsTo": "Set as To",
     "currentFrom": "Current From",
-    "currentTo": "Current To"
+    "currentTo": "Current To",
+    "openTripAria": "Open trip {{trip}} to {{terminus}}"
   },
   "tracker": {
     "departsInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",

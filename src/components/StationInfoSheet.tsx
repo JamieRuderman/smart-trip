@@ -3,7 +3,7 @@ import { X, ArrowUp, ArrowDown, Check, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
 import { isWeekend } from "@/lib/utils";
@@ -26,6 +26,9 @@ interface Arrival {
   etaMinutes: number;
   delayMinutes: number | null;
   isCanceled: boolean;
+  /** Underlying schedule trip — handed back to the caller when the row is
+   *  tapped so they can open the trip detail sheet. */
+  trip: ProcessedTrip;
 }
 
 export interface StationInfoSheetProps {
@@ -41,6 +44,13 @@ export interface StationInfoSheetProps {
   onSetFrom?: (station: Station) => void;
   /** Set the tapped station as the trip destination. */
   onSetTo?: (station: Station) => void;
+  /** Open the trip detail sheet for an arriving train, with this station
+   *  as the displayed origin and the train's terminus as the destination. */
+  onArrivalClick?: (
+    trip: ProcessedTrip,
+    fromStation: Station,
+    toStation: Station,
+  ) => void;
 }
 
 /**
@@ -58,6 +68,7 @@ export function StationInfoSheet({
   toStation = null,
   onSetFrom,
   onSetTo,
+  onArrivalClick,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = isWeekend() ? "weekend" : "weekday";
@@ -107,6 +118,7 @@ export function StationInfoSheet({
                 ? delayMinutes
                 : null,
             isCanceled: rt?.isCanceled === true,
+            trip,
           } satisfies Arrival;
         })
         .filter((a): a is Arrival => a != null);
@@ -196,7 +208,15 @@ export function StationInfoSheet({
         ) : (
           <ul className="divide-y divide-border">
             {arrivals.map((a) => (
-              <ArrivalRow key={`${a.tripNumber}-${a.isSouthbound}`} arrival={a} />
+              <ArrivalRow
+                key={`${a.tripNumber}-${a.isSouthbound}`}
+                arrival={a}
+                onClick={
+                  onArrivalClick
+                    ? () => onArrivalClick(a.trip, station, a.terminus)
+                    : undefined
+                }
+              />
             ))}
           </ul>
         )}
@@ -250,7 +270,13 @@ function FromToButton({
   );
 }
 
-function ArrivalRow({ arrival }: { arrival: Arrival }) {
+function ArrivalRow({
+  arrival,
+  onClick,
+}: {
+  arrival: Arrival;
+  onClick?: () => void;
+}) {
   const { t } = useTranslation();
   const isDelayed =
     !arrival.isCanceled &&
@@ -274,8 +300,8 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
     ? t("tracker.southbound")
     : t("tracker.northbound");
 
-  return (
-    <li className="flex items-center gap-4 py-4">
+  const rowContent = (
+    <>
       <span
         className={cn(
           "flex items-center justify-center w-14 h-10 rounded-full font-bold text-lg shrink-0",
@@ -284,7 +310,7 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
       >
         {arrival.tripNumber}
       </span>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 text-left">
         <div className="font-semibold text-foreground">
           {t("stationInfo.toTerminus", { terminus: arrival.terminus })}
         </div>
@@ -310,6 +336,29 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
           {t("stationInfo.minUnit")}
         </span>
       </div>
+    </>
+  );
+
+  return (
+    <li>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className={cn(
+            "w-full flex items-center gap-4 py-4 px-2 -mx-2 rounded-lg",
+            "hover:bg-accent transition-colors",
+          )}
+          aria-label={t("stationInfo.openTripAria", {
+            trip: arrival.tripNumber,
+            terminus: arrival.terminus,
+          })}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div className="flex items-center gap-4 py-4">{rowContent}</div>
+      )}
     </li>
   );
 }

@@ -186,6 +186,21 @@ export default function MapDiagram() {
     setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
   }, []);
 
+  // Tap an arrival row in the station sheet → close the station sheet and
+  // open the trip detail sheet for that train, with the tapped station as
+  // the displayed origin so only the upcoming portion of the trip shows.
+  const handleArrivalClick = useCallback(
+    (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
+      closeStationSheet();
+      setDetailTrip({
+        trip: { ...trip, fromStation, toStation },
+        fromStation,
+        toStation,
+      });
+    },
+    [closeStationSheet],
+  );
+
   // Picking the same station for both endpoints would produce an empty trip;
   // when the new endpoint collides with the other one, drop the other. This
   // makes the "swap origin & destination" gesture a one-tap flow.
@@ -264,6 +279,7 @@ export default function MapDiagram() {
           toStation={toStation}
           onSetFrom={handleSetFrom}
           onSetTo={handleSetTo}
+          onArrivalClick={handleArrivalClick}
         />
       )}
 

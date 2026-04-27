@@ -6,7 +6,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "DEV_API_PROXY_TARGET=http://localhost:3210 npx vite --port 5180 --strictPort"
+        "USE_SAMPLE_DATA=true npx vite --port 5180 --strictPort"
       ],
       "port": 5180,
       "autoPort": true

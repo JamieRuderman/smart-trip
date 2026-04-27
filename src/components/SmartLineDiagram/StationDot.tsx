@@ -2,31 +2,30 @@ import type { Station } from "@/types/smartSchedule";
 import { stationZoneMap } from "@/lib/stationUtils";
 import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { TOKEN } from "./tokens";
-import { StationLabel } from "./StationLabel";
 
-interface StationMarkerProps {
+interface StationDotProps {
   station: Station;
   x: number;
   y: number;
   isTerminal: boolean;
   colorTrackByZone: boolean;
-  screenScale: number;
   onClick?: (station: Station) => void;
 }
 
-export function StationMarker({
+/**
+ * The dot + invisible hit area for a station. Lives inside the zoomable
+ * group so it scales with pan/zoom; the matching `StationLabel` lives in
+ * the constant-size label layer.
+ */
+export function StationDot({
   station,
   x,
   y,
   isTerminal,
   colorTrackByZone,
-  screenScale,
   onClick,
-}: StationMarkerProps) {
+}: StationDotProps) {
   const r = isTerminal ? TOKEN.terminalR : TOKEN.stationR;
-  // Labels pin to the left of their dot; the right margin is reserved for
-  // zone headings when `colorTrackByZone` is on.
-  const labelX = x - (r + TOKEN.labelGap);
   const stroke = colorTrackByZone
     ? ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR
     : BRAND_LINE_COLOR;
@@ -55,13 +54,6 @@ export function StationMarker({
       {isTerminal && (
         <circle cx={x} cy={y} r={r * TOKEN.terminalCoreRatio} fill={stroke} />
       )}
-      <StationLabel
-        station={station}
-        x={labelX}
-        y={y}
-        isTerminal={isTerminal}
-        screenScale={screenScale}
-      />
     </g>
   );
 }

@@ -1,18 +1,17 @@
-import { useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { X, ArrowUp, ArrowDown } from "lucide-react";
+import { useMemo } from "react";
+import { X, ArrowUp, ArrowDown, Check, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
 import { isWeekend } from "@/lib/utils";
 import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
-import { SHEET_EASING, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import { AppSheet } from "@/components/ui/app-sheet";
 import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
@@ -27,6 +26,9 @@ interface Arrival {
   etaMinutes: number;
   delayMinutes: number | null;
   isCanceled: boolean;
+  /** Underlying schedule trip — handed back to the caller when the row is
+   *  tapped so they can open the trip detail sheet. */
+  trip: ProcessedTrip;
 }
 
 export interface StationInfoSheetProps {
@@ -34,13 +36,39 @@ export interface StationInfoSheetProps {
   onClose: () => void;
   station: Station;
   currentTime: Date;
+  /** Currently-selected origin (for the active trip). */
+  fromStation?: Station | null;
+  /** Currently-selected destination (for the active trip). */
+  toStation?: Station | null;
+  /** Set the tapped station as the trip origin. */
+  onSetFrom?: (station: Station) => void;
+  /** Set the tapped station as the trip destination. */
+  onSetTo?: (station: Station) => void;
+  /** Open the trip detail sheet for an arriving train, with this station
+   *  as the displayed origin and the train's terminus as the destination. */
+  onArrivalClick?: (
+    trip: ProcessedTrip,
+    fromStation: Station,
+    toStation: Station,
+  ) => void;
 }
 
+/**
+ * StationInfoSheet — station-detail content (zone badge, From/To buttons,
+ * upcoming arrivals) rendered inside the shared {@link AppSheet} chrome,
+ * so it presents identically to TripDetailSheet on both mobile (bottom
+ * sheet w/ swipe-to-dismiss) and desktop (centered Dialog).
+ */
 export function StationInfoSheet({
   isOpen,
   onClose,
   station,
   currentTime,
+  fromStation = null,
+  toStation = null,
+  onSetFrom,
+  onSetTo,
+  onArrivalClick,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = isWeekend() ? "weekend" : "weekday";
@@ -90,6 +118,7 @@ export function StationInfoSheet({
                 ? delayMinutes
                 : null,
             isCanceled: rt?.isCanceled === true,
+            trip,
           } satisfies Arrival;
         })
         .filter((a): a is Arrival => a != null);
@@ -105,105 +134,149 @@ export function StationInfoSheet({
     return merged;
   }, [station, currentTime, southboundTrips, northboundTrips, sbStatus, nbStatus]);
 
-  // Body scroll lock while the sheet is open (mobile ergonomics).
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
-
   const zone = stationZoneMap[station];
   const zoneColor = ZONE_TRACK_COLORS[zone];
 
-  return createPortal(
-    <>
+  return (
+    <AppSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={t("stationInfo.stationInfoAria", { station })}
+      handleSlot={
+        // Colored drag-handle band keyed off the station's zone color, so
+        // handle and the colored title row below read as one continuous band.
+        <div
+          className="flex justify-center pt-3 pb-1 shrink-0"
+          style={{ backgroundColor: zoneColor }}
+        >
+          <div className="w-10 h-1 rounded-full bg-white/40" />
+        </div>
+      }
+    >
       <div
-        className={cn(
-          "fixed inset-0 z-40 bg-background/40 dark:bg-background/50 transition-opacity",
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-        )}
-        style={{ transitionDuration: `${SHEET_TRANSITION_MS}ms` }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("stationInfo.stationInfoAria", { station })}
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50",
-          "bg-card rounded-t-2xl overflow-hidden",
-          "[box-shadow:0_0_8px_rgba(0,0,0,0.35)]",
-          "max-h-[92dvh] flex flex-col",
-          "transition-transform",
-          isOpen ? "translate-y-0" : "translate-y-full",
-        )}
-        style={{
-          transitionDuration: `${SHEET_TRANSITION_MS}ms`,
-          transitionTimingFunction: SHEET_EASING,
-        }}
+        className="px-5 pt-2 pb-4 flex items-start justify-between gap-4 shrink-0"
+        style={{ backgroundColor: zoneColor }}
       >
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        <div>
+          <p className="text-xs font-bold tracking-widest uppercase text-white/80">
+            {t("stationInfo.zoneLabel", { zone })}
+          </p>
+          <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 -mr-1 rounded-full text-white hover:bg-white/20 transition-colors shrink-0"
+          aria-label={t("stationInfo.close")}
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        <div className="px-5 pb-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-full"
-                style={{ background: zoneColor }}
-                aria-hidden="true"
-              />
-              <span
-                className="text-xs font-bold tracking-widest uppercase"
-                style={{ color: zoneColor }}
-              >
-                {t("stationInfo.zoneLabel", { zone })}
-              </span>
-            </div>
-            <h2 className="mt-1 text-2xl font-bold text-foreground">
-              {station}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 -mr-1 text-muted-foreground hover:text-foreground"
-            aria-label={t("stationInfo.close")}
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="border-t border-border" />
-
-        <div className="px-5 pt-4 pb-6 overflow-auto">
-          <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">
-            {t("stationInfo.nextArrivals")}
-          </h3>
-          {arrivals.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              {t("stationInfo.noUpcoming")}
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {arrivals.map((a) => (
-                <ArrivalRow key={`${a.tripNumber}-${a.isSouthbound}`} arrival={a} />
-              ))}
-            </ul>
+      {(onSetFrom || onSetTo) && (
+        <div className="px-5 pt-4 pb-4 flex gap-3">
+          {onSetFrom && (
+            <FromToButton
+              role="from"
+              isCurrent={fromStation === station}
+              onClick={() => onSetFrom(station)}
+            />
+          )}
+          {onSetTo && (
+            <FromToButton
+              role="to"
+              isCurrent={toStation === station}
+              onClick={() => onSetTo(station)}
+            />
           )}
         </div>
+      )}
+
+      <div className="border-t border-border" />
+
+      <div
+        className="px-5 pt-4 pb-6 overflow-auto"
+        data-sheet-scroll-area="true"
+      >
+        <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">
+          {t("stationInfo.nextArrivals")}
+        </h3>
+        {arrivals.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            {t("stationInfo.noUpcoming")}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {arrivals.map((a) => (
+              <ArrivalRow
+                key={`${a.tripNumber}-${a.isSouthbound}`}
+                arrival={a}
+                onClick={
+                  onArrivalClick
+                    ? () => onArrivalClick(a.trip, station, a.terminus)
+                    : undefined
+                }
+              />
+            ))}
+          </ul>
+        )}
       </div>
-    </>,
-    document.body,
+    </AppSheet>
   );
 }
 
-function ArrivalRow({ arrival }: { arrival: Arrival }) {
+function FromToButton({
+  role,
+  isCurrent,
+  onClick,
+}: {
+  role: "from" | "to";
+  isCurrent: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const RoleIcon = role === "from" ? MapPin : Flag;
+  const label = isCurrent
+    ? t(role === "from" ? "stationInfo.currentFrom" : "stationInfo.currentTo")
+    : t(role === "from" ? "stationInfo.setAsFrom" : "stationInfo.setAsTo");
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isCurrent}
+      aria-pressed={isCurrent}
+      className={cn(
+        // Card-style tappable tile — taller hit area than the previous
+        // pill; clearly grouped icon + label so the role reads at a glance.
+        "flex-1 h-14 rounded-xl border-2 px-4 flex items-center gap-3",
+        "transition-colors text-left",
+        isCurrent
+          ? "border-primary bg-primary/10 text-primary cursor-default"
+          : "border-border bg-card text-foreground hover:bg-accent hover:border-primary/40",
+      )}
+    >
+      <span
+        className={cn(
+          "shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
+          isCurrent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+        )}
+        aria-hidden="true"
+      >
+        {isCurrent ? <Check className="w-4 h-4" /> : <RoleIcon className="w-4 h-4" />}
+      </span>
+      <span className="text-sm font-semibold leading-tight">{label}</span>
+    </button>
+  );
+}
+
+function ArrivalRow({
+  arrival,
+  onClick,
+}: {
+  arrival: Arrival;
+  onClick?: () => void;
+}) {
   const { t } = useTranslation();
   const isDelayed =
     !arrival.isCanceled &&
@@ -227,8 +300,8 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
     ? t("tracker.southbound")
     : t("tracker.northbound");
 
-  return (
-    <li className="flex items-center gap-4 py-4">
+  const rowContent = (
+    <>
       <span
         className={cn(
           "flex items-center justify-center w-14 h-10 rounded-full font-bold text-lg shrink-0",
@@ -237,7 +310,7 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
       >
         {arrival.tripNumber}
       </span>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 text-left">
         <div className="font-semibold text-foreground">
           {t("stationInfo.toTerminus", { terminus: arrival.terminus })}
         </div>
@@ -263,6 +336,29 @@ function ArrivalRow({ arrival }: { arrival: Arrival }) {
           {t("stationInfo.minUnit")}
         </span>
       </div>
+    </>
+  );
+
+  return (
+    <li>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className={cn(
+            "w-full flex items-center gap-4 py-4 px-2 -mx-2 rounded-lg",
+            "hover:bg-accent transition-colors",
+          )}
+          aria-label={t("stationInfo.openTripAria", {
+            trip: arrival.tripNumber,
+            terminus: arrival.terminus,
+          })}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div className="flex items-center gap-4 py-4">{rowContent}</div>
+      )}
     </li>
   );
 }

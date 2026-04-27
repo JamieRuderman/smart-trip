@@ -71,6 +71,9 @@ export const TOKEN = {
   userPulseOpacity: 0.3,
   userInnerR: 11,
   userInnerStroke: 4,
+  /** Smaller dot rendered inside a train marker when the user is riding. */
+  userOnTrainR: 7,
+  userOnTrainStroke: 2,
 
   // Theme-backed colors
   stationFill: "hsl(var(--background))",

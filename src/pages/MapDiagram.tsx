@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Hand, Palette } from "lucide-react";
+import { ChevronLeft, Hand } from "lucide-react";
 
 import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
@@ -107,7 +107,6 @@ export default function MapDiagram() {
   const currentTime = useMemo(() => new Date(nowMinute * 60_000), [nowMinute]);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [colorTrackByZone, setColorTrackByZone] = useState(true);
   const [stationSheet, setStationSheet] = useState<Station | null>(null);
   const [stationSheetOpen, setStationSheetOpen] = useState(false);
   const [detailTrip, setDetailTrip] = useState<{
@@ -187,6 +186,21 @@ export default function MapDiagram() {
     setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
   }, []);
 
+  // Tap an arrival row in the station sheet → close the station sheet and
+  // open the trip detail sheet for that train, with the tapped station as
+  // the displayed origin so only the upcoming portion of the trip shows.
+  const handleArrivalClick = useCallback(
+    (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
+      closeStationSheet();
+      setDetailTrip({
+        trip: { ...trip, fromStation, toStation },
+        fromStation,
+        toStation,
+      });
+    },
+    [closeStationSheet],
+  );
+
   // Picking the same station for both endpoints would produce an empty trip;
   // when the new endpoint collides with the other one, drop the other. This
   // makes the "swap origin & destination" gesture a one-tap flow.
@@ -233,20 +247,6 @@ export default function MapDiagram() {
         <span className="text-xs font-semibold bg-white/15 text-white rounded-full px-2.5 py-1 whitespace-nowrap">
           {t("mapDiagram.trainsCount", { count: trains.length })}
         </span>
-        <button
-          type="button"
-          onClick={() => setColorTrackByZone((v) => !v)}
-          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium border ${
-            colorTrackByZone
-              ? "bg-white text-smart-train-green border-white"
-              : "bg-white/15 text-white border-white/30 hover:bg-white/25"
-          }`}
-          aria-label={t("mapDiagram.toggleZones")}
-          aria-pressed={colorTrackByZone}
-        >
-          <Palette className="w-4 h-4" />
-          {t("mapDiagram.zones")}
-        </button>
       </header>
 
       {/* Background tap clears the train selection; inner station/train
@@ -260,7 +260,7 @@ export default function MapDiagram() {
           selectedTrainKey={selectedTrainKey}
           onTrainClick={handleTrainClick}
           onStationClick={handleStationClick}
-          colorTrackByZone={colorTrackByZone}
+          colorTrackByZone
           fromStation={fromStation}
           toStation={toStation}
           userStation={userStation}
@@ -279,6 +279,7 @@ export default function MapDiagram() {
           toStation={toStation}
           onSetFrom={handleSetFrom}
           onSetTo={handleSetTo}
+          onArrivalClick={handleArrivalClick}
         />
       )}
 

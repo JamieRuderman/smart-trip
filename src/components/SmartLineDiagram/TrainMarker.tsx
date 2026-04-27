@@ -17,6 +17,8 @@ interface TrainMarkerProps {
   pathEl: SVGPathElement;
   stationArcs: number[];
   selected: boolean;
+  /** True when this is the train the user is currently riding. */
+  userRiding?: boolean;
   now: Date;
   onClick?: (train: MapTrain) => void;
 }
@@ -26,6 +28,7 @@ export function TrainMarker({
   pathEl,
   stationArcs,
   selected,
+  userRiding = false,
   onClick,
   now,
 }: TrainMarkerProps) {
@@ -126,6 +129,18 @@ export function TrainMarker({
           stroke={accent}
           strokeWidth={TOKEN.trainSelectedStroke}
           strokeDasharray={TOKEN.trainSelectedDash}
+        />
+      )}
+      {userRiding && (
+        // Small blue badge in the lower-right of the marker — keeps the
+        // trip number readable while signalling "you are on this train".
+        <circle
+          cx={TOKEN.trainInnerR * 0.7}
+          cy={TOKEN.trainInnerR * 0.7}
+          r={TOKEN.userOnTrainR}
+          fill={TOKEN.userLocation}
+          stroke={TOKEN.stationFill}
+          strokeWidth={TOKEN.userOnTrainStroke}
         />
       )}
     </g>

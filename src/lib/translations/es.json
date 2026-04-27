@@ -140,12 +140,13 @@
     "ferryBadgeLabel": "FERRY · {{minutes}} MIN",
     "nextFerryBadge": "PRÓXIMO FERRY · {{minutes}} MIN",
     "noMoreFerries": "NO HAY MÁS FERRIES HOY",
-    "previewTitle": "Diagrama de línea (beta)",
+    "previewTitle": "Diagrama del Mapa",
     "previewSubtitle": "Vista esquemática de todos los trenes",
     "activeTrains_one": "{{count}} activo",
     "activeTrains_other": "{{count}} activos",
     "trainsCount_one": "{{count}} Tren",
-    "trainsCount_other": "{{count}} Trenes"
+    "trainsCount_other": "{{count}} Trenes",
+    "resetZoom": "Restablecer zoom"
   },
   "stationInfo": {
     "stationInfoAria": "Información de la estación {{station}}",
@@ -160,7 +161,8 @@
     "setAsFrom": "Usar como Origen",
     "setAsTo": "Usar como Destino",
     "currentFrom": "Origen actual",
-    "currentTo": "Destino actual"
+    "currentTo": "Destino actual",
+    "openTripAria": "Abrir tren {{trip}} a {{terminus}}"
   },
   "tracker": {
     "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",

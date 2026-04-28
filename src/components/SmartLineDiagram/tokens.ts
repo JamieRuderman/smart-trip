@@ -32,7 +32,7 @@ export const TOKEN = {
   ferryNameSize: 17,
   /** Train number text lives inside the marker group, which scales with zoom,
    *  so this stays in viewBox units (no screenScale division). */
-  trainNumberSize: 15,
+  trainNumberSize: 18,
   labelWeight: 500,
   terminalWeight: 700,
   zoneLabelWeight: 700,
@@ -51,17 +51,17 @@ export const TOKEN = {
   labelGap: 28,
 
   // Train marker
-  trainPulseR: 30,
-  trainPulseRMin: 24,
-  trainPulseRMax: 34,
+  trainPulseR: 36,
+  trainPulseRMin: 30,
+  trainPulseRMax: 42,
   trainPulseOpacity: 0.18,
-  trainInnerR: 18,
+  trainInnerR: 22,
   trainStroke: 6,
   /** Triangle pointing up; rotated to match the train's bearing. */
-  trainArrow: "M 0 -33 L 8.5 -18 L -8.5 -18 Z",
-  trainTextBaseline: 5.5,
-  trainSelectedR: 40,
-  trainSelectedStroke: 2.5,
+  trainArrow: "M 0 -40 L 10 -22 L -10 -22 Z",
+  trainTextBaseline: 6.5,
+  trainSelectedR: 48,
+  trainSelectedStroke: 3,
   trainSelectedDash: "4 4",
 
   // User-location marker

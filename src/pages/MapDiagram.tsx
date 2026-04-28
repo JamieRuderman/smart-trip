@@ -6,7 +6,7 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import {
   SHEET_ENTER_DELAY_MS,
@@ -17,8 +17,10 @@ import { useNow } from "@/hooks/useNow";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import { StationInfoSheet } from "@/components/StationInfoSheet";
+import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const WINDSOR = stations[0];
 const LARKSPUR = stations[stations.length - 1];
@@ -70,6 +72,28 @@ export default function MapDiagram() {
   };
 
   const { trains } = useMapTrains();
+
+  // Realtime status keyed by full-corridor scheduled departure (origin time).
+  // Computed for both directions and both schedule types so a tapped train or
+  // arrival of either kind can surface live delay/cancellation state in the
+  // trip detail sheet. Mirrors the pattern used by /map (Map.tsx).
+  const allSouthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekday"),
+      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekend"),
+    ],
+    [],
+  );
+  const allNorthboundTrips = useMemo(
+    () => [
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekday"),
+      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekend"),
+    ],
+    [],
+  );
+  const sbStatusMaps = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, allSouthboundTrips);
+  const nbStatusMaps = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, allNorthboundTrips);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const fromParam = searchParams.get("from") as Station | null;
   const toParam = searchParams.get("to") as Station | null;
@@ -113,6 +137,7 @@ export default function MapDiagram() {
     trip: ProcessedTrip;
     fromStation: Station;
     toStation: Station;
+    realtimeStatus: TripRealtimeStatus | null;
   } | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -142,8 +167,19 @@ export default function MapDiagram() {
       fromStation: displayFrom,
       toStation: terminus,
     };
-    setDetailTrip({ trip: displayTrip, fromStation: displayFrom, toStation: terminus });
-  }, []);
+    // Pull live delay/cancellation state for this run. The status map is
+    // keyed by scheduled departure at the full-corridor origin, which is
+    // exactly match.departureTime here.
+    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
+    const realtimeStatus =
+      statusMaps.statusMap.get(match.departureTime) ?? null;
+    setDetailTrip({
+      trip: displayTrip,
+      fromStation: displayFrom,
+      toStation: terminus,
+      realtimeStatus,
+    });
+  }, [sbStatusMaps, nbStatusMaps]);
 
   useEffect(() => {
     if (detailTrip) {
@@ -192,13 +228,21 @@ export default function MapDiagram() {
   const handleArrivalClick = useCallback(
     (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
       closeStationSheet();
+      // Direction is determined by the terminus passed in: southbound trips
+      // arrive at Larkspur, northbound at Windsor. The status map is keyed
+      // by departure at the full-corridor origin (trip.departureTime).
+      const isSouthbound = toStation === LARKSPUR;
+      const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
+      const realtimeStatus =
+        statusMaps.statusMap.get(trip.departureTime) ?? null;
       setDetailTrip({
         trip: { ...trip, fromStation, toStation },
         fromStation,
         toStation,
+        realtimeStatus,
       });
     },
-    [closeStationSheet],
+    [closeStationSheet, sbStatusMaps, nbStatusMaps],
   );
 
   // Picking the same station for both endpoints would produce an empty trip;
@@ -291,8 +335,8 @@ export default function MapDiagram() {
           fromStation={detailTrip.fromStation}
           toStation={detailTrip.toStation}
           currentTime={currentTime}
-          lastUpdated={null}
-          realtimeStatus={null}
+          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
+          realtimeStatus={detailTrip.realtimeStatus}
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}

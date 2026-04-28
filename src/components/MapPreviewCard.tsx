@@ -28,10 +28,10 @@ export function MapPreviewCard() {
           <MapIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
           <div>
             <div className="font-semibold text-sm text-foreground">
-              Live Train Map
+              {t("map.previewTitle")}
             </div>
             <div className="text-xs text-muted-foreground">
-              See all trains in real time
+              {t("map.previewSubtitle")}
             </div>
           </div>
         </div>

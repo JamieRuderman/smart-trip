@@ -130,6 +130,10 @@
     "noMoreTrainsToday": "No hay más trenes hoy",
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
   },
+  "map": {
+    "previewTitle": "Mapa de Trenes en Vivo",
+    "previewSubtitle": "Ver todos los trenes en tiempo real"
+  },
   "mapDiagram": {
     "tapHint": "Toca una estación o tren para ver detalles",
     "zones": "Zonas",

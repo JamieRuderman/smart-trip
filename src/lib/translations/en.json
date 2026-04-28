@@ -130,6 +130,10 @@
     "noMoreTrainsToday": "No more trains today",
     "allTrainsDeparted": "All scheduled trains for today have departed"
   },
+  "map": {
+    "previewTitle": "Live Train Map",
+    "previewSubtitle": "See all trains in real time"
+  },
   "mapDiagram": {
     "tapHint": "Tap a station or train for details",
     "zones": "Zones",

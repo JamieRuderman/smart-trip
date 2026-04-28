@@ -140,9 +140,14 @@ export function StopTimeline({
               strokeWidth={1.5}
             />
           ) : isUserSelected ? (
+            // Selected stop should pop a touch louder than the muted
+            // intermediate dots: use stateText (fuller opacity for past /
+            // future) instead of stateIconText, plus a slightly larger
+            // glyph and thicker stroke. Brand colors for on-time / delayed
+            // / canceled are unchanged because both maps share them.
             <CircleDot
-              className={cn("h-3 w-3 shrink-0", stateIconText[accent])}
-              strokeWidth={2.25}
+              className={cn("h-3.5 w-3.5 shrink-0", stateText[accent])}
+              strokeWidth={2.5}
             />
           ) : (
             <Circle

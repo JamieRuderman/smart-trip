@@ -118,10 +118,10 @@ export function StopTimeline({
           // Mark the user's selected from/to with a ring-and-dot, matching
           // the line diagram's selected-station treatment. Skip when the
           // station is already the displayed leg's start/end (which carry
-          // the MapPin / CornerDownRight icons). When the user-selected
-          // stop is also the currently-served stop, the ring-and-dot wins
-          // over the filled-disc and renders in brand green so "this is
-          // your stop" reads instantly.
+          // the MapPin / CornerDownRight icons). When it coincides with
+          // the currently-served stop the ring-and-dot wins over the
+          // filled-disc; color follows the row's accent so the current
+          // stop reads green-on-time, gold-on-delay, etc.
           const isUserSelected =
             !isFrom &&
             !isTo &&
@@ -141,7 +141,7 @@ export function StopTimeline({
             />
           ) : isUserSelected ? (
             <CircleDot
-              className={cn("h-3 w-3 shrink-0", "text-smart-train-green")}
+              className={cn("h-3 w-3 shrink-0", stateIconText[accent])}
               strokeWidth={2.25}
             />
           ) : (

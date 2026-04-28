@@ -22,6 +22,12 @@ export interface TripDetailSheetProps {
   showFerry: boolean;
   /** Dev-only: override the live vehicle position hook result (used by devFixtures). */
   vehiclePositionOverride?: VehiclePositionMatch | null;
+  /** User's selected origin/destination, used to mark matching intermediate
+   *  rows in the stop timeline. Only meaningful when the displayed leg is
+   *  wider than the user's selected leg (e.g. tapping a train on the live
+   *  map or schematic diagram). */
+  userFromStation?: Station | null;
+  userToStation?: Station | null;
 }
 
 /**

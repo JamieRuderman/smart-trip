@@ -8,7 +8,7 @@
   "header": {
     "planYourTrip": "Plan Your Trip",
     "communityApp": "Community App",
-    "yourLocation": "Your location",
+    "departure": "Departure",
     "destination": "Destination",
     "selectDepartureStation": "Select departure station",
     "selectArrivalStation": "Select arrival station",
@@ -129,6 +129,10 @@
   "noMoreTrains": {
     "noMoreTrainsToday": "No more trains today",
     "allTrainsDeparted": "All scheduled trains for today have departed"
+  },
+  "map": {
+    "previewTitle": "Live Train Map",
+    "previewSubtitle": "See all trains in real time"
   },
   "mapDiagram": {
     "tapHint": "Tap a station or train for details",

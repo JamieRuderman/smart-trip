@@ -149,7 +149,6 @@ export function TrainScheduleApp() {
 
         {/* Live Train Map */}
         <MapDiagramPreviewCard />
-        <MapPreviewCard />
 
         {/* Empty State - No stations selected */}
         {(!fromStation || !toStation) && <EmptyState />}
@@ -176,6 +175,11 @@ export function TrainScheduleApp() {
         {fromStation && toStation && (
           <FareSection fromStation={fromStation} toStation={toStation} />
         )}
+
+        {/* Geographic map — secondary; lives below the trip-planning content
+            since regulars rarely need it but newcomers may want geographic
+            context after they've picked a route. */}
+        <MapPreviewCard />
 
         {/* Bottom bar */}
         <BottomInfoBar />

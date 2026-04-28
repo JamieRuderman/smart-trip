@@ -4,7 +4,7 @@ import { TripIcon } from "@/components/icons/TripIcon";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
-import { Circle, CornerDownRight, MapPin } from "lucide-react";
+import { Circle, CircleDot, CornerDownRight, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { StopInferenceResult } from "@/hooks/useStopInference";
 import {
@@ -26,6 +26,13 @@ interface StopTimelineProps {
   isEnded?: boolean;
   /** Pre-computed stop inference results from useTripProgress. */
   stopInference: StopInferenceResult;
+  /** The user's selected origin (from URL/schedule). When set and distinct
+   *  from the displayed leg's endpoints, the matching intermediate row gets
+   *  the dot-with-outline marker that the line diagram uses to mark
+   *  selected stations — same vocabulary in both surfaces. */
+  userFromStation?: Station | null;
+  /** The user's selected destination (from URL/schedule). See userFromStation. */
+  userToStation?: Station | null;
 }
 
 export function StopTimeline({
@@ -36,6 +43,8 @@ export function StopTimeline({
   timeFormat,
   isEnded = false,
   stopInference,
+  userFromStation = null,
+  userToStation = null,
 }: StopTimelineProps) {
   const { t } = useTranslation();
   void trip;
@@ -106,6 +115,18 @@ export function StopTimeline({
             ? stateIconText["past"]
             : stateIconText["future"];
 
+          // Mark the user's selected from/to with a ring-and-dot, matching
+          // the line diagram's selected-station treatment. Skip when the
+          // station is already the displayed leg's start/end (which carry
+          // the MapPin / CornerDownRight icons). When it coincides with
+          // the currently-served stop the ring-and-dot wins over the
+          // filled-disc; color follows the row's accent so the current
+          // stop reads green-on-time, gold-on-delay, etc.
+          const isUserSelected =
+            !isFrom &&
+            !isTo &&
+            (station === userFromStation || station === userToStation);
+
           const stopIcon = isFrom ? (
             <MapPin
               className={cn("h-5 w-5", endpointIconColor)}
@@ -117,6 +138,17 @@ export function StopTimeline({
               className={cn("h-4 w-4", endpointIconColor)}
               style={{ marginLeft: 11, marginTop: -3 }}
               strokeWidth={1.5}
+            />
+          ) : isUserSelected ? (
+            // Selected stop should pop a touch louder than the muted
+            // intermediate dots: use stateText (fuller opacity for past /
+            // future) instead of stateIconText, plus a slightly larger
+            // glyph and thicker stroke. Brand colors for on-time / delayed
+            // / canceled are unchanged because both maps share them.
+            // strokeWidth applied via style to defeat any inherited CSS.
+            <CircleDot
+              className={cn("h-4 w-4 shrink-0", stateText[accent])}
+              style={{ strokeWidth: 3 }}
             />
           ) : (
             <Circle

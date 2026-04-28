@@ -145,9 +145,10 @@ export function StopTimeline({
             // future) instead of stateIconText, plus a slightly larger
             // glyph and thicker stroke. Brand colors for on-time / delayed
             // / canceled are unchanged because both maps share them.
+            // strokeWidth applied via style to defeat any inherited CSS.
             <CircleDot
-              className={cn("h-3.5 w-3.5 shrink-0", stateText[accent])}
-              strokeWidth={2.5}
+              className={cn("h-4 w-4 shrink-0", stateText[accent])}
+              style={{ strokeWidth: 3 }}
             />
           ) : (
             <Circle

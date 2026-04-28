@@ -138,7 +138,7 @@ export function StationSelector({
             {fromStation ? (
               <StationWithFerry station={fromStation} direction="southbound" />
             ) : (
-              <SelectValue placeholder={t("header.yourLocation")} />
+              <SelectValue placeholder={t("header.departure")} />
             )}
           </SelectTrigger>
           <SelectContent

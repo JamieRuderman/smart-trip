@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ChevronLeft } from "lucide-react";
@@ -320,6 +320,19 @@ function MapContents() {
   const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
   const { trains } = useMapTrains();
+  // The user's currently-selected schedule leg is carried in the URL by the
+  // home screen and forwarded into /map by MapPreviewCard. Used only to
+  // mark matching rows in the trip detail sheet — does not affect what's
+  // drawn on the map itself.
+  const [searchParams] = useSearchParams();
+  const userFromParam = searchParams.get("from") as Station | null;
+  const userToParam = searchParams.get("to") as Station | null;
+  const userFromStation =
+    userFromParam && stationIndexMap[userFromParam] != null
+      ? userFromParam
+      : null;
+  const userToStation =
+    userToParam && stationIndexMap[userToParam] != null ? userToParam : null;
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
@@ -710,6 +723,8 @@ function MapContents() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          userFromStation={userFromStation}
+          userToStation={userToStation}
         />
       )}
     </div>

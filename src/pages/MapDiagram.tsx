@@ -340,6 +340,8 @@ export default function MapDiagram() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          userFromStation={fromStation}
+          userToStation={toStation}
         />
       )}
     </div>

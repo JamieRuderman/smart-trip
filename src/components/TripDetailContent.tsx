@@ -48,6 +48,10 @@ export interface TripDetailContentProps {
   /** All trip progress state, computed once in TripDetailSheet. */
   progress: TripProgressResult;
   showCloseButton?: boolean;
+  /** User's selected origin/destination — used by StopTimeline to mark
+   *  intermediate rows that match the user's chosen leg. */
+  userFromStation?: Station | null;
+  userToStation?: Station | null;
 }
 
 
@@ -63,6 +67,8 @@ export function TripDetailContent({
   onClose,
   progress,
   showCloseButton = true,
+  userFromStation = null,
+  userToStation = null,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -478,6 +484,8 @@ export function TripDetailContent({
           timeFormat={timeFormat}
           isEnded={isEnded}
           stopInference={stopInference}
+          userFromStation={userFromStation}
+          userToStation={userToStation}
         />
 
         {showFerry && trip.outboundFerry && (

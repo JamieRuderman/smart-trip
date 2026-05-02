@@ -44,14 +44,21 @@ function readCsv(filePath: string): CsvRow[] {
 function buildStopIdToStation(stops: CsvRow[]): {
   stopIdToStation: Map<string, string>;
   parentIds: Set<string>;
+  stationOrder: string[];
 } {
   const displayName = (raw: string) => raw.replace(/^SMART\s+/i, "").trim();
   const nameByParentId = new Map<string, string>();
   const parentIds = new Set<string>();
+  type Parent = { id: string; name: string; lat: number };
+  const parents: Parent[] = [];
   for (const s of stops) {
     if (s.location_type === "1" && s.stop_id && s.stop_name) {
-      nameByParentId.set(s.stop_id, displayName(s.stop_name));
+      const name = displayName(s.stop_name);
+      const lat = Number(s.stop_lat);
+      if (!Number.isFinite(lat)) continue;
+      nameByParentId.set(s.stop_id, name);
       parentIds.add(s.stop_id);
+      parents.push({ id: s.stop_id, name, lat });
     }
   }
   const stopIdToStation = new Map<string, string>();
@@ -61,25 +68,10 @@ function buildStopIdToStation(stops: CsvRow[]): {
     const name = nameByParentId.get(parentId);
     if (name) stopIdToStation.set(s.stop_id, name);
   }
-  return { stopIdToStation, parentIds };
+  // North → south by latitude (descending), matching updateTransitFeeds.ts.
+  const stationOrder = parents.sort((a, b) => b.lat - a.lat).map((p) => p.name);
+  return { stopIdToStation, parentIds, stationOrder };
 }
-
-const STATION_ORDER = [
-  "Windsor",
-  "Sonoma County Airport",
-  "Santa Rosa North",
-  "Santa Rosa Downtown",
-  "Rohnert Park",
-  "Cotati",
-  "Petaluma North",
-  "Petaluma Downtown",
-  "Novato San Marin",
-  "Novato Downtown",
-  "Novato Hamilton",
-  "Marin Civic Center",
-  "San Rafael",
-  "Larkspur",
-] as const;
 
 /**
  * Derive direction per platform stop_id from RT trip updates: each trip's
@@ -90,8 +82,9 @@ const STATION_ORDER = [
 function buildStopIdToDirection(
   tripUpdates: TripUpdate[],
   stopIdToStation: Map<string, string>,
+  stationOrder: string[],
 ): Map<string, TrainDirection> {
-  const stationIdx = new Map(STATION_ORDER.map((n, i) => [n, i]));
+  const stationIdx = new Map(stationOrder.map((n, i) => [n, i]));
   const directionByStopId = new Map<string, TrainDirection>();
   for (const trip of tripUpdates) {
     const sorted = [...trip.stopTimeUpdates].sort(
@@ -188,8 +181,8 @@ function main(): void {
     }
   ).updates;
 
-  const { stopIdToStation, parentIds } = buildStopIdToStation(stops);
-  const stopIdToDirection = buildStopIdToDirection(tripUpdates, stopIdToStation);
+  const { stopIdToStation, parentIds, stationOrder } = buildStopIdToStation(stops);
+  const stopIdToDirection = buildStopIdToDirection(tripUpdates, stopIdToStation, stationOrder);
   const count = emitFile(stopIdToStation, stopIdToDirection, parentIds);
   console.log(
     `Wrote ${count} platforms to ${path.relative(ROOT, OUTPUT_PATH)} from sample 511 data.`,

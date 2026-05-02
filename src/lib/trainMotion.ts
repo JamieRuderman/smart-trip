@@ -25,7 +25,7 @@ export interface ScheduledMotion {
 
 // Precomputed station-index walks. Southbound = north→south (index ascending),
 // northbound = south→north (descending). Reused across every tick/train.
-const ORDER_SB: readonly number[] = stations.map((_, i) => i);
+const ORDER_SB: readonly number[] = [...stations.keys()];
 const ORDER_NB: readonly number[] = [...ORDER_SB].reverse();
 
 // `findFullCorridorTrip` rescans the schedule cache; with N trains ticking

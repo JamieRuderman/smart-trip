@@ -44,15 +44,15 @@ export default defineConfig(({ mode }) => {
               };
             server.middlewares.use(
               "/api/gtfsrt/vehiclepositions",
-              serveSample("sample/vehiclepositions.json")
+              serveSample("data/511/realtime-samples/vehiclepositions.json")
             );
             server.middlewares.use(
               "/api/gtfsrt/tripupdates",
-              serveSample("sample/tripupdates.json")
+              serveSample("data/511/realtime-samples/tripupdates.json")
             );
             server.middlewares.use(
               "/api/gtfsrt/alerts",
-              serveSample("sample/alert.json")
+              serveSample("data/511/realtime-samples/alert.json")
             );
           },
         },

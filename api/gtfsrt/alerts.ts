@@ -20,7 +20,7 @@ function mapCause(cause: number | null | undefined): string {
 
 export default createGtfsRtHandler({
   feed: "servicealerts",
-  sampleFile: "sample/alert.json",
+  sampleFile: "data/511/realtime-samples/alert.json",
   cacheControl: "s-maxage=60, stale-while-revalidate=30",
   transform(feed) {
     const timestamp = Number(feed.header?.timestamp ?? 0);

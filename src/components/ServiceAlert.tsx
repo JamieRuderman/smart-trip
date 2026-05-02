@@ -1,4 +1,3 @@
-import staticServiceAlerts from "@/data/serviceAlerts";
 import type { ServiceAlertData } from "@/types/smartSchedule";
 import { useDismissedAlerts } from "@/hooks/useDismissedAlerts";
 import { AlertTriangle, X } from "lucide-react";
@@ -7,26 +6,16 @@ import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
 
 interface ServiceAlertProps {
-  /** Live alerts from GTFS-RT. Falls back to static data when not provided. */
-  alerts?: ServiceAlertData[];
+  /** Live alerts from GTFS-RT — already filtered by `useServiceAlerts`. */
+  alerts: ServiceAlertData[];
 }
 
 export function ServiceAlert({ alerts }: ServiceAlertProps) {
   const { t } = useTranslation();
   const { isDismissed, dismissAlert, restoreAll, dismissedCountForActive, pruneExpired } =
     useDismissedAlerts();
-  const now = new Date();
 
-  // For static fallback data only — live alerts are pre-filtered by useServiceAlerts
-  const isStaticAlertActive = (alert: ServiceAlertData) => {
-    if (alert.active === false) return false;
-    const startsOk = alert.startsAt ? new Date(alert.startsAt) <= now : true;
-    const endsOk = alert.endsAt ? now <= new Date(alert.endsAt) : true;
-    return startsOk && endsOk;
-  };
-
-  // Live alerts are already filtered; static data needs the active check
-  const activeAlerts = alerts ?? staticServiceAlerts.filter(isStaticAlertActive);
+  const activeAlerts = alerts;
 
   useEffect(() => {
     pruneExpired();

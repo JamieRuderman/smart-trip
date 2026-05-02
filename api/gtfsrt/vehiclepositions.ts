@@ -10,7 +10,7 @@ const KNOWN_STOP_IDS = new Set(Object.keys(GTFS_STOP_ID_TO_STATION));
 
 export default createGtfsRtHandler({
   feed: "vehiclepositions",
-  sampleFile: "sample/vehiclepositions.json",
+  sampleFile: "data/511/realtime-samples/vehiclepositions.json",
   cacheControl: "s-maxage=15, stale-while-revalidate=10",
   supportRaw: true,
   transform(feed) {

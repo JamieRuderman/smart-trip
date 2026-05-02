@@ -106,6 +106,7 @@ export default function MapDiagram() {
     lat: userLat,
     lng: userLng,
     speedMps: userSpeedMps,
+    heading: userHeading,
   } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
@@ -115,6 +116,7 @@ export default function MapDiagram() {
     userLat,
     userLng,
     userSpeedMps,
+    userHeading,
     trains,
   });
   const userStation = useMemo<Station | null>(() => {
@@ -309,6 +311,8 @@ export default function MapDiagram() {
           toStation={toStation}
           userStation={userStation}
           userRidingTrainKey={ridingTrainKey}
+          userLat={userLat}
+          userLng={userLng}
           className="min-h-full"
         />
       </div>

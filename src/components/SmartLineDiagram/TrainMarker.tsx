@@ -21,6 +21,11 @@ interface TrainMarkerProps {
   selected: boolean;
   /** True when this is the train the user is currently riding. */
   userRiding?: boolean;
+  /** When set, project these coords onto the rail instead of the train's
+   *  own GTFS-RT position. Used for the rider's latched train so the
+   *  marker tracks the phone (which leads the feed by ~15-30 s). */
+  overrideLat?: number | null;
+  overrideLng?: number | null;
   now: Date;
   onClick?: (train: MapTrain) => void;
 }
@@ -31,6 +36,8 @@ export function TrainMarker({
   stationArcs,
   selected,
   userRiding = false,
+  overrideLat = null,
+  overrideLng = null,
   onClick,
   now,
 }: TrainMarkerProps) {
@@ -42,7 +49,14 @@ export function TrainMarker({
   //    reliably project onto an inter-station segment).
   //  - Neither → station-midpoint fallback.
   const scheduled = scheduledProgress(train, now);
-  const gps = gpsStationProgress(train);
+  // For the rider's train, project their phone position instead of the
+  // GTFS-RT vehicle position — phone GPS is ~15-30 s ahead of the feed,
+  // so this keeps the marker on top of where the rider actually is.
+  const gpsTrain =
+    overrideLat != null && overrideLng != null
+      ? { ...train, latitude: overrideLat, longitude: overrideLng }
+      : train;
+  const gps = gpsStationProgress(gpsTrain);
   const fallback = trainStationProgress(train);
 
   const resolved =

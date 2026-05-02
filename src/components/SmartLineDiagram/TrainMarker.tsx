@@ -65,11 +65,17 @@ export function TrainMarker({
     train.delayMinutes !== null &&
     train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
 
+  // When the user is riding this train, swap the default (black) on-time
+  // accent for the user-location blue so the marker reads as "you are here"
+  // at a glance. Delayed/canceled colors still take precedence — losing the
+  // gold/gray status signal would hide important information.
   const accent = train.isCanceled
     ? TRAIN_COLORS.canceled
     : isDelayed
       ? TRAIN_COLORS.delayed
-      : TRAIN_COLORS.onTime;
+      : userRiding
+        ? TOKEN.userLocation
+        : TRAIN_COLORS.onTime;
 
   const label = train.tripNumber != null ? String(train.tripNumber) : "•";
 
@@ -131,9 +137,10 @@ export function TrainMarker({
           strokeDasharray={TOKEN.trainSelectedDash}
         />
       )}
-      {userRiding && (
-        // Small blue badge in the lower-right of the marker — keeps the
-        // trip number readable while signalling "you are on this train".
+      {userRiding && accent !== TOKEN.userLocation && (
+        // Small blue badge in the lower-right of the marker — used when the
+        // accent stays gold/gray (delayed/canceled) so the riding signal is
+        // still visible. Skipped when the whole marker is already blue.
         <circle
           cx={TOKEN.trainInnerR * 0.7}
           cy={TOKEN.trainInnerR * 0.7}

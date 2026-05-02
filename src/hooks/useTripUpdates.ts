@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { apiBaseUrl } from "@/lib/env";
-import { GTFS_STOP_ID_TO_STATION, stationIndexMap, isSouthbound as isSouthboundFn } from "@/lib/stationUtils";
+import {
+  GTFS_STOP_ID_TO_PLATFORM,
+  stationIndexMap,
+  isSouthbound as isSouthboundFn,
+  type TrainDirection,
+} from "@/lib/stationUtils";
 import type {
   GtfsRtTripUpdatesResponse,
   GtfsRtTripUpdate,
@@ -47,13 +52,35 @@ function scheduledHHMMtoUnix(yyyymmdd: string, hhmm: string): number {
   return Math.floor(new Date(year, month, day, h, m, 0).getTime() / 1000);
 }
 
+/**
+ * Resolve a feed stop_time_update to a (station, direction) pair via the
+ * platform map. Returns null when the stop_id is unknown or absent — those
+ * entries are not used for any per-trip matching.
+ */
+function resolvePlatform(
+  stu: GtfsRtStopTimeUpdate
+): { station: Station; direction: TrainDirection } | null {
+  if (!stu.stopId) return null;
+  const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
+  return platform ?? null;
+}
+
+/**
+ * Find the stop_time_update for a given station ON THIS TRIP'S DIRECTION.
+ * Matching is strictly stop_id-based: the feed's stop_id must resolve to a
+ * platform whose station matches AND whose direction matches the trip's
+ * direction. This rejects entries from the opposite-direction platform that
+ * happens to share a station name.
+ */
 function findStopUpdate(
   stopTimeUpdates: GtfsRtStopTimeUpdate[],
-  station: Station
+  station: Station,
+  direction: TrainDirection
 ): GtfsRtStopTimeUpdate | undefined {
-  return stopTimeUpdates.find(
-    (s) => s.stopId != null && GTFS_STOP_ID_TO_STATION[s.stopId] === station
-  );
+  return stopTimeUpdates.find((s) => {
+    const platform = resolvePlatform(s);
+    return platform?.station === station && platform?.direction === direction;
+  });
 }
 
 /**
@@ -76,18 +103,19 @@ function computeDelayMinutes(
  * the app's own static schedule, so it is immune to rounding noise from
  * differences between the GTFS static feed and the app's hardcoded schedule.
  *
- * minStopSequence: when provided, entries with a stopSequence strictly less than
- * this value are skipped. SMART encodes some trips as a single round-trip GTFS
- * trip (e.g. southbound → northern terminus → southbound), so a station like
- * "Santa Rosa Downtown" can appear twice: once on the northbound leg (lower
- * stopSequence, wrong departure time) and once on the southbound leg (higher
- * stopSequence, correct time). Passing the origin station's stopSequence here
- * excludes the pre-origin pass-through entries.
+ * Matching is direction-aware ID matching: only stop_time_updates whose
+ * `stop_id` resolves to a platform on the trip's direction are considered.
+ * This handles SMART's round-trip GTFS encoding — e.g. when a single trip
+ * passes through Santa Rosa Downtown northbound (wrong leg) and again
+ * southbound (correct leg), only the southbound platform's update is used.
+ * `minStopSequence` is retained as a defensive secondary filter for any
+ * future case where two same-direction passes coexist on one trip.
  */
 function buildStopRealtimeData(
   stopTimeUpdates: GtfsRtStopTimeUpdate[],
   scheduledTimesByStation: Partial<Record<string, string>>,
   startDate: string | undefined,
+  direction: TrainDirection,
   minStopSequence?: number
 ): {
   allStopLiveDepartures: Partial<Record<string, string>>;
@@ -97,14 +125,12 @@ function buildStopRealtimeData(
   const allStopDelayMinutes: Partial<Record<string, number>> = {};
 
   for (const stu of stopTimeUpdates) {
-    if (!stu.stopId || !stu.departureTime) continue;
-    // Skip stops that belong to the pre-origin leg of the trip (earlier in the
-    // stop sequence than the user's boarding station).
+    if (!stu.departureTime) continue;
     if (minStopSequence != null && stu.stopSequence != null && stu.stopSequence < minStopSequence) continue;
-    const station = GTFS_STOP_ID_TO_STATION[stu.stopId];
-    if (!station) continue;
+    const platform = resolvePlatform(stu);
+    if (!platform || platform.direction !== direction) continue;
+    const { station } = platform;
 
-    // Each station has two platform IDs (northbound/southbound); last one wins.
     allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
 
     const scheduledHHMM = scheduledTimesByStation[station];
@@ -121,6 +147,7 @@ function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
   toStation: Station,
+  direction: TrainDirection,
   /**
    * Scheduled departure at fromStation from the static timetable ("HH:MM").
    * When provided this is used as the map key and to compute real delay,
@@ -144,7 +171,7 @@ function deriveStatus(
     }
     // Some feeds include stop_time_updates with scheduled times even for CANCELED trips.
     // Use those to key by scheduled departure so the canceled badge shows for any station pair.
-    const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation);
+    const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
     if (fromUpdate?.departureTime) {
       const scheduledDeparture = unixToTimeString(fromUpdate.departureTime);
       return {
@@ -180,8 +207,8 @@ function deriveStatus(
     };
   }
 
-  const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation);
-  const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation);
+  const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
+  const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation, direction);
 
   if (!fromUpdate?.departureTime) {
     // No data for this station pair in this update
@@ -240,6 +267,7 @@ function deriveStatus(
     update.stopTimeUpdates,
     scheduledTimesByStation,
     update.startDate,
+    direction,
     fromUpdate?.stopSequence
   );
   const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
@@ -307,6 +335,7 @@ export function useTripRealtimeStatusMap(
     if (!data || !fromStation || !toStation) return empty;
 
     const southbound = isSouthboundFn(fromStation as Station, toStation as Station);
+    const direction: TrainDirection = southbound ? "southbound" : "northbound";
 
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
     // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
@@ -345,6 +374,7 @@ export function useTripRealtimeStatusMap(
         update,
         fromStation,
         toStation,
+        direction,
         scheduledDepartureParam,
         scheduledArrivalParam,
         scheduledTimesByStation

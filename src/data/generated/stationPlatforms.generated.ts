@@ -2,38 +2,56 @@
 // Do not edit manually.
 import type { Station } from "./stations.generated.js";
 
+export type TrainDirection = "northbound" | "southbound";
+
+export interface PlatformInfo {
+  readonly station: Station;
+  readonly direction: TrainDirection;
+}
+
 /**
- * Every SMART platform stop_id (GTFS location_type=0) mapped to its parent
- * station's display name. Used by both client hooks and the /api/gtfsrt
- * transforms to resolve realtime stop_id references.
+ * Every SMART platform stop_id (GTFS location_type=0) mapped to the station
+ * AND the direction that platform serves. Realtime trip updates carry a
+ * per-stop `stop_id`, so this map lets us match each update to a specific
+ * (station, direction) pair without collapsing opposite-direction platforms
+ * onto the same station entry.
  */
-export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = {
-  "71011": "Larkspur",
-  "71012": "Larkspur",
-  "71021": "San Rafael",
-  "71022": "San Rafael",
-  "71031": "Marin Civic Center",
-  "71032": "Marin Civic Center",
-  "71041": "Novato Hamilton",
-  "71042": "Novato Hamilton",
-  "71051": "Novato Downtown",
-  "71052": "Novato Downtown",
-  "71061": "Novato San Marin",
-  "71062": "Novato San Marin",
-  "71071": "Petaluma Downtown",
-  "71072": "Petaluma Downtown",
-  "71081": "Petaluma North",
-  "71082": "Petaluma North",
-  "71091": "Cotati",
-  "71092": "Cotati",
-  "71101": "Rohnert Park",
-  "71102": "Rohnert Park",
-  "71111": "Santa Rosa Downtown",
-  "71112": "Santa Rosa Downtown",
-  "71121": "Santa Rosa North",
-  "71122": "Santa Rosa North",
-  "71131": "Sonoma County Airport",
-  "71132": "Sonoma County Airport",
-  "71141": "Windsor",
-  "71142": "Windsor"
+export const GTFS_STOP_ID_TO_PLATFORM: Record<string, PlatformInfo> = {
+  "71011": { station: "Larkspur", direction: "northbound" },
+  "71012": { station: "Larkspur", direction: "southbound" },
+  "71021": { station: "San Rafael", direction: "northbound" },
+  "71022": { station: "San Rafael", direction: "southbound" },
+  "71031": { station: "Marin Civic Center", direction: "northbound" },
+  "71032": { station: "Marin Civic Center", direction: "southbound" },
+  "71041": { station: "Novato Hamilton", direction: "northbound" },
+  "71042": { station: "Novato Hamilton", direction: "southbound" },
+  "71051": { station: "Novato Downtown", direction: "northbound" },
+  "71052": { station: "Novato Downtown", direction: "southbound" },
+  "71061": { station: "Novato San Marin", direction: "northbound" },
+  "71062": { station: "Novato San Marin", direction: "southbound" },
+  "71071": { station: "Petaluma Downtown", direction: "northbound" },
+  "71072": { station: "Petaluma Downtown", direction: "southbound" },
+  "71081": { station: "Petaluma North", direction: "northbound" },
+  "71082": { station: "Petaluma North", direction: "southbound" },
+  "71091": { station: "Cotati", direction: "northbound" },
+  "71092": { station: "Cotati", direction: "southbound" },
+  "71101": { station: "Rohnert Park", direction: "northbound" },
+  "71102": { station: "Rohnert Park", direction: "southbound" },
+  "71111": { station: "Santa Rosa Downtown", direction: "northbound" },
+  "71112": { station: "Santa Rosa Downtown", direction: "southbound" },
+  "71121": { station: "Santa Rosa North", direction: "northbound" },
+  "71122": { station: "Santa Rosa North", direction: "southbound" },
+  "71131": { station: "Sonoma County Airport", direction: "northbound" },
+  "71132": { station: "Sonoma County Airport", direction: "southbound" },
+  "71141": { station: "Windsor", direction: "northbound" },
+  "71142": { station: "Windsor", direction: "southbound" },
 };
+
+/**
+ * Station-only view of `GTFS_STOP_ID_TO_PLATFORM`, retained for callers
+ * that only need to resolve a stop_id to a station name (vehicle positions,
+ * service alerts, map markers) and don't care about direction.
+ */
+export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = Object.fromEntries(
+  Object.entries(GTFS_STOP_ID_TO_PLATFORM).map(([stopId, platform]) => [stopId, platform.station]),
+) as Record<string, Station>;

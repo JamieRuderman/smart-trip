@@ -18,6 +18,7 @@ import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
+import { FONT_FAMILY } from "@/components/SmartLineDiagram/tokens";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
@@ -214,7 +215,7 @@ function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
     number.textContent = String(train.tripNumber);
     number.style.cssText = [
       "color:white",
-      "font-family:Inter, sans-serif",
+      `font-family:${FONT_FAMILY}`,
       "font-weight:900",
       "font-size:14px",
       "line-height:1",

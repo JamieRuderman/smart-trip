@@ -49,9 +49,6 @@ export function TrainMarker({
   //    reliably project onto an inter-station segment).
   //  - Neither → station-midpoint fallback.
   const scheduled = scheduledProgress(train, now);
-  // For the rider's train, project their phone position instead of the
-  // GTFS-RT vehicle position — phone GPS is ~15-30 s ahead of the feed,
-  // so this keeps the marker on top of where the rider actually is.
   const gpsTrain =
     overrideLat != null && overrideLng != null
       ? { ...train, latitude: overrideLat, longitude: overrideLng }
@@ -80,10 +77,8 @@ export function TrainMarker({
     train.delayMinutes !== null &&
     train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
 
-  // When the user is riding this train, swap the default (black) on-time
-  // accent for the user-location blue so the marker reads as "you are here"
-  // at a glance. Delayed/canceled colors still take precedence — losing the
-  // gold/gray status signal would hide important information.
+  // Riding swaps the on-time accent for blue; delayed/canceled win so the
+  // status signal isn't lost.
   const accent = train.isCanceled
     ? TRAIN_COLORS.canceled
     : isDelayed

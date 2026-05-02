@@ -35,6 +35,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { haversineKm } from "@/lib/stationUtils";
+import { EARTH_RADIUS_KM, KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
 import stations, { STATION_COORDINATES } from "@/data/stations";
 
 interface UseUserRidingArgs {
@@ -93,9 +94,6 @@ const STATIONARY_SPEED_MPS = 1;
 
 /** Number of consecutive sub-stationary ticks before releasing the latch. */
 const STATIONARY_TICKS_TO_RELEASE = 3;
-
-const EARTH_RADIUS_KM = 6371;
-const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
 
 /** Perpendicular distance (km) from a point to the SMART corridor,
  *  approximated as the polyline through the station list. The corridor is
@@ -200,9 +198,7 @@ export function useUserRiding({
     if (ridingTrainKey == null) {
       if (!nearest) return;
 
-      // Tier 1: co-located. The user and the train share GPS within the
-      // close-radius — engage regardless of speed. Handles the station-stop
-      // case where both sides report 0.
+      // Tier 1: co-located.
       if (nearest.distKm <= ENGAGE_COLOCATION_KM) {
         setRidingTrainKey(nearest.train.key);
         stationaryTicksRef.current = 0;
@@ -212,10 +208,9 @@ export function useUserRiding({
       const userMoving =
         userSpeedMps != null && userSpeedMps >= ENGAGE_SPEED_MPS;
 
-      // Tier 2: nearby and moving. Mobile Safari often returns null for
-      // `coords.speed`; treat the train's own GTFS-RT speed as corroborating
-      // evidence so we don't refuse to engage just because the device didn't
-      // report a velocity.
+      // Tier 2: nearby + something moving. The `userSpeedMps == null` gate
+      // on `trainMoving` means we only fall back to the train's GTFS-RT
+      // speed when the device didn't report one (Safari often doesn't).
       const trainMoving =
         nearest.train.speed != null &&
         nearest.train.speed >= ENGAGE_SPEED_MPS;
@@ -227,12 +222,8 @@ export function useUserRiding({
         return;
       }
 
-      // Tier 3: phone is on the rail corridor and moving. Engages on a
-      // wider radius — GTFS-RT vehicle positions can lag a moving train by
-      // multiple km between updates, so the closest train marker can sit
-      // well behind where the user actually is. Prefer a same-direction
-      // candidate when we have a heading; fall back to the overall nearest
-      // when we don't.
+      // Tier 3: on-corridor + moving. Same-direction candidate preferred so
+      // we don't latch onto a passing opposite-direction train.
       if (userMoving && distanceToCorridorKm(userLat, userLng) <= ON_TRACK_KM) {
         const directional = nearestSameDirectionTrain(
           userLat,
@@ -263,10 +254,6 @@ export function useUserRiding({
       latched.longitude,
     );
 
-    // Release if the user has clearly walked off the rail corridor — they
-    // got off the train. We deliberately do NOT release on raw distance to
-    // the latched train (it can lag multi-km behind the rider), only on a
-    // wide sanity bound and on off-corridor walking.
     if (distanceToCorridorKm(userLat, userLng) > OFF_CORRIDOR_KM) {
       setRidingTrainKey(null);
       stationaryTicksRef.current = 0;
@@ -278,11 +265,9 @@ export function useUserRiding({
       return;
     }
 
-    // Only count "user is stationary" ticks against the latch when the
-    // train is actually moving — a station stop means both sides sit still
-    // and shouldn't release. Co-location is the second guard: if user and
-    // train are still together, treat any stillness as "we're stopped at a
-    // station" rather than "user got off."
+    // A station stop (both stopped, still co-located) must not count as a
+    // stationary tick — otherwise the latch drops every time we sit at a
+    // platform for more than ~3 s.
     const userStationary =
       userSpeedMps != null && userSpeedMps < STATIONARY_SPEED_MPS;
     const trainStationary =

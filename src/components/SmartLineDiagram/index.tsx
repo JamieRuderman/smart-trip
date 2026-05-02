@@ -244,9 +244,6 @@ export function SmartLineDiagram({
                   stationArcs={snap.arcs}
                   selected={train.key === selectedTrainKey}
                   userRiding={isUserRiding}
-                  // Phone GPS leads the GTFS-RT feed by ~15-30 s. When the
-                  // rider's train is latched, snap its marker to the phone
-                  // so it doesn't trail behind the rider's actual position.
                   overrideLat={isUserRiding ? userLat : null}
                   overrideLng={isUserRiding ? userLng : null}
                   onClick={onTrainClick}

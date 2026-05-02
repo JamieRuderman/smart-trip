@@ -1,19 +1,26 @@
 /**
  * Detect whether the user is currently riding a train.
  *
- * Returns the matching train's `key` (matches `MapTrain.key`) when a train's
- * GPS position and the user's GPS position are close AND something is moving
- * fast enough to plausibly be on board. Either the device's reported speed
- * or the train's own GTFS-RT speed satisfies the movement check — Mobile
- * Safari frequently returns null for `coords.speed`, so requiring it strictly
- * misses real rides. Distance thresholds are sized to absorb the ~30 s lag
- * between vehicle-position updates (a train at ~25 m/s can be hundreds of
- * meters ahead of its last reported point).
+ * Returns the matching train's `key` (matches `MapTrain.key`) when the user's
+ * and train's GPS positions are close enough to indicate they're together.
+ * Engagement uses two tiers:
+ *   - Co-location (≤ ENGAGE_COLOCATION_KM): engage regardless of motion. At
+ *     this distance the user is effectively in the vehicle, so a station
+ *     stop where neither side reports speed shouldn't block the latch.
+ *   - Proximity (≤ ENGAGE_DISTANCE_KM): require movement (user OR train
+ *     above ENGAGE_SPEED_MPS). Mobile Safari often returns null for
+ *     `coords.speed`, so the train's own GTFS-RT speed corroborates when
+ *     the device hasn't reported a velocity.
  *
- * Hysteresis: once latched onto a train, only release when the train moves
- * far away OR the user has been near-stationary for a few ticks. Without
- * this, the dot would flick between the train marker and the nearest
- * station every time the train pauses at a red signal or station.
+ * Distance thresholds are sized to absorb the ~30 s lag between vehicle-
+ * position updates (a train at ~25 m/s can be hundreds of meters ahead of
+ * its last reported point).
+ *
+ * Hysteresis: once latched, only release when the train moves far away OR
+ * the user has been near-stationary for a few ticks while the train kept
+ * moving. A station stop (both stationary, still co-located) does NOT
+ * count as stationary ticks — otherwise the latch would drop every time
+ * the train spent more than ~3 s at a platform.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -33,17 +40,24 @@ interface UseUserRidingArgs {
  *  signal — see hasMovementSignal below. */
 const ENGAGE_SPEED_MPS = 3;
 
-/** Maximum train→user haversine distance for engaging the riding state.
- *  GTFS-RT vehicle positions are typically refreshed every ~30 s, so a train
- *  at ~25 m/s can be 700+ m ahead of its last reported point by the time we
- *  evaluate. Tight thresholds (≤ 0.3 km) miss the ride entirely; this gives
- *  the lag enough headroom while still excluding parallel roads. */
-const ENGAGE_DISTANCE_KM = 0.6;
+/** Co-location radius. Within this distance the user is effectively inside
+ *  the train, so engage regardless of reported speed. Critical for the
+ *  station-stop case: both user and train sit still (speed = 0) yet the
+ *  user is plainly on board. Tighter than ENGAGE_DISTANCE_KM so a train
+ *  passing on a parallel road can't trigger this branch. */
+const ENGAGE_COLOCATION_KM = 0.15;
+
+/** Maximum train→user haversine distance for engaging via the proximity
+ *  branch (movement required). GTFS-RT vehicle positions are typically
+ *  refreshed every ~30 s, so a train at ~25 m/s can be 700+ m ahead of its
+ *  last reported point — this absorbs that lag without being so wide that
+ *  parallel-road traffic latches. */
+const ENGAGE_DISTANCE_KM = 0.9;
 
 /** Distance at which we drop a latched train (let the dot snap back to the
  *  nearest station). Comfortably larger than ENGAGE_DISTANCE_KM so brief
  *  GPS noise or stale vehicle-position updates don't cause flicker. */
-const RELEASE_DISTANCE_KM = 1.2;
+const RELEASE_DISTANCE_KM = 1.5;
 
 /** Speed below which the user-stationary counter increments. */
 const STATIONARY_SPEED_MPS = 1;
@@ -89,25 +103,30 @@ export function useUserRiding({
     }
 
     if (ridingTrainKey == null) {
-      // Engage when a train is within radius AND something is moving fast
-      // enough. Mobile Safari often returns null for `coords.speed`; in that
-      // case the train's own GTFS-RT speed is treated as corroborating
+      if (!nearest) return;
+
+      // Tier 1: co-located. The user and the train share GPS within the
+      // close-radius — engage regardless of speed. Handles the station-stop
+      // case where both sides report 0.
+      if (nearest.distKm <= ENGAGE_COLOCATION_KM) {
+        setRidingTrainKey(nearest.train.key);
+        stationaryTicksRef.current = 0;
+        return;
+      }
+
+      // Tier 2: nearby and moving. Mobile Safari often returns null for
+      // `coords.speed`; treat the train's own GTFS-RT speed as corroborating
       // evidence so we don't refuse to engage just because the device didn't
       // report a velocity.
       const userMoving =
         userSpeedMps != null && userSpeedMps >= ENGAGE_SPEED_MPS;
       const trainMoving =
-        nearest != null &&
         nearest.train.speed != null &&
         nearest.train.speed >= ENGAGE_SPEED_MPS;
       const hasMovementSignal =
         userMoving || (userSpeedMps == null && trainMoving);
 
-      if (
-        nearest &&
-        nearest.distKm <= ENGAGE_DISTANCE_KM &&
-        hasMovementSignal
-      ) {
+      if (nearest.distKm <= ENGAGE_DISTANCE_KM && hasMovementSignal) {
         setRidingTrainKey(nearest.train.key);
         stationaryTicksRef.current = 0;
       }
@@ -134,7 +153,19 @@ export function useUserRiding({
       return;
     }
 
-    if (userSpeedMps != null && userSpeedMps < STATIONARY_SPEED_MPS) {
+    // Only count "user is stationary" ticks against the latch when the
+    // train is actually moving — a station stop means both sides sit still
+    // and shouldn't release. Co-location is the second guard: if user and
+    // train are still together, treat any stillness as "we're stopped at a
+    // station" rather than "user got off."
+    const userStationary =
+      userSpeedMps != null && userSpeedMps < STATIONARY_SPEED_MPS;
+    const trainStationary =
+      latched.speed == null || latched.speed < STATIONARY_SPEED_MPS;
+    const colocated = latchedDistKm <= ENGAGE_COLOCATION_KM;
+    const stationStop = trainStationary && colocated;
+
+    if (userStationary && !stationStop) {
       stationaryTicksRef.current += 1;
       if (stationaryTicksRef.current >= STATIONARY_TICKS_TO_RELEASE) {
         setRidingTrainKey(null);

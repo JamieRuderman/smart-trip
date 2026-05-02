@@ -1,13 +1,25 @@
 import type { Station } from "@/types/smartSchedule";
 import stations, { stationZones, STATION_COORDINATES } from "@/data/stations";
+import {
+  GTFS_STOP_ID_TO_PLATFORM,
+  GTFS_STOP_ID_TO_STATION,
+  type PlatformInfo,
+  type TrainDirection,
+} from "@/data/generated/stationPlatforms.generated";
 import { FERRY_CONSTANTS } from "./fareConstants";
 
 /**
- * Maps GTFS platform stop IDs (from SMART's stops.txt) to Station names.
- * Each physical station has two platform entries (northbound/southbound).
- * Used to correlate GTFS-RT stop_time_update.stop_id with the app's Station type.
+ * Maps GTFS platform stop IDs (from SMART's stops.txt) to a station + direction.
+ * Each physical station has two platform stop_ids (one per direction); the
+ * direction-aware map lets trip-update matching distinguish them, while the
+ * station-only view keeps existing direction-agnostic resolution working.
  */
-export { GTFS_STOP_ID_TO_STATION } from "@/data/generated/stationPlatforms.generated";
+export {
+  GTFS_STOP_ID_TO_STATION,
+  GTFS_STOP_ID_TO_PLATFORM,
+  type PlatformInfo,
+  type TrainDirection,
+};
 
 /**
  * Station utilities - derived from pure data
@@ -77,6 +89,14 @@ export function getAllStations(): Station[] {
  */
 export function isSouthbound(from: Station, to: Station): boolean {
   return (stationIndexMap[from] ?? 0) < (stationIndexMap[to] ?? 0);
+}
+
+/**
+ * Direction of travel from `from` to `to` as the canonical `TrainDirection`
+ * literal used by the realtime platform map and trip-update matching.
+ */
+export function getTripDirection(from: Station, to: Station): TrainDirection {
+  return isSouthbound(from, to) ? "southbound" : "northbound";
 }
 
 /**

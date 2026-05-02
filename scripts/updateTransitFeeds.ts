@@ -325,21 +325,92 @@ function buildStopIdToStationMap(
   return stationMap;
 }
 
+/**
+ * Group every stop_time by trip_id so per-trip walks don't have to re-scan
+ * the full stop_times table.
+ */
+function groupStopTimesByTrip(stopTimes: CsvRow[]): Map<string, CsvRow[]> {
+  const stopTimesByTrip = new Map<string, CsvRow[]>();
+  for (const stopTime of stopTimes) {
+    const list = stopTimesByTrip.get(stopTime.trip_id) ?? [];
+    list.push(stopTime);
+    stopTimesByTrip.set(stopTime.trip_id, list);
+  }
+  return stopTimesByTrip;
+}
+
+/**
+ * Determine the direction of a trip from its sorted stop_times by comparing
+ * the first and last station indices in the canonical station order.
+ * Returns null if the trip doesn't traverse two distinct known stations.
+ */
+function inferTripDirection(
+  sortedStopTimes: CsvRow[],
+  stopToStation: Map<string, string>,
+  stationIndexByName: Map<string, number>,
+): TrainDirection | null {
+  let firstIdx: number | undefined;
+  let lastIdx: number | undefined;
+  for (const st of sortedStopTimes) {
+    const station = stopToStation.get(st.stop_id);
+    const idx = station ? stationIndexByName.get(station) : undefined;
+    if (idx === undefined) continue;
+    if (firstIdx === undefined) firstIdx = idx;
+    lastIdx = idx;
+  }
+  if (firstIdx === undefined || lastIdx === undefined || firstIdx === lastIdx) return null;
+  return firstIdx < lastIdx ? "southbound" : "northbound";
+}
+
+/**
+ * Walk every trip's stop_times to determine which direction each platform
+ * `stop_id` serves. Throws if a single stop_id is observed in both
+ * directions, since that breaks the deterministic ID-to-direction match
+ * relied on by the realtime trip-update pipeline.
+ */
+function buildStopIdToDirectionMap(
+  trips: CsvRow[],
+  stopTimesByTrip: Map<string, CsvRow[]>,
+  stations: StationParent[],
+  stopToStation: Map<string, string>,
+): Map<string, TrainDirection> {
+  const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
+  const directionByStopId = new Map<string, TrainDirection>();
+  for (const trip of trips) {
+    const tripStopTimes = stopTimesByTrip.get(trip.trip_id);
+    if (!tripStopTimes || tripStopTimes.length === 0) continue;
+
+    const sorted = [...tripStopTimes].sort(
+      (a, b) => Number(a.stop_sequence) - Number(b.stop_sequence)
+    );
+
+    const direction = inferTripDirection(sorted, stopToStation, stationIndexByName);
+    if (!direction) continue;
+
+    for (const st of sorted) {
+      const stopId = st.stop_id;
+      if (!stopId || !stopToStation.has(stopId)) continue;
+      const existing = directionByStopId.get(stopId);
+      if (existing && existing !== direction) {
+        throw new Error(
+          `GTFS stop_id ${stopId} is used by both directions; cannot derive a deterministic platform direction.`
+        );
+      }
+      directionByStopId.set(stopId, direction);
+    }
+  }
+  return directionByStopId;
+}
+
 function buildTrainSchedules(
   gtfs: GtfsFiles,
+  stopTimesByTrip: Map<string, CsvRow[]>,
   stations: StationParent[],
   stopToStation: Map<string, string>,
 ): TrainSchedulesOutput {
   const stationCount = stations.length;
   const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
   const serviceTypes = deriveServiceTypes(gtfs.calendar, gtfs.calendarDates);
-
-  const stopTimesByTrip = new Map<string, CsvRow[]>();
-  for (const stopTime of gtfs.stopTimes) {
-    const tripStopTimes = stopTimesByTrip.get(stopTime.trip_id) ?? [];
-    tripStopTimes.push(stopTime);
-    stopTimesByTrip.set(stopTime.trip_id, tripStopTimes);
-  }
 
   const schedules: TrainSchedulesOutput = {
     weekday: { northbound: [], southbound: [] },
@@ -361,9 +432,6 @@ function buildTrainSchedules(
     );
 
     const stationTimes = new Array<string | undefined>(stationCount).fill(undefined);
-    let firstStationIndex: number | undefined;
-    let lastStationIndex: number | undefined;
-
     for (const stopTime of sortedStopTimes) {
       const stationName = stopToStation.get(stopTime.stop_id);
       if (!stationName) continue;
@@ -375,23 +443,15 @@ function buildTrainSchedules(
       if (!timeRaw) continue;
 
       stationTimes[stationIndex] = toTimeString(timeRaw);
-
-      if (firstStationIndex === undefined) {
-        firstStationIndex = stationIndex;
-      }
-
-      lastStationIndex = stationIndex;
     }
 
     if (!allTimesPresent(stationTimes)) {
       continue; // Skip trips that do not serve every SMART station
     }
 
-    if (firstStationIndex === undefined || lastStationIndex === undefined) {
-      continue;
-    }
+    const direction = inferTripDirection(sortedStopTimes, stopToStation, stationIndexByName);
+    if (!direction) continue;
 
-    const direction: TrainDirection = firstStationIndex < lastStationIndex ? "southbound" : "northbound";
     const times = stationTimes.slice();
 
     const bucket = schedules[scheduleType][direction];
@@ -561,30 +621,58 @@ function extractStationCoordinates(
  */
 function emitStationPlatformsFile(
   stopIdToStation: Map<string, string>,
+  stopIdToDirection: Map<string, TrainDirection>,
   stations: StationParent[],
 ): number {
   const parentIds = new Set(stations.map((s) => s.stopId));
-  const platforms = Object.fromEntries(
-    [...stopIdToStation.entries()]
-      .filter(([stopId]) => !parentIds.has(stopId))
-      .sort(([a], [b]) => a.localeCompare(b)),
-  );
+  const platformEntries = [...stopIdToStation.entries()]
+    .filter(([stopId]) => !parentIds.has(stopId))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const platforms: Record<string, { station: string; direction: TrainDirection }> = {};
+  for (const [stopId, station] of platformEntries) {
+    const direction = stopIdToDirection.get(stopId);
+    if (!direction) {
+      throw new Error(
+        `Platform stop_id ${stopId} (${station}) is not used by any trip; cannot determine direction.`,
+      );
+    }
+    platforms[stopId] = { station, direction };
+  }
 
   const outputPath = path.resolve(OUTPUT_DIR, "stationPlatforms.generated.ts");
   const content = `// Auto-generated by scripts/updateTransitFeeds.ts
 // Do not edit manually.
 import type { Station } from "./stations.generated.js";
 
+export type TrainDirection = "northbound" | "southbound";
+
+export interface PlatformInfo {
+  readonly station: Station;
+  readonly direction: TrainDirection;
+}
+
 /**
- * Every SMART platform stop_id (GTFS location_type=0) mapped to its parent
- * station's display name. Used by both client hooks and the /api/gtfsrt
- * transforms to resolve realtime stop_id references.
+ * Every SMART platform stop_id (GTFS location_type=0) mapped to the station
+ * AND the direction that platform serves. Realtime trip updates carry a
+ * per-stop \`stop_id\`, so this map lets us match each update to a specific
+ * (station, direction) pair without collapsing opposite-direction platforms
+ * onto the same station entry.
  */
-export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = ${JSON.stringify(
+export const GTFS_STOP_ID_TO_PLATFORM: Record<string, PlatformInfo> = ${JSON.stringify(
     platforms,
     null,
     2,
   )};
+
+/**
+ * Station-only view of \`GTFS_STOP_ID_TO_PLATFORM\`, retained for callers
+ * that only need to resolve a stop_id to a station name (vehicle positions,
+ * service alerts, map markers) and don't care about direction.
+ */
+export const GTFS_STOP_ID_TO_STATION: Record<string, Station> = Object.fromEntries(
+  Object.entries(GTFS_STOP_ID_TO_PLATFORM).map(([stopId, platform]) => [stopId, platform.station]),
+) as Record<string, Station>;
 `;
   fs.writeFileSync(outputPath, content, "utf-8");
   return Object.keys(platforms).length;
@@ -706,9 +794,16 @@ async function updateFeeds(): Promise<void> {
   emitStationsFile(stations);
 
   const stopIdToStation = buildStopIdToStationMap(smartGtfs.stops, stations);
-  const platformCount = emitStationPlatformsFile(stopIdToStation, stations);
+  const stopTimesByTrip = groupStopTimesByTrip(smartGtfs.stopTimes);
+  const stopIdToDirection = buildStopIdToDirectionMap(
+    smartGtfs.trips,
+    stopTimesByTrip,
+    stations,
+    stopIdToStation,
+  );
+  const platformCount = emitStationPlatformsFile(stopIdToStation, stopIdToDirection, stations);
 
-  const trainSchedules = buildTrainSchedules(smartGtfs, stations, stopIdToStation);
+  const trainSchedules = buildTrainSchedules(smartGtfs, stopTimesByTrip, stations, stopIdToStation);
   emitTrainSchedulesFile(trainSchedules);
 
   console.log("Extracting station coordinates...");

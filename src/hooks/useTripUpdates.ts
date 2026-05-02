@@ -4,7 +4,7 @@ import { apiBaseUrl } from "@/lib/env";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
   stationIndexMap,
-  isSouthbound as isSouthboundFn,
+  getTripDirection,
   type TrainDirection,
 } from "@/lib/stationUtils";
 import type {
@@ -334,8 +334,8 @@ export function useTripRealtimeStatusMap(
     const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
     if (!data || !fromStation || !toStation) return empty;
 
-    const southbound = isSouthboundFn(fromStation as Station, toStation as Station);
-    const direction: TrainDirection = southbound ? "southbound" : "northbound";
+    const direction = getTripDirection(fromStation as Station, toStation as Station);
+    const southbound = direction === "southbound";
 
     // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
     // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips

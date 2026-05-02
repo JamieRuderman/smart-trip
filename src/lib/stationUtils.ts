@@ -1,5 +1,11 @@
 import type { Station } from "@/types/smartSchedule";
 import stations, { stationZones, STATION_COORDINATES } from "@/data/stations";
+import {
+  GTFS_STOP_ID_TO_PLATFORM,
+  GTFS_STOP_ID_TO_STATION,
+  type PlatformInfo,
+  type TrainDirection,
+} from "@/data/generated/stationPlatforms.generated";
 import { FERRY_CONSTANTS } from "./fareConstants";
 
 /**
@@ -13,7 +19,7 @@ export {
   GTFS_STOP_ID_TO_PLATFORM,
   type PlatformInfo,
   type TrainDirection,
-} from "@/data/generated/stationPlatforms.generated";
+};
 
 /**
  * Station utilities - derived from pure data
@@ -83,6 +89,14 @@ export function getAllStations(): Station[] {
  */
 export function isSouthbound(from: Station, to: Station): boolean {
   return (stationIndexMap[from] ?? 0) < (stationIndexMap[to] ?? 0);
+}
+
+/**
+ * Direction of travel from `from` to `to` as the canonical `TrainDirection`
+ * literal used by the realtime platform map and trip-update matching.
+ */
+export function getTripDirection(from: Station, to: Station): TrainDirection {
+  return isSouthbound(from, to) ? "southbound" : "northbound";
 }
 
 /**

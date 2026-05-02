@@ -20,9 +20,9 @@ import type { TrainProgress } from "@/lib/trainProgress";
 const MAX_RESIDUAL_KM = 1.5;
 
 /** Earth's radius in km (haversine + arc-length scaling). */
-const EARTH_RADIUS_KM = 6371;
+export const EARTH_RADIUS_KM = 6371;
 /** km per degree of latitude (~constant). */
-const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
+export const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
 
 function directionFor(directionId: number | null): "S" | "N" {
   return directionId === 1 ? "N" : "S";

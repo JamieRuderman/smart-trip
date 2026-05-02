@@ -64,6 +64,12 @@ export interface SmartLineDiagramProps {
   /** Key (matches `MapTrain.key`) of the train the user is currently riding,
    *  if any. Renders an inset blue dot on that train's marker. */
   userRidingTrainKey?: string | null;
+  /** User's current GPS, used to override the latched train marker's
+   *  position when riding — phone GPS is typically 15–30 s ahead of the
+   *  train's GTFS-RT vehicle position, so the rider's marker should follow
+   *  reality, not the lagging feed. */
+  userLat?: number | null;
+  userLng?: number | null;
   /** Optional wrapper class (e.g. for max-width or padding). */
   className?: string;
 }
@@ -86,6 +92,8 @@ export function SmartLineDiagram({
   toStation = null,
   userStation = null,
   userRidingTrainKey = null,
+  userLat = null,
+  userLng = null,
   className,
 }: SmartLineDiagramProps) {
   const { t } = useTranslation();
@@ -226,18 +234,23 @@ export function SmartLineDiagram({
 
           {pathRef.current &&
             snap &&
-            trains.map((train) => (
-              <TrainMarker
-                key={train.key}
-                train={train}
-                pathEl={pathRef.current!}
-                stationArcs={snap.arcs}
-                selected={train.key === selectedTrainKey}
-                userRiding={train.key === userRidingTrainKey}
-                onClick={onTrainClick}
-                now={now}
-              />
-            ))}
+            trains.map((train) => {
+              const isUserRiding = train.key === userRidingTrainKey;
+              return (
+                <TrainMarker
+                  key={train.key}
+                  train={train}
+                  pathEl={pathRef.current!}
+                  stationArcs={snap.arcs}
+                  selected={train.key === selectedTrainKey}
+                  userRiding={isUserRiding}
+                  overrideLat={isUserRiding ? userLat : null}
+                  overrideLng={isUserRiding ? userLng : null}
+                  onClick={onTrainClick}
+                  now={now}
+                />
+              );
+            })}
         </g>
 
         {/* Label layer — constant CSS-pixel font sizes, hand-affined

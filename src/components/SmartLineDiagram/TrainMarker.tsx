@@ -6,11 +6,13 @@ import { scheduledProgress } from "@/lib/trainMotion";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
 
-/** When schedule and GPS disagree by more than this many station-segments,
- *  pull the schedule progress halfway toward GPS so big real deviations
- *  surface without per-tick jitter from raw GPS. */
-const SCHEDULE_GPS_DRIFT_THRESHOLD = 1.0;
-const SCHEDULE_GPS_BLEND = 0.5;
+/** GPS reflects where the train actually is; the schedule is an estimate
+ *  that subsumes `delayMinutes` but can be off by ~0.5–2 stations whenever
+ *  the static trip-update delay misforecasts or sub-3-minute lateness goes
+ *  uncaptured. Anchor mostly on GPS and let the schedule contribute a small
+ *  smoothing component so the marker keeps moving between the ~30 s
+ *  vehicle-position updates. */
+const GPS_WEIGHT = 0.85;
 
 interface TrainMarkerProps {
   train: MapTrain;
@@ -19,6 +21,11 @@ interface TrainMarkerProps {
   selected: boolean;
   /** True when this is the train the user is currently riding. */
   userRiding?: boolean;
+  /** When set, project these coords onto the rail instead of the train's
+   *  own GTFS-RT position. Used for the rider's latched train so the
+   *  marker tracks the phone (which leads the feed by ~15-30 s). */
+  overrideLat?: number | null;
+  overrideLng?: number | null;
   now: Date;
   onClick?: (train: MapTrain) => void;
 }
@@ -29,29 +36,34 @@ export function TrainMarker({
   stationArcs,
   selected,
   userRiding = false,
+  overrideLat = null,
+  overrideLng = null,
   onClick,
   now,
 }: TrainMarkerProps) {
-  // Resolve progress in this order:
-  //  1. Schedule-driven interpolation — smooth motion, absorbs delayMinutes.
-  //  2. GPS projection (corrects schedule when reality has drifted; also the
-  //     primary source when the schedule can't match the trip).
-  //  3. Station-midpoint fallback — last resort.
+  // Resolve progress:
+  //  - GPS available + schedule available → blend, weighted heavily toward
+  //    GPS so reality wins; schedule contributes between-update smoothing.
+  //  - GPS only → use it directly.
+  //  - Schedule only → use it (covers vehicles whose lat/lng we can't
+  //    reliably project onto an inter-station segment).
+  //  - Neither → station-midpoint fallback.
   const scheduled = scheduledProgress(train, now);
-  const gps = gpsStationProgress(train);
+  const gpsTrain =
+    overrideLat != null && overrideLng != null
+      ? { ...train, latitude: overrideLat, longitude: overrideLng }
+      : train;
+  const gps = gpsStationProgress(gpsTrain);
   const fallback = trainStationProgress(train);
 
-  let resolved = scheduled ?? gps ?? fallback;
-
-  if (scheduled && gps) {
-    const drift = gps.progress - scheduled.progress;
-    if (Math.abs(drift) > SCHEDULE_GPS_DRIFT_THRESHOLD) {
-      resolved = {
-        ...scheduled,
-        progress: scheduled.progress + drift * SCHEDULE_GPS_BLEND,
-      };
-    }
-  }
+  const resolved =
+    gps && scheduled
+      ? {
+          ...gps,
+          progress:
+            GPS_WEIGHT * gps.progress + (1 - GPS_WEIGHT) * scheduled.progress,
+        }
+      : (gps ?? scheduled ?? fallback);
 
   const pos = positionOnPath(
     resolved.progress,
@@ -65,11 +77,15 @@ export function TrainMarker({
     train.delayMinutes !== null &&
     train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
 
+  // Riding swaps the on-time accent for blue; delayed/canceled win so the
+  // status signal isn't lost.
   const accent = train.isCanceled
     ? TRAIN_COLORS.canceled
     : isDelayed
       ? TRAIN_COLORS.delayed
-      : TRAIN_COLORS.onTime;
+      : userRiding
+        ? TOKEN.userLocation
+        : TRAIN_COLORS.onTime;
 
   const label = train.tripNumber != null ? String(train.tripNumber) : "•";
 
@@ -131,9 +147,10 @@ export function TrainMarker({
           strokeDasharray={TOKEN.trainSelectedDash}
         />
       )}
-      {userRiding && (
-        // Small blue badge in the lower-right of the marker — keeps the
-        // trip number readable while signalling "you are on this train".
+      {userRiding && accent !== TOKEN.userLocation && (
+        // Small blue badge in the lower-right of the marker — used when the
+        // accent stays gold/gray (delayed/canceled) so the riding signal is
+        // still visible. Skipped when the whole marker is already blue.
         <circle
           cx={TOKEN.trainInnerR * 0.7}
           cy={TOKEN.trainInnerR * 0.7}

@@ -18,6 +18,7 @@ import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
+import { FONT_FAMILY } from "@/components/SmartLineDiagram/tokens";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
@@ -206,7 +207,25 @@ function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
     "justify-content:center",
     "box-sizing:border-box",
   ].join(";");
-  disc.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="${TRIP_ICON_PATH}"/></svg>`;
+  // Show the human trip number (matches the line-diagram marker) so riders
+  // can correlate at a glance. Falls back to the generic train glyph when
+  // the vehicle hasn't been matched to a scheduled trip.
+  if (train.tripNumber != null) {
+    const number = document.createElement("span");
+    number.textContent = String(train.tripNumber);
+    number.style.cssText = [
+      "color:white",
+      `font-family:${FONT_FAMILY}`,
+      "font-weight:900",
+      "font-size:14px",
+      "line-height:1",
+      "letter-spacing:0.01em",
+      "user-select:none",
+    ].join(";");
+    disc.appendChild(number);
+  } else {
+    disc.innerHTML = `<svg viewBox="0 0 512 512" fill="none" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="${TRIP_ICON_PATH}"/></svg>`;
+  }
 
   host.appendChild(shadowBackdrop);
   host.appendChild(rotator);

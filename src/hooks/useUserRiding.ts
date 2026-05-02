@@ -35,7 +35,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { haversineKm } from "@/lib/stationUtils";
-import { EARTH_RADIUS_KM, KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
+import { KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
 import stations, { STATION_COORDINATES } from "@/data/stations";
 
 interface UseUserRidingArgs {

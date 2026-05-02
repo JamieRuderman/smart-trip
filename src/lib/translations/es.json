@@ -72,7 +72,18 @@
     "alertSignupLink": "regístrate en línea",
     "linksIntro": "Ayuda y legal:",
     "supportLink": "Soporte",
-    "privacyHostedLink": "Política de privacidad"
+    "privacyHostedLink": "Política de privacidad",
+    "scheduleUpdatedToday": "Horario actualizado hoy",
+    "scheduleUpdatedYesterday": "Horario actualizado ayer",
+    "scheduleUpdatedDaysAgo_one": "Horario actualizado hace {{count}} día",
+    "scheduleUpdatedDaysAgo_other": "Horario actualizado hace {{count}} días",
+    "scheduleUpdatedUnknown": "Fecha del horario no disponible",
+    "scheduleStaleSuffix": "El servicio puede haber cambiado — desliza para actualizar.",
+    "scheduleBundledHint": "Mostrando la versión que vino con la app — conéctate a internet para obtener la más reciente."
+  },
+  "freshness": {
+    "offlineBannerTitle": "Sin conexión",
+    "offlineBannerMessage": "Mostrando el último horario guardado y los datos en caché. Las actualizaciones se reanudarán al reconectarse."
   },
   "notifications": {
     "title": "Alertas de Servicio",

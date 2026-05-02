@@ -72,7 +72,18 @@
     "alertSignupLink": "sign up online",
     "linksIntro": "Help and legal:",
     "supportLink": "Support",
-    "privacyHostedLink": "Privacy Policy"
+    "privacyHostedLink": "Privacy Policy",
+    "scheduleUpdatedToday": "Schedule updated today",
+    "scheduleUpdatedYesterday": "Schedule updated yesterday",
+    "scheduleUpdatedDaysAgo_one": "Schedule updated {{count}} day ago",
+    "scheduleUpdatedDaysAgo_other": "Schedule updated {{count}} days ago",
+    "scheduleUpdatedUnknown": "Schedule timestamp unavailable",
+    "scheduleStaleSuffix": "Service may have changed — pull to refresh.",
+    "scheduleBundledHint": "Showing the version that shipped with the app — connect to a network for the latest."
+  },
+  "freshness": {
+    "offlineBannerTitle": "Offline",
+    "offlineBannerMessage": "Showing the last cached schedule and live data. Updates resume when you reconnect."
   },
   "notifications": {
     "title": "Service Alerts",

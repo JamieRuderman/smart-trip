@@ -3,6 +3,8 @@ import { CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { computeRealtimeAgeLabel } from "@/lib/realtimeAgeLabel";
+
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
   currentTime: Date;
@@ -10,22 +12,6 @@ interface ScheduleHeaderProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   lastUpdated: Date | null;
-}
-
-function computeLabel(
-  t: (key: string, options?: Record<string, unknown>) => string,
-  lastUpdated: Date | null,
-  currentTime: Date
-): string {
-  if (!lastUpdated) return t("schedule.lastUpdatedLoading");
-  const diffMs = currentTime.getTime() - lastUpdated.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t("schedule.updatedJustNow");
-  const relative = t("schedule.updatedMinutesAgo", { count: diffMin });
-  if (diffMin >= 10) {
-    return `${relative} ${t("schedule.dataMayBeStale")}`;
-  }
-  return relative;
 }
 
 export function ScheduleHeader({
@@ -37,7 +23,7 @@ export function ScheduleHeader({
   lastUpdated,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
-  const updatedLabel = computeLabel(t, lastUpdated, currentTime);
+  const { text: updatedLabel } = computeRealtimeAgeLabel(t, lastUpdated, currentTime);
 
   return (
     <CardHeader className="p-3 md:p-6">

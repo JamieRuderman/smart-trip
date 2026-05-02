@@ -14,6 +14,9 @@ import {
 } from "@/lib/mapConstants";
 import stations, { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { MapLiveDataChip } from "@/components/MapLiveDataChip";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
@@ -338,7 +341,8 @@ export default function Map() {
 function MapContents() {
   const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
-  const { trains } = useMapTrains();
+  const { trains, lastUpdated } = useMapTrains();
+  const isOnline = useOnlineStatus();
   // The user's currently-selected schedule leg is carried in the URL by the
   // home screen and forwarded into /map by MapPreviewCard. Used only to
   // mark matching rows in the trip detail sheet — does not affect what's
@@ -722,6 +726,21 @@ function MapContents() {
         />
         {trains.length} {trains.length === 1 ? "train" : "trains"}
       </button>
+
+      {/* Live-data freshness chip — beneath the train-count pill. Color and
+          copy mirror ScheduleHeader so the same "stale" mental model carries
+          over to the map. Only renders when we have a feed timestamp. */}
+      <MapLiveDataChip lastUpdated={lastUpdated} />
+
+      {/* Offline banner overlay — only renders when offline */}
+      {!isOnline && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
+          style={{ top: "calc(60px + var(--safe-area-top))" }}
+        >
+          <OfflineBanner />
+        </div>
+      )}
 
       {/* Full trip detail sheet — opens over the map when a marker is tapped.
           Renders nothing until a trip has been resolved. isNextTrip=true so

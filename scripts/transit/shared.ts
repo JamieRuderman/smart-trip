@@ -138,6 +138,11 @@ function allTimesPresent(times: (string | undefined)[]): times is string[] {
   return times.every((time): time is string => typeof time === "string");
 }
 
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
   calendarDateRows: GtfsCalendarDate[],
@@ -463,12 +468,10 @@ export function buildTrainSchedules(
 
   for (const scheduleType of Object.keys(schedules) as ScheduleType[]) {
     for (const direction of ["northbound", "southbound"] as TrainDirection[]) {
-      schedules[scheduleType][direction].sort((a, b) => {
-        const index = direction === "southbound" ? 0 : stationCount - 1;
-        const [aHours, aMinutes] = a.times[index].split(":").map(Number);
-        const [bHours, bMinutes] = b.times[index].split(":").map(Number);
-        return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
-      });
+      const index = direction === "southbound" ? 0 : stationCount - 1;
+      schedules[scheduleType][direction].sort(
+        (a, b) => timeToMinutes(a.times[index]) - timeToMinutes(b.times[index]),
+      );
     }
   }
 
@@ -501,12 +504,7 @@ export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
     if (Number.isFinite(lat)) stopLatById.set(s.stop_id, lat);
   }
   const stopRoleMap = new Map<string, "larkspur" | "sf">();
-  const stopTimesByTrip = new Map<string, GtfsStopTime[]>();
-  for (const stopTime of feed.stopTimes) {
-    const list = stopTimesByTrip.get(stopTime.trip_id) ?? [];
-    list.push(stopTime);
-    stopTimesByTrip.set(stopTime.trip_id, list);
-  }
+  const stopTimesByTrip = groupStopTimesByTrip(feed.stopTimes);
 
   const relevantStopIds = new Set<string>();
   for (const trip of feed.trips) {
@@ -557,7 +555,7 @@ export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
 
     const departStop = larkspurSequence < sfSequence ? larkspurStop : sfStop;
     const arriveStop = larkspurSequence < sfSequence ? sfStop : larkspurStop;
-    const arrayKeyPrefix = departStop.role === "larkspur" ? "" : "Inbound";
+    const isInbound = departStop.role === "sf";
 
     const departureTimeRaw =
       departStop.stopTime.departure_time || departStop.stopTime.arrival_time;
@@ -569,28 +567,18 @@ export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
     const depart = toTimeString(departureTimeRaw);
     const arrive = toTimeString(arrivalTimeRaw);
 
-    if (arrayKeyPrefix === "") {
-      ferrySchedules[
-        `${serviceType}Ferries` as keyof FerrySchedulesOutput
-      ].push({ depart, arrive });
-    } else {
-      ferrySchedules[
-        `${serviceType}${arrayKeyPrefix}Ferries` as keyof FerrySchedulesOutput
-      ].push({
-        depart,
-        arrive,
-      });
-    }
+    const key: keyof FerrySchedulesOutput = isInbound
+      ? `${serviceType}InboundFerries`
+      : `${serviceType}Ferries`;
+    ferrySchedules[key].push({ depart, arrive });
   }
 
   for (const key of Object.keys(
     ferrySchedules,
   ) as (keyof FerrySchedulesOutput)[]) {
-    ferrySchedules[key].sort((a, b) => {
-      const [aHours, aMinutes] = a.depart.split(":").map(Number);
-      const [bHours, bMinutes] = b.depart.split(":").map(Number);
-      return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
-    });
+    ferrySchedules[key].sort(
+      (a, b) => timeToMinutes(a.depart) - timeToMinutes(b.depart),
+    );
   }
 
   return ferrySchedules;

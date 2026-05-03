@@ -52,4 +52,20 @@ describe("computeRealtimeAgeLabel", () => {
     expect(result.isStale).toBe(true);
     expect(result.text).toContain("schedule.dataMayBeStale");
   });
+
+  it("steps up to hours past 60 minutes", () => {
+    const result = computeRealtimeAgeLabel(t, minutesAgo(125), NOW);
+    expect(result.text).toContain("schedule.updatedHoursAgo[2]");
+    expect(result.isStale).toBe(true);
+  });
+
+  it("steps up to days past 24 hours", () => {
+    const result = computeRealtimeAgeLabel(
+      t,
+      minutesAgo(70 * 24 * 60),
+      NOW,
+    );
+    expect(result.text).toContain("schedule.updatedDaysAgo[70]");
+    expect(result.isStale).toBe(true);
+  });
 });

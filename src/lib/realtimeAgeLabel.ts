@@ -7,10 +7,30 @@ import type { TFunction } from "i18next";
  */
 export const REALTIME_STALE_THRESHOLD_MIN = 10;
 
+const MIN_PER_HOUR = 60;
+const MIN_PER_DAY = 60 * 24;
+
+function relativeAgo(t: TFunction, diffMin: number): string {
+  if (diffMin < MIN_PER_HOUR) {
+    return t("schedule.updatedMinutesAgo", { count: diffMin });
+  }
+  if (diffMin < MIN_PER_DAY) {
+    return t("schedule.updatedHoursAgo", {
+      count: Math.floor(diffMin / MIN_PER_HOUR),
+    });
+  }
+  return t("schedule.updatedDaysAgo", {
+    count: Math.floor(diffMin / MIN_PER_DAY),
+  });
+}
+
 /**
  * Format a "last updated X ago" label using the same wording the schedule
  * header uses. Returns the rendered string and a stale flag so the caller
  * can color-code or attach an icon without re-implementing the threshold.
+ *
+ * The unit steps up from minutes → hours → days so the label stays compact
+ * for old data (e.g. "70d ago" instead of "101037m ago").
  */
 export function computeRealtimeAgeLabel(
   t: TFunction,
@@ -26,7 +46,7 @@ export function computeRealtimeAgeLabel(
   if (diffMin < 1) {
     return { text: t("schedule.updatedJustNow"), isStale: false };
   }
-  const relative = t("schedule.updatedMinutesAgo", { count: diffMin });
+  const relative = relativeAgo(t, diffMin);
   if (diffMin >= REALTIME_STALE_THRESHOLD_MIN) {
     return {
       text: `${relative} ${t("schedule.dataMayBeStale")}`,

@@ -47,6 +47,10 @@
     "updatedJustNow": "Just now",
     "updatedMinutesAgo_one": "{{count}}m ago",
     "updatedMinutesAgo_other": "{{count}}m ago",
+    "updatedHoursAgo_one": "{{count}}h ago",
+    "updatedHoursAgo_other": "{{count}}h ago",
+    "updatedDaysAgo_one": "{{count}}d ago",
+    "updatedDaysAgo_other": "{{count}}d ago",
     "dataMayBeStale": "stale"
   },
   "fare": {

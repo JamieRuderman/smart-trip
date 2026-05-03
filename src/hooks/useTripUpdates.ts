@@ -17,10 +17,7 @@ import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
-// GTFS-RT timestamps have second-level precision while our app schedule is minute-level.
-// A 1-2 minute threshold creates too many false positives when feeds drift slightly.
-// Treat only >=3 minutes as delayed to reduce incorrect "Delayed" badges.
-const MIN_DELAY_SECONDS = 3 * 60;
+const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
 
 async function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   const res = await fetch(`${apiBaseUrl}/api/gtfsrt/tripupdates`);

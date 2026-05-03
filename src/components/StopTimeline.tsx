@@ -83,8 +83,16 @@ export function StopTimeline({
           const showLiveStopTime =
             liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
 
+          // Per-stop delay handling. The upstream feed sometimes reports a
+          // delay block at intermediate stops that recovers by the destination
+          // — when the user's origin is on time we still surface the per-stop
+          // shift as a muted "+N" pill (so the live time isn't unexplained)
+          // but skip the orange row tint and prominent "X min delay" chip
+          // that would imply the trip itself is running late.
+          const tripIsDelayed = (realtimeStatus?.delayMinutes ?? 0) > 0;
           const perStopDelayMin = allStopDelayMinutes?.[station] ?? 0;
-          const hasPerStopDelay = perStopDelayMin > 0 && !isPast;
+          const showStopDelay = perStopDelayMin > 0 && !isPast;
+          const isStopDelayProminent = showStopDelay && tripIsDelayed;
 
           const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
           const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
@@ -92,7 +100,7 @@ export function StopTimeline({
           // Per-stop semantic state — drives all colours for this row
           const accent: TripState = isCanceled
             ? "canceled"
-            : hasPerStopDelay
+            : isStopDelayProminent
             ? "delayed"
             : isCurrent
             ? "ontime"
@@ -100,13 +108,19 @@ export function StopTimeline({
             ? "past"
             : "future";
 
-          // Delay pill
-          const pill = hasPerStopDelay
+          // Delay pill — orange "X min delay" when the trip itself is delayed,
+          // muted "+N" indicator when only a mid-trip wobble is reported.
+          const pill = !showStopDelay
+            ? null
+            : isStopDelayProminent
             ? {
                 label: t("tripCard.delayed", { minutes: perStopDelayMin }),
                 cls: cn(stateBg["delayed"], "text-white"),
               }
-            : null;
+            : {
+                label: `+${perStopDelayMin}`,
+                cls: "bg-muted text-muted-foreground",
+              };
 
           // Stop-point icon — uses theme maps so colours stay in sync with text
           const endpointIconColor = isCurrent

@@ -43,7 +43,7 @@ export function ScheduleHeader({
         </span>
         <div
           className={cn(
-            "shrink-0 flex items-center gap-1 text-xs sm:text-sm text-right tracking-normal",
+            "shrink-0 flex items-center gap-1 text-xs sm:text-sm font-medium text-right tracking-normal",
             isStale ? "text-smart-gold" : "text-muted-foreground",
           )}
           role={isStale ? "status" : undefined}
@@ -52,11 +52,13 @@ export function ScheduleHeader({
           {isStale ? (
             <AlertTriangle
               className="h-4 w-4 shrink-0"
+              strokeWidth={2}
               aria-hidden="true"
             />
           ) : (
             <RefreshCw
               className="h-4 w-4 shrink-0 text-primary"
+              strokeWidth={2}
               aria-hidden="true"
             />
           )}

@@ -39,7 +39,11 @@ export function MapLiveDataChip({ lastUpdated }: MapLiveDataChipProps) {
       aria-live={isStale ? "polite" : undefined}
     >
       {isStale && (
-        <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+        <AlertTriangle
+          className="h-3 w-3 shrink-0"
+          strokeWidth={2}
+          aria-hidden="true"
+        />
       )}
       <span>{text}</span>
     </div>

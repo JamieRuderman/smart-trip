@@ -1,36 +1,23 @@
 import type { TFunction } from "i18next";
 
 /**
- * Threshold (minutes) above which realtime feed data is treated as stale.
- * Vehicle positions and trip updates poll every 15-30s, so anything older
- * than 10 minutes implies the polling has stopped — usually a network drop.
+ * Realtime feeds (vehicle positions, trip updates) poll every 15-30s, so
+ * anything older than this is broken polling — offline, suspended app, or
+ * upstream outage. Past the threshold the precise minute count is noise:
+ * the user just needs to know "don't trust this", so we collapse to "Stale"
+ * + warning icon. Below the threshold we show the count, which lets the
+ * user calibrate borderline cases ("12m ago" vs "47m ago" feel different).
  */
-export const REALTIME_STALE_THRESHOLD_MIN = 10;
-
-const MIN_PER_HOUR = 60;
-const MIN_PER_DAY = 60 * 24;
-
-function relativeAgo(t: TFunction, diffMin: number): string {
-  if (diffMin < MIN_PER_HOUR) {
-    return t("schedule.updatedMinutesAgo", { count: diffMin });
-  }
-  if (diffMin < MIN_PER_DAY) {
-    return t("schedule.updatedHoursAgo", {
-      count: Math.floor(diffMin / MIN_PER_HOUR),
-    });
-  }
-  return t("schedule.updatedDaysAgo", {
-    count: Math.floor(diffMin / MIN_PER_DAY),
-  });
-}
+export const REALTIME_STALE_THRESHOLD_MIN = 60;
 
 /**
- * Format a "last updated X ago" label using the same wording the schedule
- * header uses. Returns the rendered string and a stale flag so the caller
- * can color-code or attach an icon without re-implementing the threshold.
+ * Format a "last updated X ago" label. Returns the rendered string and a
+ * `isStale` flag so the caller can swap icons / color-code without
+ * re-implementing the threshold.
  *
- * The unit steps up from minutes → hours → days so the label stays compact
- * for old data (e.g. "70d ago" instead of "101037m ago").
+ * Two states:
+ *   - fresh (`isStale=false`): "Just now" or "Xm ago"
+ *   - stale (`isStale=true`):  "Stale"
  */
 export function computeRealtimeAgeLabel(
   t: TFunction,
@@ -43,15 +30,14 @@ export function computeRealtimeAgeLabel(
   const diffMin = Math.floor(
     (currentTime.getTime() - lastUpdated.getTime()) / 60000,
   );
+  if (diffMin >= REALTIME_STALE_THRESHOLD_MIN) {
+    return { text: t("schedule.stale"), isStale: true };
+  }
   if (diffMin < 1) {
     return { text: t("schedule.updatedJustNow"), isStale: false };
   }
-  const relative = relativeAgo(t, diffMin);
-  if (diffMin >= REALTIME_STALE_THRESHOLD_MIN) {
-    return {
-      text: `${relative} ${t("schedule.dataMayBeStale")}`,
-      isStale: true,
-    };
-  }
-  return { text: relative, isStale: false };
+  return {
+    text: t("schedule.updatedMinutesAgo", { count: diffMin }),
+    isStale: false,
+  };
 }

@@ -43,29 +43,29 @@ describe("computeRealtimeAgeLabel", () => {
     });
   });
 
-  it("appends the stale suffix once past the threshold", () => {
+  it("still shows the precise count just under the stale threshold", () => {
+    const result = computeRealtimeAgeLabel(
+      t,
+      minutesAgo(REALTIME_STALE_THRESHOLD_MIN - 1),
+      NOW,
+    );
+    expect(result.isStale).toBe(false);
+    expect(result.text).toBe(
+      `schedule.updatedMinutesAgo[${REALTIME_STALE_THRESHOLD_MIN - 1}]`,
+    );
+  });
+
+  it("collapses to a standalone 'Stale' label at the threshold", () => {
     const result = computeRealtimeAgeLabel(
       t,
       minutesAgo(REALTIME_STALE_THRESHOLD_MIN),
       NOW,
     );
-    expect(result.isStale).toBe(true);
-    expect(result.text).toContain("schedule.dataMayBeStale");
+    expect(result).toEqual({ text: "schedule.stale", isStale: true });
   });
 
-  it("steps up to hours past 60 minutes", () => {
-    const result = computeRealtimeAgeLabel(t, minutesAgo(125), NOW);
-    expect(result.text).toContain("schedule.updatedHoursAgo[2]");
-    expect(result.isStale).toBe(true);
-  });
-
-  it("steps up to days past 24 hours", () => {
-    const result = computeRealtimeAgeLabel(
-      t,
-      minutesAgo(70 * 24 * 60),
-      NOW,
-    );
-    expect(result.text).toContain("schedule.updatedDaysAgo[70]");
-    expect(result.isStale).toBe(true);
+  it("stays at 'Stale' for arbitrarily old data (no minute count)", () => {
+    const result = computeRealtimeAgeLabel(t, minutesAgo(101037), NOW);
+    expect(result).toEqual({ text: "schedule.stale", isStale: true });
   });
 });

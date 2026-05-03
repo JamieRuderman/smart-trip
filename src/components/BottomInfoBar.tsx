@@ -1,6 +1,7 @@
 import { Bell } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
+import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
 
 export function BottomInfoBar() {
@@ -47,6 +48,7 @@ export function BottomInfoBar() {
           </a>
           . {t("bottomInfo.communityProject")}
         </p>
+        <ScheduleFreshnessLabel className="ml-6 mt-2" />
         <p className="ml-6 mt-2 text-xs">
           {t("bottomInfo.linksIntro")}{" "}
           <a

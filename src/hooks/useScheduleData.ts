@@ -10,6 +10,28 @@ import { setScheduleData } from "@/lib/scheduleUtils";
 
 const STORAGE_KEY = "smart-schedule-payload";
 
+/**
+ * Where the currently-displayed schedule data came from.
+ * - `remote`  — fresh fetch from the deployed `/data/schedules.json`
+ * - `cached`  — last successful fetch, replayed from localStorage
+ * - `bundled` — build-time copy compiled into the app bundle (offline fallback)
+ *
+ * Surfaced to the UI so users can tell when they're looking at cached or
+ * bundled data — important if the cron-refreshed feed has gone stale.
+ */
+export type ScheduleSource = "remote" | "cached" | "bundled";
+
+export interface ScheduleDataState {
+  /** Refresh token. Stable when nothing has changed; ISO timestamp (or
+   *  source label) when it has. Other hooks key memos off this. */
+  version: string;
+  /** Origin of the currently-applied schedule. */
+  source: ScheduleSource;
+  /** Parsed `generatedAt` timestamp from the payload, or null if missing
+   *  (older bundled fallbacks may lack one). */
+  generatedAt: Date | null;
+}
+
 function loadCachedPayload(): SchedulePayload | null {
   if (typeof window === "undefined") return null;
   try {
@@ -31,10 +53,18 @@ function storeCachedPayload(payload: SchedulePayload): void {
   }
 }
 
-export function useScheduleData(): { version: string } {
-  const [version, setVersion] = useState(
-    bundledSchedulePayload.generatedAt ?? "bundled"
-  );
+function parseGeneratedAt(value: string | undefined): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function useScheduleData(): ScheduleDataState {
+  const [state, setState] = useState<ScheduleDataState>(() => ({
+    version: bundledSchedulePayload.generatedAt ?? "bundled",
+    source: "bundled",
+    generatedAt: parseGeneratedAt(bundledSchedulePayload.generatedAt),
+  }));
   const mountedRef = useRef(true);
   const inFlightRefreshRef = useRef<Promise<void> | null>(null);
 
@@ -55,7 +85,11 @@ export function useScheduleData(): { version: string } {
       .then((data) => {
         if (!mountedRef.current || !data || !isSchedulePayload(data)) return;
         setScheduleData(data);
-        setVersion(data.generatedAt ?? "remote");
+        setState({
+          version: data.generatedAt ?? "remote",
+          source: "remote",
+          generatedAt: parseGeneratedAt(data.generatedAt),
+        });
         storeCachedPayload(data);
       })
       .catch(() => {
@@ -73,7 +107,11 @@ export function useScheduleData(): { version: string } {
     const cached = loadCachedPayload();
     if (cached) {
       setScheduleData(cached);
-      setVersion(cached.generatedAt ?? "cached");
+      setState({
+        version: cached.generatedAt ?? "cached",
+        source: "cached",
+        generatedAt: parseGeneratedAt(cached.generatedAt),
+      });
     }
 
     void refreshSchedulePayload();
@@ -90,5 +128,5 @@ export function useScheduleData(): { version: string } {
     };
   }, [refreshSchedulePayload]);
 
-  return { version };
+  return state;
 }

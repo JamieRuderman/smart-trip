@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
+
+import { computeRealtimeAgeLabel } from "@/lib/realtimeAgeLabel";
+import { cn } from "@/lib/utils";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
@@ -10,22 +13,6 @@ interface ScheduleHeaderProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   lastUpdated: Date | null;
-}
-
-function computeLabel(
-  t: (key: string, options?: Record<string, unknown>) => string,
-  lastUpdated: Date | null,
-  currentTime: Date
-): string {
-  if (!lastUpdated) return t("schedule.lastUpdatedLoading");
-  const diffMs = currentTime.getTime() - lastUpdated.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t("schedule.updatedJustNow");
-  const relative = t("schedule.updatedMinutesAgo", { count: diffMin });
-  if (diffMin >= 10) {
-    return `${relative} ${t("schedule.dataMayBeStale")}`;
-  }
-  return relative;
 }
 
 export function ScheduleHeader({
@@ -37,7 +24,11 @@ export function ScheduleHeader({
   lastUpdated,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
-  const updatedLabel = computeLabel(t, lastUpdated, currentTime);
+  const { text: updatedLabel, isStale } = computeRealtimeAgeLabel(
+    t,
+    lastUpdated,
+    currentTime,
+  );
 
   return (
     <CardHeader className="p-3 md:p-6">
@@ -50,12 +41,27 @@ export function ScheduleHeader({
             ? t("schedule.southboundSchedule")
             : t("schedule.northboundSchedule")}
         </span>
-        <div className="max-w-[8.5rem] shrink-0 flex items-center gap-1 text-xs sm:text-sm text-muted-foreground text-right whitespace-normal break-words tracking-normal">
+        <div
+          className={cn(
+            "shrink-0 flex items-center gap-1 text-xs sm:text-sm font-medium text-right tracking-normal",
+            isStale ? "text-smart-gold" : "text-muted-foreground",
+          )}
+          role={isStale ? "status" : undefined}
+        >
           <span>{updatedLabel}</span>
-          <RefreshCw
-            className="h-4 w-4 shrink-0 text-primary"
-            aria-hidden="true"
-          />
+          {isStale ? (
+            <AlertTriangle
+              className="h-4 w-4 shrink-0"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          ) : (
+            <RefreshCw
+              className="h-4 w-4 shrink-0 text-primary"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          )}
         </div>
       </CardTitle>
       {nextTripIndex > 0 && !showAllTrips && (

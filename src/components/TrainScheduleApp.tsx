@@ -15,6 +15,7 @@ import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
+import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
@@ -144,6 +145,9 @@ export function TrainScheduleApp() {
           paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
+        {/* Connectivity banner — only renders when offline */}
+        <OfflineBanner />
+
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
 

@@ -47,7 +47,7 @@
     "updatedJustNow": "Ahora",
     "updatedMinutesAgo_one": "hace {{count}}m",
     "updatedMinutesAgo_other": "hace {{count}}m",
-    "stale": "Desactualizado"
+    "stale": "Datos desactualizados"
   },
   "fare": {
     "fareInformation": "Tarifas",

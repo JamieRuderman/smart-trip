@@ -8,7 +8,7 @@ type StopTimeUpdate = GtfsRealtime.TripUpdate.IStopTimeUpdate;
 
 export default createGtfsRtHandler({
   feed: "tripupdates",
-  sampleFile: "sample/tripupdates.json",
+  sampleFile: "data/511/realtime-samples/tripupdates.json",
   cacheControl: "s-maxage=30, stale-while-revalidate=15",
   transform(feed) {
     const timestamp = Number(feed.header?.timestamp ?? 0);

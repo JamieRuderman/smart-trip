@@ -6,42 +6,34 @@ import {
   TRAIN_VANISHED_MS,
 } from "./constants";
 import { distanceToCorridorKm } from "./corridor";
-import type { RidingLatch, TrainTransitionMap, UserSample } from "./types";
+import type { TrainTransitionMap, UserSample } from "./types";
 
 export type ReleaseReason = "off-corridor" | "vanished" | "wrong-train";
 
 interface ReleaseArgs {
-  latch: RidingLatch;
+  latchedTrainKey: string;
   user: UserSample;
   trains: MapTrain[];
   transitions: TrainTransitionMap;
 }
 
 /**
- * Decide whether to drop the latch this tick.
+ * Decide whether to drop the latch this tick. We deliberately do NOT release
+ * on stationary-user ticks the way the old detector did — long platform
+ * dwells mid-trip would spuriously drop the latch. With boarding correlation
+ * doing the engagement, only hard "the rider is gone" signals release.
  *
- * The new model trusts the boarding correlation, so a long platform dwell
- * mid-trip should NOT release the latch the way the old stationary-tick
- * counter did. Release only on hard signals:
- *   - User is clearly off the rail corridor (disembarked and walked away).
- *   - The latched train has dropped out of the GTFS-RT feed for too long
- *     (trip likely ended or vehicle went offline).
- *   - User is implausibly far from the latched train's last reported
- *     position (wrong train, or rider switched).
+ * Cheaper checks first so the polyline walk is skipped when possible.
  */
 export function shouldReleaseLatch(args: ReleaseArgs): ReleaseReason | null {
-  const { latch, user, trains, transitions } = args;
+  const { latchedTrainKey, user, trains, transitions } = args;
 
-  if (distanceToCorridorKm(user.lat, user.lng) > RELEASE_OFF_CORRIDOR_KM) {
-    return "off-corridor";
-  }
-
-  const transition = transitions.get(latch.trainKey);
+  const transition = transitions.get(latchedTrainKey);
   if (transition && user.nowMs - transition.lastSeenAtMs > TRAIN_VANISHED_MS) {
     return "vanished";
   }
 
-  const live = trains.find((t) => t.key === latch.trainKey);
+  const live = trains.find((t) => t.key === latchedTrainKey);
   if (live) {
     const distKm = haversineKm(
       user.lat,
@@ -50,6 +42,10 @@ export function shouldReleaseLatch(args: ReleaseArgs): ReleaseReason | null {
       live.longitude,
     );
     if (distKm > MAX_LATCHED_DISTANCE_KM) return "wrong-train";
+  }
+
+  if (distanceToCorridorKm(user.lat, user.lng) > RELEASE_OFF_CORRIDOR_KM) {
+    return "off-corridor";
   }
 
   return null;

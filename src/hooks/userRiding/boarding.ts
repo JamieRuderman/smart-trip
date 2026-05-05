@@ -1,5 +1,6 @@
 import { getClosestStationWithDistance } from "@/lib/stationUtils";
 import {
+  DEPARTURE_MATCH_WINDOW_MS,
   DEPARTURE_SPEED_MPS,
   PLATFORM_DWELL_MS,
   PLATFORM_RADIUS_KM,
@@ -11,15 +12,20 @@ export const INITIAL_BOARDING_STATE: BoardingState = {
   sinceMs: null,
 };
 
+/** A departure event is only useful while a corresponding train transition
+ *  could plausibly arrive. Past the match window, drop it so it can't
+ *  associate the user with a totally unrelated later departure. */
+export function isDepartureStale(
+  departure: DepartureEvent,
+  nowMs: number,
+): boolean {
+  return nowMs - departure.atMs > DEPARTURE_MATCH_WINDOW_MS;
+}
+
 /**
- * Update the boarding-primer state for a single GPS tick.
- *
- * The user is "primed for boarding" once they've dwelled inside
- * PLATFORM_RADIUS_KM of a single station for PLATFORM_DWELL_MS. A
- * `DepartureEvent` is emitted on the tick the user crosses outside the
- * platform radius while moving above DEPARTURE_SPEED_MPS — that's the
- * signal we then correlate against train stopped→moving transitions to
- * decide which overlapping train the user actually boarded.
+ * Update the boarding-primer state for a single GPS tick. The dwell
+ * requirement is what prevents drive-bys (cars passing through a platform
+ * zone) from looking like a boarding event.
  */
 export function updateBoardingState(
   prev: BoardingState,

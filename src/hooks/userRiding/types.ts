@@ -40,10 +40,3 @@ export interface TrainTransitionState {
 }
 
 export type TrainTransitionMap = Map<string, TrainTransitionState>;
-
-/** Active latch: which train the user is currently riding. */
-export interface RidingLatch {
-  trainKey: string;
-  sinceMs: number;
-  lastSeenMs: number;
-}

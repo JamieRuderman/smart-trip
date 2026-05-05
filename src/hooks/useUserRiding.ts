@@ -52,7 +52,16 @@ export function useUserRiding({
   const recentDepartureRef = useRef<DepartureEvent | null>(null);
 
   useEffect(() => {
-    if (userLat == null || userLng == null) return;
+    if (userLat == null || userLng == null) {
+      // GPS unavailable (permission revoked, location services off). Without
+      // a position we can't justify saying the user is on a train, so drop
+      // the latch and reset the boarding primer. Train transition history
+      // can stay — it's about trains, not the user.
+      if (ridingTrainKey !== null) setRidingTrainKey(null);
+      boardingRef.current = INITIAL_BOARDING_STATE;
+      recentDepartureRef.current = null;
+      return;
+    }
 
     const nowMs = Date.now();
     const sample: UserSample = {

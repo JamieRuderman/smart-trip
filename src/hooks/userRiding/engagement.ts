@@ -1,4 +1,5 @@
 import type { MapTrain } from "@/hooks/useMapTrains";
+import { alongTrackDistanceKm } from "@/lib/railProjection";
 import { haversineKm } from "@/lib/stationUtils";
 import {
   DEPARTURE_MATCH_WINDOW_MS,
@@ -67,10 +68,21 @@ function buildCandidates(user: UserSample, trains: MapTrain[]): Candidate[] {
   const out: Candidate[] = [];
   for (const train of trains) {
     if (!Number.isFinite(train.latitude) || !Number.isFinite(train.longitude)) continue;
-    out.push({
-      train,
-      distKm: haversineKm(user.lat, user.lng, train.latitude, train.longitude),
-    });
+    // Along-track corridor distance is what "closeness on the same line"
+    // actually means: a train two stations away on the curved rail can be
+    // closer in haversine than the train you're sitting on whose feed
+    // position lags ~30 s behind your phone GPS. Fall back to haversine
+    // when either point doesn't snap to the rail.
+    const along = alongTrackDistanceKm(
+      user.lat,
+      user.lng,
+      train.latitude,
+      train.longitude,
+    );
+    const distKm =
+      along ??
+      haversineKm(user.lat, user.lng, train.latitude, train.longitude);
+    out.push({ train, distKm });
   }
   out.sort((a, b) => a.distKm - b.distKm);
   return out;

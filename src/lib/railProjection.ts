@@ -91,6 +91,30 @@ export const STATION_RAIL_ARC_KM: readonly number[] = stations.map((station) => 
 });
 
 /**
+ * Distance along the rail (km) between two GPS points after both are
+ * projected onto the polyline. More meaningful than haversine on the
+ * curved corridor — two points on opposite sides of a bend can be near in
+ * straight-line km but far apart along-track.
+ *
+ * Returns `null` if either point is too far from the rail to project
+ * reliably (controlled by `maxResidualKm`, default 1.5 km — generous so
+ * passengers walking up to a platform still snap).
+ */
+export function alongTrackDistanceKm(
+  aLat: number,
+  aLng: number,
+  bLat: number,
+  bLng: number,
+  maxResidualKm = 1.5,
+): number | null {
+  const a = snapToRail(aLat, aLng);
+  const b = snapToRail(bLat, bLng);
+  if (!a || !b) return null;
+  if (a.residualKm > maxResidualKm || b.residualKm > maxResidualKm) return null;
+  return Math.abs(a.arcKm - b.arcKm);
+}
+
+/**
  * Map a rail arc-from-south distance to a fractional station index in the
  * N→S station list. Returns 0 for points north of Windsor and N-1 for
  * points south of Larkspur (clamped to the corridor).

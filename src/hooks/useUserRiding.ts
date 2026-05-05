@@ -146,23 +146,26 @@ export function useUserRiding({
     }
 
     if (ridingTrainKey != null) {
-      // Upgrade path: a fallback latch can swap to a correlated train once
-      // the corresponding GTFS-RT transition arrives in a later tick.
+      // Upgrade paths: a fallback latch can be replaced when a stronger
+      // signal lands — a boarding-correlated transition, or a clear
+      // "phone is moving along the rail in this direction" reading.
       let swapped = false;
-      if (recentDepartureRef.current) {
-        const pick = pickTrainToLatch({
-          user: sample,
-          trains,
-          transitions: transitionsRef.current,
-          recentDeparture: recentDepartureRef.current,
-        });
-        if (pick?.source === "correlation") {
-          if (pick.key !== ridingTrainKey) {
-            setRidingTrainKey(pick.key);
-            swapped = true;
-          }
-          recentDepartureRef.current = null;
-        }
+      const upgrade = pickTrainToLatch({
+        user: sample,
+        trains,
+        transitions: transitionsRef.current,
+        recentDeparture: recentDepartureRef.current,
+      });
+      if (
+        upgrade &&
+        upgrade.key !== ridingTrainKey &&
+        (upgrade.source === "correlation" || upgrade.source === "motion")
+      ) {
+        setRidingTrainKey(upgrade.key);
+        swapped = true;
+      }
+      if (upgrade?.source === "correlation") {
+        recentDepartureRef.current = null;
       }
 
       // Self-correction: if a different same-direction train is sitting

@@ -234,7 +234,12 @@ export function SmartLineDiagram({
 
           {pathRef.current &&
             snap &&
-            trains.map((train) => {
+            // The user's train renders last so it paints on top of any
+            // other marker that overlaps it on the schematic.
+            [
+              ...trains.filter((t) => t.key !== userRidingTrainKey),
+              ...trains.filter((t) => t.key === userRidingTrainKey),
+            ].map((train) => {
               const isUserRiding = train.key === userRidingTrainKey;
               return (
                 <TrainMarker

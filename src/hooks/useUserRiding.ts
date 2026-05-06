@@ -13,13 +13,16 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { MapTrain } from "@/hooks/useMapTrains";
 import {
   INITIAL_BOARDING_STATE,
   isDepartureStale,
   updateBoardingState,
 } from "./userRiding/boarding";
-import { pickTrainToLatch } from "./userRiding/engagement";
+import {
+  isUpgradeSource,
+  pickStrongerCoLocatedAlternate,
+  pickTrainToLatch,
+} from "./userRiding/engagement";
 import { shouldReleaseLatch } from "./userRiding/release";
 import { updateTransitions } from "./userRiding/transitions";
 import type {
@@ -28,6 +31,7 @@ import type {
   TrainTransitionMap,
   UserSample,
 } from "./userRiding/types";
+import type { MapTrain } from "@/hooks/useMapTrains";
 
 interface UseUserRidingArgs {
   userLat: number | null;
@@ -89,19 +93,29 @@ export function useUserRiding({
     }
 
     if (ridingTrainKey != null) {
-      // Upgrade path: a fallback latch can swap to a correlated train once
-      // the corresponding GTFS-RT transition arrives in a later tick.
-      if (recentDepartureRef.current) {
-        const pick = pickTrainToLatch({
-          user: sample,
+      // A fallback latch can be replaced by a stronger signal — a
+      // boarding-correlated transition, a "moving along the rail this
+      // way" reading, or an obviously-co-located alternate while the
+      // current latch is far away.
+      const upgrade = pickTrainToLatch({
+        user: sample,
+        trains,
+        transitions: transitionsRef.current,
+        recentDeparture: recentDepartureRef.current,
+      });
+      if (upgrade?.source === "correlation") recentDepartureRef.current = null;
+
+      const upgraded =
+        upgrade && upgrade.key !== ridingTrainKey && isUpgradeSource(upgrade.source);
+      if (upgraded) {
+        setRidingTrainKey(upgrade.key);
+      } else {
+        const alternate = pickStrongerCoLocatedAlternate(
+          ridingTrainKey,
+          sample,
           trains,
-          transitions: transitionsRef.current,
-          recentDeparture: recentDepartureRef.current,
-        });
-        if (pick?.source === "correlation") {
-          if (pick.key !== ridingTrainKey) setRidingTrainKey(pick.key);
-          recentDepartureRef.current = null;
-        }
+        );
+        if (alternate) setRidingTrainKey(alternate.key);
       }
 
       const reason = shouldReleaseLatch({

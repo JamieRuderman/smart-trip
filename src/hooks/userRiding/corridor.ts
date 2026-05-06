@@ -1,36 +1,17 @@
-import stations, { STATION_COORDINATES } from "@/data/stations";
-import { KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
+import { snapToRail, type RailSnap } from "@/lib/railProjection";
 
 /**
- * Perpendicular distance (km) from a point to the SMART corridor,
- * approximated as the polyline through the station list. Cheap enough to
- * call once per tick.
+ * Perpendicular distance (km) from a point to the SMART rail polyline.
+ * Pass `snap` when one is already available (e.g. cached for the tick)
+ * to skip the projection.
  */
-export function distanceToCorridorKm(lat: number, lng: number): number {
-  const cosLat = Math.cos((lat * Math.PI) / 180);
-  const kxKm = cosLat * KM_PER_DEG_LAT;
-  const kyKm = KM_PER_DEG_LAT;
-  let best = Infinity;
-  for (let i = 0; i < stations.length - 1; i++) {
-    const a = STATION_COORDINATES[stations[i]];
-    const b = STATION_COORDINATES[stations[i + 1]];
-    const ax = (a.lng - lng) * kxKm;
-    const ay = (a.lat - lat) * kyKm;
-    const bx = (b.lng - lng) * kxKm;
-    const by = (b.lat - lat) * kyKm;
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len2 = dx * dx + dy * dy;
-    let t = 0;
-    if (len2 > 0) {
-      t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2));
-    }
-    const px = ax + t * dx;
-    const py = ay + t * dy;
-    const d = Math.hypot(px, py);
-    if (d < best) best = d;
-  }
-  return best;
+export function distanceToCorridorKm(
+  lat: number,
+  lng: number,
+  snap?: RailSnap | null,
+): number {
+  const s = snap ?? snapToRail(lat, lng);
+  return s?.residualKm ?? Infinity;
 }
 
 /**

@@ -6,14 +6,6 @@ import { scheduledProgress } from "@/lib/trainMotion";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
 
-/** GPS reflects where the train actually is; the schedule is an estimate
- *  that subsumes `delayMinutes` but can be off by ~0.5–2 stations whenever
- *  the static trip-update delay misforecasts or sub-3-minute lateness goes
- *  uncaptured. Anchor mostly on GPS and let the schedule contribute a small
- *  smoothing component so the marker keeps moving between the ~30 s
- *  vehicle-position updates. */
-const GPS_WEIGHT = 0.85;
-
 interface TrainMarkerProps {
   train: MapTrain;
   pathEl: SVGPathElement;
@@ -41,29 +33,17 @@ export function TrainMarker({
   onClick,
   now,
 }: TrainMarkerProps) {
-  // Resolve progress:
-  //  - GPS available + schedule available → blend, weighted heavily toward
-  //    GPS so reality wins; schedule contributes between-update smoothing.
-  //  - GPS only → use it directly.
-  //  - Schedule only → use it (covers vehicles whose lat/lng we can't
-  //    reliably project onto an inter-station segment).
-  //  - Neither → station-midpoint fallback.
-  const scheduled = scheduledProgress(train, now);
+  // GPS is ground truth. Schedule is only consulted when the feed
+  // doesn't give us a usable lat/lng — otherwise the schedule's
+  // multi-station error would tug the marker off where the train
+  // actually is.
   const gpsTrain =
     overrideLat != null && overrideLng != null
       ? { ...train, latitude: overrideLat, longitude: overrideLng }
       : train;
   const gps = gpsStationProgress(gpsTrain);
-  const fallback = trainStationProgress(train);
-
   const resolved =
-    gps && scheduled
-      ? {
-          ...gps,
-          progress:
-            GPS_WEIGHT * gps.progress + (1 - GPS_WEIGHT) * scheduled.progress,
-        }
-      : (gps ?? scheduled ?? fallback);
+    gps ?? scheduledProgress(train, now) ?? trainStationProgress(train);
 
   const pos = positionOnPath(
     resolved.progress,

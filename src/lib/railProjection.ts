@@ -11,9 +11,9 @@
  */
 import stations, { STATION_COORDINATES } from "@/data/stations";
 import { SMART_RAIL_COORDINATES } from "@/data/generated/railGeometry.generated";
+import { haversineKm } from "@/lib/stationUtils";
+import { KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
 
-const EARTH_RADIUS_KM = 6371;
-const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
 // Equirectangular projection scaled by cos(meanLat). Error <15 m at SMART
 // corridor scale, plenty good for a "which segment is closest" snap.
 const LAT_REF_RAD = 38.25 * (Math.PI / 180); // corridor mid-latitude
@@ -91,27 +91,31 @@ export const STATION_RAIL_ARC_KM: readonly number[] = stations.map((station) => 
 });
 
 /**
- * Distance along the rail (km) between two GPS points after both are
- * projected onto the polyline. More meaningful than haversine on the
- * curved corridor — two points on opposite sides of a bend can be near in
- * straight-line km but far apart along-track.
+ * "Closeness on the same line" — along-track when both points snap to the
+ * rail, haversine otherwise. The fallback matters: a passenger 50 m off
+ * the line still needs a finite distance, and so does a train whose feed
+ * lat/lng momentarily reads as zero.
  *
- * Returns `null` if either point is too far from the rail to project
- * reliably (controlled by `maxResidualKm`, default 1.5 km — generous so
- * passengers walking up to a platform still snap).
+ * Pass `fromSnap` when the same source point is being compared against
+ * many destinations in a tick (user vs every train) — saves re-snapping
+ * the source on each call.
  */
-export function alongTrackDistanceKm(
-  aLat: number,
-  aLng: number,
-  bLat: number,
-  bLng: number,
-  maxResidualKm = 1.5,
-): number | null {
-  const a = snapToRail(aLat, aLng);
-  const b = snapToRail(bLat, bLng);
-  if (!a || !b) return null;
-  if (a.residualKm > maxResidualKm || b.residualKm > maxResidualKm) return null;
-  return Math.abs(a.arcKm - b.arcKm);
+const MAX_ALONG_TRACK_RESIDUAL_KM = 1.5;
+export function corridorDistanceKm(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+  fromSnap?: RailSnap | null,
+): number {
+  const a = fromSnap ?? snapToRail(fromLat, fromLng);
+  if (a && a.residualKm <= MAX_ALONG_TRACK_RESIDUAL_KM) {
+    const b = snapToRail(toLat, toLng);
+    if (b && b.residualKm <= MAX_ALONG_TRACK_RESIDUAL_KM) {
+      return Math.abs(a.arcKm - b.arcKm);
+    }
+  }
+  return haversineKm(fromLat, fromLng, toLat, toLng);
 }
 
 /**

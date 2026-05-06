@@ -234,31 +234,28 @@ export function SmartLineDiagram({
 
           {pathRef.current &&
             snap &&
-            // Render the user's train last so it paints on top of any other
-            // train marker that happens to overlap it on the schematic.
-            [...trains]
-              .sort((a, b) => {
-                const aRide = a.key === userRidingTrainKey ? 1 : 0;
-                const bRide = b.key === userRidingTrainKey ? 1 : 0;
-                return aRide - bRide;
-              })
-              .map((train) => {
-                const isUserRiding = train.key === userRidingTrainKey;
-                return (
-                  <TrainMarker
-                    key={train.key}
-                    train={train}
-                    pathEl={pathRef.current!}
-                    stationArcs={snap.arcs}
-                    selected={train.key === selectedTrainKey}
-                    userRiding={isUserRiding}
-                    overrideLat={isUserRiding ? userLat : null}
-                    overrideLng={isUserRiding ? userLng : null}
-                    onClick={onTrainClick}
-                    now={now}
-                  />
-                );
-              })}
+            // The user's train renders last so it paints on top of any
+            // other marker that overlaps it on the schematic.
+            [
+              ...trains.filter((t) => t.key !== userRidingTrainKey),
+              ...trains.filter((t) => t.key === userRidingTrainKey),
+            ].map((train) => {
+              const isUserRiding = train.key === userRidingTrainKey;
+              return (
+                <TrainMarker
+                  key={train.key}
+                  train={train}
+                  pathEl={pathRef.current!}
+                  stationArcs={snap.arcs}
+                  selected={train.key === selectedTrainKey}
+                  userRiding={isUserRiding}
+                  overrideLat={isUserRiding ? userLat : null}
+                  overrideLng={isUserRiding ? userLng : null}
+                  onClick={onTrainClick}
+                  now={now}
+                />
+              );
+            })}
         </g>
 
         {/* Label layer — constant CSS-pixel font sizes, hand-affined

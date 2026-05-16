@@ -196,23 +196,34 @@ function coldStartFallback(
   const userMoving =
     user.speedMps != null && user.speedMps >= ENGAGE_SPEED_MPS;
 
-  // Tier 1: co-located. Engage regardless of speed — at this distance the
-  // user is effectively in the vehicle, so a station stop where neither
-  // side reports speed shouldn't block the latch.
-  const colocated = candidates.filter((c) => c.distKm <= ENGAGE_COLOCATION_KM);
+  // Tier 1: co-located AND something is moving. Co-location alone is
+  // ambiguous at a station stop — a phone on the platform is in the same
+  // place as a train sitting at that platform. Without motion evidence
+  // from either side we'd latch the train of a user who's still waiting
+  // to board. The boarding-correlation path (above) is the right answer
+  // when boarding is in progress; here we just refuse to guess.
+  const colocated = candidates.filter((c) => {
+    if (c.distKm > ENGAGE_COLOCATION_KM) return false;
+    const trainMoving =
+      c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
+    return userMoving || trainMoving;
+  });
   if (colocated.length > 0) {
     return preferSameDirection(colocated, user).train.key;
   }
 
-  // Tier 2: nearby. Sitting on the rails is signal enough — speed often
-  // momentarily reads null when returning to the foreground or on Safari.
-  // Off-corridor still requires a movement signal so a coffee shop
-  // ~500 m from the line doesn't latch a passing train.
+  // Tier 2: nearby. Speed often momentarily reads null when returning to
+  // the foreground or on Safari, so a moving train co-located with the
+  // user is acceptable evidence even when the phone hasn't reported speed
+  // yet. Off-corridor still requires a movement signal so a coffee shop
+  // ~500 m from the line doesn't latch a passing train. On-corridor with
+  // both sides stationary is the same "waiting at a platform" trap as
+  // Tier 1 and gets the same treatment.
   const nearby = candidates.filter((c) => {
     if (c.distKm > ENGAGE_PROXIMITY_KM) return false;
-    if (userOnCorridor) return true;
     const trainMoving =
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
+    if (userOnCorridor) return userMoving || trainMoving;
     return userMoving || (user.speedMps == null && trainMoving);
   });
   if (nearby.length > 0) {

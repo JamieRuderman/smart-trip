@@ -195,6 +195,15 @@ function coldStartFallback(
 ): string | null {
   const userMoving =
     user.speedMps != null && user.speedMps >= ENGAGE_SPEED_MPS;
+  // When the user's heading is classifiable, restrict every tier to
+  // same-direction trains. A train going the opposite way can't be the
+  // one the user is riding, so we refuse rather than fall back to the
+  // closest as preferSameDirection would. Null when heading is missing
+  // or near east/west — direction can't gate anything in those cases.
+  const userDirId =
+    user.heading != null ? classifyHeading(user.heading) : null;
+  const directionMatches = (c: Candidate) =>
+    userDirId == null || c.train.directionId === userDirId;
 
   // Tier 1: co-located AND something is moving. Co-location alone is
   // ambiguous at a station stop — a phone on the platform is in the same
@@ -204,13 +213,12 @@ function coldStartFallback(
   // when boarding is in progress; here we just refuse to guess.
   const colocated = candidates.filter((c) => {
     if (c.distKm > ENGAGE_COLOCATION_KM) return false;
+    if (!directionMatches(c)) return false;
     const trainMoving =
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
     return userMoving || trainMoving;
   });
-  if (colocated.length > 0) {
-    return preferSameDirection(colocated, user).train.key;
-  }
+  if (colocated.length > 0) return colocated[0].train.key;
 
   // Tier 2: nearby. Off-corridor still requires a movement signal so a
   // coffee shop ~500 m from the line doesn't latch a passing train; the
@@ -222,21 +230,20 @@ function coldStartFallback(
   // a platform-watcher from latching it.
   const nearby = candidates.filter((c) => {
     if (c.distKm > ENGAGE_PROXIMITY_KM) return false;
+    if (!directionMatches(c)) return false;
     if (userOnCorridor) return userMoving;
     const trainMoving =
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
     return userMoving || (user.speedMps == null && trainMoving);
   });
-  if (nearby.length > 0) {
-    return preferSameDirection(nearby, user).train.key;
-  }
+  if (nearby.length > 0) return nearby[0].train.key;
 
   // Tier 3: on-corridor + moving — widen to the full search radius.
   if (userMoving && userOnCorridor) {
-    const onCorridor = candidates.filter((c) => c.distKm <= ON_CORRIDOR_SEARCH_KM);
-    if (onCorridor.length > 0) {
-      return preferSameDirection(onCorridor, user).train.key;
-    }
+    const onCorridor = candidates.filter(
+      (c) => c.distKm <= ON_CORRIDOR_SEARCH_KM && directionMatches(c),
+    );
+    if (onCorridor.length > 0) return onCorridor[0].train.key;
   }
   return null;
 }

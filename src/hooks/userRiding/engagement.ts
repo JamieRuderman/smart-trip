@@ -198,12 +198,16 @@ function coldStartFallback(
   // When the user's heading is classifiable, restrict every tier to
   // same-direction trains. A train going the opposite way can't be the
   // one the user is riding, so we refuse rather than fall back to the
-  // closest as preferSameDirection would. Null when heading is missing
-  // or near east/west — direction can't gate anything in those cases.
+  // closest as preferSameDirection would. Null `userDirId` (heading
+  // missing or near east/west) and null `train.directionId` (some feeds
+  // omit `direction_id`) both fall through — direction can't gate a
+  // decision when either side is unknown.
   const userDirId =
     user.heading != null ? classifyHeading(user.heading) : null;
   const directionMatches = (c: Candidate) =>
-    userDirId == null || c.train.directionId === userDirId;
+    userDirId == null ||
+    c.train.directionId == null ||
+    c.train.directionId === userDirId;
 
   // Tier 1: co-located AND something is moving. Co-location alone is
   // ambiguous at a station stop — a phone on the platform is in the same

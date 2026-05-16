@@ -212,18 +212,19 @@ function coldStartFallback(
     return preferSameDirection(colocated, user).train.key;
   }
 
-  // Tier 2: nearby. Speed often momentarily reads null when returning to
-  // the foreground or on Safari, so a moving train co-located with the
-  // user is acceptable evidence even when the phone hasn't reported speed
-  // yet. Off-corridor still requires a movement signal so a coffee shop
-  // ~500 m from the line doesn't latch a passing train. On-corridor with
-  // both sides stationary is the same "waiting at a platform" trap as
-  // Tier 1 and gets the same treatment.
+  // Tier 2: nearby. Off-corridor still requires a movement signal so a
+  // coffee shop ~500 m from the line doesn't latch a passing train; the
+  // `speedMps == null && trainMoving` allowance covers Safari/foreground
+  // ticks where the phone hasn't reported speed yet. On-corridor at
+  // 0.15–0.9 km, the candidate train is by definition NOT the train the
+  // user is co-located with (Tier 1 already handled that), so a moving
+  // train here is one passing by — requiring the user to be moving stops
+  // a platform-watcher from latching it.
   const nearby = candidates.filter((c) => {
     if (c.distKm > ENGAGE_PROXIMITY_KM) return false;
+    if (userOnCorridor) return userMoving;
     const trainMoving =
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
-    if (userOnCorridor) return userMoving || trainMoving;
     return userMoving || (user.speedMps == null && trainMoving);
   });
   if (nearby.length > 0) {

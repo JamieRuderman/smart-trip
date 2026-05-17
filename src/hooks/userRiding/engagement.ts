@@ -208,6 +208,16 @@ function coldStartFallback(
     userDirId == null ||
     c.train.directionId == null ||
     c.train.directionId === userDirId;
+  // When the user's direction is known, an explicit same-direction match
+  // beats a feed-missing-direction candidate even if the latter is a hair
+  // closer — otherwise a null-directionId train would silently outrank a
+  // real match. Lists are distance-sorted, so `find` returns the closest
+  // of each group.
+  const pickBest = (list: Candidate[]): Candidate | null => {
+    if (list.length === 0) return null;
+    if (userDirId == null) return list[0];
+    return list.find((c) => c.train.directionId === userDirId) ?? list[0];
+  };
 
   // Tier 1: co-located AND something is moving. Co-location alone is
   // ambiguous at a station stop — a phone on the platform is in the same
@@ -222,7 +232,8 @@ function coldStartFallback(
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
     return userMoving || trainMoving;
   });
-  if (colocated.length > 0) return colocated[0].train.key;
+  const colocatedPick = pickBest(colocated);
+  if (colocatedPick) return colocatedPick.train.key;
 
   // Tier 2: nearby. Off-corridor still requires a movement signal so a
   // coffee shop ~500 m from the line doesn't latch a passing train; the
@@ -240,14 +251,16 @@ function coldStartFallback(
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
     return userMoving || (user.speedMps == null && trainMoving);
   });
-  if (nearby.length > 0) return nearby[0].train.key;
+  const nearbyPick = pickBest(nearby);
+  if (nearbyPick) return nearbyPick.train.key;
 
   // Tier 3: on-corridor + moving — widen to the full search radius.
   if (userMoving && userOnCorridor) {
     const onCorridor = candidates.filter(
       (c) => c.distKm <= ON_CORRIDOR_SEARCH_KM && directionMatches(c),
     );
-    if (onCorridor.length > 0) return onCorridor[0].train.key;
+    const onCorridorPick = pickBest(onCorridor);
+    if (onCorridorPick) return onCorridorPick.train.key;
   }
   return null;
 }

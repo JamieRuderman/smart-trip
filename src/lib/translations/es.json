@@ -142,8 +142,8 @@
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"
   },
   "map": {
-    "previewTitle": "Mapa de Trenes en Vivo",
-    "previewSubtitle": "Ver todos los trenes en tiempo real"
+    "previewTitle": "Mapa en Vivo",
+    "previewSubtitle": "Vista geográfica de todos los trenes"
   },
   "mapDiagram": {
     "tapHint": "Toca una estación o tren para ver detalles",
@@ -155,7 +155,7 @@
     "ferryBadgeLabel": "FERRY · {{minutes}} MIN",
     "nextFerryBadge": "PRÓXIMO FERRY · {{minutes}} MIN",
     "noMoreFerries": "NO HAY MÁS FERRIES HOY",
-    "previewTitle": "Diagrama del Mapa",
+    "previewTitle": "Mapa Lineal en Vivo",
     "previewSubtitle": "Vista esquemática de todos los trenes",
     "activeTrains_one": "{{count}} activo",
     "activeTrains_other": "{{count}} activos",

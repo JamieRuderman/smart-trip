@@ -74,10 +74,11 @@ export interface SmartLineDiagramProps {
   className?: string;
 }
 
-// Render window — extends well past the left edge of the track so wide
-// station labels ("Santa Rosa Downtown", "Petaluma Downtown") have room
-// at phone widths. The track itself starts around x=180 in viewBox space.
-const VIEW_BOX = { x: -90, y: 40, width: 880, height: 1390 } as const;
+// Render window — extends past both edges of the track so wide station
+// labels ("Marin Civic Center", "Novato Downtown") fit on the right and
+// zone headings ("Zone 1") fit on the left at phone widths. The track
+// itself runs roughly x=180–560 in viewBox space.
+const VIEW_BOX = { x: -50, y: 40, width: 900, height: 1390 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -285,6 +286,7 @@ export function SmartLineDiagram({
               ty={ty}
               scale={scale}
               onClick={onStationClick}
+              labelSide={st.station === "Larkspur" ? "left" : "right"}
             />
           );
         })}

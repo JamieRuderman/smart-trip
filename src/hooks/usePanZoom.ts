@@ -175,23 +175,24 @@ export function usePanZoom(
     return Math.min(rect.width / viewBox.width, rect.height / viewBox.height);
   }, [svgRef, viewBox.width, viewBox.height]);
 
-  /** Clamp pan so at least 25% of the content stays in view. */
+  /** Clamp pan so the viewport's edges always stay inside the content.
+   *  At scale=1 the bounds collapse to a single point (tx=ty=0), so the
+   *  map can't be nudged off-screen when nothing's zoomed in. */
   const clampPan = useCallback(
     (tx: number, ty: number, scale: number) => {
-      // Inner content occupies viewBox; transformed = viewBox*scale + (tx,ty).
-      // We want the visible viewport (still viewBox space) to overlap content
-      // by at least this fraction.
-      const overlap = 0.25;
-      const minVisibleW = viewBox.width * overlap;
-      const minVisibleH = viewBox.height * overlap;
-      const contentW = viewBox.width * scale;
-      const contentH = viewBox.height * scale;
-      // Content x-range in viewBox space: [viewBox.x*scale + tx, ...+ contentW].
-      // Visible x-range: [viewBox.x, viewBox.x + viewBox.width].
-      const minTx = viewBox.x + minVisibleW - viewBox.x * scale - contentW;
-      const maxTx = viewBox.x + viewBox.width - minVisibleW - viewBox.x * scale;
-      const minTy = viewBox.y + minVisibleH - viewBox.y * scale - contentH;
-      const maxTy = viewBox.y + viewBox.height - minVisibleH - viewBox.y * scale;
+      // Content occupies [vb.x*s + t, vb.x*s + t + vb.w*s] in viewBox space;
+      // visible is [vb.x, vb.x + vb.w]. Solving "left content edge ≤ left
+      // visible edge" and "right content edge ≥ right visible edge" gives
+      // a tx range with endpoints vb.x*(1-s) and (vb.x+vb.w)*(1-s) — which
+      // is which depends on the sign of (1-s).
+      const ax = viewBox.x * (1 - scale);
+      const bx = (viewBox.x + viewBox.width) * (1 - scale);
+      const ay = viewBox.y * (1 - scale);
+      const by = (viewBox.y + viewBox.height) * (1 - scale);
+      const minTx = Math.min(ax, bx);
+      const maxTx = Math.max(ax, bx);
+      const minTy = Math.min(ay, by);
+      const maxTy = Math.max(ay, by);
       return {
         tx: Math.min(maxTx, Math.max(minTx, tx)),
         ty: Math.min(maxTy, Math.max(minTy, ty)),

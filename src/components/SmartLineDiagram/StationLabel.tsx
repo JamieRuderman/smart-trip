@@ -18,6 +18,9 @@ interface StationLabelProps {
    *  (same affordance as the dot itself). Pan/zoom drags are still
    *  suppressed via the document-capture handler in `usePanZoom`. */
   onClick?: (station: Station) => void;
+  /** Which side of the dot the label sits on. Defaults to "right"; Larkspur
+   *  stays on "left" so its label doesn't collide with the ferry path. */
+  labelSide?: "left" | "right";
 }
 
 /**
@@ -35,6 +38,7 @@ export function StationLabel({
   ty,
   scale,
   onClick,
+  labelSide = "right",
 }: StationLabelProps) {
   const baseSize = isTerminal ? TOKEN.terminalSize : TOKEN.labelSize;
   const fontSize = baseSize / screenScale;
@@ -42,17 +46,18 @@ export function StationLabel({
   const wrapped = MULTILINE_LABELS[station];
   const r = isTerminal ? TOKEN.terminalR : TOKEN.stationR;
 
-  // Apply the affine the matching dot would receive, then back off to the
-  // left of the (now potentially-zoomed) dot. Multiplying the gap by `scale`
-  // keeps the label's distance proportional to the rendered dot.
-  const labelX = x * scale + tx - (r + TOKEN.labelGap) * scale;
+  // Apply the affine the matching dot would receive, then back off to whichever
+  // side of the (now potentially-zoomed) dot the label sits on. Multiplying the
+  // gap by `scale` keeps the label's distance proportional to the rendered dot.
+  const offset = (r + TOKEN.labelGap) * scale;
+  const labelX = x * scale + tx + (labelSide === "left" ? -offset : offset);
   const labelY = y * scale + ty;
 
   return (
     <text
       x={labelX}
       y={labelY}
-      textAnchor="end"
+      textAnchor={labelSide === "left" ? "end" : "start"}
       dominantBaseline="central"
       pointerEvents={onClick ? "auto" : "none"}
       fontSize={fontSize}

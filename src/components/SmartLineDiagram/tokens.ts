@@ -107,13 +107,13 @@ export const MULTILINE_LABELS: Partial<Record<Station, [string, string]>> = {
   "Sonoma County Airport": ["Sonoma County", "Airport"],
 };
 
-/** Right-margin zone headings, colored per zone. Positioned at each zone's
- *  vertical midpoint; x values track the line's curve so each label reads as
- *  attached to its segment without crowding the station dots. */
+/** Left-margin zone headings, colored per zone. Positioned at each zone's
+ *  vertical midpoint; x is the right edge of the text (rendered with
+ *  textAnchor="end") so the labels track the line's curve from the left. */
 export const ZONE_LABEL_POSITIONS: { zone: number; x: number; y: number }[] = [
-  { zone: 1, x: 260, y: 120 },
-  { zone: 2, x: 345, y: 280 },
-  { zone: 3, x: 395, y: 560 },
-  { zone: 4, x: 515, y: 950 },
-  { zone: 5, x: 545, y: 1200 },
+  { zone: 1, x: 140, y: 120 },
+  { zone: 2, x: 235, y: 280 },
+  { zone: 3, x: 265, y: 560 },
+  { zone: 4, x: 425, y: 950 },
+  { zone: 5, x: 460, y: 1200 },
 ];

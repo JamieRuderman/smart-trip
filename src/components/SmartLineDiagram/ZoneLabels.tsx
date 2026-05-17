@@ -10,9 +10,10 @@ interface ZoneLabelsProps {
 }
 
 /**
- * Right-margin zone headings. Renders OUTSIDE the zoomable group so the
+ * Left-margin zone headings. Renders OUTSIDE the zoomable group so the
  * font stays at a constant CSS pixel target; positions are hand-affined
- * from the static layout coords.
+ * from the static layout coords. Right-anchored so each label ends just
+ * before the track curve.
  */
 export function ZoneLabels({ screenScale, tx, ty, scale }: ZoneLabelsProps) {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export function ZoneLabels({ screenScale, tx, ty, scale }: ZoneLabelsProps) {
           key={zone}
           x={x * scale + tx}
           y={y * scale + ty}
+          textAnchor="end"
           fontSize={fontSize}
           fontWeight={TOKEN.zoneLabelWeight}
           fill={ZONE_TRACK_COLORS[zone]}

@@ -195,36 +195,72 @@ function coldStartFallback(
 ): string | null {
   const userMoving =
     user.speedMps != null && user.speedMps >= ENGAGE_SPEED_MPS;
+  // When the user's heading is classifiable, restrict every tier to
+  // same-direction trains. A train going the opposite way can't be the
+  // one the user is riding, so we refuse rather than fall back to the
+  // closest as preferSameDirection would. Null `userDirId` (heading
+  // missing or near east/west) and null `train.directionId` (some feeds
+  // omit `direction_id`) both fall through — direction can't gate a
+  // decision when either side is unknown.
+  const userDirId =
+    user.heading != null ? classifyHeading(user.heading) : null;
+  const directionMatches = (c: Candidate) =>
+    userDirId == null ||
+    c.train.directionId == null ||
+    c.train.directionId === userDirId;
+  // When the user's direction is known, an explicit same-direction match
+  // beats a feed-missing-direction candidate even if the latter is a hair
+  // closer — otherwise a null-directionId train would silently outrank a
+  // real match. Lists are distance-sorted, so `find` returns the closest
+  // of each group.
+  const pickBest = (list: Candidate[]): Candidate | null => {
+    if (list.length === 0) return null;
+    if (userDirId == null) return list[0];
+    return list.find((c) => c.train.directionId === userDirId) ?? list[0];
+  };
 
-  // Tier 1: co-located. Engage regardless of speed — at this distance the
-  // user is effectively in the vehicle, so a station stop where neither
-  // side reports speed shouldn't block the latch.
-  const colocated = candidates.filter((c) => c.distKm <= ENGAGE_COLOCATION_KM);
-  if (colocated.length > 0) {
-    return preferSameDirection(colocated, user).train.key;
-  }
+  // Tier 1: co-located AND something is moving. Co-location alone is
+  // ambiguous at a station stop — a phone on the platform is in the same
+  // place as a train sitting at that platform. Without motion evidence
+  // from either side we'd latch the train of a user who's still waiting
+  // to board. The boarding-correlation path (above) is the right answer
+  // when boarding is in progress; here we just refuse to guess.
+  const colocated = candidates.filter((c) => {
+    if (c.distKm > ENGAGE_COLOCATION_KM) return false;
+    if (!directionMatches(c)) return false;
+    const trainMoving =
+      c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
+    return userMoving || trainMoving;
+  });
+  const colocatedPick = pickBest(colocated);
+  if (colocatedPick) return colocatedPick.train.key;
 
-  // Tier 2: nearby. Sitting on the rails is signal enough — speed often
-  // momentarily reads null when returning to the foreground or on Safari.
-  // Off-corridor still requires a movement signal so a coffee shop
-  // ~500 m from the line doesn't latch a passing train.
+  // Tier 2: nearby. Off-corridor still requires a movement signal so a
+  // coffee shop ~500 m from the line doesn't latch a passing train; the
+  // `speedMps == null && trainMoving` allowance covers Safari/foreground
+  // ticks where the phone hasn't reported speed yet. On-corridor at
+  // 0.15–0.9 km, the candidate train is by definition NOT the train the
+  // user is co-located with (Tier 1 already handled that), so a moving
+  // train here is one passing by — requiring the user to be moving stops
+  // a platform-watcher from latching it.
   const nearby = candidates.filter((c) => {
     if (c.distKm > ENGAGE_PROXIMITY_KM) return false;
-    if (userOnCorridor) return true;
+    if (!directionMatches(c)) return false;
+    if (userOnCorridor) return userMoving;
     const trainMoving =
       c.train.speed != null && c.train.speed >= ENGAGE_SPEED_MPS;
     return userMoving || (user.speedMps == null && trainMoving);
   });
-  if (nearby.length > 0) {
-    return preferSameDirection(nearby, user).train.key;
-  }
+  const nearbyPick = pickBest(nearby);
+  if (nearbyPick) return nearbyPick.train.key;
 
   // Tier 3: on-corridor + moving — widen to the full search radius.
   if (userMoving && userOnCorridor) {
-    const onCorridor = candidates.filter((c) => c.distKm <= ON_CORRIDOR_SEARCH_KM);
-    if (onCorridor.length > 0) {
-      return preferSameDirection(onCorridor, user).train.key;
-    }
+    const onCorridor = candidates.filter(
+      (c) => c.distKm <= ON_CORRIDOR_SEARCH_KM && directionMatches(c),
+    );
+    const onCorridorPick = pickBest(onCorridor);
+    if (onCorridorPick) return onCorridorPick.train.key;
   }
   return null;
 }

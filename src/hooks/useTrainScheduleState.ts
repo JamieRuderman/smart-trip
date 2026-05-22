@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
-import { isWeekend, createMinuteInterval } from "@/lib/utils";
+import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
+import { createMinuteInterval } from "@/lib/utils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 
@@ -73,8 +73,7 @@ export interface TrainScheduleState {
 }
 
 /** Returns the schedule type appropriate for the current calendar day. */
-const todayScheduleType = (): "weekday" | "weekend" =>
-  isWeekend() ? "weekend" : "weekday";
+const todayScheduleType = (): "weekday" | "weekend" => getTodayScheduleType();
 
 /** Params managed by the state sync — all others are preserved verbatim. */
 const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);

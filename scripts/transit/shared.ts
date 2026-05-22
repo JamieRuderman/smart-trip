@@ -63,6 +63,13 @@ export type FerrySchedulesOutput = {
   weekendInboundFerries: FerryTrip[];
 };
 
+/**
+ * Map of "YYYY-MM-DD" → effective schedule type for dates where SMART runs
+ * a schedule different from the natural day-of-week (e.g. Memorial Day
+ * Monday running the weekend schedule). Derived from GTFS calendar_dates.
+ */
+export type ScheduleOverridesOutput = Record<string, ScheduleType>;
+
 /** GGF's stable route_id for the Larkspur ↔ San Francisco ferry. */
 export const LARKSPUR_SF_ROUTE_ID = "LSSF";
 
@@ -190,6 +197,145 @@ export function deriveServiceTypes(
   }
 
   return serviceTypes;
+}
+
+const GTFS_DAY_KEYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+function parseGtfsDate(yyyymmdd: string): Date | null {
+  if (!/^\d{8}$/.test(yyyymmdd)) return null;
+  const year = Number(yyyymmdd.slice(0, 4));
+  const month = Number(yyyymmdd.slice(4, 6));
+  const day = Number(yyyymmdd.slice(6, 8));
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function classifyServicePattern(
+  row: GtfsCalendar,
+): ScheduleType | "mixed" | "empty" {
+  const weekday = (
+    ["monday", "tuesday", "wednesday", "thursday", "friday"] as const
+  ).some((day) => row[day] === "1");
+  const weekend = (["saturday", "sunday"] as const).some(
+    (day) => row[day] === "1",
+  );
+  if (weekday && weekend) return "mixed";
+  if (weekday) return "weekday";
+  if (weekend) return "weekend";
+  return "empty";
+}
+
+/**
+ * Return the schedule type actually running on `date` after applying any
+ * `calendar_dates` exceptions, or `null` if neither schedule type is active
+ * (e.g. Thanksgiving — no service at all).
+ */
+function effectiveScheduleType(
+  date: string,
+  dayOfWeek: number,
+  calendarRows: GtfsCalendar[],
+  exceptionsByDate: Map<string, { added: Set<string>; removed: Set<string> }>,
+): ScheduleType | null {
+  const exceptions = exceptionsByDate.get(date);
+  const added = exceptions?.added ?? new Set<string>();
+  const removed = exceptions?.removed ?? new Set<string>();
+  const dayKey = GTFS_DAY_KEYS[dayOfWeek];
+
+  let weekdayActive = false;
+  let weekendActive = false;
+
+  for (const row of calendarRows) {
+    if (removed.has(row.service_id)) continue;
+    const inRange = row.start_date <= date && date <= row.end_date;
+    const dayActive = inRange && row[dayKey] === "1";
+    const isActive = dayActive || added.has(row.service_id);
+    if (!isActive) continue;
+
+    const pattern = classifyServicePattern(row);
+    if (pattern === "weekday") weekdayActive = true;
+    else if (pattern === "weekend") weekendActive = true;
+  }
+
+  if (weekdayActive && !weekendActive) return "weekday";
+  if (weekendActive && !weekdayActive) return "weekend";
+  return null;
+}
+
+/**
+ * Derive a map of "YYYY-MM-DD" → effective schedule type for every date in
+ * `calendar_dates.txt` whose effective service differs from the natural
+ * day-of-week. So Memorial Day Monday lands in the map as "weekend".
+ *
+ * `minDate` filters out far-past holidays so the emitted map stays small.
+ * If a date has no service at all (e.g. Christmas), we fall back to
+ * "weekend" — the reduced view is less misleading than the full weekday
+ * grid when no trains are actually running.
+ */
+export function deriveScheduleOverrides(
+  calendarRows: GtfsCalendar[],
+  calendarDateRows: GtfsCalendarDate[],
+  options?: { minDate?: Date },
+): ScheduleOverridesOutput {
+  const exceptionsByDate = new Map<
+    string,
+    { added: Set<string>; removed: Set<string> }
+  >();
+  for (const row of calendarDateRows) {
+    const entry = exceptionsByDate.get(row.date) ?? {
+      added: new Set<string>(),
+      removed: new Set<string>(),
+    };
+    if (row.exception_type === "1") entry.added.add(row.service_id);
+    if (row.exception_type === "2") entry.removed.add(row.service_id);
+    exceptionsByDate.set(row.date, entry);
+  }
+
+  const minDateStr = options?.minDate
+    ? `${options.minDate.getFullYear()}${String(options.minDate.getMonth() + 1).padStart(2, "0")}${String(options.minDate.getDate()).padStart(2, "0")}`
+    : null;
+
+  const dates = [...exceptionsByDate.keys()].sort();
+  const overrides: ScheduleOverridesOutput = {};
+
+  for (const date of dates) {
+    if (minDateStr && date < minDateStr) continue;
+    const parsed = parseGtfsDate(date);
+    if (!parsed) continue;
+
+    const dayOfWeek = parsed.getDay();
+    const naturalType: ScheduleType =
+      dayOfWeek === 0 || dayOfWeek === 6 ? "weekend" : "weekday";
+
+    const active = effectiveScheduleType(
+      date,
+      dayOfWeek,
+      calendarRows,
+      exceptionsByDate,
+    );
+    // No active service → weekend view is the conservative default.
+    const effective: ScheduleType = active ?? "weekend";
+    if (effective === naturalType) continue;
+
+    const iso = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+    overrides[iso] = effective;
+  }
+
+  return overrides;
 }
 
 // ── Stations / platforms ─────────────────────────────────────────────────────
@@ -727,6 +873,31 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = ${JSON.string
   )};
 
 export default trainSchedules;
+`;
+}
+
+export function renderScheduleOverridesFile(
+  overrides: ScheduleOverridesOutput,
+): string {
+  return `// Auto-generated by scripts/updateTransitFeeds.ts
+// Do not edit manually.
+
+export type ScheduleType = "weekday" | "weekend";
+
+/**
+ * Calendar-date overrides for SMART's effective schedule type, derived
+ * from GTFS \`calendar_dates.txt\`. Keys are local "YYYY-MM-DD"; values are
+ * the schedule that actually runs that day (e.g. Memorial Day Monday →
+ * "weekend"). Dates not in this map fall back to the natural day-of-week
+ * classification.
+ */
+export const scheduleOverrides: Record<string, ScheduleType> = ${JSON.stringify(
+    overrides,
+    null,
+    2,
+  )};
+
+export default scheduleOverrides;
 `;
 }
 

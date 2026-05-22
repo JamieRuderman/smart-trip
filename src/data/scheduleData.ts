@@ -5,6 +5,7 @@ import {
   weekdayInboundFerries,
   weekendInboundFerries,
 } from "@/data/ferrySchedule";
+import scheduleOverrides from "@/data/scheduleOverrides";
 import type { FerryConnection, TrainSchedule } from "@/types/smartSchedule";
 
 export type FerrySchedules = {
@@ -14,9 +15,17 @@ export type FerrySchedules = {
   weekendInboundFerries: FerryConnection[];
 };
 
+/**
+ * "YYYY-MM-DD" → schedule type that actually runs that day, when it differs
+ * from the natural day-of-week (e.g. Memorial Day Monday → "weekend").
+ * Derived from GTFS `calendar_dates.txt` at build time.
+ */
+export type ScheduleOverrides = Record<string, ScheduleType>;
+
 export type SchedulePayload = {
   trainSchedules: Record<ScheduleType, TrainSchedule>;
   ferrySchedules: FerrySchedules;
+  scheduleOverrides?: ScheduleOverrides;
   generatedAt?: string;
 };
 
@@ -28,6 +37,7 @@ export const bundledSchedulePayload: SchedulePayload = {
     weekdayInboundFerries,
     weekendInboundFerries,
   },
+  scheduleOverrides,
 };
 
 export function isSchedulePayload(value: unknown): value is SchedulePayload {

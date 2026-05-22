@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getTodayScheduleType, setScheduleData } from "@/lib/scheduleUtils";
 import {
   bundledSchedulePayload,
+  isSchedulePayload,
   type SchedulePayload,
 } from "@/data/scheduleData";
 
@@ -22,21 +23,26 @@ describe("getTodayScheduleType", () => {
     expect(getTodayScheduleType(sat)).toBe("weekend");
   });
 
-  it("applies the bundled holiday override for Memorial Day 2026", () => {
-    const memorialDay = new Date(2026, 4, 25); // Mon 2026-05-25
-    expect(getTodayScheduleType(memorialDay)).toBe("weekend");
+  it("applies a holiday override that maps a weekday Monday to weekend", () => {
+    // Use a synthetic far-future date so the test doesn't depend on whether
+    // any specific holiday is still inside the build-time minDate floor.
+    setScheduleData({
+      ...bundledSchedulePayload,
+      scheduleOverrides: { "2099-05-25": "weekend" },
+    });
+    expect(getTodayScheduleType(new Date(2099, 4, 25))).toBe("weekend"); // Mon
   });
 
   it("uses overrides from a refreshed schedule payload", () => {
     const payload: SchedulePayload = {
       ...bundledSchedulePayload,
-      scheduleOverrides: { "2026-07-04": "weekday" },
+      scheduleOverrides: { "2099-07-04": "weekday" },
     };
     setScheduleData(payload);
-    // Sat 2026-07-04 — refreshed payload tells us it's a weekday schedule.
-    expect(getTodayScheduleType(new Date(2026, 6, 4))).toBe("weekday");
+    // Sat 2099-07-04 — refreshed payload tells us it's a weekday schedule.
+    expect(getTodayScheduleType(new Date(2099, 6, 4))).toBe("weekday");
     // Untouched dates still follow day-of-week.
-    expect(getTodayScheduleType(new Date(2026, 6, 5))).toBe("weekend");
+    expect(getTodayScheduleType(new Date(2099, 6, 5))).toBe("weekend");
   });
 
   it("defaults to new Date() when no argument is passed", () => {
@@ -45,10 +51,14 @@ describe("getTodayScheduleType", () => {
   });
 
   it("uses local-time date keys, not UTC", () => {
-    // 2026-05-25 23:30 local time should still match the Memorial Day override
-    // even if UTC has already rolled to 2026-05-26.
-    const lateMemorialDay = new Date(2026, 4, 25, 23, 30);
-    expect(getTodayScheduleType(lateMemorialDay)).toBe("weekend");
+    setScheduleData({
+      ...bundledSchedulePayload,
+      scheduleOverrides: { "2099-05-25": "weekend" },
+    });
+    // 2099-05-25 23:30 local time should match the override even when UTC
+    // has already rolled to 2099-05-26.
+    const lateMonday = new Date(2099, 4, 25, 23, 30);
+    expect(getTodayScheduleType(lateMonday)).toBe("weekend");
   });
 
   it("ignores a vitest fake clock by reading the provided Date directly", () => {
@@ -60,5 +70,42 @@ describe("getTodayScheduleType", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("isSchedulePayload override validation", () => {
+  function basePayload(): Record<string, unknown> {
+    return {
+      trainSchedules: bundledSchedulePayload.trainSchedules,
+      ferrySchedules: bundledSchedulePayload.ferrySchedules,
+    };
+  }
+
+  it("accepts a payload with no scheduleOverrides field", () => {
+    expect(isSchedulePayload(basePayload())).toBe(true);
+  });
+
+  it("accepts a payload with a valid scheduleOverrides map", () => {
+    expect(
+      isSchedulePayload({
+        ...basePayload(),
+        scheduleOverrides: { "2099-05-25": "weekend" },
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects an override value that isn't a known schedule type", () => {
+    expect(
+      isSchedulePayload({
+        ...basePayload(),
+        scheduleOverrides: { "2099-05-25": "garbage" },
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects scheduleOverrides that isn't a plain object", () => {
+    expect(
+      isSchedulePayload({ ...basePayload(), scheduleOverrides: [] }),
+    ).toBe(false);
   });
 });

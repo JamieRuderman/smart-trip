@@ -12,7 +12,6 @@ import { APP_CONSTANTS } from "@/lib/fareConstants";
 interface PersistedState {
   fromStation: Station;
   toStation: Station;
-  scheduleType: "weekday" | "weekend";
   tripNumber: number | null;
   savedAt: number;
 }
@@ -41,14 +40,12 @@ function loadPersistedState(): PersistedState | null {
 function savePersistedState(
   fromStation: Station,
   toStation: Station,
-  scheduleType: "weekday" | "weekend",
   tripNumber: number | null
 ): void {
   try {
     const data: PersistedState = {
       fromStation,
       toStation,
-      scheduleType,
       tripNumber,
       savedAt: Date.now(),
     };
@@ -108,11 +105,7 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
         (searchParams.get("to") as Station) ||
         (persisted ? persisted.toStation : ""),
       scheduleType:
-        isSharedLink && urlType
-          ? urlType
-          : persisted
-            ? persisted.scheduleType
-            : todayScheduleType(),
+        isSharedLink && urlType ? urlType : todayScheduleType(),
       showAllTrips: false,
       currentTime: debugCurrentTime ?? new Date(),
       selectedTripNumber: !isNaN(urlTripNumber)
@@ -155,10 +148,9 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     savePersistedState(
       state.fromStation,
       state.toStation,
-      state.scheduleType,
       state.selectedTripNumber
     );
-  }, [state.fromStation, state.toStation, state.scheduleType, state.selectedTripNumber]);
+  }, [state.fromStation, state.toStation, state.selectedTripNumber]);
 
   // Update current time every minute
   useEffect(() => {

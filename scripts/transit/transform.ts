@@ -129,9 +129,11 @@ export function transformRawToGenerated(): void {
   );
 
   // Limit overrides to a recent + future window so the bundled map doesn't
-  // accumulate stale historical holidays.
+  // accumulate stale historical holidays. Use day arithmetic (not setMonth)
+  // to avoid rolling over when today's day-of-month doesn't exist a month
+  // back (e.g. Mar 31 → Feb 31 → Mar 3).
   const overrideFloor = new Date();
-  overrideFloor.setMonth(overrideFloor.getMonth() - 1);
+  overrideFloor.setDate(overrideFloor.getDate() - 31);
   const scheduleOverrides = deriveScheduleOverrides(
     smartFeed.calendar,
     smartFeed.calendarDates,

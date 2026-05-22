@@ -40,12 +40,20 @@ export const bundledSchedulePayload: SchedulePayload = {
   scheduleOverrides,
 };
 
+function isValidScheduleOverrides(value: unknown): value is ScheduleOverrides {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  for (const v of Object.values(value as Record<string, unknown>)) {
+    if (v !== "weekday" && v !== "weekend") return false;
+  }
+  return true;
+}
+
 export function isSchedulePayload(value: unknown): value is SchedulePayload {
   if (!value || typeof value !== "object") return false;
   const payload = value as SchedulePayload;
   const train = payload.trainSchedules;
   const ferry = payload.ferrySchedules;
-  return Boolean(
+  const baseValid = Boolean(
     train &&
       train.weekday &&
       train.weekend &&
@@ -55,4 +63,13 @@ export function isSchedulePayload(value: unknown): value is SchedulePayload {
       Array.isArray(ferry.weekdayInboundFerries) &&
       Array.isArray(ferry.weekendInboundFerries)
   );
+  if (!baseValid) return false;
+  // Overrides are optional, but if present every value must be a valid type.
+  if (
+    payload.scheduleOverrides !== undefined &&
+    !isValidScheduleOverrides(payload.scheduleOverrides)
+  ) {
+    return false;
+  }
+  return true;
 }

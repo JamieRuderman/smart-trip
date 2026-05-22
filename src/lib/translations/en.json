@@ -179,6 +179,20 @@
     "currentTo": "Current To",
     "openTripAria": "Open trip {{trip}} to {{terminus}}"
   },
+  "departureReminder": {
+    "setReminder": "Remind me to leave",
+    "label": "Remind me before departure",
+    "minutesBefore_one": "{{count}} min before",
+    "minutesBefore_other": "{{count}} min before",
+    "custom": "Custom…",
+    "customPlaceholder": "Minutes",
+    "set": "Set",
+    "cancel": "Cancel reminder",
+    "activeAt": "Reminder at {{time}} ({{leadMinutes}} min before)",
+    "permissionDenied": "Enable notifications in your settings to receive reminders.",
+    "notificationTitle": "Time to leave for {{station}}",
+    "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before)."
+  },
   "tracker": {
     "departsInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Arrives in {{minutes}} min",

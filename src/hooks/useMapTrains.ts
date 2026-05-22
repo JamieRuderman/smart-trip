@@ -3,8 +3,7 @@ import { useVehiclePositions } from "@/hooks/useVehiclePositions";
 import { useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
-import { isWeekend } from "@/lib/utils";
+import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { VehicleStopStatus } from "@/types/gtfsRt";
@@ -46,7 +45,7 @@ function buildTripNumberIndex(): Map<string, number> {
   const north = stations[0];
   const south = stations[stations.length - 1];
   const lastIdx = stations.length - 1;
-  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const scheduleType = getTodayScheduleType();
   for (const sb of [true, false]) {
     const from = sb ? north : south;
     const to = sb ? south : north;

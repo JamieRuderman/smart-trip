@@ -25,14 +25,17 @@ import {
   buildStopIdToStationMap,
   buildTrainSchedules,
   checkSanityFloors,
+  deriveScheduleOverrides,
   extractStationCoordinates,
   groupStopTimesByTrip,
   renderFerrySchedulesFile,
+  renderScheduleOverridesFile,
   renderStationCoordinatesFile,
   renderStationPlatformsFile,
   renderStationsFile,
   renderTrainSchedulesFile,
   type FerrySchedulesOutput,
+  type ScheduleOverridesOutput,
   type TrainSchedulesOutput,
 } from "./shared.js";
 
@@ -75,12 +78,14 @@ function writeOutput(filename: string, content: string): void {
 function emitPublicScheduleJson(
   trainSchedules: TrainSchedulesOutput,
   ferrySchedules: FerrySchedulesOutput,
+  scheduleOverrides: ScheduleOverridesOutput,
 ): void {
   fs.mkdirSync(PUBLIC_DATA_DIR, { recursive: true });
   const payload = {
     generatedAt: new Date().toISOString(),
     trainSchedules,
     ferrySchedules,
+    scheduleOverrides,
   };
   fs.writeFileSync(
     path.resolve(PUBLIC_DATA_DIR, "schedules.json"),
@@ -123,6 +128,22 @@ export function transformRawToGenerated(): void {
     renderTrainSchedulesFile(trainSchedules),
   );
 
+  // Limit overrides to a recent + future window so the bundled map doesn't
+  // accumulate stale historical holidays. Use day arithmetic (not setMonth)
+  // to avoid rolling over when today's day-of-month doesn't exist a month
+  // back (e.g. Mar 31 → Feb 31 → Mar 3).
+  const overrideFloor = new Date();
+  overrideFloor.setDate(overrideFloor.getDate() - 31);
+  const scheduleOverrides = deriveScheduleOverrides(
+    smartFeed.calendar,
+    smartFeed.calendarDates,
+    { minDate: overrideFloor },
+  );
+  writeOutput(
+    "scheduleOverrides.generated.ts",
+    renderScheduleOverridesFile(scheduleOverrides),
+  );
+
   console.log("Extracting station coordinates…");
   const stationCoords = extractStationCoordinates(stations);
   writeOutput(
@@ -136,7 +157,7 @@ export function transformRawToGenerated(): void {
     "ferrySchedule.generated.ts",
     renderFerrySchedulesFile(ferrySchedules),
   );
-  emitPublicScheduleJson(trainSchedules, ferrySchedules);
+  emitPublicScheduleJson(trainSchedules, ferrySchedules, scheduleOverrides);
 
   const trainTripCounts = {
     weekdaySouthbound: trainSchedules.weekday.southbound.length,
@@ -157,6 +178,9 @@ export function transformRawToGenerated(): void {
   );
   console.log("Generated SMART train schedules", trainTripCounts);
   console.log("Generated ferry schedules", ferryCounts);
+  console.log(
+    `Generated ${Object.keys(scheduleOverrides).length} schedule overrides (calendar-date holidays).`,
+  );
 
   const failures = checkSanityFloors({
     stationCount: stations.length,

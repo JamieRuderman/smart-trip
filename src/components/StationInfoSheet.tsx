@@ -3,10 +3,13 @@ import { X, ArrowUp, ArrowDown, Check, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
-import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
+import {
+  getFilteredTrips,
+  getTodayScheduleType,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { isWeekend } from "@/lib/utils";
 import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { cn } from "@/lib/utils";
@@ -71,7 +74,7 @@ export function StationInfoSheet({
   onArrivalClick,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
-  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const scheduleType = getTodayScheduleType();
 
   const southboundTrips = useMemo(
     () => getFilteredTrips(WINDSOR, LARKSPUR, scheduleType),

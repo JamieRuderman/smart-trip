@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
-import { isWeekend, createMinuteInterval } from "@/lib/utils";
+import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
+import { createMinuteInterval } from "@/lib/utils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 
@@ -12,7 +12,6 @@ import { APP_CONSTANTS } from "@/lib/fareConstants";
 interface PersistedState {
   fromStation: Station;
   toStation: Station;
-  scheduleType: "weekday" | "weekend";
   tripNumber: number | null;
   savedAt: number;
 }
@@ -41,14 +40,12 @@ function loadPersistedState(): PersistedState | null {
 function savePersistedState(
   fromStation: Station,
   toStation: Station,
-  scheduleType: "weekday" | "weekend",
   tripNumber: number | null
 ): void {
   try {
     const data: PersistedState = {
       fromStation,
       toStation,
-      scheduleType,
       tripNumber,
       savedAt: Date.now(),
     };
@@ -73,8 +70,7 @@ export interface TrainScheduleState {
 }
 
 /** Returns the schedule type appropriate for the current calendar day. */
-const todayScheduleType = (): "weekday" | "weekend" =>
-  isWeekend() ? "weekend" : "weekday";
+const todayScheduleType = (): "weekday" | "weekend" => getTodayScheduleType();
 
 /** Params managed by the state sync — all others are preserved verbatim. */
 const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);
@@ -109,11 +105,7 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
         (searchParams.get("to") as Station) ||
         (persisted ? persisted.toStation : ""),
       scheduleType:
-        isSharedLink && urlType
-          ? urlType
-          : persisted
-            ? persisted.scheduleType
-            : todayScheduleType(),
+        isSharedLink && urlType ? urlType : todayScheduleType(),
       showAllTrips: false,
       currentTime: debugCurrentTime ?? new Date(),
       selectedTripNumber: !isNaN(urlTripNumber)
@@ -156,10 +148,9 @@ export function useTrainScheduleState(scheduleDataVersion?: string) {
     savePersistedState(
       state.fromStation,
       state.toStation,
-      state.scheduleType,
       state.selectedTripNumber
     );
-  }, [state.fromStation, state.toStation, state.scheduleType, state.selectedTripNumber]);
+  }, [state.fromStation, state.toStation, state.selectedTripNumber]);
 
   // Update current time every minute
   useEffect(() => {

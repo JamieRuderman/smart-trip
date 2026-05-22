@@ -1,12 +1,13 @@
 import stations from "@/data/stations";
 import {
   bundledSchedulePayload,
+  type ScheduleOverrides,
   type SchedulePayload,
 } from "@/data/scheduleData";
+import bundledScheduleOverrides from "@/data/scheduleOverrides";
 import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
 import { parseTimeToMinutes, isTimeInPast } from "./timeUtils";
-import { isWeekend } from "./utils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
 import type {
   Station,
@@ -264,7 +265,7 @@ function sortedFerries(scheduleType: ScheduleType): FerryConnection[] {
 }
 
 export function getNextFerryDeparture(now: Date): FerryConnection | null {
-  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const scheduleType = getTodayScheduleType(now);
   const ferries = sortedFerries(scheduleType);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return (
@@ -272,9 +273,43 @@ export function getNextFerryDeparture(now: Date): FerryConnection | null {
   );
 }
 
+/**
+ * Effective schedule overrides — starts from the build-time bundled map and
+ * is swapped wholesale when `setScheduleData` receives a fresh payload (so
+ * the same daily refresh that updates timetables also picks up new holidays).
+ */
+let activeScheduleOverrides: ScheduleOverrides = { ...bundledScheduleOverrides };
+
+function localDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * The schedule type that should be used for `now`. Defers to GTFS-derived
+ * calendar-date overrides (Memorial Day Monday → "weekend", etc.) before
+ * falling back to the natural day-of-week classification.
+ */
+export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
+  const override = activeScheduleOverrides[localDateKey(now)];
+  if (override) return override;
+  const day = now.getDay();
+  return day === 0 || day === 6 ? "weekend" : "weekday";
+}
+
 export function setScheduleData(payload: SchedulePayload): void {
   try {
     scheduleCache = processScheduleData(payload);
+    // When the payload doesn't carry overrides (e.g. a pre-feature cached
+    // payload, or a remote endpoint that hasn't been redeployed), reset to
+    // the build-time bundled map instead of silently keeping prior state —
+    // otherwise stale overrides from an earlier payload can outlive their
+    // relevance.
+    activeScheduleOverrides = payload.scheduleOverrides
+      ? { ...payload.scheduleOverrides }
+      : { ...bundledScheduleOverrides };
     scheduleVersion += 1;
     // Downstream caches were built from the previous payload — evict them.
     ferryCache = null;
@@ -318,7 +353,7 @@ export function findFullCorridorTrip(
   const from = isSouthbound ? stations[0] : stations[stations.length - 1];
   const to = isSouthbound ? stations[stations.length - 1] : stations[0];
   const originIndex = isSouthbound ? 0 : stations.length - 1;
-  const scheduleType = isWeekend() ? "weekend" : "weekday";
+  const scheduleType = getTodayScheduleType();
   const candidates = getFilteredTrips(from, to, scheduleType);
   if (tripNumber != null) {
     return (

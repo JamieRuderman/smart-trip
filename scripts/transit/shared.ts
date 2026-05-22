@@ -242,15 +242,19 @@ function classifyServicePattern(
 
 /**
  * Return the schedule type actually running on `date` after applying any
- * `calendar_dates` exceptions, or `null` if neither schedule type is active
- * (e.g. Thanksgiving — no service at all).
+ * `calendar_dates` exceptions:
+ * - "weekday"/"weekend" — exactly that schedule is active
+ * - "mixed" — both schedules run simultaneously (e.g. extra service added
+ *   alongside the regular pattern); the natural day-of-week service is
+ *   still in effect, so no override is needed
+ * - "none" — no service at all (e.g. Thanksgiving), distinct from "mixed"
  */
 function effectiveScheduleType(
   date: string,
   dayOfWeek: number,
   calendarRows: GtfsCalendar[],
   exceptionsByDate: Map<string, { added: Set<string>; removed: Set<string> }>,
-): ScheduleType | null {
+): ScheduleType | "mixed" | "none" {
   const exceptions = exceptionsByDate.get(date);
   const added = exceptions?.added ?? new Set<string>();
   const removed = exceptions?.removed ?? new Set<string>();
@@ -271,9 +275,10 @@ function effectiveScheduleType(
     else if (pattern === "weekend") weekendActive = true;
   }
 
-  if (weekdayActive && !weekendActive) return "weekday";
-  if (weekendActive && !weekdayActive) return "weekend";
-  return null;
+  if (weekdayActive && weekendActive) return "mixed";
+  if (weekdayActive) return "weekday";
+  if (weekendActive) return "weekend";
+  return "none";
 }
 
 /**
@@ -327,8 +332,11 @@ export function deriveScheduleOverrides(
       calendarRows,
       exceptionsByDate,
     );
-    // No active service → weekend view is the conservative default.
-    const effective: ScheduleType = active ?? "weekend";
+    // "mixed" means natural day-of-week service still runs alongside extras
+    // — no override needed. "none" (true no-service day) falls back to the
+    // weekend view since it's less misleading than a full weekday grid.
+    if (active === "mixed") continue;
+    const effective: ScheduleType = active === "none" ? "weekend" : active;
     if (effective === naturalType) continue;
 
     const iso = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;

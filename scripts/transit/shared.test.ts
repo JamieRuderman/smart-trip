@@ -82,4 +82,15 @@ describe("deriveScheduleOverrides", () => {
     );
     expect(overrides).toEqual({});
   });
+
+  it("does not emit an override when weekday and weekend service both run", () => {
+    // A weekday Monday where extra weekend-pattern service is added but the
+    // regular weekday service is NOT removed — the natural weekday schedule
+    // is still in effect, so we must not downgrade to weekend.
+    const overrides = deriveScheduleOverrides(
+      [WEEKDAY, WEEKEND],
+      [{ service_id: "weekend", date: "20260518", exception_type: "1" }],
+    );
+    expect(overrides).toEqual({});
+  });
 });

@@ -39,18 +39,40 @@ export function reminderIdFor(tripNumber: number, departureAt: number): number {
   return (yymmdd << 14) | (tripNumber & 0x3fff);
 }
 
+function isReminder(value: unknown): value is DepartureReminder {
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.id === "number" &&
+    Number.isFinite(r.id) &&
+    typeof r.tripNumber === "number" &&
+    typeof r.fromStation === "string" &&
+    typeof r.toStation === "string" &&
+    typeof r.departureAt === "number" &&
+    Number.isFinite(r.departureAt) &&
+    typeof r.reminderAt === "number" &&
+    Number.isFinite(r.reminderAt) &&
+    typeof r.leadMinutes === "number" &&
+    typeof r.title === "string" &&
+    typeof r.body === "string"
+  );
+}
+
 function safeLoad(): DepartureReminder[] {
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(REMINDER_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as DepartureReminder[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isReminder);
   } catch {
     return [];
   }
 }
 
 function safeSave(list: DepartureReminder[]): void {
+  if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(list));
   } catch {
@@ -64,9 +86,16 @@ function prune(list: DepartureReminder[]): DepartureReminder[] {
   return list.filter((r) => r.reminderAt > cutoff);
 }
 
+/**
+ * Returns the current set of reminders, pruning expired ones and persisting
+ * the cleanup back to storage. Persistent pruning is what keeps native
+ * storage from growing unbounded (native skips rehydrate entirely).
+ */
 export function listReminders(): DepartureReminder[] {
-  const list = prune(safeLoad());
-  return list;
+  const raw = safeLoad();
+  const pruned = prune(raw);
+  if (pruned.length !== raw.length) safeSave(pruned);
+  return pruned;
 }
 
 export async function ensureNotificationPermission(): Promise<boolean> {
@@ -146,22 +175,25 @@ async function scheduleNative(reminder: DepartureReminder): Promise<void> {
   });
 }
 
+/**
+ * Schedule a reminder. Throws if the underlying platform refuses to schedule
+ * (e.g. iOS permission was revoked after the first grant, Android exact-alarm
+ * denied) — callers should treat that as "not scheduled" and surface it to
+ * the user, since leaving a phantom storage entry would falsely show "active"
+ * with no notification ever firing.
+ */
 export async function scheduleReminder(
   reminder: DepartureReminder
 ): Promise<void> {
-  const next = safeLoad().filter((r) => r.id !== reminder.id);
-  next.push(reminder);
-  safeSave(next);
-
   if (Capacitor.isNativePlatform()) {
-    try {
-      await scheduleNative(reminder);
-    } catch (error) {
-      logger.warn("Failed to schedule native notification", error);
-    }
+    await scheduleNative(reminder);
   } else {
     armWebTimer(reminder);
   }
+
+  const next = safeLoad().filter((r) => r.id !== reminder.id);
+  next.push(reminder);
+  safeSave(next);
 }
 
 export async function cancelReminder(id: number): Promise<void> {
@@ -194,10 +226,9 @@ export function rehydrateWebReminders(): void {
   if (rehydrated) return;
   rehydrated = true;
   if (Capacitor.isNativePlatform()) return;
-  const list = prune(safeLoad());
-  // Persist the pruned list back so old entries don't linger.
-  safeSave(list);
-  for (const reminder of list) {
+  // Don't write storage from here — that would race against another tab that
+  // just scheduled a new reminder. listReminders() prunes on next read.
+  for (const reminder of prune(safeLoad())) {
     armWebTimer(reminder);
   }
 }

@@ -190,6 +190,8 @@
     "cancel": "Cancelar recordatorio",
     "activeAt": "Recordatorio a las {{time}} ({{leadMinutes}} min antes)",
     "permissionDenied": "Activa las notificaciones en tu configuración para recibir recordatorios.",
+    "scheduleFailed": "No se pudo programar el recordatorio. Inténtalo de nuevo.",
+    "customInvalid": "Introduce un número entero de minutos entre 1 y {{max}}.",
     "notificationTitle": "Hora de salir hacia {{station}}",
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes)."
   },

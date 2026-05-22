@@ -190,6 +190,8 @@
     "cancel": "Cancel reminder",
     "activeAt": "Reminder at {{time}} ({{leadMinutes}} min before)",
     "permissionDenied": "Enable notifications in your settings to receive reminders.",
+    "scheduleFailed": "Couldn't schedule the reminder. Try again in a moment.",
+    "customInvalid": "Enter a whole number of minutes between 1 and {{max}}.",
     "notificationTitle": "Time to leave for {{station}}",
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before)."
   },

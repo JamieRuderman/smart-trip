@@ -10,6 +10,7 @@ import {
   type DepartureReminder,
   type ReminderText,
 } from "@/lib/departureReminder";
+import { logger } from "@/lib/logger";
 
 function notifyChange(): void {
   if (typeof window === "undefined") return;
@@ -24,9 +25,9 @@ export interface UseDepartureReminderArgs {
   departureAt: number;
 }
 
-export interface SetReminderResult {
-  granted: boolean;
-}
+export type SetReminderResult =
+  | { ok: true }
+  | { ok: false; reason: "permission" | "schedule-failed" };
 
 export function useDepartureReminder({
   tripNumber,
@@ -50,9 +51,12 @@ export function useDepartureReminder({
   }, [id]);
 
   const setReminderForLead = useCallback(
-    async (leadMinutes: number, text: ReminderText): Promise<SetReminderResult> => {
+    async (
+      leadMinutes: number,
+      text: ReminderText
+    ): Promise<SetReminderResult> => {
       const granted = await ensureNotificationPermission();
-      if (!granted) return { granted: false };
+      if (!granted) return { ok: false, reason: "permission" };
 
       const reminderAt = departureAt - leadMinutes * 60_000;
       const next: DepartureReminder = {
@@ -66,11 +70,51 @@ export function useDepartureReminder({
         title: text.title,
         body: text.body,
       };
-      await scheduleReminderLib(next);
+      try {
+        await scheduleReminderLib(next);
+      } catch (error) {
+        logger.warn("Failed to schedule departure reminder", error);
+        return { ok: false, reason: "schedule-failed" };
+      }
       notifyChange();
-      return { granted: true };
+      return { ok: true };
     },
     [departureAt, fromStation, id, toStation, tripNumber]
+  );
+
+  /**
+   * Re-arm an existing reminder under the same id with a refreshed reminderAt
+   * and updated body text. Used when the live departure time drifts (delay)
+   * so the reminder still fires the right number of minutes before the
+   * actual train. Silently no-ops on failure — we already had a working
+   * reminder at the old time, so a failed re-arm is worse than nothing.
+   */
+  const reschedule = useCallback(
+    async (text: ReminderText): Promise<void> => {
+      if (!reminder) return;
+      const newReminderAt = departureAt - reminder.leadMinutes * 60_000;
+      if (
+        newReminderAt === reminder.reminderAt &&
+        text.title === reminder.title &&
+        text.body === reminder.body
+      ) {
+        return;
+      }
+      const updated: DepartureReminder = {
+        ...reminder,
+        departureAt,
+        reminderAt: newReminderAt,
+        title: text.title,
+        body: text.body,
+      };
+      try {
+        await scheduleReminderLib(updated);
+        notifyChange();
+      } catch (error) {
+        logger.warn("Failed to refresh departure reminder", error);
+      }
+    },
+    [departureAt, reminder]
   );
 
   const cancel = useCallback(async () => {
@@ -78,5 +122,5 @@ export function useDepartureReminder({
     notifyChange();
   }, [id]);
 
-  return { reminder, setReminderForLead, cancel };
+  return { reminder, setReminderForLead, reschedule, cancel };
 }

@@ -45,6 +45,25 @@ describe("getTodayScheduleType", () => {
     expect(getTodayScheduleType(new Date(2099, 6, 5))).toBe("weekend");
   });
 
+  it("clears stale overrides when a refreshed payload omits the field", () => {
+    // First load a payload that defines a synthetic override.
+    setScheduleData({
+      ...bundledSchedulePayload,
+      scheduleOverrides: { "2099-08-10": "weekend" },
+    });
+    expect(getTodayScheduleType(new Date(2099, 7, 10))).toBe("weekend"); // Mon
+
+    // Then load a payload without the field (e.g. older cached JSON).
+    // We must drop the stale "2099-08-10" override and revert to the
+    // bundled build-time map.
+    const payloadWithoutOverrides: SchedulePayload = {
+      trainSchedules: bundledSchedulePayload.trainSchedules,
+      ferrySchedules: bundledSchedulePayload.ferrySchedules,
+    };
+    setScheduleData(payloadWithoutOverrides);
+    expect(getTodayScheduleType(new Date(2099, 7, 10))).toBe("weekday");
+  });
+
   it("defaults to new Date() when no argument is passed", () => {
     // Just confirm it returns one of the valid values without throwing.
     expect(["weekday", "weekend"]).toContain(getTodayScheduleType());

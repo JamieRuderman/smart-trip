@@ -247,6 +247,8 @@ function classifyServicePattern(
  * - "mixed" — both schedules run simultaneously (e.g. extra service added
  *   alongside the regular pattern); the natural day-of-week service is
  *   still in effect, so no override is needed
+ * - "unknown" — an added service_id has no calendar.txt row so we can't
+ *   classify its pattern; bail out instead of guessing
  * - "none" — no service at all (e.g. Thanksgiving), distinct from "mixed"
  */
 function effectiveScheduleType(
@@ -254,11 +256,19 @@ function effectiveScheduleType(
   dayOfWeek: number,
   calendarRows: GtfsCalendar[],
   exceptionsByDate: Map<string, { added: Set<string>; removed: Set<string> }>,
-): ScheduleType | "mixed" | "none" {
+): ScheduleType | "mixed" | "unknown" | "none" {
   const exceptions = exceptionsByDate.get(date);
   const added = exceptions?.added ?? new Set<string>();
   const removed = exceptions?.removed ?? new Set<string>();
   const dayKey = GTFS_DAY_KEYS[dayOfWeek];
+
+  // GTFS permits service_ids that only exist in calendar_dates.txt (date-only
+  // services with no weekly pattern). We can't classify their weekday/weekend
+  // nature, so flag any such add and bail out conservatively below.
+  const calendarServiceIds = new Set(calendarRows.map((r) => r.service_id));
+  for (const id of added) {
+    if (!calendarServiceIds.has(id)) return "unknown";
+  }
 
   let weekdayActive = false;
   let weekendActive = false;
@@ -333,9 +343,11 @@ export function deriveScheduleOverrides(
       exceptionsByDate,
     );
     // "mixed" means natural day-of-week service still runs alongside extras
-    // — no override needed. "none" (true no-service day) falls back to the
+    // — no override needed. "unknown" means we encountered a date-only
+    // service_id with no calendar.txt row; defer to natural day-of-week
+    // rather than guess. "none" (true no-service day) falls back to the
     // weekend view since it's less misleading than a full weekday grid.
-    if (active === "mixed") continue;
+    if (active === "mixed" || active === "unknown") continue;
     const effective: ScheduleType = active === "none" ? "weekend" : active;
     if (effective === naturalType) continue;
 

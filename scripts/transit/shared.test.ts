@@ -93,4 +93,19 @@ describe("deriveScheduleOverrides", () => {
     );
     expect(overrides).toEqual({});
   });
+
+  it("defers to natural day-of-week when a date-only service is added", () => {
+    // Friday 2026-05-22: regular weekday service removed, an unknown
+    // date-only service_id added (no calendar.txt row). We can't classify
+    // it, so we must NOT emit a weekend override — the user is left with
+    // the natural weekday view rather than a guessed downgrade.
+    const overrides = deriveScheduleOverrides(
+      [WEEKDAY, WEEKEND],
+      [
+        { service_id: "weekday", date: "20260522", exception_type: "2" },
+        { service_id: "special-event", date: "20260522", exception_type: "1" },
+      ],
+    );
+    expect(overrides).toEqual({});
+  });
 });

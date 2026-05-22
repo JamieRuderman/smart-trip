@@ -302,9 +302,14 @@ export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
 export function setScheduleData(payload: SchedulePayload): void {
   try {
     scheduleCache = processScheduleData(payload);
-    if (payload.scheduleOverrides) {
-      activeScheduleOverrides = { ...payload.scheduleOverrides };
-    }
+    // When the payload doesn't carry overrides (e.g. a pre-feature cached
+    // payload, or a remote endpoint that hasn't been redeployed), reset to
+    // the build-time bundled map instead of silently keeping prior state —
+    // otherwise stale overrides from an earlier payload can outlive their
+    // relevance.
+    activeScheduleOverrides = payload.scheduleOverrides
+      ? { ...payload.scheduleOverrides }
+      : { ...bundledScheduleOverrides };
     scheduleVersion += 1;
     // Downstream caches were built from the previous payload — evict them.
     ferryCache = null;

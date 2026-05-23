@@ -188,7 +188,7 @@
   },
   "departureReminder": {
     "setReminder": "Remind me to leave",
-    "label": "Remind me before departure",
+    "label": "How much time do you need?",
     "minutesChip_one": "{{count}} min",
     "minutesChip_other": "{{count}} min",
     "custom": "Custom…",

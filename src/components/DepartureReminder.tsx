@@ -81,6 +81,34 @@ export function DepartureReminder({
     [currentTime, effectiveTime]
   );
 
+  /**
+   * Whole minutes between now and the train's departure. Used to filter the
+   * picker to only lead-time options that would actually fire before the
+   * train leaves — offering "60 min" for a train arriving in 16 min would
+   * fire the reminder 44 minutes ago, which isn't useful.
+   */
+  const minutesUntilDeparture = useMemo(
+    () => Math.floor((departureAt - currentTime.getTime()) / 60_000),
+    [currentTime, departureAt]
+  );
+
+  const availableChips = useMemo(
+    () => QUICK_LEAD_MINUTES.filter((m) => m < minutesUntilDeparture),
+    [minutesUntilDeparture]
+  );
+
+  /**
+   * Hard cap for custom input — at least 1 minute of lead time so the
+   * reminder isn't scheduled in the past or for "now".
+   */
+  const maxCustomMinutes = Math.max(
+    0,
+    Math.min(MAX_CUSTOM_MINUTES, minutesUntilDeparture - 1)
+  );
+
+  /** Less than 2 minutes left: even a 1-minute reminder rounds to "now". */
+  const tooLateToSchedule = minutesUntilDeparture < 2;
+
   const { reminder, setReminderForLead, reschedule, cancel } =
     useDepartureReminder({
       tripNumber,
@@ -133,15 +161,22 @@ export function DepartureReminder({
     [buildText, closePicker, setReminderForLead]
   );
 
-  const parseCustomMinutes = useCallback((value: string): number | null => {
-    const trimmed = value.trim();
-    if (!INTEGER_MINUTES_RE.test(trimmed)) return null;
-    const minutes = Number(trimmed);
-    if (!Number.isInteger(minutes) || minutes <= 0 || minutes > MAX_CUSTOM_MINUTES) {
-      return null;
-    }
-    return minutes;
-  }, []);
+  const parseCustomMinutes = useCallback(
+    (value: string): number | null => {
+      const trimmed = value.trim();
+      if (!INTEGER_MINUTES_RE.test(trimmed)) return null;
+      const minutes = Number(trimmed);
+      if (
+        !Number.isInteger(minutes) ||
+        minutes <= 0 ||
+        minutes > maxCustomMinutes
+      ) {
+        return null;
+      }
+      return minutes;
+    },
+    [maxCustomMinutes]
+  );
 
   const customMinutes = parseCustomMinutes(customInput);
 
@@ -190,7 +225,7 @@ export function DepartureReminder({
     );
   }
 
-  if (departureInPast) return null;
+  if (departureInPast || tooLateToSchedule) return null;
 
   if (!pickerOpen) {
     return (
@@ -215,7 +250,7 @@ export function DepartureReminder({
       : pickerError === "schedule-failed"
         ? t("departureReminder.scheduleFailed")
         : pickerError === "custom-invalid"
-          ? t("departureReminder.customInvalid", { max: MAX_CUSTOM_MINUTES })
+          ? t("departureReminder.customInvalid", { max: maxCustomMinutes })
           : null;
 
   return (
@@ -242,19 +277,21 @@ export function DepartureReminder({
           </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {QUICK_LEAD_MINUTES.map((minutes) => (
-            <Button
-              key={minutes}
-              type="button"
-              variant="outline"
-              onClick={() => void handlePick(minutes)}
-              className="h-11 px-0 text-sm font-medium"
-            >
-              {t("departureReminder.minutesChip", { count: minutes })}
-            </Button>
-          ))}
-        </div>
+        {availableChips.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            {availableChips.map((minutes) => (
+              <Button
+                key={minutes}
+                type="button"
+                variant="outline"
+                onClick={() => void handlePick(minutes)}
+                className="h-11 px-0 text-sm font-medium"
+              >
+                {t("departureReminder.minutesChip", { count: minutes })}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {!showCustom ? (
           <Button
@@ -270,7 +307,7 @@ export function DepartureReminder({
             <input
               type="number"
               min={1}
-              max={MAX_CUSTOM_MINUTES}
+              max={maxCustomMinutes}
               step={1}
               inputMode="numeric"
               value={customInput}

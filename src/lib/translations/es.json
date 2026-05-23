@@ -188,7 +188,7 @@
   },
   "departureReminder": {
     "setReminder": "Recuérdame salir",
-    "label": "Recuérdame antes de la salida",
+    "label": "¿Cuánto tiempo necesitas?",
     "minutesChip_one": "{{count}} min",
     "minutesChip_other": "{{count}} min",
     "custom": "Personalizado…",

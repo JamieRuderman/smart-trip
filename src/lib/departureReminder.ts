@@ -156,20 +156,20 @@ function armWebTimer(reminder: DepartureReminder): void {
   const existing = webTimers.get(reminder.id);
   if (existing != null) window.clearTimeout(existing);
 
-  const delay = reminder.reminderAt - Date.now();
-  if (delay <= 0) {
-    fireWebNotification(reminder);
-    const remaining = safeLoad().filter((r) => r.id !== reminder.id);
-    safeSave(remaining);
-    return;
-  }
-  const handle = window.setTimeout(() => {
+  const fireAndClean = () => {
     webTimers.delete(reminder.id);
     fireWebNotification(reminder);
     const remaining = safeLoad().filter((r) => r.id !== reminder.id);
     safeSave(remaining);
     window.dispatchEvent(new Event(REMINDER_CHANGED_EVENT));
-  }, delay);
+  };
+
+  const delay = reminder.reminderAt - Date.now();
+  if (delay <= 0) {
+    fireAndClean();
+    return;
+  }
+  const handle = window.setTimeout(fireAndClean, delay);
   webTimers.set(reminder.id, handle);
 }
 

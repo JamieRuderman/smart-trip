@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { X, ArrowUp, ArrowDown, Check, MapPin, Flag } from "lucide-react";
+import { X, ArrowUp, ArrowDown, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import stations from "@/data/stations";
@@ -15,6 +15,14 @@ import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { AppSheet } from "@/components/ui/app-sheet";
+import { TripIcon } from "@/components/icons/TripIcon";
+import { TimeDisplay } from "@/components/TimeDisplay";
+import {
+  cardTripState,
+  stateCardStyle,
+  stateText,
+  type TripState,
+} from "@/lib/tripTheme";
 import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
@@ -27,6 +35,18 @@ interface Arrival {
   terminus: Station;
   isSouthbound: boolean;
   etaMinutes: number;
+  /** Effective arrival time at this station, "HH:MM" — includes live updates
+   *  when present so the displayed clock time reflects real-world delay. */
+  effectiveTime: string;
+  /** Scheduled arrival time at this station — used to show a struck-through
+   *  comparison when the live time differs (delayed). */
+  scheduledTime: string;
+  /** The user's destination if they've picked one in the matching direction;
+   *  otherwise the train's end-of-line terminus. */
+  destinationStation: Station;
+  /** Effective arrival time at {@link destinationStation}, or null when the
+   *  tapped station IS the destination (so we don't render a redundant time). */
+  destinationTime: string | null;
   delayMinutes: number | null;
   isCanceled: boolean;
   /** Underlying schedule trip — handed back to the caller when the row is
@@ -47,6 +67,12 @@ export interface StationInfoSheetProps {
   onSetFrom?: (station: Station) => void;
   /** Set the tapped station as the trip destination. */
   onSetTo?: (station: Station) => void;
+  /** Clear the trip origin — called when tapping the From button while this
+   *  station is already the origin. */
+  onClearFrom?: () => void;
+  /** Clear the trip destination — called when tapping the To button while
+   *  this station is already the destination. */
+  onClearTo?: () => void;
   /** Open the trip detail sheet for an arriving train, with this station
    *  as the displayed origin and the train's terminus as the destination. */
   onArrivalClick?: (
@@ -54,6 +80,12 @@ export interface StationInfoSheetProps {
     fromStation: Station,
     toStation: Station,
   ) => void;
+  /** Trip number the user is currently riding (if any) — matching arrival
+   *  rows are visually emphasized so the user can spot their own train. */
+  ridingTripNumber?: number | null;
+  /** Direction the user's riding train is heading — disambiguates trip
+   *  numbers that are reused across schedule types. `null` when unknown. */
+  ridingIsSouthbound?: boolean | null;
 }
 
 /**
@@ -71,7 +103,11 @@ export function StationInfoSheet({
   toStation = null,
   onSetFrom,
   onSetTo,
+  onClearFrom,
+  onClearTo,
   onArrivalClick,
+  ridingTripNumber = null,
+  ridingIsSouthbound = null,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = getTodayScheduleType();
@@ -87,6 +123,17 @@ export function StationInfoSheet({
 
   const sbStatus = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, southboundTrips);
   const nbStatus = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, northboundTrips);
+
+  // When the user has both endpoints selected, restrict the arrivals list to
+  // the direction of their trip — these are train schedules, and trains going
+  // the wrong way aren't actionable from the station they tapped.
+  const directionFilter = useMemo<"southbound" | "northbound" | null>(() => {
+    if (!fromStation || !toStation) return null;
+    const a = stationIndexMap[fromStation];
+    const b = stationIndexMap[toStation];
+    if (a == null || b == null) return null;
+    return a < b ? "southbound" : "northbound";
+  }, [fromStation, toStation]);
 
   const arrivals = useMemo<Arrival[]>(() => {
     const stationIdx = stationIndexMap[station];
@@ -110,12 +157,33 @@ export function StationInfoSheet({
           const etaMinutes = parseTimeToMinutes(effectiveTime) - nowMinutes;
 
           const delayMinutes = rt?.delayMinutes ?? null;
+          const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+
+          // Prefer the user's selected destination if direction matches the
+          // train; otherwise fall back to the train's end-of-line terminus.
+          const destinationStation: Station =
+            directionFilter && toStation && (directionFilter === "southbound") === isSouthbound
+              ? toStation
+              : terminus;
+          let destinationTime: string | null = null;
+          if (destinationStation !== station) {
+            const destIdx = stationIndexMap[destinationStation];
+            const destStatic = destIdx != null ? trip.times[destIdx] : null;
+            if (destStatic && destStatic !== "~~") {
+              const destLive = rt?.allStopLiveDepartures?.[destinationStation];
+              destinationTime = destLive ?? destStatic;
+            }
+          }
 
           return {
             tripNumber: trip.trip,
-            terminus: isSouthbound ? LARKSPUR : WINDSOR,
+            terminus,
             isSouthbound,
             etaMinutes,
+            effectiveTime,
+            scheduledTime: staticTime,
+            destinationStation,
+            destinationTime,
             delayMinutes:
               delayMinutes != null && delayMinutes >= DELAY_MINUTES_THRESHOLD
                 ? delayMinutes
@@ -130,12 +198,27 @@ export function StationInfoSheet({
       ...collect(southboundTrips, true, sbStatus),
       ...collect(northboundTrips, false, nbStatus),
     ]
-      .filter((a) => a.etaMinutes >= 0 && a.etaMinutes <= ARRIVALS_WINDOW_MINUTES)
+      .filter(
+        (a) =>
+          a.etaMinutes >= 0 &&
+          a.etaMinutes <= ARRIVALS_WINDOW_MINUTES &&
+          (directionFilter == null ||
+            (directionFilter === "southbound") === a.isSouthbound),
+      )
       .sort((a, b) => a.etaMinutes - b.etaMinutes)
       .slice(0, MAX_ARRIVALS);
 
     return merged;
-  }, [station, currentTime, southboundTrips, northboundTrips, sbStatus, nbStatus]);
+  }, [
+    station,
+    currentTime,
+    southboundTrips,
+    northboundTrips,
+    sbStatus,
+    nbStatus,
+    directionFilter,
+    toStation,
+  ]);
 
   const zone = stationZoneMap[station];
   const zoneColor = ZONE_TRACK_COLORS[zone];
@@ -179,17 +262,23 @@ export function StationInfoSheet({
       {(onSetFrom || onSetTo) && (
         <div className="px-5 pt-4 pb-4 flex gap-3">
           {onSetFrom && (
-            <FromToButton
+            <FromToColumn
               role="from"
               isCurrent={fromStation === station}
-              onClick={() => onSetFrom(station)}
+              onClick={() =>
+                fromStation === station
+                  ? onClearFrom?.()
+                  : onSetFrom(station)
+              }
             />
           )}
           {onSetTo && (
-            <FromToButton
+            <FromToColumn
               role="to"
               isCurrent={toStation === station}
-              onClick={() => onSetTo(station)}
+              onClick={() =>
+                toStation === station ? onClearTo?.() : onSetTo(station)
+              }
             />
           )}
         </div>
@@ -209,18 +298,26 @@ export function StationInfoSheet({
             {t("stationInfo.noUpcoming")}
           </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {arrivals.map((a) => (
-              <ArrivalRow
-                key={`${a.tripNumber}-${a.isSouthbound}`}
-                arrival={a}
-                onClick={
-                  onArrivalClick
-                    ? () => onArrivalClick(a.trip, station, a.terminus)
-                    : undefined
-                }
-              />
-            ))}
+          <ul className="flex flex-col gap-2">
+            {arrivals.map((a) => {
+              const isRiding =
+                ridingTripNumber != null &&
+                ridingIsSouthbound != null &&
+                a.tripNumber === ridingTripNumber &&
+                a.isSouthbound === ridingIsSouthbound;
+              return (
+                <ArrivalRow
+                  key={`${a.tripNumber}-${a.isSouthbound}`}
+                  arrival={a}
+                  isRiding={isRiding}
+                  onClick={
+                    onArrivalClick
+                      ? () => onArrivalClick(a.trip, station, a.terminus)
+                      : undefined
+                  }
+                />
+              );
+            })}
           </ul>
         )}
       </div>
@@ -228,7 +325,7 @@ export function StationInfoSheet({
   );
 }
 
-function FromToButton({
+function FromToColumn({
   role,
   isCurrent,
   onClick,
@@ -239,45 +336,64 @@ function FromToButton({
 }) {
   const { t } = useTranslation();
   const RoleIcon = role === "from" ? MapPin : Flag;
-  const label = isCurrent
-    ? t(role === "from" ? "stationInfo.currentFrom" : "stationInfo.currentTo")
-    : t(role === "from" ? "stationInfo.setAsFrom" : "stationInfo.setAsTo");
+  const roleLabel = t(
+    role === "from" ? "stationInfo.departure" : "stationInfo.destination",
+  );
+  const actionLabel = t(
+    isCurrent ? "stationInfo.clearStation" : "stationInfo.setStation",
+  );
+  const ariaLabel = t(
+    isCurrent
+      ? role === "from"
+        ? "stationInfo.clearDepartureAria"
+        : "stationInfo.clearDestinationAria"
+      : role === "from"
+        ? "stationInfo.setAsDepartureAria"
+        : "stationInfo.setAsDestinationAria",
+  );
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={isCurrent}
-      aria-pressed={isCurrent}
-      className={cn(
-        // Card-style tappable tile — taller hit area than the previous
-        // pill; clearly grouped icon + label so the role reads at a glance.
-        "flex-1 h-14 rounded-xl border-2 px-4 flex items-center gap-3",
-        "transition-colors text-left",
-        isCurrent
-          ? "border-primary bg-primary/10 text-primary cursor-default"
-          : "border-border bg-card text-foreground hover:bg-accent hover:border-primary/40",
-      )}
-    >
-      <span
-        className={cn(
-          "shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
-          isCurrent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-        )}
-        aria-hidden="true"
-      >
-        {isCurrent ? <Check className="w-4 h-4" /> : <RoleIcon className="w-4 h-4" />}
+    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+      <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">
+        {roleLabel}
       </span>
-      <span className="text-sm font-semibold leading-tight">{label}</span>
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={isCurrent}
+        aria-label={ariaLabel}
+        className={cn(
+          "h-11 rounded-xl border-2 px-3 flex items-center gap-2",
+          "transition-colors text-left",
+          isCurrent
+            ? "border-primary bg-primary/10 text-primary hover:bg-primary/20"
+            : "border-border bg-card text-foreground hover:bg-accent hover:border-primary/40",
+        )}
+      >
+        <span
+          className={cn(
+            "shrink-0 w-7 h-7 rounded-full flex items-center justify-center",
+            isCurrent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+          )}
+          aria-hidden="true"
+        >
+          {isCurrent ? <X className="w-3.5 h-3.5" /> : <RoleIcon className="w-3.5 h-3.5" />}
+        </span>
+        <span className="text-sm font-semibold leading-tight">{actionLabel}</span>
+      </button>
+    </div>
   );
 }
 
 function ArrivalRow({
   arrival,
+  isRiding = false,
   onClick,
 }: {
   arrival: Arrival;
+  /** True when the user is currently riding this train — adds a "Riding"
+   *  badge and a primary-tinted ring around the row so it stands out. */
+  isRiding?: boolean;
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
@@ -286,60 +402,103 @@ function ArrivalRow({
     arrival.delayMinutes != null &&
     arrival.delayMinutes >= DELAY_MINUTES_THRESHOLD;
 
-  const badgeClasses = arrival.isCanceled
-    ? "bg-muted text-muted-foreground"
-    : isDelayed
-      ? "bg-smart-gold text-white"
-      : "bg-smart-train-green text-white";
-
-  const etaClasses = arrival.isCanceled
-    ? "text-muted-foreground line-through"
-    : isDelayed
-      ? "text-smart-gold"
-      : "text-foreground";
+  // Card state mirrors TripCard's semantics so the row reads in the same
+  // visual language as the main schedule. No "next train" highlight here —
+  // every row is an upcoming arrival; only delay/cancel deserve emphasis.
+  const cardState: TripState = cardTripState({
+    isCanceledOrSkipped: arrival.isCanceled,
+    isDelayed,
+    isNextTrip: false,
+    isPastTrip: false,
+  });
 
   const DirArrow = arrival.isSouthbound ? ArrowDown : ArrowUp;
   const directionLabel = arrival.isSouthbound
     ? t("tracker.southbound")
     : t("tracker.northbound");
 
+  const etaCopy = arrival.isCanceled
+    ? t("stationInfo.canceledSuffix").replace(/^·\s*/, "")
+    : arrival.etaMinutes <= 0
+      ? t("stationInfo.nowArriving")
+      : t("stationInfo.inMinutes", { minutes: arrival.etaMinutes });
+
   const rowContent = (
     <>
-      <span
-        className={cn(
-          "flex items-center justify-center w-14 h-10 rounded-full font-bold text-lg shrink-0",
-          badgeClasses,
+      {/* Train icon + number, tinted by trip state (delayed = gold,
+          canceled = red, otherwise foreground). When the user is riding
+          this train, a "Riding" pill sits beside the number. */}
+      <div className={cn("flex items-center gap-1.5 shrink-0", stateText[cardState])}>
+        <TripIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+        <span className="text-2xl font-semibold tabular-nums leading-none">
+          {arrival.tripNumber}
+        </span>
+        {isRiding && (
+          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-user-location text-white text-[10px] font-bold uppercase tracking-wider leading-none">
+            {t("stationInfo.riding")}
+          </span>
         )}
-      >
-        {arrival.tripNumber}
-      </span>
-      <div className="flex-1 min-w-0 text-left">
-        <div className="font-semibold text-foreground">
-          {t("stationInfo.toTerminus", { terminus: arrival.terminus })}
-        </div>
-        <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
-          <DirArrow className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{directionLabel}</span>
-          {arrival.isCanceled ? (
-            <span className="text-destructive font-medium">
-              {t("stationInfo.canceledSuffix")}
-            </span>
-          ) : isDelayed ? (
-            <span className="text-smart-gold font-medium">
-              {t("stationInfo.delaySuffix", { minutes: arrival.delayMinutes })}
-            </span>
-          ) : null}
-        </div>
       </div>
-      <div className="shrink-0 text-right">
-        <span className={cn("text-3xl font-bold tabular-nums", etaClasses)}>
-          {arrival.etaMinutes}
-        </span>
-        <span className={cn("text-sm ml-1", etaClasses)}>
-          {t("stationInfo.minUnit")}
-        </span>
+
+      {/* Direction — lucide arrow + label, replacing the old "to Terminus".
+          When the train continues to a destination beyond this stop, the
+          arrival time at that destination sits underneath the direction
+          label so the row's "where & when" lives in one column. */}
+      <div className="flex-1 min-w-0 leading-tight">
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <DirArrow className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span className="font-medium truncate">{directionLabel}</span>
+        </div>
+        {arrival.destinationTime && (
+          <div
+            className={cn(
+              "text-xs tabular-nums mt-0.5 flex items-center gap-1",
+              arrival.isCanceled ? "text-muted-foreground line-through" : "text-muted-foreground",
+            )}
+          >
+            <span aria-hidden="true">→</span>
+            <TimeDisplay time={arrival.destinationTime} />
+            <span className="font-medium truncate">{arrival.destinationStation}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Right: arrival at this station (large) + "in X min". */}
+      <div className="shrink-0 text-right leading-tight">
+        <div
+          className={cn(
+            "text-xl font-semibold tabular-nums",
+            arrival.isCanceled && "line-through text-muted-foreground",
+            isDelayed && "text-smart-gold",
+          )}
+        >
+          <TimeDisplay time={arrival.effectiveTime} />
+        </div>
+        <div
+          className={cn(
+            "text-xs tabular-nums mt-0.5",
+            arrival.isCanceled ? "text-destructive font-medium" : "text-muted-foreground",
+            isDelayed && "text-smart-gold font-medium",
+          )}
+        >
+          {etaCopy}
+        </div>
+        {isDelayed && (
+          <TimeDisplay
+            time={arrival.scheduledTime}
+            className="text-xs line-through text-muted-foreground"
+          />
+        )}
       </div>
     </>
+  );
+
+  const cardClasses = cn(
+    "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
+    stateCardStyle[cardState],
+    // Currently-riding train gets a primary-tinted ring so it pops out of
+    // the list at a glance — overlays whatever state tint is already in use.
+    isRiding && "ring-2 ring-user-location ring-offset-2 ring-offset-background",
   );
 
   return (
@@ -349,8 +508,8 @@ function ArrivalRow({
           type="button"
           onClick={onClick}
           className={cn(
-            "w-full flex items-center gap-4 py-4 px-2 -mx-2 rounded-lg",
-            "hover:bg-accent transition-colors",
+            cardClasses,
+            "w-full text-left touch-manipulation cursor-pointer focus:outline-none",
           )}
           aria-label={t("stationInfo.openTripAria", {
             trip: arrival.tripNumber,
@@ -360,7 +519,7 @@ function ArrivalRow({
           {rowContent}
         </button>
       ) : (
-        <div className="flex items-center gap-4 py-4">{rowContent}</div>
+        <div className={cardClasses}>{rowContent}</div>
       )}
     </li>
   );

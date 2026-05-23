@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, BellRing, X } from "lucide-react";
+import { AlertTriangle, Bell, BellOff, BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { useDepartureReminder } from "@/hooks/useDepartureReminder";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { cn } from "@/lib/utils";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
 
-const QUICK_LEAD_MINUTES = [5, 10, 15, 20, 25, 30, 45, 60] as const;
-const MAX_CUSTOM_MINUTES = 1440;
-const INTEGER_MINUTES_RE = /^\d+$/;
+/** Default suggested lead time when opening the picker. Capped to the
+ *  available window so we never preselect an impossible value. */
+const DEFAULT_LEAD_MINUTES = 15;
+const MAX_LEAD_MINUTES = 1440;
+/** Show the "close to departure" warning when the reminder fires within
+ *  this many minutes of the train's actual departure. */
+const CLOSE_TO_DEPARTURE_THRESHOLD = 3;
 
 interface DepartureReminderProps {
   tripNumber: number;
@@ -58,7 +64,7 @@ function formatClockTime(
   });
 }
 
-type PickerError = null | "permission" | "schedule-failed" | "custom-invalid";
+type PickerError = null | "permission" | "schedule-failed";
 
 export function DepartureReminder({
   tripNumber,
@@ -71,8 +77,6 @@ export function DepartureReminder({
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customInput, setCustomInput] = useState("");
   const [pickerError, setPickerError] = useState<PickerError>(null);
 
   const effectiveTime = liveDepartureTime ?? departureTime;
@@ -81,33 +85,41 @@ export function DepartureReminder({
     [currentTime, effectiveTime]
   );
 
-  /**
-   * Whole minutes between now and the train's departure. Used to filter the
-   * picker to only lead-time options that would actually fire before the
-   * train leaves — offering "60 min" for a train arriving in 16 min would
-   * fire the reminder 44 minutes ago, which isn't useful.
-   */
   const minutesUntilDeparture = useMemo(
     () => Math.floor((departureAt - currentTime.getTime()) / 60_000),
     [currentTime, departureAt]
   );
 
-  const availableChips = useMemo(
-    () => QUICK_LEAD_MINUTES.filter((m) => m < minutesUntilDeparture),
-    [minutesUntilDeparture]
-  );
-
-  /**
-   * Hard cap for custom input — at least 1 minute of lead time so the
-   * reminder isn't scheduled in the past or for "now".
-   */
-  const maxCustomMinutes = Math.max(
-    0,
-    Math.min(MAX_CUSTOM_MINUTES, minutesUntilDeparture - 1)
+  /** Maximum lead time we'll allow: leave at least 1 minute between the
+   *  reminder firing and the train's departure. */
+  const maxLeadMinutes = Math.max(
+    1,
+    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture - 1)
   );
 
   /** Less than 2 minutes left: even a 1-minute reminder rounds to "now". */
   const tooLateToSchedule = minutesUntilDeparture < 2;
+
+  const [sliderValue, setSliderValue] = useState(() =>
+    Math.min(DEFAULT_LEAD_MINUTES, Math.max(1, maxLeadMinutes))
+  );
+
+  // As time ticks, the window shrinks. Clamp the slider down so it never
+  // exceeds the current max — otherwise a long-open picker could submit a
+  // value that's now in the past.
+  useEffect(() => {
+    if (sliderValue > maxLeadMinutes) {
+      setSliderValue(maxLeadMinutes);
+    }
+  }, [maxLeadMinutes, sliderValue]);
+
+  // Reset slider to a sensible default each time the picker re-opens.
+  useEffect(() => {
+    if (pickerOpen) {
+      setSliderValue(Math.min(DEFAULT_LEAD_MINUTES, maxLeadMinutes));
+      setPickerError(null);
+    }
+  }, [maxLeadMinutes, pickerOpen]);
 
   const { reminder, setReminderForLead, reschedule, cancel } =
     useDepartureReminder({
@@ -133,8 +145,7 @@ export function DepartureReminder({
 
   // Live-departure drift: when a delay (or correction) shifts departureAt
   // and we already have a scheduled reminder, re-arm it under the same id
-  // so it fires the right number of minutes before the actual train and
-  // displays the updated time in the body.
+  // so it fires the right number of minutes before the actual train.
   useEffect(() => {
     if (!reminder) return;
     if (reminder.departureAt === departureAt) return;
@@ -143,52 +154,17 @@ export function DepartureReminder({
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);
-    setShowCustom(false);
-    setCustomInput("");
     setPickerError(null);
   }, []);
 
-  const handlePick = useCallback(
-    async (leadMinutes: number) => {
-      if (!Number.isFinite(leadMinutes) || leadMinutes <= 0) return;
-      const result = await setReminderForLead(leadMinutes, buildText(leadMinutes));
-      if (result.ok === false) {
-        setPickerError(result.reason);
-        return;
-      }
-      closePicker();
-    },
-    [buildText, closePicker, setReminderForLead]
-  );
-
-  const parseCustomMinutes = useCallback(
-    (value: string): number | null => {
-      const trimmed = value.trim();
-      if (!INTEGER_MINUTES_RE.test(trimmed)) return null;
-      const minutes = Number(trimmed);
-      if (
-        !Number.isInteger(minutes) ||
-        minutes <= 0 ||
-        minutes > maxCustomMinutes
-      ) {
-        return null;
-      }
-      return minutes;
-    },
-    [maxCustomMinutes]
-  );
-
-  const customMinutes = parseCustomMinutes(customInput);
-
-  const handleCustomSubmit = useCallback(() => {
-    if (customMinutes == null) {
-      setPickerError("custom-invalid");
+  const handleSet = useCallback(async () => {
+    const result = await setReminderForLead(sliderValue, buildText(sliderValue));
+    if (result.ok === false) {
+      setPickerError(result.reason);
       return;
     }
-    void handlePick(customMinutes);
-  }, [customMinutes, handlePick]);
-
-  const departureInPast = departureAt <= Date.now();
+    closePicker();
+  }, [buildText, closePicker, setReminderForLead, sliderValue]);
 
   if (reminder) {
     return (
@@ -225,7 +201,7 @@ export function DepartureReminder({
     );
   }
 
-  if (departureInPast || tooLateToSchedule) return null;
+  if (departureAt <= Date.now() || tooLateToSchedule) return null;
 
   if (!pickerOpen) {
     return (
@@ -244,20 +220,21 @@ export function DepartureReminder({
     );
   }
 
+  const bufferMinutes = minutesUntilDeparture - sliderValue;
+  const isCloseToDeparture = bufferMinutes <= CLOSE_TO_DEPARTURE_THRESHOLD;
+
   const errorMessage =
     pickerError === "permission"
       ? t("departureReminder.permissionDenied")
       : pickerError === "schedule-failed"
         ? t("departureReminder.scheduleFailed")
-        : pickerError === "custom-invalid"
-          ? t("departureReminder.customInvalid", { max: maxCustomMinutes })
-          : null;
+        : null;
 
   return (
     <GutterRow>
-      <div className="flex-1 min-w-0 rounded-lg border border-input bg-card p-3 space-y-3">
+      <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium flex items-center gap-1.5">
+          <span className="text-sm font-medium flex items-center gap-1.5 text-foreground">
             <Bell
               className="h-3.5 w-3.5 text-muted-foreground"
               aria-hidden="true"
@@ -277,65 +254,76 @@ export function DepartureReminder({
           </button>
         </div>
 
-        {availableChips.length > 0 && (
-          <div className="grid grid-cols-4 gap-2">
-            {availableChips.map((minutes) => (
-              <Button
-                key={minutes}
-                type="button"
-                variant="outline"
-                onClick={() => void handlePick(minutes)}
-                className="h-11 px-0 text-sm font-medium"
-              >
-                {t("departureReminder.minutesChip", { count: minutes })}
-              </Button>
-            ))}
+        <div className="text-center py-1">
+          <div
+            className={cn(
+              "text-3xl font-semibold tabular-nums leading-none",
+              isCloseToDeparture ? "text-smart-gold" : "text-foreground",
+            )}
+          >
+            {t("departureReminder.minutesValue", { count: sliderValue })}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {t("departureReminder.beforeDeparture")}
+          </div>
+        </div>
+
+        <div className="px-1 space-y-1.5">
+          <Slider
+            value={[sliderValue]}
+            min={1}
+            max={maxLeadMinutes}
+            step={1}
+            onValueChange={(values) => {
+              const next = values[0];
+              if (typeof next === "number") setSliderValue(next);
+            }}
+            aria-label={t("departureReminder.label")}
+            aria-valuetext={t("departureReminder.minutesValue", {
+              count: sliderValue,
+            })}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>
+              {t("departureReminder.minutesValue", { count: 1 })}
+            </span>
+            <span>
+              {t("departureReminder.minutesValue", { count: maxLeadMinutes })}
+            </span>
+          </div>
+        </div>
+
+        {isCloseToDeparture && (
+          <div
+            className="p-3 rounded-lg bg-smart-gold/10 border border-smart-gold/40 flex items-start gap-2"
+            role="status"
+          >
+            <AlertTriangle
+              className="h-4 w-4 text-smart-gold mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-smart-gold">
+                {t("departureReminder.warningTitle")}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {bufferMinutes <= 0
+                  ? t("departureReminder.warningBodyImmediate")
+                  : t("departureReminder.warningBody", {
+                      count: bufferMinutes,
+                    })}
+              </p>
+            </div>
           </div>
         )}
 
-        {!showCustom ? (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setShowCustom(true)}
-            className="w-full h-10 text-sm"
-          >
-            {t("departureReminder.custom")}
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={maxCustomMinutes}
-              step={1}
-              inputMode="numeric"
-              value={customInput}
-              onChange={(event) => {
-                setCustomInput(event.target.value);
-                setPickerError(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  handleCustomSubmit();
-                }
-              }}
-              placeholder={t("departureReminder.customPlaceholder")}
-              className="flex-1 h-11 rounded-md border border-input bg-background px-3 text-base"
-              aria-label={t("departureReminder.customPlaceholder")}
-              autoFocus
-            />
-            <Button
-              type="button"
-              onClick={handleCustomSubmit}
-              disabled={customMinutes == null}
-              className="h-11 px-4"
-            >
-              {t("departureReminder.set")}
-            </Button>
-          </div>
-        )}
+        <Button
+          type="button"
+          onClick={() => void handleSet()}
+          className="w-full h-11"
+        >
+          {t("departureReminder.setReminderConfirm")}
+        </Button>
 
         {errorMessage && (
           <p

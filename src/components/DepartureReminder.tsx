@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, BellRing } from "lucide-react";
+import { Bell, BellOff, BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useDepartureReminder } from "@/hooks/useDepartureReminder";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import type { Station } from "@/types/smartSchedule";
@@ -66,7 +58,7 @@ function formatClockTime(
   });
 }
 
-type MenuError = null | "permission" | "schedule-failed" | "custom-invalid";
+type PickerError = null | "permission" | "schedule-failed" | "custom-invalid";
 
 export function DepartureReminder({
   tripNumber,
@@ -78,10 +70,10 @@ export function DepartureReminder({
   timeFormat,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
   const [customInput, setCustomInput] = useState("");
-  const [menuError, setMenuError] = useState<MenuError>(null);
+  const [pickerError, setPickerError] = useState<PickerError>(null);
 
   const effectiveTime = liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
@@ -121,11 +113,11 @@ export function DepartureReminder({
     void reschedule(buildText(reminder.leadMinutes));
   }, [buildText, departureAt, reminder, reschedule]);
 
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
+  const closePicker = useCallback(() => {
+    setPickerOpen(false);
     setShowCustom(false);
     setCustomInput("");
-    setMenuError(null);
+    setPickerError(null);
   }, []);
 
   const handlePick = useCallback(
@@ -133,12 +125,12 @@ export function DepartureReminder({
       if (!Number.isFinite(leadMinutes) || leadMinutes <= 0) return;
       const result = await setReminderForLead(leadMinutes, buildText(leadMinutes));
       if (result.ok === false) {
-        setMenuError(result.reason);
+        setPickerError(result.reason);
         return;
       }
-      closeMenu();
+      closePicker();
     },
-    [buildText, closeMenu, setReminderForLead]
+    [buildText, closePicker, setReminderForLead]
   );
 
   const parseCustomMinutes = useCallback((value: string): number | null => {
@@ -155,7 +147,7 @@ export function DepartureReminder({
 
   const handleCustomSubmit = useCallback(() => {
     if (customMinutes == null) {
-      setMenuError("custom-invalid");
+      setPickerError("custom-invalid");
       return;
     }
     void handlePick(customMinutes);
@@ -188,7 +180,7 @@ export function DepartureReminder({
             size="sm"
             onClick={() => void cancel()}
             aria-label={t("departureReminder.cancel")}
-            className="h-7 px-2 text-xs gap-1"
+            className="h-8 px-2 text-xs gap-1"
           >
             <BellOff className="h-3.5 w-3.5" aria-hidden="true" />
             {t("departureReminder.cancel")}
@@ -200,104 +192,124 @@ export function DepartureReminder({
 
   if (departureInPast) return null;
 
+  if (!pickerOpen) {
+    return (
+      <GutterRow>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPickerOpen(true)}
+          aria-label={t("departureReminder.setReminder")}
+          className="h-9 gap-1.5"
+        >
+          <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{t("departureReminder.setReminder")}</span>
+        </Button>
+      </GutterRow>
+    );
+  }
+
+  const errorMessage =
+    pickerError === "permission"
+      ? t("departureReminder.permissionDenied")
+      : pickerError === "schedule-failed"
+        ? t("departureReminder.scheduleFailed")
+        : pickerError === "custom-invalid"
+          ? t("departureReminder.customInvalid", { max: MAX_CUSTOM_MINUTES })
+          : null;
+
   return (
     <GutterRow>
-      <DropdownMenu
-        open={menuOpen}
-        onOpenChange={(open) => {
-          setMenuOpen(open);
-          if (!open) {
-            setShowCustom(false);
-            setCustomInput("");
-            setMenuError(null);
-          }
-        }}
-      >
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
-            aria-label={t("departureReminder.setReminder")}
+      <div className="flex-1 min-w-0 rounded-lg border border-input bg-card p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium flex items-center gap-1.5">
+            <Bell
+              className="h-3.5 w-3.5 text-muted-foreground"
+              aria-hidden="true"
+            />
+            {t("departureReminder.label")}
+          </span>
+          <button
+            type="button"
+            onClick={closePicker}
+            aria-label={t("departureReminder.closePicker")}
+            className="h-8 w-8 -mr-1 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
           >
-            <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{t("departureReminder.setReminder")}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-60">
-          <DropdownMenuLabel>{t("departureReminder.label")}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
+            <X
+              className="h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
           {QUICK_LEAD_MINUTES.map((minutes) => (
-            <DropdownMenuItem
+            <Button
               key={minutes}
-              onSelect={(event) => {
-                event.preventDefault();
-                void handlePick(minutes);
-              }}
+              type="button"
+              variant="outline"
+              onClick={() => void handlePick(minutes)}
+              className="h-11 px-0 text-sm font-medium"
             >
-              {t("departureReminder.minutesBefore", { count: minutes })}
-            </DropdownMenuItem>
+              {t("departureReminder.minutesChip", { count: minutes })}
+            </Button>
           ))}
-          <DropdownMenuSeparator />
-          {!showCustom ? (
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                setShowCustom(true);
+        </div>
+
+        {!showCustom ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setShowCustom(true)}
+            className="w-full h-10 text-sm"
+          >
+            {t("departureReminder.custom")}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={MAX_CUSTOM_MINUTES}
+              step={1}
+              inputMode="numeric"
+              value={customInput}
+              onChange={(event) => {
+                setCustomInput(event.target.value);
+                setPickerError(null);
               }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleCustomSubmit();
+                }
+              }}
+              placeholder={t("departureReminder.customPlaceholder")}
+              className="flex-1 h-11 rounded-md border border-input bg-background px-3 text-base"
+              aria-label={t("departureReminder.customPlaceholder")}
+              autoFocus
+            />
+            <Button
+              type="button"
+              onClick={handleCustomSubmit}
+              disabled={customMinutes == null}
+              className="h-11 px-4"
             >
-              {t("departureReminder.custom")}
-            </DropdownMenuItem>
-          ) : (
-            <div className="px-2 py-1.5 flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={MAX_CUSTOM_MINUTES}
-                step={1}
-                inputMode="numeric"
-                value={customInput}
-                onChange={(event) => {
-                  setCustomInput(event.target.value);
-                  setMenuError(null);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleCustomSubmit();
-                  }
-                }}
-                placeholder={t("departureReminder.customPlaceholder")}
-                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-                aria-label={t("departureReminder.customPlaceholder")}
-                autoFocus
-              />
-              <Button
-                size="sm"
-                className="h-7 px-2"
-                onClick={handleCustomSubmit}
-                disabled={customMinutes == null}
-              >
-                {t("departureReminder.set")}
-              </Button>
-            </div>
-          )}
-          {menuError && (
-            <>
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-xs text-destructive">
-                {menuError === "permission"
-                  ? t("departureReminder.permissionDenied")
-                  : menuError === "schedule-failed"
-                    ? t("departureReminder.scheduleFailed")
-                    : t("departureReminder.customInvalid", {
-                        max: MAX_CUSTOM_MINUTES,
-                      })}
-              </div>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              {t("departureReminder.set")}
+            </Button>
+          </div>
+        )}
+
+        {errorMessage && (
+          <p
+            className="text-xs text-destructive"
+            role="alert"
+            aria-live="polite"
+          >
+            {errorMessage}
+          </p>
+        )}
+      </div>
     </GutterRow>
   );
 }

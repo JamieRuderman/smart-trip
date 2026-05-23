@@ -193,8 +193,16 @@ function coldStartFallback(
   user: UserSample,
   userOnCorridor: boolean,
 ): string | null {
+  // Every cold-start tier requires explicit user motion. A null speed
+  // (laptop forever, phone briefly at first sample) is not evidence of
+  // riding — the boarding-correlation path above is the right answer when
+  // boarding is in progress, so here we refuse to guess. Without this
+  // gate, a stationary user near the line (e.g. a home within 900 m of
+  // the corridor) gets latched onto any passing train.
   const userMoving =
     user.speedMps != null && user.speedMps >= ENGAGE_SPEED_MPS;
+  if (!userMoving) return null;
+
   // When the user's heading is classifiable, restrict every tier to
   // same-direction trains. A train going the opposite way can't be the
   // one the user is riding, so we refuse rather than fall back to the
@@ -219,32 +227,23 @@ function coldStartFallback(
     return list.find((c) => c.train.directionId === userDirId) ?? list[0];
   };
 
-  // Every cold-start tier requires explicit user motion. A null speed
-  // (laptop forever, phone briefly at first sample) is not evidence of
-  // riding — the boarding-correlation path above is the right answer when
-  // boarding is in progress, so here we refuse to guess. Without this
-  // gate, a stationary user near the line (e.g. a home within 900 m of
-  // the corridor) gets latched onto any passing train.
-  if (!userMoving) return null;
-
-  // Tier 1: co-located. The user is moving and a train is right on top
-  // of them — strongest cold-start signal short of correlation.
+  // Tier 1: co-located. A train is right on top of the (moving) user —
+  // strongest cold-start signal short of correlation.
   const colocated = candidates.filter(
     (c) => c.distKm <= ENGAGE_COLOCATION_KM && directionMatches(c),
   );
   const colocatedPick = pickBest(colocated);
   if (colocatedPick) return colocatedPick.train.key;
 
-  // Tier 2: nearby. User is moving like a train within 0.9 km.
-  const nearby = candidates.filter((c) => {
-    if (c.distKm > ENGAGE_PROXIMITY_KM) return false;
-    if (!directionMatches(c)) return false;
-    return true;
-  });
+  // Tier 2: nearby — within 0.9 km, any candidate direction that matches.
+  const nearby = candidates.filter(
+    (c) => c.distKm <= ENGAGE_PROXIMITY_KM && directionMatches(c),
+  );
   const nearbyPick = pickBest(nearby);
   if (nearbyPick) return nearbyPick.train.key;
 
-  // Tier 3: on-corridor + moving — widen to the full search radius.
+  // Tier 3: on-corridor — widen to the full search radius for users
+  // who are squarely on the rail.
   if (userOnCorridor) {
     const onCorridor = candidates.filter(
       (c) => c.distKm <= ON_CORRIDOR_SEARCH_KM && directionMatches(c),

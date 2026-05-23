@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -8,6 +9,7 @@ import { Capacitor } from "@capacitor/core";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
+import { rehydrateWebReminders } from "@/lib/departureReminder";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import Map from "./pages/Map";
@@ -30,6 +32,12 @@ const App = () => {
     emitAppRefreshEvent();
     await queryClient.refetchQueries({ type: "active" });
   });
+
+  // Re-arm any persisted departure reminders after a page reload (web only;
+  // native notifications survive launches on their own).
+  useEffect(() => {
+    rehydrateWebReminders();
+  }, []);
 
   return (
     <ErrorBoundary>

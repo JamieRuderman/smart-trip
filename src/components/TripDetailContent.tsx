@@ -28,6 +28,7 @@ import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
 import { TimePair } from "./TimePair";
 import { AlarmStatusLabel } from "./AlarmStatusLabel";
+import { DepartureReminder } from "./DepartureReminder";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -353,6 +354,18 @@ export function TripDetailContent({
               <span>{t("header.useMyLocation")}</span>
             </button>
           </GutterRow>
+        )}
+
+        {!isEnded && !isCanceledOrSkipped && (
+          <DepartureReminder
+            tripNumber={trip.trip}
+            fromStation={fromStation}
+            toStation={toStation}
+            departureTime={trip.departureTime}
+            liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
+            currentTime={currentTime}
+            timeFormat={timeFormat}
+          />
         )}
       </div>
 

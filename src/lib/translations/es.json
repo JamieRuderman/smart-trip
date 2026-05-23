@@ -179,6 +179,22 @@
     "currentTo": "Destino actual",
     "openTripAria": "Abrir tren {{trip}} a {{terminus}}"
   },
+  "departureReminder": {
+    "setReminder": "Recuérdame salir",
+    "label": "Recuérdame antes de la salida",
+    "minutesBefore_one": "{{count}} min antes",
+    "minutesBefore_other": "{{count}} min antes",
+    "custom": "Personalizado…",
+    "customPlaceholder": "Minutos",
+    "set": "Listo",
+    "cancel": "Cancelar recordatorio",
+    "activeAt": "Recordatorio a las {{time}} ({{leadMinutes}} min antes)",
+    "permissionDenied": "Activa las notificaciones en tu configuración para recibir recordatorios.",
+    "scheduleFailed": "No se pudo programar el recordatorio. Inténtalo de nuevo.",
+    "customInvalid": "Introduce un número entero de minutos entre 1 y {{max}}.",
+    "notificationTitle": "Hora de salir hacia {{station}}",
+    "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes)."
+  },
   "tracker": {
     "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Llega en {{minutes}} min",

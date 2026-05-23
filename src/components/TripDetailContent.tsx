@@ -285,10 +285,10 @@ export function TripDetailContent({
         <AlarmStatusLabel status={alarmStatus} />
       </div>
 
-      {/* Metadata: duration · stops · fare */}
+      {/* Metadata: duration · stops · fare · [debug toggle] */}
       <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
         <GutterRow className="text-sm text-muted-foreground">
-          <span className="flex items-center gap-1 flex-wrap">
+          <span className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
             <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{durationDisplay}</span>
             {stopCount > 0 && (
@@ -311,6 +311,23 @@ export function TripDetailContent({
               </>
             )}
           </span>
+          <button
+            type="button"
+            onClick={() => setShowDebugPanel((v) => !v)}
+            aria-expanded={showDebugPanel}
+            aria-label={
+              showDebugPanel
+                ? "Hide data sources"
+                : "Show data sources"
+            }
+            className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showDebugPanel ? (
+              <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </button>
         </GutterRow>
 
         {!isEnded && distanceToNextStopMi != null && nextStop != null && (
@@ -356,41 +373,10 @@ export function TripDetailContent({
           </GutterRow>
         )}
 
-        {!isEnded && !isCanceledOrSkipped && (
-          <DepartureReminder
-            tripNumber={trip.trip}
-            fromStation={fromStation}
-            toStation={toStation}
-            departureTime={trip.departureTime}
-            liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
-            currentTime={currentTime}
-            timeFormat={timeFormat}
-          />
-        )}
-      </div>
-
-      {/* ── Debug: Data Sources panel (dev/QA only, collapsed by default) ── */}
-      <div className="px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-[5rem] shrink-0" aria-hidden="true" />
-          <button
-            onClick={() => setShowDebugPanel((v) => !v)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground/70 transition-colors py-1"
-            aria-expanded={showDebugPanel}
-          >
-            {showDebugPanel ? (
-              <ChevronUp className="h-3 w-3 shrink-0" />
-            ) : (
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            )}
-            Data sources
-          </button>
-        </div>
-
+        {/* Data Sources panel (toggled by the chevron in the metadata row) */}
         {showDebugPanel && (
-          <div className="flex gap-3">
-            <div className="w-[5rem] shrink-0" aria-hidden="true" />
-            <div className="mb-2 rounded-md border border-border/60 divide-y divide-border/40 text-xs overflow-hidden flex-1">
+          <GutterRow className="pt-1">
+            <div className="flex-1 rounded-md border border-border/60 divide-y divide-border/40 text-xs overflow-hidden">
               {/* Schedule inference row */}
               <div className="flex items-start gap-2 px-3 py-2">
                 <span
@@ -479,9 +465,25 @@ export function TripDetailContent({
                 </div>
               </div>
             </div>
-          </div>
+          </GutterRow>
         )}
       </div>
+
+      {/* Departure reminder — own section so it reads as an action area
+          rather than just another row of trip metadata. */}
+      {!isEnded && !isCanceledOrSkipped && (
+        <div className="px-4 pb-2 shrink-0">
+          <DepartureReminder
+            tripNumber={trip.trip}
+            fromStation={fromStation}
+            toStation={toStation}
+            departureTime={trip.departureTime}
+            liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
+            currentTime={currentTime}
+            timeFormat={timeFormat}
+          />
+        </div>
+      )}
 
       {/* Scrollable stop timeline */}
       <div

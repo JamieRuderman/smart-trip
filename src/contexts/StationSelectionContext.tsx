@@ -33,7 +33,17 @@ function loadPersistedState(): PersistedState | null {
     const raw = localStorage.getItem(APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY);
     if (!raw) return null;
     const parsed: PersistedState = JSON.parse(raw);
-    if (!parsed.fromStation || !parsed.toStation || !parsed.savedAt) {
+    // Reject anything missing required fields. `scheduleType` is checked
+    // explicitly because an earlier persistence schema (used by the original
+    // useTrainScheduleState hook) omitted it; surviving records would
+    // otherwise inject `undefined` into the schedule cache key and yield
+    // empty trip lists after upgrade.
+    if (
+      !parsed.fromStation ||
+      !parsed.toStation ||
+      !parsed.savedAt ||
+      (parsed.scheduleType !== "weekday" && parsed.scheduleType !== "weekend")
+    ) {
       localStorage.removeItem(APP_CONSTANTS.ACTIVE_TRIP_STORAGE_KEY);
       return null;
     }

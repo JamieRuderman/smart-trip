@@ -3,6 +3,8 @@ import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useMapTrains } from "@/hooks/useMapTrains";
+import { useUserRiding } from "@/hooks/useUserRiding";
 import { getClosestStation } from "@/lib/stationUtils";
 import {
   HEADER_HEIGHTS,
@@ -50,18 +52,42 @@ export function TrainScheduleApp() {
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
-  // Geolocation for closest station
+  // Geolocation for closest station + riding detection. `watch: true` keeps
+  // speedMps/heading fresh so `useUserRiding` can latch onto the train the
+  // user is on while they have the schedule open.
   const {
     lat,
     lng,
+    speedMps,
+    heading,
     loading: locationLoading,
     requestLocation,
   } = useGeolocation({
-    watch: false,
+    watch: true,
     autoRequestOnNative: true,
   });
   const closestStation =
     lat != null && lng != null ? getClosestStation(lat, lng) : null;
+
+  // Live trains + which one the user is currently on. We only need this to
+  // highlight the matching row — pass the derived trip number + direction
+  // down rather than the full train list.
+  const { trains } = useMapTrains();
+  const { ridingTrainKey } = useUserRiding({
+    userLat: lat,
+    userLng: lng,
+    userSpeedMps: speedMps,
+    userHeading: heading,
+    trains,
+  });
+  const ridingTrain = useMemo(
+    () =>
+      ridingTrainKey ? trains.find((t) => t.key === ridingTrainKey) ?? null : null,
+    [trains, ridingTrainKey],
+  );
+  const ridingTripNumber = ridingTrain?.tripNumber ?? null;
+  const ridingIsSouthbound =
+    ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
 
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.
@@ -169,6 +195,8 @@ export function TrainScheduleApp() {
             timeFormat="12h"
             selectedTripNumber={selectedTripNumber}
             onSelectTrip={setSelectedTrip}
+            ridingTripNumber={ridingTripNumber}
+            ridingIsSouthbound={ridingIsSouthbound}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (

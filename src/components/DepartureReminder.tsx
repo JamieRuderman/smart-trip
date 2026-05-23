@@ -32,18 +32,23 @@ interface DepartureReminderProps {
   timeFormat: "12h" | "24h";
 }
 
+/** Hours of past-ness before we assume a HH:MM refers to tomorrow's run. */
+const NEXT_DAY_ROLLOVER_HOURS = 4;
+
 /**
- * Build an epoch timestamp for a train's HH:MM departure, anchored to the
- * nearest *future* occurrence. If the train's HH:MM is earlier in the day
- * than `currentTime`, treat it as tomorrow's departure (e.g. a 00:15 train
- * viewed at 23:55). Without this, late-night/early-morning trips would
- * compute to a 24-hour-old timestamp and the reminder UI would disappear.
+ * Build an epoch timestamp for a train's HH:MM departure. If the HH:MM lies
+ * many hours in the past, assume it refers to the next day's run (e.g. a
+ * 00:15 train viewed at 23:55). Within a few hours of now, treat it as
+ * today so a just-departed train is correctly flagged as in the past rather
+ * than silently treated as tomorrow's same trip.
  */
 function buildDepartureTimestamp(currentTime: Date, hhmm: string): number {
   const minutes = parseTimeToMinutes(hhmm);
   const d = new Date(currentTime);
   d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-  if (d.getTime() < currentTime.getTime()) {
+  const rolloverCutoff =
+    currentTime.getTime() - NEXT_DAY_ROLLOVER_HOURS * 60 * 60 * 1000;
+  if (d.getTime() < rolloverCutoff) {
     d.setDate(d.getDate() + 1);
   }
   return d.getTime();
@@ -89,6 +94,7 @@ export function DepartureReminder({
       tripNumber,
       fromStation,
       toStation,
+      scheduledDepartureTime: departureTime,
       departureAt,
     });
 

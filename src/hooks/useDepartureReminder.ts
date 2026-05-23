@@ -21,7 +21,11 @@ export interface UseDepartureReminderArgs {
   tripNumber: number;
   fromStation: Station;
   toStation: Station;
-  /** Epoch ms of the train's departure from fromStation. */
+  /** The trip's *scheduled* HH:MM departure — used as a stable id key that
+   *  doesn't shift when realtime updates move the actual departure across
+   *  a calendar boundary. */
+  scheduledDepartureTime: string;
+  /** Epoch ms of the train's departure from fromStation (live-aware). */
   departureAt: number;
 }
 
@@ -33,9 +37,10 @@ export function useDepartureReminder({
   tripNumber,
   fromStation,
   toStation,
+  scheduledDepartureTime,
   departureAt,
 }: UseDepartureReminderArgs) {
-  const id = reminderIdFor(tripNumber, departureAt);
+  const id = reminderIdFor(tripNumber, scheduledDepartureTime);
 
   const [reminder, setReminder] = useState<DepartureReminder | null>(() =>
     listReminders().find((r) => r.id === id) ?? null

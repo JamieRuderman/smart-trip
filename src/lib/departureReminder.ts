@@ -28,15 +28,26 @@ export const REMINDER_STORAGE_KEY = "smart-train-departure-reminders";
 export const REMINDER_CHANGED_EVENT = "smart-train-reminders-changed";
 
 /**
- * Notification IDs must be 32-bit signed integers on both native platforms.
- * We pack (yymmdd << 14) | (tripNumber & 0x3FFF) so two same-numbered trips on
- * different days don't collide.
+ * Build a stable reminder id from the trip number and its *scheduled* HH:MM
+ * departure. We intentionally do not include any calendar component: a late-
+ * night trip that gets delayed past midnight (so its departureAt rolls to
+ * the next day) keeps the same id and can still be found by the hook —
+ * otherwise the active-reminder pill would vanish and the OS-scheduled
+ * notification would be orphaned with no UI to cancel it.
+ *
+ * Two trips with the same number running at the same wall-clock time would
+ * collide, but that doesn't occur in SMART's timetable (and is incidentally
+ * the same trip from the user's mental model).
  */
-export function reminderIdFor(tripNumber: number, departureAt: number): number {
-  const d = new Date(departureAt);
-  const yymmdd =
-    (d.getFullYear() % 100) * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-  return (yymmdd << 14) | (tripNumber & 0x3fff);
+export function reminderIdFor(tripNumber: number, scheduledHhmm: string): number {
+  const cleaned = scheduledHhmm.replace(/[*~]/g, "");
+  const [hStr, mStr] = cleaned.split(":");
+  const h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const minuteOfDay = h * 60 + m;
+  // Pack (minuteOfDay, tripNumber) into a positive 32-bit signed int.
+  // minuteOfDay ≤ 1439 in normal use; tripNumber stays well under 100_000.
+  return minuteOfDay * 100_000 + (tripNumber % 100_000);
 }
 
 function isReminder(value: unknown): value is DepartureReminder {

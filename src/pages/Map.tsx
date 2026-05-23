@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ChevronLeft } from "lucide-react";
@@ -25,6 +25,7 @@ import { FONT_FAMILY } from "@/components/SmartLineDiagram/tokens";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -343,19 +344,19 @@ function MapContents() {
   const { theme } = useTheme();
   const { trains, lastUpdated } = useMapTrains();
   const isOnline = useOnlineStatus();
-  // The user's currently-selected schedule leg is carried in the URL by the
-  // home screen and forwarded into /map by MapPreviewCard. Used only to
-  // mark matching rows in the trip detail sheet — does not affect what's
-  // drawn on the map itself.
-  const [searchParams] = useSearchParams();
-  const userFromParam = searchParams.get("from") as Station | null;
-  const userToParam = searchParams.get("to") as Station | null;
+  // The user's currently-selected schedule leg comes from the shared
+  // StationSelectionContext. Used only to mark matching rows in the trip
+  // detail sheet — does not affect what's drawn on the map itself.
+  const { fromStation: userFromSelection, toStation: userToSelection } =
+    useStationSelection();
   const userFromStation =
-    userFromParam && stationIndexMap[userFromParam] != null
-      ? userFromParam
+    userFromSelection && stationIndexMap[userFromSelection] != null
+      ? userFromSelection
       : null;
   const userToStation =
-    userToParam && stationIndexMap[userToParam] != null ? userToParam : null;
+    userToSelection && stationIndexMap[userToSelection] != null
+      ? userToSelection
+      : null;
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,

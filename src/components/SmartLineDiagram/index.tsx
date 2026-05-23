@@ -29,6 +29,7 @@ import {
   BRAND_LINE_COLOR,
 } from "@/data/smartLineLayout";
 import { snapToPath } from "@/lib/pathSnap";
+import { stationIndexMap } from "@/lib/stationUtils";
 import { TOKEN, MOTION_TICK_MS } from "./tokens";
 import { useClockTick } from "./useClockTick";
 import { buildSmoothPath } from "./buildSmoothPath";
@@ -109,6 +110,15 @@ export function SmartLineDiagram({
     return selected.size > 0 ? selected : null;
   }, [fromStation, toStation]);
 
+  // Index range of the user's selected from→to span. When both endpoints are
+  // set, stations outside this range render in the muted track color.
+  const selectedRange = useMemo(() => {
+    if (!fromStation || !toStation) return null;
+    const a = stationIndexMap[fromStation];
+    const b = stationIndexMap[toStation];
+    return { min: Math.min(a, b), max: Math.max(a, b) };
+  }, [fromStation, toStation]);
+
   const svgRef = useRef<SVGSVGElement | null>(null);
   const pathRef = useRef<SVGPathElement | null>(null);
   const [snap, setSnap] = useState<{
@@ -135,6 +145,9 @@ export function SmartLineDiagram({
   }, []);
 
   const ferryD = useMemo(() => buildSmoothPath(FERRY_WAYPOINTS, 28), []);
+  // Larkspur is the last station — the ferry connection follows its state.
+  const ferryMuted =
+    !!selectedRange && selectedRange.max < stationIndexMap.Larkspur;
   const now = useClockTick(MOTION_TICK_MS);
   const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width, VIEW_BOX.height);
   const { tx, ty, scale, transform, reset } = usePanZoom(svgRef, {
@@ -173,7 +186,7 @@ export function SmartLineDiagram({
             <g opacity={0.9}>
               <path
                 d={ferryD}
-                stroke={TOKEN.detailStroke}
+                stroke={ferryMuted ? TOKEN.mutedTrack : TOKEN.detailStroke}
                 strokeWidth={TOKEN.lineW * 0.55}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -183,6 +196,7 @@ export function SmartLineDiagram({
               <FerryTerminus
                 x={FERRY_WAYPOINTS[2].x}
                 y={FERRY_WAYPOINTS[2].y}
+                muted={ferryMuted}
               />
             </g>
           )}
@@ -202,6 +216,8 @@ export function SmartLineDiagram({
               pathD={ROUTE_PATH_D}
               totalLength={snap.totalLength}
               stationArcs={snap.arcs}
+              fromStation={fromStation}
+              toStation={toStation}
             />
           )}
 
@@ -209,6 +225,10 @@ export function SmartLineDiagram({
             const isEnlarged = enlargedStations
               ? enlargedStations.has(st.station)
               : i === 0 || i === arr.length - 1;
+            const idx = stationIndexMap[st.station];
+            const isMuted =
+              !!selectedRange &&
+              (idx < selectedRange.min || idx > selectedRange.max);
             return (
               <StationDot
                 key={st.station}
@@ -217,6 +237,7 @@ export function SmartLineDiagram({
                 y={st.y}
                 isTerminal={isEnlarged}
                 colorTrackByZone={colorTrackByZone}
+                muted={isMuted}
                 onClick={onStationClick}
               />
             );
@@ -300,6 +321,7 @@ export function SmartLineDiagram({
             tx={tx}
             ty={ty}
             scale={scale}
+            muted={ferryMuted}
           />
         )}
       </svg>

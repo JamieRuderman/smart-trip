@@ -104,19 +104,28 @@ export function DepartureReminder({
     [currentTime, effectiveTime]
   );
 
-  const minutesUntilDeparture = useMemo(
-    () => Math.floor((departureAt - currentTime.getTime()) / 60_000),
-    [currentTime, departureAt]
-  );
+  /**
+   * Whole minutes until departure, computed as the diff between epoch-minute
+   * numbers so it matches the "Arrives in X min" countdown elsewhere in the
+   * sheet (which uses getMinutes() and ignores sub-minute remainders).
+   * Using millisecond-precision floor here would round 4m30s down to 4
+   * while the countdown shows 5 — confusing for the user.
+   */
+  const minutesUntilDeparture = useMemo(() => {
+    const departureMinute = Math.floor(departureAt / 60_000);
+    const currentMinute = Math.floor(currentTime.getTime() / 60_000);
+    return departureMinute - currentMinute;
+  }, [currentTime, departureAt]);
 
-  /** Maximum lead time we'll allow: leave at least 1 minute between the
-   *  reminder firing and the train's departure. */
+  /** Maximum lead time we'll allow. Picking exactly this value fires the
+   *  alarm immediately, which is fine as a "leave now" nudge — the user
+   *  explicitly chose the max. */
   const maxLeadMinutes = Math.max(
     1,
-    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture - 1)
+    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
   );
 
-  /** Less than 2 minutes left: even a 1-minute reminder rounds to "now". */
+  /** Need at least 2 minutes so the slider has a non-degenerate range. */
   const tooLateToSchedule = minutesUntilDeparture < 2;
 
   const [sliderValue, setSliderValue] = useState(() =>

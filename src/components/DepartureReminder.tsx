@@ -16,6 +16,9 @@ const MAX_LEAD_MINUTES = 1440;
 /** Show the "close to departure" warning when the reminder fires within
  *  this many minutes of the train's actual departure. */
 const CLOSE_TO_DEPARTURE_THRESHOLD = 3;
+/** How long the open/close animation runs, in ms. Matches the
+ *  duration-200 utility used in the className. */
+const PICKER_ANIMATION_MS = 200;
 
 interface DepartureReminderProps {
   tripNumber: number;
@@ -77,7 +80,23 @@ export function DepartureReminder({
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Keep the picker mounted briefly after pickerOpen flips to false so the
+  // exit animation can play before the element is removed from the DOM.
+  const [pickerMounted, setPickerMounted] = useState(false);
   const [pickerError, setPickerError] = useState<PickerError>(null);
+
+  useEffect(() => {
+    if (pickerOpen) {
+      setPickerMounted(true);
+      return;
+    }
+    if (!pickerMounted) return;
+    const timer = window.setTimeout(
+      () => setPickerMounted(false),
+      PICKER_ANIMATION_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [pickerOpen, pickerMounted]);
 
   const effectiveTime = liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
@@ -166,10 +185,13 @@ export function DepartureReminder({
     closePicker();
   }, [buildText, closePicker, setReminderForLead, sliderValue]);
 
-  if (reminder) {
+  // Wait for the picker to finish its exit animation before swapping in the
+  // active pill — otherwise the picker would pop out and the pill pop in
+  // simultaneously, defeating the smooth transition.
+  if (reminder && !pickerMounted) {
     return (
       <GutterRow>
-        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3">
+        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <BellRing
@@ -212,7 +234,7 @@ export function DepartureReminder({
 
   if (departureAt <= Date.now() || tooLateToSchedule) return null;
 
-  if (!pickerOpen) {
+  if (!pickerMounted) {
     return (
       <GutterRow>
         <Button
@@ -246,7 +268,14 @@ export function DepartureReminder({
 
   return (
     <GutterRow>
-      <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 space-y-3">
+      <div
+        className={cn(
+          "flex-1 min-w-0 rounded-lg bg-muted/40 p-3 space-y-3 duration-200",
+          pickerOpen
+            ? "animate-in fade-in slide-in-from-top-1"
+            : "animate-out fade-out slide-out-to-top-1",
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium flex items-center gap-1.5 text-foreground">
             <Bell

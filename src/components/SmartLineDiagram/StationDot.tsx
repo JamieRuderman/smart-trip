@@ -9,6 +9,9 @@ interface StationDotProps {
   y: number;
   isTerminal: boolean;
   colorTrackByZone: boolean;
+  /** When true, render in the muted track color instead of the zone color
+   *  — used for stations outside the selected from→to range. */
+  muted?: boolean;
   onClick?: (station: Station) => void;
 }
 
@@ -23,12 +26,15 @@ export function StationDot({
   y,
   isTerminal,
   colorTrackByZone,
+  muted = false,
   onClick,
 }: StationDotProps) {
   const r = isTerminal ? TOKEN.terminalR : TOKEN.stationR;
-  const stroke = colorTrackByZone
-    ? ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR
-    : BRAND_LINE_COLOR;
+  const stroke = muted
+    ? TOKEN.mutedTrack
+    : colorTrackByZone
+      ? ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR
+      : BRAND_LINE_COLOR;
 
   return (
     <g

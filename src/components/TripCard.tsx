@@ -28,6 +28,9 @@ interface TripCardProps {
   currentTime: Date;
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
+  /** When true, the user is currently riding this train — the card gets
+   *  a blue ring and a "Riding" pill near the trip number. */
+  isRiding?: boolean;
 }
 
 export const TripCard = memo(function TripCard({
@@ -43,6 +46,7 @@ export const TripCard = memo(function TripCard({
   currentTime,
   selectedTripNumber,
   onSelectTrip,
+  isRiding = false,
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -168,6 +172,10 @@ export const TripCard = memo(function TripCard({
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
           stateCardStyle[cardState],
+          // Riding indicator — blue ring overlays whatever state tint the
+          // row already has so a delayed/canceled/on-time train can still
+          // be recognized as the one the user is on.
+          isRiding && "ring-2 ring-user-location ring-offset-2 ring-offset-background",
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -188,6 +196,14 @@ export const TripCard = memo(function TripCard({
           isSkipped={isOriginSkipped}
           isDelayed={isDelayed}
         />
+        {isRiding && (
+          <span
+            className="-ml-2 mr-2 shrink-0 px-1.5 py-0.5 rounded-md bg-user-location text-white text-[10px] font-bold uppercase tracking-wider leading-none"
+            aria-label={t("tripCard.ridingAria", "Currently riding this train")}
+          >
+            {t("stationInfo.riding")}
+          </span>
+        )}
         {isMobile ? (
           <div className="flex flex-col items-start ml-4 w-full">
             <div className="flex flex-row gap-2 items-start text-lg whitespace-nowrap">

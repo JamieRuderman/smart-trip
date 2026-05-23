@@ -20,6 +20,12 @@ interface ScheduleResultsProps {
   timeFormat: "12h" | "24h";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
+  /** Trip number of the train the user is currently riding (if any) — the
+   *  matching row gets a blue ring + "Riding" pill. */
+  ridingTripNumber?: number | null;
+  /** Direction of the riding train — disambiguates trip numbers that are
+   *  reused across directions. */
+  ridingIsSouthbound?: boolean | null;
 }
 
 export function ScheduleResults({
@@ -32,8 +38,18 @@ export function ScheduleResults({
   timeFormat,
   selectedTripNumber,
   onSelectTrip,
+  ridingTripNumber = null,
+  ridingIsSouthbound = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
+  // Direction of the displayed schedule — used to confirm a riding trip
+  // number actually belongs to the schedule the user is looking at (the
+  // same trip number is reused across the opposite-direction schedule).
+  const scheduleIsSouthbound = direction?.direction === "southbound";
+  const ridingMatchesSchedule =
+    ridingTripNumber != null &&
+    ridingIsSouthbound != null &&
+    ridingIsSouthbound === scheduleIsSouthbound;
   const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
@@ -115,12 +131,15 @@ export function ScheduleResults({
             const showFerry =
               trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 
+            const isRiding =
+              ridingMatchesSchedule && trip.trip === ridingTripNumber;
             return (
               <TripCard
                 key={trip.trip}
                 trip={trip}
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
+                isRiding={isRiding}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}

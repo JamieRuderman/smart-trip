@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "operatorId": "GF",
-  "fetchedAt": "2026-05-18T16:16:18.855Z",
+  "fetchedAt": "2026-05-23T14:24:50.745Z",
   "sourceUrl": "https://api.511.org/transit/datafeeds?operator_id=GF",
   "agency": [
     {
@@ -99,11 +99,11 @@
     },
     {
       "route_id": "TRIA",
-      "service_id": "72813",
-      "trip_id": "9427944",
+      "service_id": "76504",
+      "trip_id": "9428073",
       "trip_headsign": "",
-      "direction_id": "0",
-      "block_id": "1811864",
+      "direction_id": "1",
+      "block_id": "1811866",
       "shape_id": "",
       "trip_short_name": "",
       "bikes_allowed": "",
@@ -111,11 +111,11 @@
     },
     {
       "route_id": "TRIA",
-      "service_id": "76504",
-      "trip_id": "9428073",
+      "service_id": "72813",
+      "trip_id": "9427944",
       "trip_headsign": "",
-      "direction_id": "1",
-      "block_id": "1811866",
+      "direction_id": "0",
+      "block_id": "1811864",
       "shape_id": "",
       "trip_short_name": "",
       "bikes_allowed": "",
@@ -1146,10 +1146,10 @@
     {
       "stop_id": "43002",
       "stop_code": "43002",
-      "stop_name": "Angel Island",
+      "stop_name": "Angel Island-No Service to Tiburon",
       "stop_lat": "37.868518",
       "stop_lon": "-122.434917",
-      "zone_id": "80211",
+      "zone_id": "80373",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1164,7 +1164,7 @@
       "stop_name": "Larkspur",
       "stop_lat": "37.944712",
       "stop_lon": "-122.508355",
-      "zone_id": "80212",
+      "zone_id": "80374",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1179,7 +1179,7 @@
       "stop_name": "San Francisco-Gate B",
       "stop_lat": "37.796533",
       "stop_lon": "-122.393763",
-      "zone_id": "80210",
+      "zone_id": "80372",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1194,7 +1194,7 @@
       "stop_name": "San Francisco-Gate C",
       "stop_lat": "37.795921",
       "stop_lon": "-122.392427",
-      "zone_id": "80210",
+      "zone_id": "80372",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1209,7 +1209,7 @@
       "stop_name": "Sausalito",
       "stop_lat": "37.856166",
       "stop_lon": "-122.477546",
-      "zone_id": "80211",
+      "zone_id": "80373",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1221,10 +1221,10 @@
     {
       "stop_id": "43007",
       "stop_code": "43007",
-      "stop_name": "Tiburon",
+      "stop_name": "Tiburon-No Service to Angel Island",
       "stop_lat": "37.872732",
       "stop_lon": "-122.455917",
-      "zone_id": "80212",
+      "zone_id": "80374",
       "stop_desc": "",
       "stop_url": "",
       "location_type": "",
@@ -1332,42 +1332,6 @@
       "timepoint": "1"
     },
     {
-      "trip_id": "9427944",
-      "arrival_time": "19:15:00",
-      "departure_time": "19:15:00",
-      "stop_id": "43000",
-      "stop_sequence": "1",
-      "stop_headsign": "",
-      "pickup_type": "0",
-      "drop_off_type": "0",
-      "shape_dist_traveled": "",
-      "timepoint": "1"
-    },
-    {
-      "trip_id": "9427944",
-      "arrival_time": "19:45:00",
-      "departure_time": "19:50:00",
-      "stop_id": "43003",
-      "stop_sequence": "3",
-      "stop_headsign": "",
-      "pickup_type": "0",
-      "drop_off_type": "0",
-      "shape_dist_traveled": "",
-      "timepoint": "1"
-    },
-    {
-      "trip_id": "9427944",
-      "arrival_time": "20:05:00",
-      "departure_time": "20:05:00",
-      "stop_id": "43007",
-      "stop_sequence": "4",
-      "stop_headsign": "",
-      "pickup_type": "0",
-      "drop_off_type": "0",
-      "shape_dist_traveled": "",
-      "timepoint": "1"
-    },
-    {
       "trip_id": "9428073",
       "arrival_time": "10:15:00",
       "departure_time": "10:15:00",
@@ -1409,6 +1373,42 @@
       "departure_time": "12:00:00",
       "stop_id": "43008",
       "stop_sequence": "6",
+      "stop_headsign": "",
+      "pickup_type": "0",
+      "drop_off_type": "0",
+      "shape_dist_traveled": "",
+      "timepoint": "1"
+    },
+    {
+      "trip_id": "9427944",
+      "arrival_time": "19:15:00",
+      "departure_time": "19:15:00",
+      "stop_id": "43000",
+      "stop_sequence": "1",
+      "stop_headsign": "",
+      "pickup_type": "0",
+      "drop_off_type": "0",
+      "shape_dist_traveled": "",
+      "timepoint": "1"
+    },
+    {
+      "trip_id": "9427944",
+      "arrival_time": "19:45:00",
+      "departure_time": "19:50:00",
+      "stop_id": "43003",
+      "stop_sequence": "3",
+      "stop_headsign": "",
+      "pickup_type": "0",
+      "drop_off_type": "0",
+      "shape_dist_traveled": "",
+      "timepoint": "1"
+    },
+    {
+      "trip_id": "9427944",
+      "arrival_time": "20:05:00",
+      "departure_time": "20:05:00",
+      "stop_id": "43007",
+      "stop_sequence": "4",
       "stop_headsign": "",
       "pickup_type": "0",
       "drop_off_type": "0",
@@ -3526,7 +3526,7 @@
       "friday": "1",
       "saturday": "0",
       "sunday": "0",
-      "start_date": "20260413",
+      "start_date": "20260518",
       "end_date": "20260612"
     },
     {
@@ -3538,10 +3538,21 @@
       "friday": "0",
       "saturday": "1",
       "sunday": "1",
-      "start_date": "20260412",
+      "start_date": "20260523",
       "end_date": "20260613"
     }
   ],
-  "calendarDates": [],
+  "calendarDates": [
+    {
+      "service_id": "72813",
+      "date": "20260525",
+      "exception_type": "2"
+    },
+    {
+      "service_id": "76504",
+      "date": "20260525",
+      "exception_type": "1"
+    }
+  ],
   "shapes": null
 }

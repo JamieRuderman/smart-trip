@@ -12,6 +12,9 @@ interface FerryLabelsProps {
   tx: number;
   ty: number;
   scale: number;
+  /** When true (Larkspur is outside the selected range), dim "San Francisco"
+   *  to match Larkspur's muted state. */
+  muted?: boolean;
 }
 
 /**
@@ -28,6 +31,7 @@ export function FerryLabels({
   tx,
   ty,
   scale,
+  muted = false,
 }: FerryLabelsProps) {
   const { t } = useTranslation();
   const ferry = getNextFerryDeparture(now);
@@ -59,7 +63,8 @@ export function FerryLabels({
         textAnchor="middle"
         fontSize={nameSize}
         fontWeight={TOKEN.ferryNameWeight}
-        className="fill-foreground"
+        fill={muted ? TOKEN.mutedTrack : undefined}
+        className={muted ? undefined : "fill-foreground"}
         style={{ fontFamily: FONT_FAMILY }}
       >
         {t("mapDiagram.sanFrancisco")}

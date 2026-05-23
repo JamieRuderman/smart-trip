@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, Hand } from "lucide-react";
 
 import stations from "@/data/stations";
@@ -8,6 +8,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
 import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { useStationSelection } from "@/contexts/stationSelection";
 import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
@@ -94,13 +95,18 @@ export default function MapDiagram() {
   const sbStatusMaps = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, allSouthboundTrips);
   const nbStatusMaps = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, allNorthboundTrips);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const fromParam = searchParams.get("from") as Station | null;
-  const toParam = searchParams.get("to") as Station | null;
+  const {
+    fromStation: fromSelection,
+    toStation: toSelection,
+    setFromStation,
+    setToStation,
+  } = useStationSelection();
   const fromStation =
-    fromParam && stationIndexMap[fromParam] != null ? fromParam : null;
+    fromSelection && stationIndexMap[fromSelection] != null
+      ? fromSelection
+      : null;
   const toStation =
-    toParam && stationIndexMap[toParam] != null ? toParam : null;
+    toSelection && stationIndexMap[toSelection] != null ? toSelection : null;
 
   const {
     lat: userLat,
@@ -119,6 +125,16 @@ export default function MapDiagram() {
     userHeading,
     trains,
   });
+  // Look up the user's currently-ridden train so child sheets can highlight
+  // the matching arrival row by trip number + direction.
+  const ridingTrain = useMemo(
+    () =>
+      ridingTrainKey ? trains.find((t) => t.key === ridingTrainKey) ?? null : null,
+    [trains, ridingTrainKey],
+  );
+  const ridingTripNumber = ridingTrain?.tripNumber ?? null;
+  const ridingIsSouthbound =
+    ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
   const userStation = useMemo<Station | null>(() => {
     // While riding, the user-location dot rides the train marker — suppress
     // the duplicate station-anchored dot so we don't show two blue dots.
@@ -247,30 +263,33 @@ export default function MapDiagram() {
     [closeStationSheet, sbStatusMaps, nbStatusMaps],
   );
 
-  // Picking the same station for both endpoints would produce an empty trip;
-  // when the new endpoint collides with the other one, drop the other. This
-  // makes the "swap origin & destination" gesture a one-tap flow.
+  // The context setters already drop the other endpoint when the new one
+  // collides — see StationSelectionContext.
   const handleSetFrom = useCallback(
     (s: Station) => {
-      const params = new URLSearchParams(searchParams);
-      params.set("from", s);
-      if (params.get("to") === s) params.delete("to");
-      setSearchParams(params, { replace: true });
+      setFromStation(s);
       closeStationSheet();
     },
-    [searchParams, setSearchParams, closeStationSheet],
+    [setFromStation, closeStationSheet],
   );
 
   const handleSetTo = useCallback(
     (s: Station) => {
-      const params = new URLSearchParams(searchParams);
-      params.set("to", s);
-      if (params.get("from") === s) params.delete("from");
-      setSearchParams(params, { replace: true });
+      setToStation(s);
       closeStationSheet();
     },
-    [searchParams, setSearchParams, closeStationSheet],
+    [setToStation, closeStationSheet],
   );
+
+  const handleClearFrom = useCallback(() => {
+    setFromStation("");
+    closeStationSheet();
+  }, [setFromStation, closeStationSheet]);
+
+  const handleClearTo = useCallback(() => {
+    setToStation("");
+    closeStationSheet();
+  }, [setToStation, closeStationSheet]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
@@ -327,7 +346,11 @@ export default function MapDiagram() {
           toStation={toStation}
           onSetFrom={handleSetFrom}
           onSetTo={handleSetTo}
+          onClearFrom={handleClearFrom}
+          onClearTo={handleClearTo}
           onArrivalClick={handleArrivalClick}
+          ridingTripNumber={ridingTripNumber}
+          ridingIsSouthbound={ridingIsSouthbound}
         />
       )}
 

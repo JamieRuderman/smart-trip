@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, BellOff, BellRing, X } from "lucide-react";
+import { AlertTriangle, Bell, BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useDepartureReminder } from "@/hooks/useDepartureReminder";
@@ -168,34 +168,43 @@ export function DepartureReminder({
 
   if (reminder) {
     return (
-      <GutterRow className="text-sm">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 text-foreground">
-            <BellRing
-              className="h-4 w-4 text-primary shrink-0"
-              aria-hidden="true"
-            />
-            <span>
-              {t("departureReminder.activeAt", {
-                time: formatClockTime(
-                  reminder.reminderAt,
-                  timeFormat,
-                  i18n.language
-                ),
-                leadMinutes: reminder.leadMinutes,
-              })}
-            </span>
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void cancel()}
-            aria-label={t("departureReminder.cancel")}
-            className="h-8 px-2 text-xs gap-1"
-          >
-            <BellOff className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("departureReminder.cancel")}
-          </Button>
+      <GutterRow>
+        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <BellRing
+                className="h-4 w-4 text-primary shrink-0"
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground tabular-nums">
+                  {t("departureReminder.remindAt", {
+                    time: formatClockTime(
+                      reminder.reminderAt,
+                      timeFormat,
+                      i18n.language,
+                    ),
+                  })}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t("departureReminder.minutesBefore", {
+                    count: reminder.leadMinutes,
+                  })}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void cancel()}
+              aria-label={t("departureReminder.cancel")}
+              className="h-8 w-8 -mr-1 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
+            >
+              <X
+                className="h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
         </div>
       </GutterRow>
     );

@@ -10,6 +10,7 @@ import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { rehydrateWebReminders } from "@/lib/departureReminder";
+import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import Map from "./pages/Map";
@@ -47,13 +48,15 @@ const App = () => {
           <TooltipProvider>
             <BrowserRouter>
               <ErrorBoundary>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/map" element={<Map />} />
-                  <Route path="/map-diagram" element={<MapDiagram />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
+                <StationSelectionProvider>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/map" element={<Map />} />
+                    <Route path="/map-diagram" element={<MapDiagram />} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </StationSelectionProvider>
                 {!isNative && <Analytics />}
               </ErrorBoundary>
             </BrowserRouter>

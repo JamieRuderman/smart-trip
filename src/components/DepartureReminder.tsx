@@ -168,7 +168,7 @@ export function DepartureReminder({
 
   if (reminder) {
     return (
-      <GutterRow>
+      <GutterRow className="mt-2">
         <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -214,7 +214,7 @@ export function DepartureReminder({
 
   if (!pickerOpen) {
     return (
-      <GutterRow>
+      <GutterRow className="mt-2">
         <Button
           variant="outline"
           size="sm"
@@ -245,7 +245,7 @@ export function DepartureReminder({
         : null;
 
   return (
-    <GutterRow>
+    <GutterRow className="mt-2">
       <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium flex items-center gap-1.5 text-foreground">

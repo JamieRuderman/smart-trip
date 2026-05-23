@@ -187,7 +187,7 @@
     "openTripAria": "Abrir tren {{trip}} a {{terminus}}"
   },
   "departureReminder": {
-    "setReminder": "Recuérdame salir",
+    "setReminder": "Añadir recordatorio",
     "setReminderConfirm": "Activar recordatorio",
     "label": "¿Cuánto tiempo necesitas?",
     "beforeDeparture": "antes de la salida",

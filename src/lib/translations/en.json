@@ -187,7 +187,7 @@
     "openTripAria": "Open trip {{trip}} to {{terminus}}"
   },
   "departureReminder": {
-    "setReminder": "Remind me to leave",
+    "setReminder": "Add reminder",
     "setReminderConfirm": "Set reminder",
     "label": "How much time do you need?",
     "beforeDeparture": "before departure",

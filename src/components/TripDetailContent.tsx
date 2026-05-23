@@ -355,8 +355,12 @@ export function TripDetailContent({
             </button>
           </GutterRow>
         )}
+      </div>
 
-        {!isEnded && !isCanceledOrSkipped && (
+      {/* Departure reminder — own section so it reads as an action area
+          rather than just another row of trip metadata. */}
+      {!isEnded && !isCanceledOrSkipped && (
+        <div className="px-4 pb-2 shrink-0">
           <DepartureReminder
             tripNumber={trip.trip}
             fromStation={fromStation}
@@ -366,8 +370,8 @@ export function TripDetailContent({
             currentTime={currentTime}
             timeFormat={timeFormat}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Debug: Data Sources panel (dev/QA only, collapsed by default) ── */}
       <div className="px-4 shrink-0">

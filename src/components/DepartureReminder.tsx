@@ -220,8 +220,13 @@ export function DepartureReminder({
     );
   }
 
-  const bufferMinutes = minutesUntilDeparture - sliderValue;
-  const isCloseToDeparture = bufferMinutes <= CLOSE_TO_DEPARTURE_THRESHOLD;
+  // sliderValue is the lead time — how many minutes before the train the
+  // reminder fires. A small lead means the alarm fires close to the train's
+  // departure, leaving little time to actually leave; that's the warning
+  // case (analogous to the ferry quick-transfer warning).
+  const isCloseToDeparture = sliderValue <= CLOSE_TO_DEPARTURE_THRESHOLD;
+  const alarmAt = departureAt - sliderValue * 60_000;
+  const alarmAtLabel = formatClockTime(alarmAt, timeFormat, i18n.language);
 
   const errorMessage =
     pickerError === "permission"
@@ -266,6 +271,9 @@ export function DepartureReminder({
           <div className="text-xs text-muted-foreground mt-1">
             {t("departureReminder.beforeDeparture")}
           </div>
+          <div className="text-sm text-foreground/70 mt-1.5 tabular-nums">
+            {t("departureReminder.alarmAt", { time: alarmAtLabel })}
+          </div>
         </div>
 
         <div className="px-1 space-y-1.5">
@@ -307,11 +315,7 @@ export function DepartureReminder({
                 {t("departureReminder.warningTitle")}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {bufferMinutes <= 0
-                  ? t("departureReminder.warningBodyImmediate")
-                  : t("departureReminder.warningBody", {
-                      count: bufferMinutes,
-                    })}
+                {t("departureReminder.warningBody", { count: sliderValue })}
               </p>
             </div>
           </div>

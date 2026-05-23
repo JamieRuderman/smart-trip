@@ -108,18 +108,13 @@ export function DepartureReminder({
    * Whole minutes until departure, computed as the diff between epoch-minute
    * numbers so it matches the "Arrives in X min" countdown elsewhere in the
    * sheet (which uses getMinutes() and ignores sub-minute remainders).
-   * Using millisecond-precision floor here would round 4m30s down to 4
-   * while the countdown shows 5 — confusing for the user.
    */
-  const minutesUntilDeparture = useMemo(() => {
-    const departureMinute = Math.floor(departureAt / 60_000);
-    const currentMinute = Math.floor(currentTime.getTime() / 60_000);
-    return departureMinute - currentMinute;
-  }, [currentTime, departureAt]);
+  const minutesUntilDeparture =
+    Math.floor(departureAt / 60_000) -
+    Math.floor(currentTime.getTime() / 60_000);
 
-  /** Maximum lead time we'll allow. Picking exactly this value fires the
-   *  alarm immediately, which is fine as a "leave now" nudge — the user
-   *  explicitly chose the max. */
+  /** Maximum lead time we'll allow. Picking the max fires the alarm
+   *  immediately — fine as a "leave now" nudge since the user chose it. */
   const maxLeadMinutes = Math.max(
     1,
     Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
@@ -132,22 +127,9 @@ export function DepartureReminder({
     Math.min(DEFAULT_LEAD_MINUTES, Math.max(1, maxLeadMinutes))
   );
 
-  // As time ticks, the window shrinks. Clamp the slider down so it never
-  // exceeds the current max — otherwise a long-open picker could submit a
-  // value that's now in the past.
-  useEffect(() => {
-    if (sliderValue > maxLeadMinutes) {
-      setSliderValue(maxLeadMinutes);
-    }
-  }, [maxLeadMinutes, sliderValue]);
-
-  // Reset slider to a sensible default each time the picker re-opens.
-  useEffect(() => {
-    if (pickerOpen) {
-      setSliderValue(Math.min(DEFAULT_LEAD_MINUTES, maxLeadMinutes));
-      setPickerError(null);
-    }
-  }, [maxLeadMinutes, pickerOpen]);
+  /** Clamp at render time so a long-open picker can't submit a value that
+   *  drifted past the shrinking max as currentTime ticked forward. */
+  const clampedSliderValue = Math.min(sliderValue, maxLeadMinutes);
 
   const { reminder, setReminderForLead, reschedule, cancel } =
     useDepartureReminder({
@@ -185,14 +167,23 @@ export function DepartureReminder({
     setPickerError(null);
   }, []);
 
+  const openPicker = useCallback(() => {
+    setSliderValue(Math.min(DEFAULT_LEAD_MINUTES, maxLeadMinutes));
+    setPickerError(null);
+    setPickerOpen(true);
+  }, [maxLeadMinutes]);
+
   const handleSet = useCallback(async () => {
-    const result = await setReminderForLead(sliderValue, buildText(sliderValue));
+    const result = await setReminderForLead(
+      clampedSliderValue,
+      buildText(clampedSliderValue),
+    );
     if (result.ok === false) {
       setPickerError(result.reason);
       return;
     }
     closePicker();
-  }, [buildText, closePicker, setReminderForLead, sliderValue]);
+  }, [buildText, clampedSliderValue, closePicker, setReminderForLead]);
 
   // Wait for the picker to finish its exit animation before swapping in the
   // active pill — otherwise the picker would pop out and the pill pop in
@@ -200,7 +191,7 @@ export function DepartureReminder({
   if (reminder && !pickerMounted) {
     return (
       <GutterRow>
-        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <BellRing
@@ -249,7 +240,7 @@ export function DepartureReminder({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setPickerOpen(true)}
+          onClick={openPicker}
           aria-label={t("departureReminder.setReminder")}
           className="h-9 gap-1.5"
         >
@@ -260,12 +251,12 @@ export function DepartureReminder({
     );
   }
 
-  // sliderValue is the lead time — how many minutes before the train the
-  // reminder fires. A small lead means the alarm fires close to the train's
-  // departure, leaving little time to actually leave; that's the warning
-  // case (analogous to the ferry quick-transfer warning).
-  const isCloseToDeparture = sliderValue <= CLOSE_TO_DEPARTURE_THRESHOLD;
-  const alarmAt = departureAt - sliderValue * 60_000;
+  // The lead is small → alarm fires close to the train, leaving little time
+  // to actually leave. That's the warning case (analogous to the ferry
+  // quick-transfer warning).
+  const isCloseToDeparture =
+    clampedSliderValue <= CLOSE_TO_DEPARTURE_THRESHOLD;
+  const alarmAt = departureAt - clampedSliderValue * 60_000;
   const alarmAtLabel = formatClockTime(alarmAt, timeFormat, i18n.language);
 
   const errorMessage =
@@ -281,8 +272,8 @@ export function DepartureReminder({
         className={cn(
           "flex-1 min-w-0 rounded-lg bg-muted/40 p-3 space-y-3 duration-200",
           pickerOpen
-            ? "animate-in fade-in slide-in-from-top-1"
-            : "animate-out fade-out slide-out-to-top-1",
+            ? "animate-in slide-in-from-top-4"
+            : "animate-out slide-out-to-top-4",
         )}
       >
         <div className="flex items-center justify-between gap-2">
@@ -313,7 +304,7 @@ export function DepartureReminder({
               isCloseToDeparture ? "text-smart-gold" : "text-foreground",
             )}
           >
-            {t("departureReminder.minutesValue", { count: sliderValue })}
+            {t("departureReminder.minutesValue", { count: clampedSliderValue })}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {t("departureReminder.beforeDeparture")}
@@ -325,7 +316,7 @@ export function DepartureReminder({
 
         <div className="px-1 space-y-1.5">
           <Slider
-            value={[sliderValue]}
+            value={[clampedSliderValue]}
             min={1}
             max={maxLeadMinutes}
             step={1}
@@ -335,7 +326,7 @@ export function DepartureReminder({
             }}
             aria-label={t("departureReminder.label")}
             aria-valuetext={t("departureReminder.minutesValue", {
-              count: sliderValue,
+              count: clampedSliderValue,
             })}
           />
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
@@ -362,7 +353,9 @@ export function DepartureReminder({
                 {t("departureReminder.warningTitle")}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {t("departureReminder.warningBody", { count: sliderValue })}
+                {t("departureReminder.warningBody", {
+                  count: clampedSliderValue,
+                })}
               </p>
             </div>
           </div>

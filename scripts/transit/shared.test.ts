@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GtfsCalendar, GtfsCalendarDate } from "../../src/types/gtfs.js";
 
-import { deriveScheduleOverrides } from "./shared.js";
+import { deriveScheduleOverrides, deriveServiceTypes } from "./shared.js";
 
 const WEEKDAY: GtfsCalendar = {
   service_id: "weekday",
@@ -107,5 +107,53 @@ describe("deriveScheduleOverrides", () => {
       ],
     );
     expect(overrides).toEqual({});
+  });
+});
+
+describe("deriveServiceTypes", () => {
+  // Regression for issue #43: 511 republished the Golden Gate Ferry bundle
+  // with weekend service 76504 starting 2026-05-23. The Friday 2026-05-22
+  // refresh saw no weekend service "active today" and the sanity floor
+  // tripped. The look-ahead window must classify the upcoming weekend
+  // service so the refresh succeeds.
+  it("classifies a service whose start_date is a few days in the future", () => {
+    const calendar: GtfsCalendar[] = [
+      { ...WEEKDAY, service_id: "wk", start_date: "20260518", end_date: "20260612" },
+      { ...WEEKEND, service_id: "we", start_date: "20260523", end_date: "20260613" },
+    ];
+    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    expect(result.get("wk")).toBe("weekday");
+    expect(result.get("we")).toBe("weekend");
+  });
+
+  it("ignores services whose end_date is before today", () => {
+    const calendar: GtfsCalendar[] = [
+      { ...WEEKEND, service_id: "stale", start_date: "20260101", end_date: "20260301" },
+    ];
+    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    expect(result.has("stale")).toBe(false);
+  });
+
+  it("ignores services whose start_date is beyond the look-ahead window", () => {
+    const calendar: GtfsCalendar[] = [
+      { ...WEEKEND, service_id: "far", start_date: "20260801", end_date: "20260901" },
+    ];
+    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    expect(result.has("far")).toBe(false);
+  });
+
+  it("honours today-only calendar_dates exceptions", () => {
+    // Memorial Day Monday: weekday service removed, weekend service forced on.
+    const calendar: GtfsCalendar[] = [
+      { ...WEEKDAY, service_id: "wk" },
+      { ...WEEKEND, service_id: "we" },
+    ];
+    const exceptions: GtfsCalendarDate[] = [
+      { service_id: "wk", date: "20260525", exception_type: "2" },
+      { service_id: "we", date: "20260525", exception_type: "1" },
+    ];
+    const result = deriveServiceTypes(calendar, exceptions, new Date(2026, 4, 25));
+    expect(result.has("wk")).toBe(false);
+    expect(result.get("we")).toBe("weekend");
   });
 });

@@ -150,16 +150,32 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+// Window we accept for classifying a calendar.txt row as "active".
+// 511 occasionally publishes a fresh GTFS bundle whose service window
+// starts a few days in the future (e.g. the weekend service starts on
+// Saturday but the bundle goes live on Friday). Without a look-ahead,
+// the Friday refresh sees zero weekend trips and trips the sanity floor
+// — see issue #43. Two weeks comfortably covers the typical publication
+// cadence without admitting services that are still many weeks out.
+const SERVICE_LOOKAHEAD_DAYS = 14;
+
+function formatGtfsDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}${m}${d}`;
+}
+
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
   calendarDateRows: GtfsCalendarDate[],
   referenceDate?: Date,
 ): Map<string, ScheduleType> {
   const ref = referenceDate ?? new Date();
-  const y = ref.getFullYear();
-  const m = String(ref.getMonth() + 1).padStart(2, "0");
-  const d = String(ref.getDate()).padStart(2, "0");
-  const refDateStr = `${y}${m}${d}`;
+  const refDateStr = formatGtfsDate(ref);
+  const horizon = new Date(ref);
+  horizon.setDate(horizon.getDate() + SERVICE_LOOKAHEAD_DAYS);
+  const horizonDateStr = formatGtfsDate(horizon);
 
   const addedServices = new Set<string>();
   const removedServices = new Set<string>();
@@ -176,9 +192,13 @@ export function deriveServiceTypes(
     const startDate = row.start_date ?? "";
     const endDate = row.end_date ?? "";
 
-    const inRange = startDate <= refDateStr && refDateStr <= endDate;
+    // Overlap [today, today + lookahead] with [startDate, endDate]: the
+    // service is either active today or scheduled to become active within
+    // the look-ahead horizon.
+    const overlapsWindow =
+      startDate <= horizonDateStr && refDateStr <= endDate;
     const isActive =
-      (inRange && !removedServices.has(row.service_id)) ||
+      (overlapsWindow && !removedServices.has(row.service_id)) ||
       addedServices.has(row.service_id);
     if (!isActive) continue;
 

@@ -1,7 +1,10 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 // Static landing page for the Larkspur ↔ SF ferry connection.
 // Pure component; ferry schedules pulled at build time from generated data.
+// JSX pragmas above force the automatic runtime so no React import needed.
 
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   weekdayFerries,
   weekendFerries,

@@ -1,7 +1,11 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 // Static landing page for a from→to journey on the SMART train.
-// Pure component, same constraints as StationLandingPage.
+// Pure component, same constraints as StationLandingPage. The JSX pragmas
+// above force tsx + esbuild to use the automatic JSX runtime so no
+// `import React` is needed at runtime.
 
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Station } from "@/data/generated/stations.generated";
 import { STATION_ORDER } from "@/data/generated/stations.generated";
 import {

@@ -1,4 +1,12 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 // Static landing page template for a single SMART station.
+//
+// The two pragmas above force both tsc and tsx (via esbuild) to use React's
+// automatic JSX runtime for THIS file, regardless of project-level tsconfig.
+// Without them, tsx falls back to classic JSX, which would require `import
+// React` in scope at runtime — and tsc would then flag that import as
+// unused. The pragmas are the cleanest cross-cutting fix.
 //
 // Constraints — these are non-negotiable for the prerender pipeline:
 //   - PURE component: no hooks, no Context, no React Router, no QueryClient
@@ -9,7 +17,7 @@
 // The component is rendered with renderToStaticMarkup; the resulting HTML
 // is wrapped in src/seo/shell.ts to produce the final document.
 
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Station } from "@/data/generated/stations.generated";
 import {
   STATION_ORDER,

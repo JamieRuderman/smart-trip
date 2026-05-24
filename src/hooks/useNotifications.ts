@@ -30,7 +30,7 @@ export function useNotifications() {
       alerts.map((alert) => ({
         id: alert.id,
         title: alert.title ?? "Service Alert",
-        message: alert.message,
+        message: alert.message ?? "",
         severity: alert.severity ?? "warning",
         sourceType: "service-alert" as const,
       })),

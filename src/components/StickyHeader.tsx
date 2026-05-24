@@ -119,7 +119,9 @@ export const StickyHeader = memo(function StickyHeader({
             >
               <Tabs
                 value={scheduleType}
-                onValueChange={onScheduleTypeChange}
+                onValueChange={(value) =>
+                  onScheduleTypeChange(value as "weekday" | "weekend")
+                }
                 aria-label={t("header.selectScheduleType")}
                 className="py-2"
               >

@@ -114,6 +114,7 @@ function RouteScheduleCard({
                   time={depart}
                   arriveTime={arrive}
                   trailing={formatDuration(duration, lang)}
+                  direction={direction === "northbound" ? "north" : "south"}
                 />
               </li>
             ))}

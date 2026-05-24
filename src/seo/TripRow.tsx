@@ -31,6 +31,40 @@ function TripIcon({ className }: { className?: string }) {
   );
 }
 
+// Lucide ArrowUp / ArrowDown paths (v0.462). Inlined so the directional
+// arrow stays visible next to every row even on mobile where columns
+// stack and the "Northbound / Southbound" heading scrolls off-screen.
+function DirectionArrow({
+  direction,
+  className,
+}: {
+  direction: "north" | "south";
+  className?: string;
+}) {
+  const paths =
+    direction === "north"
+      ? ["M12 19V5", "m5 12 7-7 7 7"]
+      : ["M12 5v14", "m19 12-7 7-7-7"];
+  const label = direction === "north" ? "Northbound" : "Southbound";
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={["inline-block", className].filter(Boolean).join(" ")}
+      role="img"
+      aria-label={label}
+    >
+      {paths.map((d, i) => (
+        <path key={i} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 const cn = (...parts: Array<string | false | undefined | null>): string =>
   parts.filter(Boolean).join(" ");
 
@@ -44,6 +78,12 @@ interface TripRowProps {
   trailing?: string;
   /** Apply muted styling — e.g. when no service in that direction. */
   muted?: boolean;
+  /**
+   * Optional direction indicator. Shows a small up/down arrow before the
+   * trip number so the direction stays visible per-row even after the
+   * column heading scrolls off-screen on mobile.
+   */
+  direction?: "north" | "south";
 }
 
 export function TripRow({
@@ -52,6 +92,7 @@ export function TripRow({
   arriveTime,
   trailing,
   muted = false,
+  direction,
 }: TripRowProps) {
   return (
     <div
@@ -60,6 +101,12 @@ export function TripRow({
         muted && "opacity-50",
       )}
     >
+      {direction ? (
+        <DirectionArrow
+          direction={direction}
+          className="h-4 w-4 text-muted-foreground shrink-0"
+        />
+      ) : null}
       <div className="flex items-center gap-1.5 text-smart-train-green shrink-0">
         <TripIcon className="h-5 w-5" aria-hidden="true" />
         <span className="text-xl font-semibold tabular-nums">{tripNumber}</span>

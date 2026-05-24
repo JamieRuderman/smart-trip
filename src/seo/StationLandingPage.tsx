@@ -107,7 +107,11 @@ function DirectionSchedule({
         <ul className="space-y-1.5 list-none p-0">
           {trips.map(({ trip, time }) => (
             <li key={`${direction}-${trip}`}>
-              <TripRow tripNumber={trip} time={time} />
+              <TripRow
+                tripNumber={trip}
+                time={time}
+                direction={direction === "northbound" ? "north" : "south"}
+              />
             </li>
           ))}
         </ul>

@@ -1,29 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import {
-  bundledSchedulePayload,
   isSchedulePayload,
   type SchedulePayload,
 } from "@/data/scheduleData";
 import { scheduleUrl } from "@/lib/env";
 import { APP_REFRESH_EVENT } from "@/lib/refreshEvents";
-import { setScheduleData } from "@/lib/scheduleUtils";
+import {
+  getScheduleMeta,
+  setScheduleData,
+  subscribeSchedule,
+  type ScheduleSource,
+} from "@/lib/scheduleUtils";
 
 const STORAGE_KEY = "smart-schedule-payload";
 
-/**
- * Where the currently-displayed schedule data came from.
- * - `remote`  — fresh fetch from the deployed `/data/schedules.json`
- * - `cached`  — last successful fetch, replayed from localStorage
- * - `bundled` — build-time copy compiled into the app bundle (offline fallback)
- *
- * Surfaced to the UI so users can tell when they're looking at cached or
- * bundled data — important if the cron-refreshed feed has gone stale.
- */
-export type ScheduleSource = "remote" | "cached" | "bundled";
+export type { ScheduleSource };
 
 export interface ScheduleDataState {
-  /** Refresh token. Stable when nothing has changed; ISO timestamp (or
-   *  source label) when it has. Other hooks key memos off this. */
+  /** Refresh token. Stable when nothing has changed; advances whenever the
+   *  underlying schedule cache is rebuilt. Other hooks key memos off this. */
   version: string;
   /** Origin of the currently-applied schedule. */
   source: ScheduleSource;
@@ -53,18 +48,8 @@ function storeCachedPayload(payload: SchedulePayload): void {
   }
 }
 
-function parseGeneratedAt(value: string | undefined): Date | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
 export function useScheduleData(): ScheduleDataState {
-  const [state, setState] = useState<ScheduleDataState>(() => ({
-    version: bundledSchedulePayload.generatedAt ?? "bundled",
-    source: "bundled",
-    generatedAt: parseGeneratedAt(bundledSchedulePayload.generatedAt),
-  }));
+  const meta = useSyncExternalStore(subscribeSchedule, getScheduleMeta, getScheduleMeta);
   const mountedRef = useRef(true);
   const inFlightRefreshRef = useRef<Promise<void> | null>(null);
 
@@ -84,12 +69,9 @@ export function useScheduleData(): ScheduleDataState {
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (!mountedRef.current || !data || !isSchedulePayload(data)) return;
-        setScheduleData(data);
-        setState({
-          version: data.generatedAt ?? "remote",
-          source: "remote",
-          generatedAt: parseGeneratedAt(data.generatedAt),
-        });
+        // setScheduleData publishes cache + meta atomically and notifies
+        // subscribers; useSyncExternalStore picks up the new snapshot.
+        setScheduleData(data, "remote");
         storeCachedPayload(data);
       })
       .catch(() => {
@@ -106,12 +88,7 @@ export function useScheduleData(): ScheduleDataState {
   useEffect(() => {
     const cached = loadCachedPayload();
     if (cached) {
-      setScheduleData(cached);
-      setState({
-        version: cached.generatedAt ?? "cached",
-        source: "cached",
-        generatedAt: parseGeneratedAt(cached.generatedAt),
-      });
+      setScheduleData(cached, "cached");
     }
 
     void refreshSchedulePayload();
@@ -128,5 +105,9 @@ export function useScheduleData(): ScheduleDataState {
     };
   }, [refreshSchedulePayload]);
 
-  return state;
+  return {
+    version: String(meta.version),
+    source: meta.source,
+    generatedAt: meta.generatedAt,
+  };
 }

@@ -221,13 +221,48 @@ try {
 }
 
 /**
- * Monotonic counter incremented each time `setScheduleData` rebuilds the
- * cache. Downstream consumers (e.g. trainMotion's per-trip memo) can watch
- * this to invalidate their own caches without a circular import.
+ * Where the currently-applied schedule came from. Lives next to the cache
+ * so cache + version + source can only transition atomically inside
+ * `setScheduleData`. React consumers read via `useSyncExternalStore`
+ * against `subscribeSchedule` / `getScheduleMeta` to avoid the cache/version
+ * tear that occurred when these lived in separate React state.
  */
-let scheduleVersion = 0;
+export type ScheduleSource = "remote" | "cached" | "bundled";
+
+export interface ScheduleMeta {
+  /** Monotonic counter incremented each time `setScheduleData` rebuilds the
+   *  cache. Downstream caches (e.g. trainMotion's per-trip memo) watch this
+   *  to invalidate without a circular import. */
+  version: number;
+  source: ScheduleSource;
+  generatedAt: Date | null;
+}
+
+function parseGeneratedAt(value: string | undefined): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+let scheduleMeta: ScheduleMeta = {
+  version: 0,
+  source: "bundled",
+  generatedAt: parseGeneratedAt(bundledSchedulePayload.generatedAt),
+};
+
+const scheduleSubscribers = new Set<() => void>();
+
+export function subscribeSchedule(listener: () => void): () => void {
+  scheduleSubscribers.add(listener);
+  return () => scheduleSubscribers.delete(listener);
+}
+
+export function getScheduleMeta(): ScheduleMeta {
+  return scheduleMeta;
+}
+
 export function getScheduleVersion(): number {
-  return scheduleVersion;
+  return scheduleMeta.version;
 }
 
 /**
@@ -299,9 +334,15 @@ export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
   return day === 0 || day === 6 ? "weekend" : "weekday";
 }
 
-export function setScheduleData(payload: SchedulePayload): void {
+export function setScheduleData(
+  payload: SchedulePayload,
+  source: ScheduleSource = "remote",
+): void {
   try {
-    scheduleCache = processScheduleData(payload);
+    const nextCache = processScheduleData(payload);
+    // Apply atomically: only after the new cache is built (so a throw above
+    // can't leave the cache and meta out of sync) do we publish.
+    scheduleCache = nextCache;
     // When the payload doesn't carry overrides (e.g. a pre-feature cached
     // payload, or a remote endpoint that hasn't been redeployed), reset to
     // the build-time bundled map instead of silently keeping prior state —
@@ -310,9 +351,14 @@ export function setScheduleData(payload: SchedulePayload): void {
     activeScheduleOverrides = payload.scheduleOverrides
       ? { ...payload.scheduleOverrides }
       : { ...bundledScheduleOverrides };
-    scheduleVersion += 1;
     // Downstream caches were built from the previous payload — evict them.
     ferryCache = null;
+    scheduleMeta = {
+      version: scheduleMeta.version + 1,
+      source,
+      generatedAt: parseGeneratedAt(payload.generatedAt),
+    };
+    scheduleSubscribers.forEach((listener) => listener());
   } catch (error) {
     console.error("[ScheduleUtils] Error processing schedule data:", error);
   }

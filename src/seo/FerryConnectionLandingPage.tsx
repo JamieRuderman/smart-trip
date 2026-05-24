@@ -25,6 +25,7 @@ import { Layout } from "./Layout";
 export interface FerryConnectionLandingPageProps {
   lang: Lang;
   scheduleGeneratedAt: string;
+  smartLogoHref: string;
 }
 
 const linkTo = (lang: Lang, path: string): string =>
@@ -72,6 +73,7 @@ function FerryList({
 export function FerryConnectionLandingPage({
   lang,
   scheduleGeneratedAt,
+  smartLogoHref,
 }: FerryConnectionLandingPageProps) {
   const t = translator(lang);
 
@@ -80,6 +82,7 @@ export function FerryConnectionLandingPage({
       lang={lang}
       alternateLangPath="/ferry-connection/"
       scheduleGeneratedAt={scheduleGeneratedAt}
+      smartLogoHref={smartLogoHref}
     >
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="text-sm">

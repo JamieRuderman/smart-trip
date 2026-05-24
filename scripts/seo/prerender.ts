@@ -75,29 +75,36 @@ const TOP_ROUTE_PAIRS: Array<readonly [Station, Station]> = [
 ];
 
 // ---------------------------------------------------------------------------
-// Locate the hashed CSS bundle Vite produced for the main SPA entry.
+// Locate hashed assets Vite produced for the main SPA entry.
 //
-// Vite names emitted CSS after the source HTML entry: index.html → index-*.css.
-// Lazy-loaded routes get their own chunks (e.g. Map-*.css for the lazy Map
-// page). We want the entry chunk, not a route chunk — matching the literal
-// `index-` prefix is deterministic and survives future route additions.
+// Vite names emitted assets after the source name: index.html → index-*.css;
+// `import smartLogo from "@/assets/smart-logo.svg"` → smart-logo-*.svg.
+// Matching the literal name prefix is deterministic and survives future
+// lazy-route additions.
 // ---------------------------------------------------------------------------
-function findStylesheetHref(): string {
+function findAssetByPrefix(prefix: string, extension: string): string {
   const assetsDir = path.join(distDir, "assets");
   if (!fs.existsSync(assetsDir)) {
     throw new Error(
       `dist/assets not found at ${assetsDir}. Did vite build run before this script?`,
     );
   }
-  const entryCss = fs
-    .readdirSync(assetsDir)
-    .find((f) => /^index-.*\.css$/.test(f));
-  if (!entryCss) {
+  const pattern = new RegExp(`^${prefix}-.*\\.${extension}$`);
+  const match = fs.readdirSync(assetsDir).find((f) => pattern.test(f));
+  if (!match) {
     throw new Error(
-      "Could not find index-*.css in dist/assets — Vite entry-CSS naming may have changed.",
+      `Could not find ${prefix}-*.${extension} in dist/assets — Vite asset naming may have changed.`,
     );
   }
-  return `/assets/${entryCss}`;
+  return `/assets/${match}`;
+}
+
+function findStylesheetHref(): string {
+  return findAssetByPrefix("index", "css");
+}
+
+function findSmartLogoHref(): string {
+  return findAssetByPrefix("smart-logo", "svg");
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +148,7 @@ function buildStationPage(
   lang: Lang,
   scheduleGeneratedAt: string,
   stylesheetHref: string,
+  smartLogoHref: string,
 ): string {
   const slug = stationSlug(station);
   const t = translator(lang);
@@ -149,6 +157,7 @@ function buildStationPage(
       station,
       lang,
       scheduleGeneratedAt,
+      smartLogoHref,
     }),
   );
 
@@ -197,6 +206,7 @@ function buildRoutePairPage(
   lang: Lang,
   scheduleGeneratedAt: string,
   stylesheetHref: string,
+  smartLogoHref: string,
 ): string {
   const slug = routePairSlug(from, to);
   const t = translator(lang);
@@ -206,6 +216,7 @@ function buildRoutePairPage(
       to,
       lang,
       scheduleGeneratedAt,
+      smartLogoHref,
     }),
   );
 
@@ -238,12 +249,14 @@ function buildFerryPage(
   lang: Lang,
   scheduleGeneratedAt: string,
   stylesheetHref: string,
+  smartLogoHref: string,
 ): string {
   const t = translator(lang);
   const body = renderToStaticMarkup(
     createElement(FerryConnectionLandingPage, {
       lang,
       scheduleGeneratedAt,
+      smartLogoHref,
     }),
   );
 
@@ -328,6 +341,7 @@ function main(): void {
   }
 
   const stylesheetHref = findStylesheetHref();
+  const smartLogoHref = findSmartLogoHref();
   const scheduleGeneratedAt = readScheduleGeneratedAt();
 
   let pageCount = 0;
@@ -344,6 +358,7 @@ function main(): void {
         lang,
         scheduleGeneratedAt,
         stylesheetHref,
+        smartLogoHref,
       );
       writePage({
         outputPath: path.join(
@@ -373,6 +388,7 @@ function main(): void {
         lang,
         scheduleGeneratedAt,
         stylesheetHref,
+        smartLogoHref,
       );
       writePage({
         outputPath: path.join(
@@ -394,7 +410,12 @@ function main(): void {
 
   // Ferry page
   for (const lang of LANGUAGES) {
-    const html = buildFerryPage(lang, scheduleGeneratedAt, stylesheetHref);
+    const html = buildFerryPage(
+      lang,
+      scheduleGeneratedAt,
+      stylesheetHref,
+      smartLogoHref,
+    );
     writePage({
       outputPath: path.join(
         LANG_PATH_PREFIX[lang].replace(/^\//, ""),

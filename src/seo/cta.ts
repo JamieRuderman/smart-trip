@@ -14,6 +14,11 @@
 import { APP_STORE_URL } from "./constants";
 import { translator, type Lang } from "./i18n";
 
+// SMART train icon SVG, mirrored from src/components/icons/TripIcon.tsx.
+// Inlined as a raw HTML string because the CTA is built as a template
+// literal (not React), so we can't reuse the JSX TripRow/TripIcon helpers.
+const TRAIN_ICON_SVG = `<svg viewBox="0 0 512 512" fill="none" stroke="currentColor" class="inline-block h-5 w-5" aria-hidden="true"><path d="M185.985 327.015H162.647M326.015 327.015H349.353M162.647 420.368L115.97 490.383M349.353 420.368L396.03 490.383M69.2939 239.496V303.677C69.2939 369.024 120.638 420.368 185.985 420.368H326.015C391.362 420.368 442.706 369.024 442.706 303.677V239.496M69.2939 239.496V210.324C69.2939 160.806 88.9647 113.317 123.979 78.3024C135.618 66.6635 148.635 56.72 162.647 48.6308M69.2939 239.496H162.647M442.706 239.496V210.324C442.706 160.806 423.035 113.317 388.021 78.3024C376.382 66.6635 363.365 56.72 349.353 48.6308M442.706 239.496H349.353M162.647 239.496V48.6308M162.647 239.496H349.353M162.647 48.6308C190.789 32.3844 222.942 23.6174 256 23.6174C289.058 23.6174 321.212 32.3844 349.353 48.6308M349.353 239.496V48.6308" stroke-width="42.67" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 interface CtaProps {
   lang: Lang;
   /** Optional deep-link query for the desktop CTA, e.g. "from=Larkspur". */
@@ -52,7 +57,7 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
   const headingClass = "text-xl font-bold mb-2";
   const subtitleClass = "text-muted-foreground mb-4";
   const buttonClass =
-    "inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90 transition no-underline";
+    "inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90 transition no-underline";
 
   return `<aside class="${blockClass}" data-cta-position="${position}" aria-label="${escapeHtml(t("seo.cta.aria"))}">
   <div data-cta="ios" hidden>
@@ -66,6 +71,7 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
     <h2 class="${headingClass}">${escapeHtml(t("seo.cta.desktop.title"))}</h2>
     <p class="${subtitleClass}">${escapeHtml(t("seo.cta.desktop.subtitle"))}</p>
     <a class="${buttonClass}" href="${escapeHtml(webappHref)}">
+      ${TRAIN_ICON_SVG}
       ${escapeHtml(t("seo.cta.desktop.button"))}
     </a>
   </div>

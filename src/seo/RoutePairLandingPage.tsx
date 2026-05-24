@@ -29,6 +29,7 @@ export interface RoutePairLandingPageProps {
   to: Station;
   lang: Lang;
   scheduleGeneratedAt: string;
+  smartLogoHref: string;
 }
 
 const linkTo = (lang: Lang, path: string): string =>
@@ -128,6 +129,7 @@ export function RoutePairLandingPage({
   to,
   lang,
   scheduleGeneratedAt,
+  smartLogoHref,
 }: RoutePairLandingPageProps) {
   const t = translator(lang);
   const fromIndex = STATION_ORDER.indexOf(from);
@@ -144,6 +146,7 @@ export function RoutePairLandingPage({
       lang={lang}
       alternateLangPath={`/routes/${routePairSlug(from, to)}/`}
       scheduleGeneratedAt={scheduleGeneratedAt}
+      smartLogoHref={smartLogoHref}
     >
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="text-sm">

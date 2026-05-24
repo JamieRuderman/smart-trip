@@ -40,6 +40,7 @@ export interface StationLandingPageProps {
   station: Station;
   lang: Lang;
   scheduleGeneratedAt: string;
+  smartLogoHref: string;
 }
 
 const directionOf = (
@@ -161,6 +162,7 @@ export function StationLandingPage({
   station,
   lang,
   scheduleGeneratedAt,
+  smartLogoHref,
 }: StationLandingPageProps) {
   const t = translator(lang);
   const slug = stationSlug(station);
@@ -174,6 +176,7 @@ export function StationLandingPage({
       lang={lang}
       alternateLangPath={`/stations/${slug}/`}
       scheduleGeneratedAt={scheduleGeneratedAt}
+      smartLogoHref={smartLogoHref}
     >
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="text-sm">

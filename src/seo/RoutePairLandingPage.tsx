@@ -40,12 +40,17 @@ const linkTo = (lang: Lang, path: string): string =>
 const zoneOf = (station: Station): number =>
   STATION_ZONES.find((z) => z.station === station)?.zone ?? 0;
 
-// Returns minutes between two HH:MM strings, accounting for trips that don't
-// cross midnight (SMART doesn’t run overnight, so we can keep this simple).
+// Minutes between two HH:MM strings. SMART doesn't run overnight today, but
+// using `(arrive - depart + 1440) % 1440` instead of `Math.abs(...)` keeps
+// us correct if service ever crosses midnight — and matches the
+// stationIndex→stationIndex order the caller passes (always forward in
+// travel direction), so the result is always positive without abs().
 function durationMinutes(depart: string, arrive: string): number {
   const [dh, dm] = depart.split(":").map(Number);
   const [ah, am] = arrive.split(":").map(Number);
-  return Math.abs(ah * 60 + am - (dh * 60 + dm));
+  const departTotal = dh * 60 + dm;
+  const arriveTotal = ah * 60 + am;
+  return (arriveTotal - departTotal + 1440) % 1440;
 }
 
 function formatDuration(mins: number, lang: Lang): string {

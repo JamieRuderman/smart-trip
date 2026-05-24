@@ -75,7 +75,12 @@ const TOP_ROUTE_PAIRS: Array<readonly [Station, Station]> = [
 ];
 
 // ---------------------------------------------------------------------------
-// Locate the hashed CSS bundle Vite produced this build.
+// Locate the hashed CSS bundle Vite produced for the main SPA entry.
+//
+// Vite names emitted CSS after the source HTML entry: index.html → index-*.css.
+// Lazy-loaded routes get their own chunks (e.g. Map-*.css for the lazy Map
+// page). We want the entry chunk, not a route chunk — matching the literal
+// `index-` prefix is deterministic and survives future route additions.
 // ---------------------------------------------------------------------------
 function findStylesheetHref(): string {
   const assetsDir = path.join(distDir, "assets");
@@ -84,20 +89,15 @@ function findStylesheetHref(): string {
       `dist/assets not found at ${assetsDir}. Did vite build run before this script?`,
     );
   }
-  const cssFiles = fs
+  const entryCss = fs
     .readdirSync(assetsDir)
-    .filter((f) => f.endsWith(".css"));
-  if (cssFiles.length === 0) {
-    throw new Error("No .css files in dist/assets — Vite didn't emit a stylesheet.");
+    .find((f) => /^index-.*\.css$/.test(f));
+  if (!entryCss) {
+    throw new Error(
+      "Could not find index-*.css in dist/assets — Vite entry-CSS naming may have changed.",
+    );
   }
-  // Pick the largest CSS file (Tailwind output is by far the biggest).
-  const largest = cssFiles
-    .map((f) => ({
-      file: f,
-      size: fs.statSync(path.join(assetsDir, f)).size,
-    }))
-    .sort((a, b) => b.size - a.size)[0];
-  return `/assets/${largest.file}`;
+  return `/assets/${entryCss}`;
 }
 
 // ---------------------------------------------------------------------------

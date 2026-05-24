@@ -41,8 +41,10 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
 
 /**
  * Look up a translation key for the given language. Falls back to English if
- * the key is missing in the target dictionary. If the key is missing in both,
- * returns the key itself so the gap is visible in the rendered HTML.
+ * the key is missing in the target dictionary. If the key is missing in BOTH,
+ * we throw at build time — a missing key would otherwise render as the raw
+ * key string in the page HTML (including the <title>), and we'd rather fail
+ * the deploy than ship that.
  */
 export function t(key: string, lang: Lang, vars?: Record<string, string | number>): string {
   const primary = lookup(dictionaries[lang], key);
@@ -51,7 +53,9 @@ export function t(key: string, lang: Lang, vars?: Record<string, string | number
     const fallback = lookup(dictionaries.en, key);
     if (fallback !== undefined) return interpolate(fallback, vars);
   }
-  return key;
+  throw new Error(
+    `[seo/i18n] Missing translation key "${key}" for lang "${lang}" (and no English fallback). Add it to src/lib/translations/${lang}.json and en.json.`,
+  );
 }
 
 /** Convenience: build a `t()` curried to one language for cleaner templates. */

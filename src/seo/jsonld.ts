@@ -17,6 +17,7 @@
 
 import type { Station } from "@/data/generated/stations.generated";
 import { STATION_COORDINATES } from "@/data/generated/stationCoordinates.generated";
+import { stationSlug } from "../../scripts/seo/slugify";
 import {
   SITE_URL,
   SITE_NAME,
@@ -53,7 +54,7 @@ export function trainStation(station: Station, lang: Lang) {
     "@type": "TrainStation",
     name: t("seo.station.schemaName", { station }),
     description: t("seo.station.schemaDescription", { station }),
-    url: `${SITE_URL}${LANG_PATH_PREFIX[lang]}/stations/${slugForSchema(station)}/`,
+    url: `${SITE_URL}${LANG_PATH_PREFIX[lang]}/stations/${stationSlug(station)}/`,
     geo: {
       "@type": "GeoCoordinates",
       latitude: coords.lat,
@@ -114,13 +115,3 @@ export function organizationJsonLd() {
   };
 }
 
-// Inline slug helper duplicated from scripts/seo/slugify.ts so that
-// src/seo/* has no dependency on the scripts/ folder (which contains
-// Node-only code we don’t want pulled into the SPA bundle if anyone
-// accidentally imports it later).
-function slugForSchema(station: Station): string {
-  return station
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}

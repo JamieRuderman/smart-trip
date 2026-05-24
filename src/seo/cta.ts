@@ -44,18 +44,28 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
   const t = translator(lang);
   const webappHref = webappQuery ? `/?${webappQuery}` : "/";
 
-  return `<aside class="cta-block" data-cta-position="${position}" aria-label="${escapeHtml(t("seo.cta.aria"))}">
+  // All styling via Tailwind utilities so the static pages match the SPA's
+  // design system without needing a separate stylesheet. Tailwind picks these
+  // classes up via its content scan of src/**/*.ts.
+  const blockClass =
+    "my-8 p-6 rounded-xl border bg-card text-card-foreground shadow-sm";
+  const headingClass = "text-xl font-bold mb-2";
+  const subtitleClass = "text-muted-foreground mb-4";
+  const buttonClass =
+    "inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90 transition no-underline";
+
+  return `<aside class="${blockClass}" data-cta-position="${position}" aria-label="${escapeHtml(t("seo.cta.aria"))}">
   <div data-cta="ios" hidden>
-    <h2>${escapeHtml(t("seo.cta.ios.title"))}</h2>
-    <p>${escapeHtml(t("seo.cta.ios.subtitle"))}</p>
-    <a class="cta-link cta-link-appstore" href="${escapeHtml(APP_STORE_URL)}" rel="noopener">
+    <h2 class="${headingClass}">${escapeHtml(t("seo.cta.ios.title"))}</h2>
+    <p class="${subtitleClass}">${escapeHtml(t("seo.cta.ios.subtitle"))}</p>
+    <a class="${buttonClass}" href="${escapeHtml(APP_STORE_URL)}" target="_blank" rel="noopener noreferrer">
       ${escapeHtml(t("seo.cta.ios.appStore"))}
     </a>
   </div>
   <div data-cta="desktop">
-    <h2>${escapeHtml(t("seo.cta.desktop.title"))}</h2>
-    <p>${escapeHtml(t("seo.cta.desktop.subtitle"))}</p>
-    <a class="cta-link cta-link-primary" href="${escapeHtml(webappHref)}">
+    <h2 class="${headingClass}">${escapeHtml(t("seo.cta.desktop.title"))}</h2>
+    <p class="${subtitleClass}">${escapeHtml(t("seo.cta.desktop.subtitle"))}</p>
+    <a class="${buttonClass}" href="${escapeHtml(webappHref)}">
       ${escapeHtml(t("seo.cta.desktop.button"))}
     </a>
   </div>

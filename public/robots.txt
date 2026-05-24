@@ -12,3 +12,7 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Sitemap host should be swapped to https://smarttraintrip.com once the
+# custom domain is registered and pointed at Vercel.
+Sitemap: https://smart-trip-community.vercel.app/sitemap.xml

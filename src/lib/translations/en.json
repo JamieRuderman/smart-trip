@@ -247,12 +247,11 @@
       "alternateName": "SMART Train Schedule (Community)"
     },
     "cta": {
-      "aria": "Get the SMART train app or open the live web app",
-      "mobile": {
-        "title": "Get the SMART trip app",
-        "subtitle": "Live departures, trip planning, and service alerts on your phone.",
-        "appStore": "Download on the App Store",
-        "playStore": "Get it on Google Play"
+      "aria": "Get the SMART train iOS app or open the live web app",
+      "ios": {
+        "title": "Get the SMART trip iOS app",
+        "subtitle": "Live departures, trip planning, and service alerts on your iPhone.",
+        "appStore": "Download on the App Store"
       },
       "desktop": {
         "title": "Open the live map and schedule",

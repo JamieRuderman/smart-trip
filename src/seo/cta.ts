@@ -1,11 +1,17 @@
 // CTA block for prerendered static SEO pages.
 //
-// Each page renders BOTH the mobile and desktop CTAs in the HTML so search
+// Each page renders BOTH the iOS-app and webapp CTAs in the HTML so search
 // engines see both messages, then a tiny inline script unhides the one that
-// matches the visitor's user-agent. CSS fallback (with no JS) shows the
-// desktop CTA — same as what most search-engine crawlers will see anyway.
+// matches the visitor's user-agent.
+//
+// Detection rule: only iOS (iPhone / iPod / iPad pre-iPadOS-13) sees the
+// App Store CTA. Everyone else — Android phones, Android tablets, desktop
+// browsers, and iPadOS desktop-mode — gets the "Open SMART trip" webapp CTA
+// because (a) there's no Android app yet, and (b) the webapp is the better
+// experience for Android until that ships. With no JS, the desktop CTA is
+// the default, which is also what crawlers will see.
 
-import { APP_STORE_URL, PLAY_STORE_URL } from "./constants";
+import { APP_STORE_URL } from "./constants";
 import { translator, type Lang } from "./i18n";
 
 interface CtaProps {
@@ -39,17 +45,12 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
   const webappHref = webappQuery ? `/?${webappQuery}` : "/";
 
   return `<aside class="cta-block" data-cta-position="${position}" aria-label="${escapeHtml(t("seo.cta.aria"))}">
-  <div data-cta="mobile" hidden>
-    <h2>${escapeHtml(t("seo.cta.mobile.title"))}</h2>
-    <p>${escapeHtml(t("seo.cta.mobile.subtitle"))}</p>
-    <div class="cta-links">
-      <a class="cta-link cta-link-appstore" href="${escapeHtml(APP_STORE_URL)}" rel="noopener">
-        ${escapeHtml(t("seo.cta.mobile.appStore"))}
-      </a>
-      <a class="cta-link cta-link-playstore" href="${escapeHtml(PLAY_STORE_URL)}" rel="noopener">
-        ${escapeHtml(t("seo.cta.mobile.playStore"))}
-      </a>
-    </div>
+  <div data-cta="ios" hidden>
+    <h2>${escapeHtml(t("seo.cta.ios.title"))}</h2>
+    <p>${escapeHtml(t("seo.cta.ios.subtitle"))}</p>
+    <a class="cta-link cta-link-appstore" href="${escapeHtml(APP_STORE_URL)}" rel="noopener">
+      ${escapeHtml(t("seo.cta.ios.appStore"))}
+    </a>
   </div>
   <div data-cta="desktop">
     <h2>${escapeHtml(t("seo.cta.desktop.title"))}</h2>
@@ -63,14 +64,16 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
 
 /**
  * Inline script body (minus the <script> wrapper) that swaps CTA visibility
- * based on user-agent. Kept tiny — under 300 bytes — so it doesn't move
+ * based on user-agent. Kept tiny — under 200 bytes — so it doesn't move
  * Lighthouse Performance off 100. Runs synchronously in <body> after the CTA
  * markup, so it can't FOUC.
  *
- * Conservative regex: matches the platforms we want to send to the app stores
- * (mobile phones + iPad). iPad-as-desktop (iPadOS 13+) deliberately gets the
- * desktop CTA because the user has explicitly opted out of mobile sites.
+ * Only matches iOS devices (iPhone / iPod / pre-iPadOS-13 iPad). Android and
+ * everything else falls through to the desktop/webapp CTA — because there's
+ * no Android app yet and the webapp is the better Android experience.
+ * iPadOS 13+ in desktop mode (no "iPad" in UA) also gets the desktop CTA,
+ * which is fine: those users explicitly opted out of mobile sites.
  */
 export function ctaScript(): string {
-  return `(function(){var m=/Android|iPhone|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);document.querySelectorAll('[data-cta]').forEach(function(el){el.hidden=el.getAttribute('data-cta')!==(m?'mobile':'desktop');});})();`;
+  return `(function(){var i=/iPhone|iPod|iPad/i.test(navigator.userAgent);document.querySelectorAll('[data-cta]').forEach(function(el){el.hidden=el.getAttribute('data-cta')!==(i?'ios':'desktop');});})();`;
 }

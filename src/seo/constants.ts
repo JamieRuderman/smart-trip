@@ -5,15 +5,9 @@
 // Anything that depends on the production domain lives here so it's a single
 // place to update once smarttraintrip.com is registered and pointed at Vercel.
 
-// ---------------------------------------------------------------------------
-// Production site URL.
-//
-// TODO: swap to https://smarttraintrip.com once the domain is registered and
-// pointed at Vercel (apex + www). Until then the prerendered <link rel="canonical">
-// and sitemap entries will reference the .vercel.app URL — Google handles this
-// fine, and we’ll do a single search-and-replace deploy when the domain flips.
-// ---------------------------------------------------------------------------
-export const SITE_URL = "https://smart-trip-community.vercel.app" as const;
+// Production site URL. Configured in Vercel with apex + www and a 308
+// redirect from smart-trip-community.vercel.app to preserve crawl equity.
+export const SITE_URL = "https://smarttraintrip.com" as const;
 
 export const SITE_NAME = "SMART trip" as const;
 export const SITE_TAGLINE =
@@ -36,15 +30,11 @@ export const LANG_PATH_PREFIX: Record<Lang, string> = {
   es: "/es",
 };
 
-// ---------------------------------------------------------------------------
-// App Store / Play Store URLs for the mobile CTA.
-//
-// TODO: replace placeholders with real listing URLs once the apps are
-// published. Leaving "#" hrefs makes the CTA visually present (and crawlable)
-// without sending users to a broken destination.
-// ---------------------------------------------------------------------------
-export const APP_STORE_URL = "#" as const; // TODO: https://apps.apple.com/...
-export const PLAY_STORE_URL = "#" as const; // TODO: https://play.google.com/store/apps/details?id=...
+// iOS App Store listing. Android isn't released yet — Android visitors fall
+// through to the desktop/webapp CTA instead of seeing a broken Play Store
+// link.
+export const APP_STORE_URL =
+  "https://apps.apple.com/us/app/smart-trip-community-app/id6758808442" as const;
 
 // Brand colors (kept in sync with tailwind config + index.html theme-color).
 export const BRAND_PRIMARY = "#11ab75" as const;

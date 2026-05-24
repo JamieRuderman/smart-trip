@@ -247,12 +247,11 @@
       "alternateName": "Horario del Tren SMART (Comunidad)"
     },
     "cta": {
-      "aria": "Obtén la app del tren SMART o abre la app web en vivo",
-      "mobile": {
-        "title": "Obtén la app SMART trip",
-        "subtitle": "Salidas en vivo, planificación de viajes y alertas en tu teléfono.",
-        "appStore": "Descargar en App Store",
-        "playStore": "Disponible en Google Play"
+      "aria": "Obtén la app de iOS del tren SMART o abre la app web en vivo",
+      "ios": {
+        "title": "Obtén la app SMART trip para iOS",
+        "subtitle": "Salidas en vivo, planificación de viajes y alertas en tu iPhone.",
+        "appStore": "Descargar en App Store"
       },
       "desktop": {
         "title": "Abrir el mapa y horario en vivo",

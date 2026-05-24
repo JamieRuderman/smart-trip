@@ -156,11 +156,21 @@ export function DepartureReminder({
   // Live-departure drift: when a delay (or correction) shifts departureAt
   // and we already have a scheduled reminder, re-arm it under the same id
   // so it fires the right number of minutes before the actual train.
+  //
+  // Only depend on values that actually decide whether we re-schedule
+  // (reminder id, the two timestamps, and the lead). buildText and the
+  // reschedule callback close over the latest t/i18n.language via the
+  // function reference and would otherwise re-trigger every render the
+  // parent recomputes — drowning the native scheduler in no-op calls.
+  const reminderId = reminder?.id;
+  const reminderDepartureAt = reminder?.departureAt;
+  const reminderLeadMinutes = reminder?.leadMinutes;
   useEffect(() => {
-    if (!reminder) return;
-    if (reminder.departureAt === departureAt) return;
-    void reschedule(buildText(reminder.leadMinutes));
-  }, [buildText, departureAt, reminder, reschedule]);
+    if (reminderId == null || reminderDepartureAt == null) return;
+    if (reminderDepartureAt === departureAt) return;
+    void reschedule(buildText(reminderLeadMinutes ?? 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departureAt, reminderId, reminderDepartureAt, reminderLeadMinutes]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);
@@ -185,9 +195,17 @@ export function DepartureReminder({
     closePicker();
   }, [buildText, clampedSliderValue, closePicker, setReminderForLead]);
 
-  // Wait for the picker to finish its exit animation before swapping in the
-  // active pill — otherwise the picker would pop out and the pill pop in
-  // simultaneously, defeating the smooth transition.
+  // Order matters here:
+  //   1. Active pill — show the user's existing reminder. Has highest
+  //      priority once the picker is fully unmounted, regardless of
+  //      tooLateToSchedule, so a just-set reminder for an imminent train
+  //      still surfaces.
+  //   2. Picker — if it's mounted (either open or mid-exit-animation),
+  //      keep it on screen. Don't yank it out from under the user even if
+  //      the window closes mid-interaction.
+  //   3. Trigger button — only the default empty state respects
+  //      tooLateToSchedule and the departure-already-passed gate.
+
   if (reminder && !pickerMounted) {
     return (
       <GutterRow>
@@ -232,9 +250,8 @@ export function DepartureReminder({
     );
   }
 
-  if (departureAt <= Date.now() || tooLateToSchedule) return null;
-
   if (!pickerMounted) {
+    if (departureAt <= Date.now() || tooLateToSchedule) return null;
     return (
       <GutterRow>
         <Button
@@ -314,7 +331,16 @@ export function DepartureReminder({
           </div>
         </div>
 
-        <div className="px-1 space-y-1.5">
+        {/* Stop touch events from bubbling to the parent AppSheet, which has
+            a swipe-to-dismiss handler that calls preventDefault on every
+            touchmove. The Radix Slider emits many touchmove events per drag,
+            each one spamming a "Unable to preventDefault inside passive
+            event listener" warning AND making the sheet treat the slider
+            drag as a swipe-to-dismiss gesture. */}
+        <div
+          className="px-1 space-y-1.5"
+          onTouchStart={(event) => event.stopPropagation()}
+        >
           <Slider
             value={[clampedSliderValue]}
             min={1}
@@ -328,6 +354,7 @@ export function DepartureReminder({
             aria-valuetext={t("departureReminder.minutesValue", {
               count: clampedSliderValue,
             })}
+            thumbLabel={t("departureReminder.label")}
           />
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
             <span>

@@ -1,10 +1,8 @@
-/** @jsxRuntime automatic */
-/** @jsxImportSource react */
 // Static landing page for the Larkspur ↔ SF ferry connection.
 // Pure component; ferry schedules pulled at build time from generated data.
-// JSX pragmas above force the automatic runtime so no React import needed.
 
-import type { ReactNode } from "react";
+import React from "react";
+void React; // tsx (classic JSX) needs React in scope; tsc would flag unused.
 import {
   weekdayFerries,
   weekendFerries,
@@ -12,16 +10,17 @@ import {
   weekendInboundFerries,
 } from "@/data/generated/ferrySchedule.generated";
 import type { FerryConnection } from "@/types/smartSchedule";
-import { stationSlug } from "../../scripts/seo/slugify";
 import {
-  SITE_NAME,
-  DATA_ATTRIBUTION,
-  SITE_DISCLAIMER,
-  LANG_PATH_PREFIX,
-  type Lang,
-} from "./constants";
+  CardContent,
+  CardHeader,
+  CardTitle,
+  SectionCard,
+} from "./ui";
+import { stationSlug } from "../../scripts/seo/slugify";
+import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
+import { Layout } from "./Layout";
 
 export interface FerryConnectionLandingPageProps {
   lang: Lang;
@@ -31,33 +30,41 @@ export interface FerryConnectionLandingPageProps {
 const linkTo = (lang: Lang, path: string): string =>
   `${LANG_PATH_PREFIX[lang]}${path}`;
 
-interface FerryTableProps {
+function FerryList({
+  trips,
+  heading,
+  lang,
+}: {
   trips: FerryConnection[];
   heading: string;
   lang: Lang;
-}
-
-function FerryTable({ trips, heading, lang }: FerryTableProps): ReactNode {
+}) {
   const t = translator(lang);
   return (
-    <div>
-      <h3 className="font-semibold mb-2">{heading}</h3>
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-1 pr-4">{t("seo.ferry.departColumn")}</th>
-            <th className="text-left py-1">{t("seo.ferry.arriveColumn")}</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="space-y-2">
+      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+        {heading}
+      </h3>
+      {trips.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">
+          {t("seo.ferry.noService")}
+        </p>
+      ) : (
+        <ul className="space-y-1.5 list-none p-0">
           {trips.map(({ depart, arrive }, i) => (
-            <tr key={`${depart}-${i}`} className="border-b last:border-0">
-              <td className="py-1 pr-4 font-mono">{depart}</td>
-              <td className="py-1 font-mono">{arrive}</td>
-            </tr>
+            <li
+              key={`${depart}-${i}`}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg border bg-card"
+            >
+              <span className="font-mono text-sm">{depart}</span>
+              <span className="text-muted-foreground" aria-hidden="true">
+                →
+              </span>
+              <span className="font-mono text-sm">{arrive}</span>
+            </li>
           ))}
-        </tbody>
-      </table>
+        </ul>
+      )}
     </div>
   );
 }
@@ -65,22 +72,23 @@ function FerryTable({ trips, heading, lang }: FerryTableProps): ReactNode {
 export function FerryConnectionLandingPage({
   lang,
   scheduleGeneratedAt,
-}: FerryConnectionLandingPageProps): ReactNode {
+}: FerryConnectionLandingPageProps) {
   const t = translator(lang);
-  const generatedDate = new Date(scheduleGeneratedAt).toLocaleDateString(
-    lang === "es" ? "es-US" : "en-US",
-    { year: "numeric", month: "long", day: "numeric" },
-  );
 
   return (
-    <article className="container mx-auto px-4 py-8 max-w-4xl">
-      <nav aria-label="Breadcrumb" className="text-sm mb-4">
+    <Layout
+      lang={lang}
+      alternateLangPath="/ferry-connection/"
+      scheduleGeneratedAt={scheduleGeneratedAt}
+    >
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex gap-2 text-muted-foreground">
           <li>
             <a href={linkTo(lang, "/")} className="hover:underline">
-              {SITE_NAME}
+              {t("seo.layout.home")}
             </a>
-            {" /"}
+            <span aria-hidden="true"> /</span>
           </li>
           <li className="text-foreground" aria-current="page">
             {t("seo.ferry.breadcrumb")}
@@ -88,11 +96,15 @@ export function FerryConnectionLandingPage({
         </ol>
       </nav>
 
-      <h1 className="text-3xl md:text-4xl font-bold mb-4">
-        {t("seo.ferry.h1")}
-      </h1>
-      <p className="text-lg text-muted-foreground mb-6">{t("seo.ferry.intro")}</p>
+      {/* Title + intro */}
+      <section className="space-y-3">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+          {t("seo.ferry.h1")}
+        </h1>
+        <p className="text-lg text-muted-foreground">{t("seo.ferry.intro")}</p>
+      </section>
 
+      {/* Primary CTA */}
       <div
         dangerouslySetInnerHTML={{
           __html: renderCta({
@@ -103,58 +115,68 @@ export function FerryConnectionLandingPage({
         }}
       />
 
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.ferry.weekdayHeading")}
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <FerryTable
-            trips={weekdayFerries}
-            heading={t("seo.ferry.outboundHeading")}
-            lang={lang}
-          />
-          <FerryTable
-            trips={weekdayInboundFerries}
-            heading={t("seo.ferry.inboundHeading")}
-            lang={lang}
-          />
-        </div>
-      </section>
+      {/* Weekday */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.ferry.weekdayHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            <FerryList
+              trips={weekdayFerries}
+              heading={t("seo.ferry.outboundHeading")}
+              lang={lang}
+            />
+            <FerryList
+              trips={weekdayInboundFerries}
+              heading={t("seo.ferry.inboundHeading")}
+              lang={lang}
+            />
+          </div>
+        </CardContent>
+      </SectionCard>
 
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.ferry.weekendHeading")}
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <FerryTable
-            trips={weekendFerries}
-            heading={t("seo.ferry.outboundHeading")}
-            lang={lang}
-          />
-          <FerryTable
-            trips={weekendInboundFerries}
-            heading={t("seo.ferry.inboundHeading")}
-            lang={lang}
-          />
-        </div>
-      </section>
+      {/* Weekend */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.ferry.weekendHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            <FerryList
+              trips={weekendFerries}
+              heading={t("seo.ferry.outboundHeading")}
+              lang={lang}
+            />
+            <FerryList
+              trips={weekendInboundFerries}
+              heading={t("seo.ferry.inboundHeading")}
+              lang={lang}
+            />
+          </div>
+        </CardContent>
+      </SectionCard>
 
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.ferry.relatedHeading")}
-        </h2>
-        <ul className="space-y-1 text-sm">
-          <li>
-            <a
-              href={linkTo(lang, `/stations/${stationSlug("Larkspur")}/`)}
-              className="hover:underline"
-            >
-              {t("seo.ferry.larkspurLink")}
-            </a>
-          </li>
-        </ul>
-      </section>
+      {/* Related */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.ferry.relatedHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1 text-sm list-none p-0">
+            <li>
+              <a
+                href={linkTo(lang, `/stations/${stationSlug("Larkspur")}/`)}
+                className="hover:underline"
+              >
+                {t("seo.ferry.larkspurLink")}
+              </a>
+            </li>
+          </ul>
+        </CardContent>
+      </SectionCard>
 
+      {/* Secondary CTA */}
       <div
         dangerouslySetInnerHTML={{
           __html: renderCta({
@@ -164,23 +186,6 @@ export function FerryConnectionLandingPage({
           }),
         }}
       />
-
-      <footer className="mt-12 pt-6 border-t text-sm text-muted-foreground">
-        <p className="mb-2">
-          {t("seo.station.lastUpdated", { date: generatedDate })}
-        </p>
-        <p className="mb-2">{DATA_ATTRIBUTION}</p>
-        <p className="mb-4">{SITE_DISCLAIMER}</p>
-        <p>
-          <a
-            href={linkTo(lang === "en" ? "es" : "en", "/ferry-connection/")}
-            className="hover:underline"
-            hrefLang={lang === "en" ? "es" : "en"}
-          >
-            {lang === "en" ? "Ver en español" : "View in English"}
-          </a>
-        </p>
-      </footer>
-    </article>
+    </Layout>
   );
 }

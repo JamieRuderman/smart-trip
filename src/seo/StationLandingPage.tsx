@@ -1,23 +1,17 @@
-/** @jsxRuntime automatic */
-/** @jsxImportSource react */
 // Static landing page template for a single SMART station.
 //
-// The two pragmas above force both tsc and tsx (via esbuild) to use React's
-// automatic JSX runtime for THIS file, regardless of project-level tsconfig.
-// Without them, tsx falls back to classic JSX, which would require `import
-// React` in scope at runtime — and tsc would then flag that import as
-// unused. The pragmas are the cleanest cross-cutting fix.
-//
-// Constraints — these are non-negotiable for the prerender pipeline:
+// Constraints — non-negotiable for the prerender pipeline:
 //   - PURE component: no hooks, no Context, no React Router, no QueryClient
 //   - All data is supplied as props by the prerender script
-//   - Uses existing Tailwind classes so visual identity matches the SPA
-//     without importing any SPA JS
+//   - Uses local Card / SectionCard / PillBadge mirrors (src/seo/ui.tsx)
+//     that copy the SPA's class strings — visual fidelity without
+//     importing across the prerender JSX-runtime boundary
 //
 // The component is rendered with renderToStaticMarkup; the resulting HTML
 // is wrapped in src/seo/shell.ts to produce the final document.
 
-import type { ReactNode } from "react";
+import React from "react";
+void React; // tsx (classic JSX) needs React in scope; tsc would flag unused.
 import type { Station } from "@/data/generated/stations.generated";
 import {
   STATION_ORDER,
@@ -28,21 +22,23 @@ import {
   type ScheduleType,
 } from "@/data/generated/trainSchedules.generated";
 import { FARE_CONSTANTS } from "@/lib/fareConstants";
-import { stationSlug } from "../../scripts/seo/slugify";
 import {
-  SITE_NAME,
-  DATA_ATTRIBUTION,
-  SITE_DISCLAIMER,
-  LANG_PATH_PREFIX,
-  type Lang,
-} from "./constants";
+  CardContent,
+  CardHeader,
+  CardTitle,
+  SectionCard,
+  PillBadge,
+} from "./ui";
+import { stationSlug } from "../../scripts/seo/slugify";
+import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
+import { Layout } from "./Layout";
+import { TripRow } from "./TripRow";
 
 export interface StationLandingPageProps {
   station: Station;
   lang: Lang;
-  /** ISO timestamp string from schedules.json `generatedAt`. */
   scheduleGeneratedAt: string;
 }
 
@@ -74,98 +70,90 @@ const fareBetween = (fromZone: number, toZone: number): number => {
 const linkTo = (lang: Lang, path: string): string =>
   `${LANG_PATH_PREFIX[lang]}${path}`;
 
-interface ScheduleTableProps {
+interface DirectionScheduleProps {
   station: Station;
   type: ScheduleType;
+  direction: "northbound" | "southbound";
   lang: Lang;
 }
 
-function ScheduleTable({ station, type, lang }: ScheduleTableProps): ReactNode {
+function DirectionSchedule({
+  station,
+  type,
+  direction,
+  lang,
+}: DirectionScheduleProps) {
   const t = translator(lang);
   const stationIndex = STATION_ORDER.indexOf(station);
-  const trips = trainSchedules[type];
-  const northbound = trips.northbound
+  const trips = trainSchedules[type][direction]
     .map((trip) => ({ trip: trip.trip, time: trip.times[stationIndex] }))
-    .filter((entry) => entry.time);
-  const southbound = trips.southbound
-    .map((trip) => ({ trip: trip.trip, time: trip.times[stationIndex] }))
-    .filter((entry) => entry.time);
+    .filter((entry) => Boolean(entry.time));
 
   return (
-    <section className="my-8">
-      <h2 className="text-2xl font-bold mb-4">
+    <div className="space-y-2">
+      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
         {t(
-          type === "weekday"
-            ? "seo.station.weekdayHeading"
-            : "seo.station.weekendHeading",
-          { station },
+          direction === "northbound"
+            ? "seo.station.northbound"
+            : "seo.station.southbound",
         )}
-      </h2>
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="font-semibold mb-2">
-            {t("seo.station.northbound")}
-          </h3>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-1 pr-4">
-                  {t("seo.station.tripColumn")}
-                </th>
-                <th className="text-left py-1">{t("seo.station.timeColumn")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {northbound.length === 0 ? (
-                <tr>
-                  <td colSpan={2} className="py-1 text-muted-foreground">
-                    {t("seo.station.noService")}
-                  </td>
-                </tr>
-              ) : (
-                northbound.map(({ trip, time }) => (
-                  <tr key={`nb-${trip}`} className="border-b last:border-0">
-                    <td className="py-1 pr-4">#{trip}</td>
-                    <td className="py-1 font-mono">{time}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      </h3>
+      {trips.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">
+          {t("seo.station.noService")}
+        </p>
+      ) : (
+        <ul className="space-y-1.5 list-none p-0">
+          {trips.map(({ trip, time }) => (
+            <li key={`${direction}-${trip}`}>
+              <TripRow tripNumber={trip} time={time} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ScheduleCard({
+  station,
+  type,
+  lang,
+}: {
+  station: Station;
+  type: ScheduleType;
+  lang: Lang;
+}) {
+  const t = translator(lang);
+  return (
+    <SectionCard>
+      <CardHeader>
+        <CardTitle>
+          {t(
+            type === "weekday"
+              ? "seo.station.weekdayHeading"
+              : "seo.station.weekendHeading",
+            { station },
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid md:grid-cols-2 gap-6">
+          <DirectionSchedule
+            station={station}
+            type={type}
+            direction="northbound"
+            lang={lang}
+          />
+          <DirectionSchedule
+            station={station}
+            type={type}
+            direction="southbound"
+            lang={lang}
+          />
         </div>
-        <div>
-          <h3 className="font-semibold mb-2">
-            {t("seo.station.southbound")}
-          </h3>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-1 pr-4">
-                  {t("seo.station.tripColumn")}
-                </th>
-                <th className="text-left py-1">{t("seo.station.timeColumn")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {southbound.length === 0 ? (
-                <tr>
-                  <td colSpan={2} className="py-1 text-muted-foreground">
-                    {t("seo.station.noService")}
-                  </td>
-                </tr>
-              ) : (
-                southbound.map(({ trip, time }) => (
-                  <tr key={`sb-${trip}`} className="border-b last:border-0">
-                    <td className="py-1 pr-4">#{trip}</td>
-                    <td className="py-1 font-mono">{time}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+      </CardContent>
+    </SectionCard>
   );
 }
 
@@ -173,28 +161,28 @@ export function StationLandingPage({
   station,
   lang,
   scheduleGeneratedAt,
-}: StationLandingPageProps): ReactNode {
+}: StationLandingPageProps) {
   const t = translator(lang);
   const slug = stationSlug(station);
   const { north, south } = neighbors(station);
   const zone = zoneOf(station);
   const pos = directionOf(station);
-  const generatedDate = new Date(scheduleGeneratedAt).toLocaleDateString(
-    lang === "es" ? "es-US" : "en-US",
-    { year: "numeric", month: "long", day: "numeric" },
-  );
-
   const isLarkspur = station === "Larkspur";
 
   return (
-    <article className="container mx-auto px-4 py-8 max-w-4xl">
-      <nav aria-label="Breadcrumb" className="text-sm mb-4">
+    <Layout
+      lang={lang}
+      alternateLangPath={`/stations/${slug}/`}
+      scheduleGeneratedAt={scheduleGeneratedAt}
+    >
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex gap-2 text-muted-foreground">
           <li>
             <a href={linkTo(lang, "/")} className="hover:underline">
-              {SITE_NAME}
+              {t("seo.layout.home")}
             </a>
-            {" /"}
+            <span aria-hidden="true"> /</span>
           </li>
           <li className="text-foreground" aria-current="page">
             {t("seo.station.breadcrumb", { station })}
@@ -202,20 +190,24 @@ export function StationLandingPage({
         </ol>
       </nav>
 
-      <h1 className="text-3xl md:text-4xl font-bold mb-4">
-        {t("seo.station.h1", { station })}
-      </h1>
+      {/* Title + intro */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+            {t("seo.station.h1", { station })}
+          </h1>
+          <PillBadge
+            label={t("seo.station.zonePill", { zone })}
+            color="neutral"
+          />
+        </div>
+        <p className="text-lg text-muted-foreground">
+          {t(`seo.station.intro.${pos}`, { station, zone })}
+        </p>
+      </section>
 
-      <p className="text-lg text-muted-foreground mb-6">
-        {t(`seo.station.intro.${pos}`, { station, zone })}
-      </p>
-
-      {/* Primary CTA — high on the page so visitors funnel to the right app */}
+      {/* Primary CTA */}
       <div
-        // dangerouslySetInnerHTML lets us drop in raw CTA markup (string from
-        // src/seo/cta.ts) that includes the data-cta attribute pairing.
-        // The CTA logic intentionally lives outside the React tree because
-        // it needs to coordinate with an inline script.
         dangerouslySetInnerHTML={{
           __html: renderCta({
             lang,
@@ -225,126 +217,139 @@ export function StationLandingPage({
         }}
       />
 
-      <ScheduleTable station={station} type="weekday" lang={lang} />
-      <ScheduleTable station={station} type="weekend" lang={lang} />
+      {/* Schedules */}
+      <ScheduleCard station={station} type="weekday" lang={lang} />
+      <ScheduleCard station={station} type="weekend" lang={lang} />
 
-      {/* Fare summary to adjacent stations */}
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.station.fareHeading")}
-        </h2>
-        <p className="mb-3">
-          {t("seo.station.fareZone", { station, zone })}
-        </p>
-        <ul className="space-y-1">
-          {north && (
-            <li>
-              <a
-                href={linkTo(lang, `/routes/${stationSlug(station)}-to-${stationSlug(north)}/`)}
-                className="hover:underline"
-              >
-                {t("seo.station.fareRow", {
-                  from: station,
-                  to: north,
-                  price: fareBetween(zone, zoneOf(north)).toFixed(2),
-                })}
-              </a>
-            </li>
-          )}
-          {south && (
-            <li>
-              <a
-                href={linkTo(lang, `/routes/${stationSlug(station)}-to-${stationSlug(south)}/`)}
-                className="hover:underline"
-              >
-                {t("seo.station.fareRow", {
-                  from: station,
-                  to: south,
-                  price: fareBetween(zone, zoneOf(south)).toFixed(2),
-                })}
-              </a>
-            </li>
-          )}
-        </ul>
-      </section>
+      {/* Fares */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.station.fareHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p>{t("seo.station.fareZone", { station, zone })}</p>
+          <ul className="space-y-2 list-none p-0">
+            {north && (
+              <li>
+                <a
+                  href={linkTo(
+                    lang,
+                    `/routes/${stationSlug(station)}-to-${stationSlug(north)}/`,
+                  )}
+                  className="inline-flex items-center gap-2 hover:underline"
+                >
+                  <span>{station} → {north}</span>
+                  <PillBadge
+                    label={`$${fareBetween(zone, zoneOf(north)).toFixed(2)}`}
+                    color="ontime"
+                  />
+                </a>
+              </li>
+            )}
+            {south && (
+              <li>
+                <a
+                  href={linkTo(
+                    lang,
+                    `/routes/${stationSlug(station)}-to-${stationSlug(south)}/`,
+                  )}
+                  className="inline-flex items-center gap-2 hover:underline"
+                >
+                  <span>{station} → {south}</span>
+                  <PillBadge
+                    label={`$${fareBetween(zone, zoneOf(south)).toFixed(2)}`}
+                    color="ontime"
+                  />
+                </a>
+              </li>
+            )}
+          </ul>
+        </CardContent>
+      </SectionCard>
 
-      {/* Ferry connection mention for Larkspur, and for nearby stations as a link */}
+      {/* Ferry connection (Larkspur only) */}
       {isLarkspur ? (
-        <section className="my-8">
-          <h2 className="text-2xl font-bold mb-4">
-            {t("seo.station.ferryHeading")}
-          </h2>
-          <p>
-            {t("seo.station.ferryBody")}{" "}
-            <a
-              href={linkTo(lang, "/ferry-connection/")}
-              className="font-semibold hover:underline"
-            >
-              {t("seo.station.ferryLink")}
-            </a>
-          </p>
-        </section>
+        <SectionCard>
+          <CardHeader>
+            <CardTitle>{t("seo.station.ferryHeading")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              {t("seo.station.ferryBody")}{" "}
+              <a
+                href={linkTo(lang, "/ferry-connection/")}
+                className="font-semibold hover:underline text-smart-train-green"
+              >
+                {t("seo.station.ferryLink")}
+              </a>
+            </p>
+          </CardContent>
+        </SectionCard>
       ) : null}
 
-      {/* FAQ — also emitted as JSON-LD FAQPage by the prerender shell */}
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.station.faqHeading")}
-        </h2>
-        <dl className="space-y-4">
-          {(["cost", "firstTrain", "parking"] as const).map((key) => (
-            <div key={key}>
-              <dt className="font-semibold">
-                {t(`seo.station.faq.${key}.q`, { station })}
-              </dt>
-              <dd className="text-muted-foreground">
-                {t(`seo.station.faq.${key}.a`, { station, zone })}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {/* FAQ */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.station.faqHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="space-y-4">
+            {(["cost", "firstTrain", "parking"] as const).map((key) => (
+              <div key={key}>
+                <dt className="font-semibold">
+                  {t(`seo.station.faq.${key}.q`, { station })}
+                </dt>
+                <dd className="text-muted-foreground mt-1">
+                  {t(`seo.station.faq.${key}.a`, { station, zone })}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </CardContent>
+      </SectionCard>
 
-      {/* Cross-discovery link graph: prev/next + all stations */}
-      <nav className="my-8" aria-label="Other stations">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.station.otherStationsHeading")}
-        </h2>
-        <div className="flex justify-between text-sm mb-4">
-          {north ? (
-            <a
-              href={linkTo(lang, `/stations/${stationSlug(north)}/`)}
-              className="hover:underline"
-            >
-              ← {t("seo.station.prev", { station: north })}
-            </a>
-          ) : (
-            <span />
-          )}
-          {south ? (
-            <a
-              href={linkTo(lang, `/stations/${stationSlug(south)}/`)}
-              className="hover:underline"
-            >
-              {t("seo.station.next", { station: south })} →
-            </a>
-          ) : (
-            <span />
-          )}
-        </div>
-        <ul className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-          {STATION_ORDER.filter((s) => s !== station).map((s) => (
-            <li key={s}>
+      {/* Cross-discovery: other stations */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.station.otherStationsHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between text-sm">
+            {north ? (
               <a
-                href={linkTo(lang, `/stations/${stationSlug(s)}/`)}
-                className="hover:underline"
+                href={linkTo(lang, `/stations/${stationSlug(north)}/`)}
+                className="hover:underline text-smart-train-green"
               >
-                {s}
+                ← {t("seo.station.prev", { station: north })}
               </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+            ) : (
+              <span />
+            )}
+            {south ? (
+              <a
+                href={linkTo(lang, `/stations/${stationSlug(south)}/`)}
+                className="hover:underline text-smart-train-green"
+              >
+                {t("seo.station.next", { station: south })} →
+              </a>
+            ) : (
+              <span />
+            )}
+          </div>
+          <ul className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm list-none p-0">
+            {STATION_ORDER.filter((s) => s !== station).map((s) => (
+              <li key={s}>
+                <a
+                  href={linkTo(lang, `/stations/${stationSlug(s)}/`)}
+                  className="hover:underline"
+                >
+                  {s}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </SectionCard>
 
       {/* Secondary CTA */}
       <div
@@ -356,23 +361,6 @@ export function StationLandingPage({
           }),
         }}
       />
-
-      <footer className="mt-12 pt-6 border-t text-sm text-muted-foreground">
-        <p className="mb-2">
-          {t("seo.station.lastUpdated", { date: generatedDate })}
-        </p>
-        <p className="mb-2">{DATA_ATTRIBUTION}</p>
-        <p className="mb-4">{SITE_DISCLAIMER}</p>
-        <p>
-          <a
-            href={linkTo(lang === "en" ? "es" : "en", `/stations/${slug}/`)}
-            className="hover:underline"
-            hrefLang={lang === "en" ? "es" : "en"}
-          >
-            {lang === "en" ? "Ver en español" : "View in English"}
-          </a>
-        </p>
-      </footer>
-    </article>
+    </Layout>
   );
 }

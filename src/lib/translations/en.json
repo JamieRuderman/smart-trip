@@ -246,6 +246,11 @@
     "site": {
       "alternateName": "SMART Train Schedule (Community)"
     },
+    "layout": {
+      "communityPill": "Community App",
+      "home": "SMART trip",
+      "lastUpdated": "Schedule data updated {{date}}."
+    },
     "cta": {
       "aria": "Get the SMART train iOS app or open the live web app",
       "ios": {
@@ -264,6 +269,7 @@
       "description": "Full SMART train schedule for {{station}} station. Weekday and weekend departures, fares, and connections.",
       "h1": "{{station}} SMART Train Station — Schedule & Service Info",
       "breadcrumb": "{{station}} Station",
+      "zonePill": "Zone {{zone}}",
       "intro": {
         "north-end": "{{station}} is the northern terminus of the SMART rail line, in fare zone {{zone}}. All northbound trains end here; southbound service begins from this platform.",
         "south-end": "{{station}} is the southern terminus of the SMART rail line, in fare zone {{zone}}, with direct ferry connections to San Francisco. All southbound trains end here.",
@@ -326,6 +332,7 @@
         "northbound": "Northbound",
         "southbound": "Southbound"
       },
+      "zonesPill": "{{zones}} zones",
       "relatedHeading": "Related Pages",
       "viewStation": "{{station}} station schedule",
       "viewReverse": "Reverse trip: {{from}} to {{to}}"
@@ -340,6 +347,7 @@
       "weekendHeading": "Weekend Ferries",
       "outboundHeading": "Larkspur → San Francisco",
       "inboundHeading": "San Francisco → Larkspur",
+      "noService": "No scheduled ferries.",
       "departColumn": "Depart",
       "arriveColumn": "Arrive",
       "relatedHeading": "Related Pages",

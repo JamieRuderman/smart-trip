@@ -1,31 +1,28 @@
-/** @jsxRuntime automatic */
-/** @jsxImportSource react */
-// Static landing page for a from→to journey on the SMART train.
-// Pure component, same constraints as StationLandingPage. The JSX pragmas
-// above force tsx + esbuild to use the automatic JSX runtime so no
-// `import React` is needed at runtime.
+// Static landing page for a from→to journey on the SMART train. Pure component;
+// uses src/seo/ui.tsx mirrors of the SPA's Card / SectionCard / PillBadge.
 
-import type { ReactNode } from "react";
+import React from "react";
+void React; // tsx (classic JSX) needs React in scope; tsc would flag unused.
 import type { Station } from "@/data/generated/stations.generated";
-import { STATION_ORDER } from "@/data/generated/stations.generated";
+import { STATION_ORDER, STATION_ZONES } from "@/data/generated/stations.generated";
 import {
   trainSchedules,
   type ScheduleType,
 } from "@/data/generated/trainSchedules.generated";
 import { FARE_CONSTANTS } from "@/lib/fareConstants";
+import {
+  CardContent,
+  CardHeader,
+  CardTitle,
+  SectionCard,
+  PillBadge,
+} from "./ui";
 import { stationSlug, routePairSlug } from "../../scripts/seo/slugify";
-import {
-  STATION_ZONES,
-} from "@/data/generated/stations.generated";
-import {
-  SITE_NAME,
-  DATA_ATTRIBUTION,
-  SITE_DISCLAIMER,
-  LANG_PATH_PREFIX,
-  type Lang,
-} from "./constants";
+import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
+import { Layout } from "./Layout";
+import { TripRow } from "./TripRow";
 
 export interface RoutePairLandingPageProps {
   from: Station;
@@ -41,10 +38,8 @@ const zoneOf = (station: Station): number =>
   STATION_ZONES.find((z) => z.station === station)?.zone ?? 0;
 
 // Minutes between two HH:MM strings. SMART doesn't run overnight today, but
-// using `(arrive - depart + 1440) % 1440` instead of `Math.abs(...)` keeps
-// us correct if service ever crosses midnight — and matches the
-// stationIndex→stationIndex order the caller passes (always forward in
-// travel direction), so the result is always positive without abs().
+// using `(arrive - depart + 1440) % 1440` instead of Math.abs keeps us
+// correct if service ever crosses midnight.
 function durationMinutes(depart: string, arrive: string): number {
   const [dh, dm] = depart.split(":").map(Number);
   const [ah, am] = arrive.split(":").map(Number);
@@ -63,7 +58,7 @@ function formatDuration(mins: number, lang: Lang): string {
     : t("seo.route.hoursMinutes", { hours: h, mins: m });
 }
 
-interface RouteScheduleTableProps {
+interface RouteScheduleCardProps {
   fromIndex: number;
   toIndex: number;
   direction: "northbound" | "southbound";
@@ -71,16 +66,15 @@ interface RouteScheduleTableProps {
   lang: Lang;
 }
 
-function RouteScheduleTable({
+function RouteScheduleCard({
   fromIndex,
   toIndex,
   direction,
   type,
   lang,
-}: RouteScheduleTableProps): ReactNode {
+}: RouteScheduleCardProps) {
   const t = translator(lang);
-  const trips = trainSchedules[type][direction];
-  const rows = trips
+  const trips = trainSchedules[type][direction]
     .map((trip) => {
       const depart = trip.times[fromIndex];
       const arrive = trip.times[toIndex];
@@ -95,47 +89,37 @@ function RouteScheduleTable({
     .filter((row): row is NonNullable<typeof row> => row !== null);
 
   return (
-    <section className="my-8">
-      <h2 className="text-2xl font-bold mb-4">
-        {t(
-          type === "weekday"
-            ? "seo.route.weekdayHeading"
-            : "seo.route.weekendHeading",
-        )}
-      </h2>
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 pr-4">{t("seo.route.tripColumn")}</th>
-            <th className="text-left py-2 pr-4">
-              {t("seo.route.departColumn")}
-            </th>
-            <th className="text-left py-2 pr-4">
-              {t("seo.route.arriveColumn")}
-            </th>
-            <th className="text-left py-2">{t("seo.route.durationColumn")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={4} className="py-2 text-muted-foreground">
-                {t("seo.route.noService")}
-              </td>
-            </tr>
-          ) : (
-            rows.map(({ trip, depart, arrive, duration }) => (
-              <tr key={trip} className="border-b last:border-0">
-                <td className="py-1 pr-4">#{trip}</td>
-                <td className="py-1 pr-4 font-mono">{depart}</td>
-                <td className="py-1 pr-4 font-mono">{arrive}</td>
-                <td className="py-1">{formatDuration(duration, lang)}</td>
-              </tr>
-            ))
+    <SectionCard>
+      <CardHeader>
+        <CardTitle>
+          {t(
+            type === "weekday"
+              ? "seo.route.weekdayHeading"
+              : "seo.route.weekendHeading",
           )}
-        </tbody>
-      </table>
-    </section>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {trips.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            {t("seo.route.noService")}
+          </p>
+        ) : (
+          <ul className="space-y-2 list-none p-0">
+            {trips.map(({ trip, depart, arrive, duration }) => (
+              <li key={trip}>
+                <TripRow
+                  tripNumber={trip}
+                  time={depart}
+                  arriveTime={arrive}
+                  trailing={formatDuration(duration, lang)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </SectionCard>
   );
 }
 
@@ -144,7 +128,7 @@ export function RoutePairLandingPage({
   to,
   lang,
   scheduleGeneratedAt,
-}: RoutePairLandingPageProps): ReactNode {
+}: RoutePairLandingPageProps) {
   const t = translator(lang);
   const fromIndex = STATION_ORDER.indexOf(from);
   const toIndex = STATION_ORDER.indexOf(to);
@@ -154,20 +138,21 @@ export function RoutePairLandingPage({
     fromIndex > toIndex ? "northbound" : "southbound";
   const zones = Math.abs(zoneOf(from) - zoneOf(to)) + 1;
   const fare = zones * FARE_CONSTANTS.ADULT_FARE_PER_ZONE;
-  const generatedDate = new Date(scheduleGeneratedAt).toLocaleDateString(
-    lang === "es" ? "es-US" : "en-US",
-    { year: "numeric", month: "long", day: "numeric" },
-  );
 
   return (
-    <article className="container mx-auto px-4 py-8 max-w-4xl">
-      <nav aria-label="Breadcrumb" className="text-sm mb-4">
+    <Layout
+      lang={lang}
+      alternateLangPath={`/routes/${routePairSlug(from, to)}/`}
+      scheduleGeneratedAt={scheduleGeneratedAt}
+    >
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex gap-2 text-muted-foreground flex-wrap">
           <li>
             <a href={linkTo(lang, "/")} className="hover:underline">
-              {SITE_NAME}
+              {t("seo.layout.home")}
             </a>
-            {" /"}
+            <span aria-hidden="true"> /</span>
           </li>
           <li>
             <a
@@ -176,7 +161,7 @@ export function RoutePairLandingPage({
             >
               {from}
             </a>
-            {" /"}
+            <span aria-hidden="true"> /</span>
           </li>
           <li className="text-foreground" aria-current="page">
             {t("seo.route.breadcrumb", { to })}
@@ -184,13 +169,29 @@ export function RoutePairLandingPage({
         </ol>
       </nav>
 
-      <h1 className="text-3xl md:text-4xl font-bold mb-4">
-        {t("seo.route.h1", { from, to })}
-      </h1>
-      <p className="text-lg text-muted-foreground mb-6">
-        {t("seo.route.intro", { from, to, direction: t(`seo.route.dir.${direction}`) })}
-      </p>
+      {/* Title + summary */}
+      <section className="space-y-3">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+          {t("seo.route.h1", { from, to })}
+        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <PillBadge label={t(`seo.route.dir.${direction}`)} color="ontime" />
+          <PillBadge
+            label={t("seo.route.zonesPill", { zones })}
+            color="neutral"
+          />
+          <PillBadge label={`$${fare.toFixed(2)}`} color="neutral" />
+        </div>
+        <p className="text-lg text-muted-foreground">
+          {t("seo.route.intro", {
+            from,
+            to,
+            direction: t(`seo.route.dir.${direction}`),
+          })}
+        </p>
+      </section>
 
+      {/* Primary CTA */}
       <div
         dangerouslySetInnerHTML={{
           __html: renderCta({
@@ -201,25 +202,15 @@ export function RoutePairLandingPage({
         }}
       />
 
-      <section className="my-8 grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <dt className="font-semibold">{t("seo.route.fareLabel")}</dt>
-          <dd>${fare.toFixed(2)} ({zones} {t(zones === 1 ? "common.zone" : "common.zones")})</dd>
-        </div>
-        <div>
-          <dt className="font-semibold">{t("seo.route.directionLabel")}</dt>
-          <dd>{t(`seo.route.dir.${direction}`)}</dd>
-        </div>
-      </section>
-
-      <RouteScheduleTable
+      {/* Schedules */}
+      <RouteScheduleCard
         fromIndex={fromIndex}
         toIndex={toIndex}
         direction={direction}
         type="weekday"
         lang={lang}
       />
-      <RouteScheduleTable
+      <RouteScheduleCard
         fromIndex={fromIndex}
         toIndex={toIndex}
         direction={direction}
@@ -227,38 +218,42 @@ export function RoutePairLandingPage({
         lang={lang}
       />
 
-      <section className="my-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {t("seo.route.relatedHeading")}
-        </h2>
-        <ul className="space-y-1 text-sm">
-          <li>
-            <a
-              href={linkTo(lang, `/stations/${stationSlug(from)}/`)}
-              className="hover:underline"
-            >
-              {t("seo.route.viewStation", { station: from })}
-            </a>
-          </li>
-          <li>
-            <a
-              href={linkTo(lang, `/stations/${stationSlug(to)}/`)}
-              className="hover:underline"
-            >
-              {t("seo.route.viewStation", { station: to })}
-            </a>
-          </li>
-          <li>
-            <a
-              href={linkTo(lang, `/routes/${routePairSlug(to, from)}/`)}
-              className="hover:underline"
-            >
-              {t("seo.route.viewReverse", { from: to, to: from })}
-            </a>
-          </li>
-        </ul>
-      </section>
+      {/* Related */}
+      <SectionCard>
+        <CardHeader>
+          <CardTitle>{t("seo.route.relatedHeading")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2 text-sm list-none p-0">
+            <li>
+              <a
+                href={linkTo(lang, `/stations/${stationSlug(from)}/`)}
+                className="hover:underline"
+              >
+                {t("seo.route.viewStation", { station: from })}
+              </a>
+            </li>
+            <li>
+              <a
+                href={linkTo(lang, `/stations/${stationSlug(to)}/`)}
+                className="hover:underline"
+              >
+                {t("seo.route.viewStation", { station: to })}
+              </a>
+            </li>
+            <li>
+              <a
+                href={linkTo(lang, `/routes/${routePairSlug(to, from)}/`)}
+                className="hover:underline"
+              >
+                {t("seo.route.viewReverse", { from: to, to: from })}
+              </a>
+            </li>
+          </ul>
+        </CardContent>
+      </SectionCard>
 
+      {/* Secondary CTA */}
       <div
         dangerouslySetInnerHTML={{
           __html: renderCta({
@@ -268,26 +263,6 @@ export function RoutePairLandingPage({
           }),
         }}
       />
-
-      <footer className="mt-12 pt-6 border-t text-sm text-muted-foreground">
-        <p className="mb-2">
-          {t("seo.station.lastUpdated", { date: generatedDate })}
-        </p>
-        <p className="mb-2">{DATA_ATTRIBUTION}</p>
-        <p className="mb-4">{SITE_DISCLAIMER}</p>
-        <p>
-          <a
-            href={linkTo(
-              lang === "en" ? "es" : "en",
-              `/routes/${routePairSlug(from, to)}/`,
-            )}
-            className="hover:underline"
-            hrefLang={lang === "en" ? "es" : "en"}
-          >
-            {lang === "en" ? "Ver en español" : "View in English"}
-          </a>
-        </p>
-      </footer>
-    </article>
+    </Layout>
   );
 }

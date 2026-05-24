@@ -246,6 +246,11 @@
     "site": {
       "alternateName": "Horario del Tren SMART (Comunidad)"
     },
+    "layout": {
+      "communityPill": "App Comunitaria",
+      "home": "SMART trip",
+      "lastUpdated": "Datos del horario actualizados el {{date}}."
+    },
     "cta": {
       "aria": "Obtén la app de iOS del tren SMART o abre la app web en vivo",
       "ios": {
@@ -264,6 +269,7 @@
       "description": "Horario completo del tren SMART para la estación {{station}}. Salidas entre semana y fin de semana, tarifas y conexiones.",
       "h1": "Estación de Tren SMART {{station}} — Horario e Información",
       "breadcrumb": "Estación {{station}}",
+      "zonePill": "Zona {{zone}}",
       "intro": {
         "north-end": "{{station}} es la terminal norte de la línea ferroviaria SMART, en la zona tarifaria {{zone}}. Todos los trenes hacia el norte terminan aquí; el servicio hacia el sur comienza desde esta plataforma.",
         "south-end": "{{station}} es la terminal sur de la línea ferroviaria SMART, en la zona tarifaria {{zone}}, con conexiones directas en ferry a San Francisco. Todos los trenes hacia el sur terminan aquí.",
@@ -326,6 +332,7 @@
         "northbound": "Hacia el norte",
         "southbound": "Hacia el sur"
       },
+      "zonesPill": "{{zones}} zonas",
       "relatedHeading": "Páginas Relacionadas",
       "viewStation": "Horario de la estación {{station}}",
       "viewReverse": "Viaje inverso: de {{from}} a {{to}}"
@@ -340,6 +347,7 @@
       "weekendHeading": "Ferries de fin de semana",
       "outboundHeading": "Larkspur → San Francisco",
       "inboundHeading": "San Francisco → Larkspur",
+      "noService": "Sin ferries programados.",
       "departColumn": "Sale",
       "arriveColumn": "Llega",
       "relatedHeading": "Páginas Relacionadas",

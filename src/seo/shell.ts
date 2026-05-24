@@ -121,7 +121,7 @@ export function renderShell(opts: ShellOptions): string {
     ${jsonLdBlocks}
   </head>
   <body class="bg-background text-foreground">
-    <main>${opts.bodyHtml}</main>
+    ${opts.bodyHtml}
     <script>${ctaScript()}</script>
   </body>
 </html>

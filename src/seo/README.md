@@ -36,13 +36,17 @@ Top route pairs are hand-picked in `scripts/seo/prerender.ts` (`TOP_ROUTE_PAIRS`
 ## Constraints for templates
 
 - **Pure components only.** No hooks, no Router, no QueryClient, no Context.
-- **Must include `@jsxRuntime automatic` + `@jsxImportSource react` pragmas**
-  at the top. Without them, `tsx` (the runtime) falls back to classic JSX and
-  demands `import React` in scope — while `tsc` with `react-jsx` flags that
-  same import as unused. The pragmas resolve both per-file.
+- **`import React from "react"` + `void React;`** at the top of every `.tsx`.
+  `tsx` (the prerender runtime) uses classic JSX and needs React in scope;
+  `tsc` with `react-jsx` doesn't need the import and would otherwise flag
+  it as unused. The `void React;` line satisfies both.
 - All data flows in via props from the prerender script.
-- Visual identity comes from the SPA's compiled Tailwind stylesheet
-  (`/assets/index-*.css`), located at build time by `findStylesheetHref()`.
+- Visual identity uses local mirrors of the SPA's Card / SectionCard /
+  PillBadge (in `src/seo/ui.tsx`). The class strings are copies-of-truth
+  from the real components — update both if the design shifts.
+- Tailwind picks up class names from `.ts` and `.tsx` files in `src/`, so
+  classes in template-literal strings (e.g. inside `cta.ts`) are emitted
+  to the compiled CSS bundle.
 
 ## Updating production constants
 

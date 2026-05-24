@@ -6,9 +6,11 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { findFullCorridorTrip, getFilteredTrips } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
 import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
@@ -18,46 +20,12 @@ import { useNow } from "@/hooks/useNow";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import { StationInfoSheet } from "@/components/StationInfoSheet";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const WINDSOR = stations[0];
 const LARKSPUR = stations[stations.length - 1];
-
-/**
- * Pick the timeline's "from" station for a tapped train so only upcoming
- * stops appear (plus one previous stop for the current-station highlight).
- */
-function pickDisplayFromStation(
-  train: MapTrain,
-  isSouthbound: boolean,
-): Station {
-  const origin = isSouthbound ? WINDSOR : LARKSPUR;
-  let anchorStation: Station | null = train.nextStation;
-  let treatAsServed = train.currentStatus === "STOPPED_AT";
-  if (anchorStation == null) {
-    anchorStation = getClosestStation(train.latitude, train.longitude);
-    treatAsServed = true;
-  }
-  const anchorIdx = stationIndexMap[anchorStation];
-  if (anchorIdx == null) return origin;
-
-  const upcomingIdx = treatAsServed
-    ? isSouthbound
-      ? anchorIdx + 1
-      : anchorIdx - 1
-    : anchorIdx;
-  const displayFromIdx = isSouthbound ? upcomingIdx - 1 : upcomingIdx + 1;
-  if (displayFromIdx >= 0 && displayFromIdx < stations.length) {
-    return stations[displayFromIdx];
-  }
-  if (upcomingIdx >= 0 && upcomingIdx < stations.length) {
-    return stations[upcomingIdx];
-  }
-  return anchorStation;
-}
 
 export default function MapDiagram() {
   const navigate = useNavigate();
@@ -73,27 +41,7 @@ export default function MapDiagram() {
   };
 
   const { trains } = useMapTrains();
-
-  // Realtime status keyed by full-corridor scheduled departure (origin time).
-  // Computed for both directions and both schedule types so a tapped train or
-  // arrival of either kind can surface live delay/cancellation state in the
-  // trip detail sheet. Mirrors the pattern used by /map (Map.tsx).
-  const allSouthboundTrips = useMemo(
-    () => [
-      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekday"),
-      ...getFilteredTrips(WINDSOR, LARKSPUR, "weekend"),
-    ],
-    [],
-  );
-  const allNorthboundTrips = useMemo(
-    () => [
-      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekday"),
-      ...getFilteredTrips(LARKSPUR, WINDSOR, "weekend"),
-    ],
-    [],
-  );
-  const sbStatusMaps = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, allSouthboundTrips);
-  const nbStatusMaps = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, allNorthboundTrips);
+  const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
 
   const {
     fromStation: fromSelection,

@@ -43,9 +43,10 @@ i18n
       // Convert detected language codes to our supported languages
       convertDetectedLanguage: (lng: string) => {
         // Extract base language code (e.g., "es" from "es-MX", "en" from "en-US")
-        const baseLang = lng.toLowerCase().split("-")[0];
-        // Return if supported, otherwise return undefined to use fallback
-        return ["en", "es"].includes(baseLang) ? baseLang : undefined;
+        const baseLang = lng.toLowerCase().split("-")[0] ?? lng;
+        // Return supported base lang; unsupported codes pass through and
+        // i18next falls back via `fallbackLng` + `supportedLngs`.
+        return ["en", "es"].includes(baseLang) ? baseLang : lng;
       },
     },
     interpolation: {

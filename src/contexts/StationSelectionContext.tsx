@@ -139,9 +139,15 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   // Including pathname matters because back-navigation may restore a URL whose
   // params predate edits made on another route; we re-assert state onto it.
   // Unmanaged params (e.g. debugTime, debugDate, devTrip) are preserved as-is.
+  //
+  // `searchParams` is read via a ref so we always merge against the latest
+  // URL without making this effect depend on it (which would loop, since
+  // `setSearchParams` triggers a new `searchParams` identity).
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
   useEffect(() => {
     const params: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
+    searchParamsRef.current.forEach((value, key) => {
       if (!MANAGED_PARAMS.has(key)) params[key] = value;
     });
     if (state.fromStation) params.from = state.fromStation;
@@ -151,13 +157,13 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       params.type = state.scheduleType;
     }
     setSearchParams(params, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.fromStation,
     state.toStation,
     state.selectedTripNumber,
     state.scheduleType,
     location.pathname,
+    setSearchParams,
   ]);
 
   // Persist state to localStorage on native so it survives app restarts (24h expiry).

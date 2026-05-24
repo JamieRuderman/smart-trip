@@ -140,6 +140,140 @@ function buildStopRealtimeData(
   return { allStopLiveDepartures, allStopDelayMinutes };
 }
 
+type DerivedStatusResult =
+  | { kind: "primary"; scheduledDeparture: string; status: TripRealtimeStatus }
+  | { kind: "fallback"; scheduledDeparture: string; status: TripRealtimeStatus }
+  | { kind: "none" };
+
+const CANCELED_STATUS: TripRealtimeStatus = {
+  isCanceled: true,
+  isOriginSkipped: false,
+  isDestinationSkipped: false,
+};
+
+/**
+ * CANCELED branch: pick a usable key for the cancellation badge. Prefers
+ * the caller's static scheduled departure; falls back through the feed's
+ * own stop_time_updates and finally to the trip startTime (flagged so
+ * callers can do a secondary scan against trip.times).
+ */
+function deriveCanceledStatus(
+  update: GtfsRtTripUpdate,
+  fromStation: Station,
+  direction: TrainDirection,
+  scheduledDepartureParam: string | null,
+): DerivedStatusResult {
+  if (scheduledDepartureParam) {
+    return {
+      kind: "primary",
+      scheduledDeparture: scheduledDepartureParam,
+      status: CANCELED_STATUS,
+    };
+  }
+  const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
+  if (fromUpdate?.departureTime) {
+    return {
+      kind: "primary",
+      scheduledDeparture: unixToTimeString(fromUpdate.departureTime),
+      status: CANCELED_STATUS,
+    };
+  }
+  if (update.startTime) {
+    return {
+      kind: "fallback",
+      scheduledDeparture: update.startTime.slice(0, 5),
+      status: CANCELED_STATUS,
+    };
+  }
+  return { kind: "none" };
+}
+
+/**
+ * Normal (non-canceled) branch: compute live departure/arrival times,
+ * delay minutes, and per-stop realtime data for the requested station pair.
+ */
+function deriveScheduledStatus(
+  update: GtfsRtTripUpdate,
+  fromStation: Station,
+  toStation: Station,
+  direction: TrainDirection,
+  scheduledDepartureParam: string | null,
+  scheduledArrivalParam: string | null,
+  scheduledTimesByStation: Partial<Record<string, string>>,
+): DerivedStatusResult {
+  const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
+  const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation, direction);
+
+  if (!fromUpdate?.departureTime) return { kind: "none" };
+
+  const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
+  const isDestinationSkipped = toUpdate?.scheduleRelationship === "SKIPPED";
+
+  // Use departure.time per SMART spec — manually adjusted for holds/delays.
+  const liveDepartureTime = unixToTimeString(fromUpdate.departureTime);
+
+  // Compute delay by diffing the live departure.time against the static
+  // scheduled time. 511 always sends departureDelay: 0 even for delayed
+  // trains, so we cannot use that field for primary detection.
+  const delayMinutes =
+    scheduledDepartureParam && update.startDate
+      ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
+      : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
+        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
+        ? Math.round(fromUpdate.departureDelay / 60)
+        : undefined;
+
+  // The map key is the static scheduled departure — so ScheduleResults can
+  // look it up by trip.departureTime (which also comes from the static schedule).
+  const scheduledDeparture =
+    scheduledDepartureParam ??
+    unixToTimeString(fromUpdate.departureTime - (fromUpdate.departureDelay ?? 0));
+
+  const isDelayed = delayMinutes != null;
+
+  // Live arrival time at destination: 511 also shifts arrivalTime forward
+  // when delayed, but arrivalDelay is always 0. Show the live arrival time
+  // whenever the train is running late on departure.
+  let liveArrivalTime: string | undefined;
+  let arrivalDelayMinutes: number | undefined;
+  if (toUpdate?.arrivalTime && isDelayed) {
+    liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+    if (scheduledArrivalParam && update.startDate) {
+      arrivalDelayMinutes = computeDelayMinutes(
+        toUpdate.arrivalTime,
+        scheduledArrivalParam,
+        update.startDate,
+      );
+    }
+  }
+
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+    update.stopTimeUpdates,
+    scheduledTimesByStation,
+    update.startDate,
+    direction,
+    fromUpdate.stopSequence,
+  );
+  const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
+
+  return {
+    kind: "primary",
+    scheduledDeparture,
+    status: {
+      isCanceled: false,
+      liveDepartureTime: delayMinutes != null ? liveDepartureTime : undefined,
+      liveArrivalTime,
+      delayMinutes,
+      arrivalDelayMinutes,
+      isOriginSkipped: !!isOriginSkipped,
+      isDestinationSkipped: !!isDestinationSkipped,
+      allStopLiveDepartures,
+      allStopDelayMinutes,
+      hasRealtimeStopData,
+    },
+  };
+}
+
 function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
@@ -155,135 +289,20 @@ function deriveStatus(
   scheduledArrivalParam: string | null,
   /** All static scheduled times for this trip, keyed by station name. Used to
    *  compute per-stop delay against the app's own schedule (not GTFS static). */
-  scheduledTimesByStation: Partial<Record<string, string>>
-): { scheduledDeparture: string | null; isStartTimeFallback?: boolean; status: TripRealtimeStatus } {
+  scheduledTimesByStation: Partial<Record<string, string>>,
+): DerivedStatusResult {
   if (update.scheduleRelationship === "CANCELED") {
-    // Prefer the static scheduled departure as the key so the canceled badge
-    // lines up with the correct trip card even when 511 omits stop_time_updates.
-    if (scheduledDepartureParam) {
-      return {
-        scheduledDeparture: scheduledDepartureParam,
-        status: { isCanceled: true, isOriginSkipped: false, isDestinationSkipped: false },
-      };
-    }
-    // Some feeds include stop_time_updates with scheduled times even for CANCELED trips.
-    // Use those to key by scheduled departure so the canceled badge shows for any station pair.
-    const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
-    if (fromUpdate?.departureTime) {
-      const scheduledDeparture = unixToTimeString(fromUpdate.departureTime);
-      return {
-        scheduledDeparture,
-        status: {
-          isCanceled: true,
-          isOriginSkipped: false,
-          isDestinationSkipped: false,
-        },
-      };
-    }
-    // Fallback: the feed omitted stop_time_updates for this station pair.
-    // Key by startTime (origin departure), but flag it so callers can do a secondary
-    // scan against trip.times instead of relying on a direct departureTime match.
-    if (update.startTime) {
-      return {
-        scheduledDeparture: update.startTime.slice(0, 5),
-        isStartTimeFallback: true,
-        status: {
-          isCanceled: true,
-          isOriginSkipped: false,
-          isDestinationSkipped: false,
-        },
-      };
-    }
-    return {
-      scheduledDeparture: null,
-      status: {
-        isCanceled: true,
-        isOriginSkipped: false,
-        isDestinationSkipped: false,
-      },
-    };
+    return deriveCanceledStatus(update, fromStation, direction, scheduledDepartureParam);
   }
-
-  const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
-  const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation, direction);
-
-  if (!fromUpdate?.departureTime) {
-    // No data for this station pair in this update
-    return {
-      scheduledDeparture: null,
-      status: {
-        isCanceled: false,
-        isOriginSkipped: false,
-        isDestinationSkipped: false,
-      },
-    };
-  }
-
-  const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
-  const isDestinationSkipped = toUpdate?.scheduleRelationship === "SKIPPED";
-
-  // Use departure.time per SMART spec — manually adjusted for holds/delays.
-  const liveDepartureTime = unixToTimeString(fromUpdate.departureTime);
-
-  // Compute delay by diffing the live departure.time against the static scheduled time.
-  // 511 always sends departureDelay: 0 even for delayed trains, so we cannot use
-  // that field. Instead we rely on the static timetable passed in from the caller.
-  const delayMinutes =
-    scheduledDepartureParam && update.startDate
-      ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
-      : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
-        ? Math.round(fromUpdate.departureDelay / 60)
-        : undefined;
-
-  // The map key is the static scheduled departure — so ScheduleResults can look it
-  // up by trip.departureTime (which also comes from the static schedule).
-  const scheduledDeparture =
-    scheduledDepartureParam ??
-    unixToTimeString(fromUpdate.departureTime - (fromUpdate.departureDelay ?? 0));
-
-  const isDelayed = delayMinutes != null;
-
-  // Live arrival time at destination: 511 also shifts arrivalTime forward when delayed,
-  // but arrivalDelay is always 0 (same issue as departureDelay). Show the live arrival
-  // time whenever the train is running late on departure.
-  let liveArrivalTime: string | undefined;
-  let arrivalDelayMinutes: number | undefined;
-  if (toUpdate?.arrivalTime && isDelayed) {
-    liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
-    if (scheduledArrivalParam && update.startDate) {
-      arrivalDelayMinutes = computeDelayMinutes(
-        toUpdate.arrivalTime,
-        scheduledArrivalParam,
-        update.startDate
-      );
-    }
-  }
-
-  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
-    update.stopTimeUpdates,
-    scheduledTimesByStation,
-    update.startDate,
+  return deriveScheduledStatus(
+    update,
+    fromStation,
+    toStation,
     direction,
-    fromUpdate?.stopSequence
+    scheduledDepartureParam,
+    scheduledArrivalParam,
+    scheduledTimesByStation,
   );
-  const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
-
-  return {
-    scheduledDeparture,
-    status: {
-      isCanceled: false,
-      liveDepartureTime: delayMinutes != null ? liveDepartureTime : undefined,
-      liveArrivalTime,
-      delayMinutes,
-      arrivalDelayMinutes,
-      isOriginSkipped,
-      isDestinationSkipped,
-      allStopLiveDepartures,
-      allStopDelayMinutes,
-      hasRealtimeStopData,
-    },
-  };
 }
 
 export function useTripUpdates() {
@@ -367,23 +386,21 @@ export function useTripRealtimeStatusMap(
         }
       }
 
-      const { scheduledDeparture, isStartTimeFallback, status } = deriveStatus(
+      const result = deriveStatus(
         update,
         fromStation,
         toStation,
         direction,
         scheduledDepartureParam,
         scheduledArrivalParam,
-        scheduledTimesByStation
+        scheduledTimesByStation,
       );
-      if (scheduledDeparture) {
-        if (isStartTimeFallback) {
-          // Don't add to the main map with a potentially wrong key.
-          // Store separately so ScheduleResults can scan trip.times for a match.
-          canceledByStartTime.set(scheduledDeparture, status);
-        } else {
-          statusMap.set(scheduledDeparture, status);
-        }
+      if (result.kind === "primary") {
+        statusMap.set(result.scheduledDeparture, result.status);
+      } else if (result.kind === "fallback") {
+        // Don't add to the main map with a potentially wrong key. Store
+        // separately so ScheduleResults can scan trip.times for a match.
+        canceledByStartTime.set(result.scheduledDeparture, result.status);
       }
     }
     return { statusMap, canceledByStartTime, lastUpdated };

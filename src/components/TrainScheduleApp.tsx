@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useTrainScheduleState } from "@/hooks/useTrainScheduleState";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { useScheduleData } from "@/hooks/useScheduleData";
+import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { createMinuteInterval } from "@/lib/utils";
+import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMapTrains } from "@/hooks/useMapTrains";
@@ -38,17 +41,37 @@ export function TrainScheduleApp() {
     fromStation,
     toStation,
     scheduleType,
-    showAllTrips,
-    currentTime,
-    filteredTrips,
     selectedTripNumber,
     setFromStation,
     setToStation,
     setScheduleType,
-    toggleShowAllTrips,
     swapStations,
     setSelectedTrip,
-  } = useTrainScheduleState(scheduleDataVersion);
+  } = useStationSelection();
+
+  const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
+  const [currentTime, setCurrentTime] = useState<Date>(
+    () => debugCurrentTime ?? new Date(),
+  );
+  useEffect(() => {
+    if (debugCurrentTime) return;
+    return createMinuteInterval(() => {
+      setCurrentTime(new Date());
+    });
+  }, [debugCurrentTime]);
+
+  const [showAllTrips, setShowAllTrips] = useState(false);
+  const toggleShowAllTrips = useCallback(() => {
+    setShowAllTrips((prev) => !prev);
+  }, []);
+
+  // `scheduleDataVersion` is a refresh token from useScheduleData(); included
+  // so trips recompute when cached/remote schedule data swaps in memory.
+  const filteredTrips = useMemo(() => {
+    if (!fromStation || !toStation) return [];
+    return getFilteredTrips(fromStation, toStation, scheduleType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromStation, toStation, scheduleType, scheduleDataVersion]);
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
@@ -114,7 +137,7 @@ export function TrainScheduleApp() {
     (station: NonNullable<typeof closestStation>) => {
       setFromStation(station);
       if (station === toStation) {
-        setToStation("" as typeof station);
+        setToStation("");
       }
     },
     [setFromStation, setToStation, toStation],

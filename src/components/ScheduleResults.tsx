@@ -82,6 +82,12 @@ export function ScheduleResults({
         )
       : displayedTrips;
 
+  // First non-past index in visibleTrips — used to flag the "Next" row.
+  // Single pass instead of per-row .slice().every() (O(n) total vs O(n²)).
+  const nextVisibleIndex = visibleTrips.findIndex(
+    (trip) => !isTimeInPast(currentTime, trip.departureTime),
+  );
+
   if (!direction) return null;
 
   /**
@@ -121,15 +127,9 @@ export function ScheduleResults({
           {visibleTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
             const realtimeStatus = getRealtimeStatus(trip);
-            const isNextTrip =
-              !isPastTrip &&
-              visibleTrips
-                .slice(0, index)
-                .every((prevTrip) =>
-                  isTimeInPast(currentTime, prevTrip.departureTime)
-                );
+            const isNextTrip = index === nextVisibleIndex;
             const showFerry =
-              trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
+              !!trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 
             const isRiding =
               ridingMatchesSchedule && trip.trip === ridingTripNumber;

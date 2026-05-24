@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
@@ -25,7 +24,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      mode === "development" && componentTagger(),
       // When USE_SAMPLE_DATA=true, intercept API routes and serve local JSON files
       mode === "development" &&
         useSampleData && {
@@ -60,6 +58,17 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          // Keep mapbox-gl in its own chunk so the lazy-loaded Map route can
+          // pull it in on demand without dragging it into the initial bundle.
+          manualChunks: {
+            "mapbox-gl": ["mapbox-gl"],
+          },
+        },
       },
     },
   };

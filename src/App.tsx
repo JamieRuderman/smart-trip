@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -13,9 +13,12 @@ import { rehydrateWebReminders } from "@/lib/departureReminder";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
-import Map from "./pages/Map";
-import MapDiagram from "./pages/MapDiagram";
 import NotFound from "./pages/NotFound";
+
+// Map routes pull in mapbox-gl (~700 KB JS + CSS). Lazy-load so users who
+// stay on the schedule view never pay that cost.
+const Map = lazy(() => import("./pages/Map"));
+const MapDiagram = lazy(() => import("./pages/MapDiagram"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,13 +52,15 @@ const App = () => {
             <BrowserRouter>
               <ErrorBoundary>
                 <StationSelectionProvider>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/map" element={<Map />} />
-                    <Route path="/map-diagram" element={<MapDiagram />} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                  <Suspense fallback={null}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/map" element={<Map />} />
+                      <Route path="/map-diagram" element={<MapDiagram />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
                 </StationSelectionProvider>
                 {!isNative && <Analytics />}
               </ErrorBoundary>

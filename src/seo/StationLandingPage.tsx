@@ -227,7 +227,7 @@ export function StationLandingPage({
       {/* Fares */}
       <SectionCard>
         <CardHeader>
-          <CardTitle>{t("seo.station.fareHeading")}</CardTitle>
+          <CardTitle>{t("seo.station.fareHeading", { station })}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p>{t("seo.station.fareZone", { station, zone })}</p>

@@ -31,12 +31,26 @@ function lookup(dict: TranslationMap, key: string): string | undefined {
   return typeof cursor === "string" ? cursor : undefined;
 }
 
-function interpolate(template: string, vars?: Record<string, string | number>): string {
-  if (!vars) return template;
-  return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => {
-    const value = vars[name];
+function interpolate(
+  key: string,
+  template: string,
+  vars?: Record<string, string | number>,
+): string {
+  const result = template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => {
+    const value = vars?.[name];
     return value === undefined ? match : String(value);
   });
+  // Fail fast if any placeholder is still present — usually means the
+  // caller forgot to pass a var, which would otherwise render as
+  // literal "{{station}}" in the page. Catching it at build time
+  // prevents the broken text from ever reaching production.
+  const leftover = result.match(/\{\{(\w+)\}\}/);
+  if (leftover) {
+    throw new Error(
+      `[seo/i18n] Translation key "${key}" has unreplaced placeholder ${leftover[0]}. Pass it via the vars argument to t().`,
+    );
+  }
+  return result;
 }
 
 /**
@@ -48,10 +62,10 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
  */
 export function t(key: string, lang: Lang, vars?: Record<string, string | number>): string {
   const primary = lookup(dictionaries[lang], key);
-  if (primary !== undefined) return interpolate(primary, vars);
+  if (primary !== undefined) return interpolate(key, primary, vars);
   if (lang !== "en") {
     const fallback = lookup(dictionaries.en, key);
-    if (fallback !== undefined) return interpolate(fallback, vars);
+    if (fallback !== undefined) return interpolate(key, fallback, vars);
   }
   throw new Error(
     `[seo/i18n] Missing translation key "${key}" for lang "${lang}" (and no English fallback). Add it to src/lib/translations/${lang}.json and en.json.`,

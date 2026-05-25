@@ -1,8 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { GtfsCalendar, GtfsCalendarDate } from "../../src/types/gtfs.js";
+import type {
+  GtfsCalendar,
+  GtfsCalendarDate,
+  GtfsFeed,
+  GtfsStopTime,
+} from "../../src/types/gtfs.js";
 
-import { deriveScheduleOverrides, deriveServiceTypes } from "./shared.js";
+import {
+  buildTrainSchedules,
+  deriveScheduleOverrides,
+  deriveServiceTypes,
+  type StationParent,
+} from "./shared.js";
 
 const WEEKDAY: GtfsCalendar = {
   service_id: "weekday",
@@ -142,6 +152,12 @@ describe("deriveServiceTypes", () => {
     expect(result.has("far")).toBe(false);
   });
 
+  // Memorial Day Monday: calendar_dates removes the weekday service and
+  // adds the weekend one. We deliberately ignore those today-only
+  // exceptions during static classification — the SPA's runtime
+  // getTodayScheduleType() handles "show weekend on holidays" instead.
+  // Without this, the sanity floor in transform.ts trips on 0 weekday
+  // trips every time a federal holiday falls on a Monday-Friday.
   it("classifies by canonical day pattern even on holiday exception dates", () => {
     // Memorial Day Monday: calendar_dates removes the weekday service and
     // adds the weekend one. We deliberately ignore those today-only
@@ -159,5 +175,127 @@ describe("deriveServiceTypes", () => {
     const result = deriveServiceTypes(calendar, new Date(2026, 4, 25));
     expect(result.get("wk")).toBe("weekday");
     expect(result.get("we")).toBe("weekend");
+  });
+});
+
+// ── buildTrainSchedules — Memorial Day end-to-end regression ────────────────
+//
+// deriveServiceTypes tests above prove the classification step survives
+// holiday exceptions. This test goes one layer down: through the full
+// buildTrainSchedules pipeline that classify-then-filters trips, with a
+// mocked system clock fixed to Memorial Day. It's the most direct test
+// that the sanity floor in transform.ts can't trip on a holiday because
+// of this codepath again.
+describe("buildTrainSchedules", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("emits weekday trips on a US federal holiday Monday (Memorial Day)", () => {
+    // Pin "today" to Memorial Day 2026 (Mon May 25). buildTrainSchedules
+    // calls deriveServiceTypes() with no reference date, so it reads
+    // new Date() — hence the system-clock mock.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 25, 12, 0, 0));
+
+    // Minimal 2-station feed: Alpha (north) → Bravo (south). Northbound
+    // would mean Bravo → Alpha. Both trips travel A → B = southbound.
+    const stations: StationParent[] = [
+      { stopId: "STA_A", name: "Alpha", lat: 0, lng: 0, zone: 1 },
+      { stopId: "STA_B", name: "Bravo", lat: 0, lng: 0, zone: 2 },
+    ];
+    const stopToStation = new Map<string, string>([
+      ["STA_A", "Alpha"],
+      ["STA_B", "Bravo"],
+    ]);
+
+    const feed: GtfsFeed = {
+      schemaVersion: 1,
+      operatorId: "SA",
+      fetchedAt: "2026-05-24T00:00:00Z",
+      sourceUrl: "",
+      agency: [],
+      routes: [],
+      stops: [],
+      stopTimes: [],
+      shapes: null,
+      calendar: [
+        { ...WEEKDAY, service_id: "wk" },
+        { ...WEEKEND, service_id: "we" },
+      ],
+      // Memorial Day exception: removes weekday, adds weekend. Pre-fix,
+      // this would have caused deriveServiceTypes to drop the weekday
+      // service, and trip T1 below would be skipped → 0 weekday trips.
+      calendarDates: addWeekendRemoveWeekday("20260525"),
+      trips: [
+        {
+          route_id: "R",
+          service_id: "wk",
+          trip_id: "T1",
+          trip_short_name: "101",
+        },
+        {
+          route_id: "R",
+          service_id: "we",
+          trip_id: "T2",
+          trip_short_name: "202",
+        },
+      ],
+    };
+
+    const stopTimesByTrip = new Map<string, GtfsStopTime[]>([
+      [
+        "T1",
+        [
+          {
+            trip_id: "T1",
+            stop_id: "STA_A",
+            stop_sequence: "1",
+            departure_time: "08:00:00",
+            arrival_time: "08:00:00",
+          },
+          {
+            trip_id: "T1",
+            stop_id: "STA_B",
+            stop_sequence: "2",
+            departure_time: "08:30:00",
+            arrival_time: "08:30:00",
+          },
+        ],
+      ],
+      [
+        "T2",
+        [
+          {
+            trip_id: "T2",
+            stop_id: "STA_A",
+            stop_sequence: "1",
+            departure_time: "10:00:00",
+            arrival_time: "10:00:00",
+          },
+          {
+            trip_id: "T2",
+            stop_id: "STA_B",
+            stop_sequence: "2",
+            departure_time: "10:30:00",
+            arrival_time: "10:30:00",
+          },
+        ],
+      ],
+    ]);
+
+    const result = buildTrainSchedules(
+      feed,
+      stopTimesByTrip,
+      stations,
+      stopToStation,
+    );
+
+    // The user-visible bug: weekday counts dropped to 0 on Memorial Day,
+    // tripping the sanity floor. Assert they survive the new pipeline.
+    expect(result.weekday.southbound).toHaveLength(1);
+    expect(result.weekday.southbound[0].trip).toBe(101);
+    expect(result.weekend.southbound).toHaveLength(1);
+    expect(result.weekend.southbound[0].trip).toBe(202);
   });
 });

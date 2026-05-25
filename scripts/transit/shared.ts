@@ -150,13 +150,17 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-// Window we accept for classifying a calendar.txt row as "active".
-// 511 occasionally publishes a fresh GTFS bundle whose service window
-// starts a few days in the future (e.g. the weekend service starts on
-// Saturday but the bundle goes live on Friday). Without a look-ahead,
-// the Friday refresh sees zero weekend trips and trips the sanity floor
-// — see issue #43. Two weeks comfortably covers the typical publication
-// cadence without admitting services that are still many weeks out.
+// Look-ahead applied when deciding whether a calendar.txt row is in scope
+// for classification. 511 occasionally publishes a fresh GTFS bundle whose
+// service window starts a few days in the future — e.g. the weekend
+// service starts on Saturday but the bundle goes live on Friday. Without
+// the look-ahead, the Friday refresh sees zero weekend trips and the
+// sanity floor trips (issue #43). Two weeks comfortably covers the
+// typical publication cadence without admitting services many weeks out.
+//
+// This is the ONLY remaining today-relative behavior in deriveServiceTypes:
+// today-only calendar_dates exceptions used to filter classification but
+// no longer do — see commit 761ccc0.
 const SERVICE_LOOKAHEAD_DAYS = 14;
 
 function formatGtfsDate(date: Date): string {

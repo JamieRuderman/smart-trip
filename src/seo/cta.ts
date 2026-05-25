@@ -52,10 +52,12 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
   // All styling via Tailwind utilities so the static pages match the SPA's
   // design system without needing a separate stylesheet. Tailwind picks these
   // classes up via its content scan of src/**/*.ts.
-  // Match the SectionCard radius so CTAs share the same rounded silhouette
-  // as the other cards on the page.
+  //
+  // Class string mirrors SectionCard exactly: rounded corners, bg-card, no
+  // shadow, borderless on mobile, bordered at md+. Keeps CTAs visually
+  // indistinguishable from schedule/fare/FAQ cards above and below.
   const blockClass =
-    "my-8 p-6 rounded-[1.5rem] sm:rounded-[2rem] border bg-card text-card-foreground shadow-sm";
+    "my-8 p-6 rounded-[1.5rem] sm:rounded-[2rem] border-0 shadow-none md:border bg-card text-card-foreground";
   const headingClass = "text-xl font-bold mb-2";
   const subtitleClass = "text-muted-foreground mb-4";
   const buttonClass =

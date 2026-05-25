@@ -267,7 +267,8 @@
     "station": {
       "title": "Horario de la estación SMART {{station}} | {{site}}",
       "description": "Horario completo del tren SMART para la estación {{station}}. Salidas entre semana y fin de semana, tarifas y conexiones.",
-      "h1": "Estación de Tren SMART {{station}} | Horario e Información",
+      "h1Main": "Estación de Tren SMART {{station}}",
+      "h1Sub": "Horario e Información",
       "breadcrumb": "Estación {{station}}",
       "zonePill": "Zona {{zone}}",
       "intro": {

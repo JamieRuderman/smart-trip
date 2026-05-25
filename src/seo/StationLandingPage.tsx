@@ -202,7 +202,8 @@ export function StationLandingPage({
       <section className="space-y-3 px-6">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            {t("seo.station.h1", { station })}
+            {t("seo.station.h1Main", { station })}
+            <span className="block">{t("seo.station.h1Sub")}</span>
           </h1>
           <PillBadge
             label={t("seo.station.zonePill", { zone })}

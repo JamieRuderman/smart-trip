@@ -267,7 +267,8 @@
     "station": {
       "title": "{{station}} SMART Train Station Schedule | {{site}}",
       "description": "Full SMART train schedule for {{station}} station. Weekday and weekend departures, fares, and connections.",
-      "h1": "{{station}} SMART Train Station | Schedule & Service Info",
+      "h1Main": "{{station}} SMART Train Station",
+      "h1Sub": "Schedule & Service Info",
       "breadcrumb": "{{station}} Station",
       "zonePill": "Zone {{zone}}",
       "intro": {

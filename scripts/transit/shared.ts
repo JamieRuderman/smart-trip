@@ -168,8 +168,6 @@ function formatGtfsDate(date: Date): string {
 
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _calendarDateRows: GtfsCalendarDate[],
   referenceDate?: Date,
 ): Map<string, ScheduleType> {
   const ref = referenceDate ?? new Date();
@@ -579,7 +577,7 @@ export function buildTrainSchedules(
 ): TrainSchedulesOutput {
   const stationCount = stations.length;
   const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
-  const serviceTypes = deriveServiceTypes(feed.calendar, feed.calendarDates);
+  const serviceTypes = deriveServiceTypes(feed.calendar);
 
   const schedules: TrainSchedulesOutput = {
     weekday: { northbound: [], southbound: [] },
@@ -664,7 +662,7 @@ export function buildTrainSchedules(
 }
 
 export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
-  const serviceTypes = deriveServiceTypes(feed.calendar, feed.calendarDates);
+  const serviceTypes = deriveServiceTypes(feed.calendar);
 
   // Anchor on the route_id so the trip set doesn't depend on stop names.
   // If the route disappears the sanity floor fails the run.

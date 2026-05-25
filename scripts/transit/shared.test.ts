@@ -121,7 +121,7 @@ describe("deriveServiceTypes", () => {
       { ...WEEKDAY, service_id: "wk", start_date: "20260518", end_date: "20260612" },
       { ...WEEKEND, service_id: "we", start_date: "20260523", end_date: "20260613" },
     ];
-    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    const result = deriveServiceTypes(calendar, new Date(2026, 4, 22));
     expect(result.get("wk")).toBe("weekday");
     expect(result.get("we")).toBe("weekend");
   });
@@ -130,7 +130,7 @@ describe("deriveServiceTypes", () => {
     const calendar: GtfsCalendar[] = [
       { ...WEEKEND, service_id: "stale", start_date: "20260101", end_date: "20260301" },
     ];
-    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    const result = deriveServiceTypes(calendar, new Date(2026, 4, 22));
     expect(result.has("stale")).toBe(false);
   });
 
@@ -138,7 +138,7 @@ describe("deriveServiceTypes", () => {
     const calendar: GtfsCalendar[] = [
       { ...WEEKEND, service_id: "far", start_date: "20260801", end_date: "20260901" },
     ];
-    const result = deriveServiceTypes(calendar, [], new Date(2026, 4, 22));
+    const result = deriveServiceTypes(calendar, new Date(2026, 4, 22));
     expect(result.has("far")).toBe(false);
   });
 
@@ -153,11 +153,10 @@ describe("deriveServiceTypes", () => {
       { ...WEEKDAY, service_id: "wk" },
       { ...WEEKEND, service_id: "we" },
     ];
-    const exceptions: GtfsCalendarDate[] = [
-      { service_id: "wk", date: "20260525", exception_type: "2" },
-      { service_id: "we", date: "20260525", exception_type: "1" },
-    ];
-    const result = deriveServiceTypes(calendar, exceptions, new Date(2026, 4, 25));
+    // Exceptions are present in the raw GTFS feed but no longer affect
+    // classification — they're consumed elsewhere (scheduleOverrides) and
+    // by the SPA's runtime getTodayScheduleType().
+    const result = deriveServiceTypes(calendar, new Date(2026, 4, 25));
     expect(result.get("wk")).toBe("weekday");
     expect(result.get("we")).toBe("weekend");
   });

@@ -84,8 +84,8 @@ export function FerryConnectionLandingPage({
       scheduleGeneratedAt={scheduleGeneratedAt}
       smartLogoHref={smartLogoHref}
     >
-      {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="text-sm">
+      {/* Breadcrumb — px-6 matches the horizontal padding inside SectionCards. */}
+      <nav aria-label="Breadcrumb" className="text-sm px-6">
         <ol className="flex gap-2 text-muted-foreground">
           <li>
             <a href={linkTo(lang, "/")} className="hover:underline">
@@ -100,7 +100,7 @@ export function FerryConnectionLandingPage({
       </nav>
 
       {/* Title + intro */}
-      <section className="space-y-3">
+      <section className="space-y-3 px-6">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
           {t("seo.ferry.h1")}
         </h1>

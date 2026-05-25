@@ -182,8 +182,9 @@ export function StationLandingPage({
       scheduleGeneratedAt={scheduleGeneratedAt}
       smartLogoHref={smartLogoHref}
     >
-      {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="text-sm">
+      {/* Breadcrumb — px-6 matches the horizontal padding inside SectionCards
+          so non-card content aligns visually with card content below. */}
+      <nav aria-label="Breadcrumb" className="text-sm px-6">
         <ol className="flex gap-2 text-muted-foreground">
           <li>
             <a href={linkTo(lang, "/")} className="hover:underline">
@@ -198,7 +199,7 @@ export function StationLandingPage({
       </nav>
 
       {/* Title + intro */}
-      <section className="space-y-3">
+      <section className="space-y-3 px-6">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
             {t("seo.station.h1", { station })}

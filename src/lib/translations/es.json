@@ -265,9 +265,9 @@
       }
     },
     "station": {
-      "title": "Horario de la estación SMART {{station}} — {{site}}",
+      "title": "Horario de la estación SMART {{station}} | {{site}}",
       "description": "Horario completo del tren SMART para la estación {{station}}. Salidas entre semana y fin de semana, tarifas y conexiones.",
-      "h1": "Estación de Tren SMART {{station}} — Horario e Información",
+      "h1": "Estación de Tren SMART {{station}} | Horario e Información",
       "breadcrumb": "Estación {{station}}",
       "zonePill": "Zona {{zone}}",
       "intro": {
@@ -284,7 +284,7 @@
       "noService": "Sin trenes programados.",
       "fareHeading": "Tarifas desde {{station}}",
       "fareZone": "{{station}} está en la zona tarifaria {{zone}}. Las tarifas son por zonas; cada zona añade $1.50 a la tarifa de adulto.",
-      "fareRow": "{{from}} → {{to}} — ${{price}}",
+      "fareRow": "{{from}} → {{to}} | ${{price}}",
       "ferryHeading": "Conexión con Ferry",
       "ferryBody": "La estación SMART de Larkspur conecta directamente con la terminal de ferry de Larkspur con servicio hacia San Francisco.",
       "ferryLink": "Ver horario y detalles de la conexión →",
@@ -311,7 +311,7 @@
       "schemaDescription": "Estación ferroviaria de cercanías SMART (Sonoma-Marin Area Rail Transit) en {{station}}."
     },
     "route": {
-      "title": "Horario de tren SMART de {{from}} a {{to}} — {{site}}",
+      "title": "Horario de tren SMART de {{from}} a {{to}} | {{site}}",
       "description": "Horario del tren SMART de {{from}} a {{to}}: salidas entre semana y fin de semana, duración del viaje y tarifas.",
       "h1": "Tren SMART: de {{from}} a {{to}}",
       "intro": "Servicio ferroviario SMART {{direction}} de {{from}} a {{to}}. Horarios de salida, llegada y tarifas abajo.",
@@ -338,7 +338,7 @@
       "viewReverse": "Viaje inverso: de {{from}} a {{to}}"
     },
     "ferry": {
-      "title": "Conexión con Ferry de Larkspur — {{site}}",
+      "title": "Conexión con Ferry de Larkspur | {{site}}",
       "description": "Horario del ferry que conecta la estación SMART de Larkspur con San Francisco. Salidas entre semana y fin de semana.",
       "h1": "Conexión con Ferry de Larkspur",
       "intro": "La estación SMART de Larkspur conecta directamente con la terminal de ferry de Larkspur con servicio regular al Ferry Building de San Francisco. Hay opciones de billete combinado disponibles vía Clipper.",

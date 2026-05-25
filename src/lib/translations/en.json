@@ -265,9 +265,9 @@
       }
     },
     "station": {
-      "title": "{{station}} SMART Train Station Schedule — {{site}}",
+      "title": "{{station}} SMART Train Station Schedule | {{site}}",
       "description": "Full SMART train schedule for {{station}} station. Weekday and weekend departures, fares, and connections.",
-      "h1": "{{station}} SMART Train Station — Schedule & Service Info",
+      "h1": "{{station}} SMART Train Station | Schedule & Service Info",
       "breadcrumb": "{{station}} Station",
       "zonePill": "Zone {{zone}}",
       "intro": {
@@ -284,7 +284,7 @@
       "noService": "No scheduled trains.",
       "fareHeading": "Fares from {{station}}",
       "fareZone": "{{station}} is in fare zone {{zone}}. Fares are zone-based; each zone adds $1.50 for adult fares.",
-      "fareRow": "{{from}} → {{to}} — ${{price}}",
+      "fareRow": "{{from}} → {{to}} | ${{price}}",
       "ferryHeading": "Ferry Connection",
       "ferryBody": "Larkspur SMART station connects directly to the Larkspur Ferry Terminal with onward service to San Francisco.",
       "ferryLink": "See ferry schedule and connection details →",
@@ -311,7 +311,7 @@
       "schemaDescription": "SMART (Sonoma-Marin Area Rail Transit) commuter rail station at {{station}}."
     },
     "route": {
-      "title": "{{from}} to {{to}} SMART Train Schedule — {{site}}",
+      "title": "{{from}} to {{to}} SMART Train Schedule | {{site}}",
       "description": "SMART train schedule from {{from}} to {{to}}: weekday and weekend departures, trip time, and fares.",
       "h1": "SMART Train: {{from}} to {{to}}",
       "intro": "{{direction}} SMART rail service from {{from}} to {{to}}. Departure times, arrival times, and fares below.",
@@ -338,7 +338,7 @@
       "viewReverse": "Reverse trip: {{from}} to {{to}}"
     },
     "ferry": {
-      "title": "Larkspur Ferry Connection — {{site}}",
+      "title": "Larkspur Ferry Connection | {{site}}",
       "description": "Ferry schedule connecting the Larkspur SMART station to San Francisco. Weekday and weekend departures.",
       "h1": "Larkspur Ferry Connection",
       "intro": "The Larkspur SMART station connects directly to the Larkspur Ferry Terminal with regular service to San Francisco's Ferry Building. Combined ticketing options are available via Clipper.",

@@ -139,6 +139,11 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 /** Tracks in-flight setTimeout handles on web so we can cancel a reminder. */
 const webTimers = new Map<number, number>();
 
+/** Public URL of the app icon used for web Notification.icon. apple-touch-
+ *  icon.png is a 180×180 PNG already served from /public, which is the
+ *  shape browsers expect for notification icons. */
+const WEB_NOTIFICATION_ICON = "/apple-touch-icon.png";
+
 function fireWebNotification(reminder: DepartureReminder): void {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
@@ -146,6 +151,8 @@ function fireWebNotification(reminder: DepartureReminder): void {
     new Notification(reminder.title, {
       body: reminder.body,
       tag: `smart-trip-reminder-${reminder.id}`,
+      icon: WEB_NOTIFICATION_ICON,
+      badge: WEB_NOTIFICATION_ICON,
     });
   } catch (error) {
     logger.warn("Failed to fire web notification", error);

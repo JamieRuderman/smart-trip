@@ -142,8 +142,13 @@ describe("deriveServiceTypes", () => {
     expect(result.has("far")).toBe(false);
   });
 
-  it("honours today-only calendar_dates exceptions", () => {
-    // Memorial Day Monday: weekday service removed, weekend service forced on.
+  it("classifies by canonical day pattern even on holiday exception dates", () => {
+    // Memorial Day Monday: calendar_dates removes the weekday service and
+    // adds the weekend one. We deliberately ignore those today-only
+    // exceptions during static classification — the SPA's runtime
+    // getTodayScheduleType() handles "show weekend on holidays" instead.
+    // Without this, the sanity floor in transform.ts trips on 0 weekday
+    // trips every time a federal holiday falls on a Monday-Friday.
     const calendar: GtfsCalendar[] = [
       { ...WEEKDAY, service_id: "wk" },
       { ...WEEKEND, service_id: "we" },
@@ -153,7 +158,7 @@ describe("deriveServiceTypes", () => {
       { service_id: "we", date: "20260525", exception_type: "1" },
     ];
     const result = deriveServiceTypes(calendar, exceptions, new Date(2026, 4, 25));
-    expect(result.has("wk")).toBe(false);
+    expect(result.get("wk")).toBe("weekday");
     expect(result.get("we")).toBe("weekend");
   });
 });

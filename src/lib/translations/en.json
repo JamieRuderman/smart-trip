@@ -248,6 +248,7 @@
     },
     "layout": {
       "communityPill": "Community App",
+      "communityPillAria": "Community app on GitHub",
       "home": "SMART trip",
       "lastUpdated": "Schedule data updated {{date}}."
     },

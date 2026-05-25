@@ -12,6 +12,7 @@ import {
   DATA_ATTRIBUTION,
   SITE_DISCLAIMER,
   LANG_PATH_PREFIX,
+  COMMUNITY_REPO_URL,
   type Lang,
 } from "./constants";
 import { translator } from "./i18n";
@@ -90,10 +91,16 @@ export function Layout({
               height={130}
             />
           </a>
-          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium bg-white/15 border border-white/20 whitespace-nowrap">
+          <a
+            href={COMMUNITY_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t("seo.layout.communityPillAria")}
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium bg-white/15 border border-white/20 whitespace-nowrap hover:bg-white/25 transition no-underline text-white"
+          >
             <HeartHandshakeIcon className="h-3.5 w-3.5" />
             {t("seo.layout.communityPill")}
-          </span>
+          </a>
         </div>
       </header>
 

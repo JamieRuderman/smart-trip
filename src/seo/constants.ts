@@ -36,5 +36,10 @@ export const LANG_PATH_PREFIX: Record<Lang, string> = {
 export const APP_STORE_URL =
   "https://apps.apple.com/us/app/smart-trip-community-app/id6758808442" as const;
 
+// GitHub repo — linked from the "Community App" pill in the hero so users
+// can verify the open-source claim. Matches src/components/StickyHeader.tsx.
+export const COMMUNITY_REPO_URL =
+  "https://github.com/JamieRuderman/smart-train-schedule" as const;
+
 // Brand colors (kept in sync with tailwind config + index.html theme-color).
 export const BRAND_PRIMARY = "#11ab75" as const;

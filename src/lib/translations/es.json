@@ -248,6 +248,7 @@
     },
     "layout": {
       "communityPill": "App Comunitaria",
+      "communityPillAria": "App comunitaria en GitHub",
       "home": "SMART trip",
       "lastUpdated": "Datos del horario actualizados el {{date}}."
     },

@@ -76,7 +76,7 @@ export function Layout({
     <div className="min-h-screen bg-background text-foreground">
       {/* Green hero — matches the SPA's bg-smart-train-green header band */}
       <header className="bg-smart-train-green text-white">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex items-start sm:items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-4 flex-wrap">
           <a
             href={`${LANG_PATH_PREFIX[lang]}/`}
             className="block hover:opacity-90"

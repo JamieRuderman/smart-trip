@@ -99,7 +99,7 @@ export function Layout({
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">{children}</main>
 
-      <footer className="max-w-4xl mx-auto px-4 py-8 mt-8 border-t text-sm text-muted-foreground space-y-2">
+      <footer className="max-w-4xl mx-auto px-4 py-8 text-sm text-muted-foreground space-y-2">
         <p>{t("seo.layout.lastUpdated", { date: generatedDate })}</p>
         <p>{DATA_ATTRIBUTION}</p>
         <p>{SITE_DISCLAIMER}</p>

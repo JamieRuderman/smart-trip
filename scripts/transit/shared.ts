@@ -150,13 +150,17 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-// Window we accept for classifying a calendar.txt row as "active".
-// 511 occasionally publishes a fresh GTFS bundle whose service window
-// starts a few days in the future (e.g. the weekend service starts on
-// Saturday but the bundle goes live on Friday). Without a look-ahead,
-// the Friday refresh sees zero weekend trips and trips the sanity floor
-// — see issue #43. Two weeks comfortably covers the typical publication
-// cadence without admitting services that are still many weeks out.
+// Look-ahead applied when deciding whether a calendar.txt row is in scope
+// for classification. 511 occasionally publishes a fresh GTFS bundle whose
+// service window starts a few days in the future — e.g. the weekend
+// service starts on Saturday but the bundle goes live on Friday. Without
+// the look-ahead, the Friday refresh sees zero weekend trips and the
+// sanity floor trips (issue #43). Two weeks comfortably covers the
+// typical publication cadence without admitting services many weeks out.
+//
+// This is the ONLY remaining today-relative behavior in deriveServiceTypes:
+// today-only calendar_dates exceptions used to filter classification but
+// no longer do — see commit 761ccc0.
 const SERVICE_LOOKAHEAD_DAYS = 14;
 
 function formatGtfsDate(date: Date): string {
@@ -168,7 +172,6 @@ function formatGtfsDate(date: Date): string {
 
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
-  calendarDateRows: GtfsCalendarDate[],
   referenceDate?: Date,
 ): Map<string, ScheduleType> {
   const ref = referenceDate ?? new Date();
@@ -177,14 +180,15 @@ export function deriveServiceTypes(
   horizon.setDate(horizon.getDate() + SERVICE_LOOKAHEAD_DAYS);
   const horizonDateStr = formatGtfsDate(horizon);
 
-  const addedServices = new Set<string>();
-  const removedServices = new Set<string>();
-  for (const row of calendarDateRows) {
-    if (row.date === refDateStr) {
-      if (row.exception_type === "1") addedServices.add(row.service_id);
-      if (row.exception_type === "2") removedServices.add(row.service_id);
-    }
-  }
+  // We intentionally ignore today-only calendar_dates exceptions when
+  // classifying services. The output of this transform is the *static*
+  // schedule shipped with the app — it should represent SMART's canonical
+  // weekday vs weekend operating patterns, not "what's running today."
+  // Previously, when today was a US federal weekday-holiday (e.g. Memorial
+  // Day), the weekday service was removed by exception_type=2 and the
+  // sanity floor at the end of the transform tripped on 0 weekday trips.
+  // The SPA has its own runtime getTodayScheduleType() that flips display
+  // to "weekend" on holidays — that's where today-awareness belongs.
 
   const serviceTypes = new Map<string, ScheduleType>();
 
@@ -192,15 +196,12 @@ export function deriveServiceTypes(
     const startDate = row.start_date ?? "";
     const endDate = row.end_date ?? "";
 
-    // Overlap [today, today + lookahead] with [startDate, endDate]: the
-    // service is either active today or scheduled to become active within
-    // the look-ahead horizon.
+    // Overlap [today, today + lookahead] with [startDate, endDate]: only
+    // consider services whose date window intersects the near future, so
+    // we don't classify services that haven't started or have expired.
     const overlapsWindow =
       startDate <= horizonDateStr && refDateStr <= endDate;
-    const isActive =
-      (overlapsWindow && !removedServices.has(row.service_id)) ||
-      addedServices.has(row.service_id);
-    if (!isActive) continue;
+    if (!overlapsWindow) continue;
 
     const weekdayActive = (
       ["monday", "tuesday", "wednesday", "thursday", "friday"] as const
@@ -580,7 +581,7 @@ export function buildTrainSchedules(
 ): TrainSchedulesOutput {
   const stationCount = stations.length;
   const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
-  const serviceTypes = deriveServiceTypes(feed.calendar, feed.calendarDates);
+  const serviceTypes = deriveServiceTypes(feed.calendar);
 
   const schedules: TrainSchedulesOutput = {
     weekday: { northbound: [], southbound: [] },
@@ -665,7 +666,7 @@ export function buildTrainSchedules(
 }
 
 export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
-  const serviceTypes = deriveServiceTypes(feed.calendar, feed.calendarDates);
+  const serviceTypes = deriveServiceTypes(feed.calendar);
 
   // Anchor on the route_id so the trip set doesn't depend on stop names.
   // If the route disappears the sanity floor fails the run.

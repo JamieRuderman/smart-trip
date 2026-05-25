@@ -241,5 +241,118 @@
     "arrivingSoon": "Arriving soon",
     "onTheWay": "On the way",
     "atDestination": "At destination"
+  },
+  "seo": {
+    "site": {
+      "alternateName": "SMART Train Schedule (Community)"
+    },
+    "layout": {
+      "communityPill": "Community App",
+      "communityPillAria": "Community app on GitHub",
+      "home": "SMART trip",
+      "lastUpdated": "Schedule data updated {{date}}."
+    },
+    "cta": {
+      "aria": "Get the SMART train iOS app or open the live web app",
+      "ios": {
+        "title": "Get the SMART trip iOS app",
+        "subtitle": "Live departures, trip planning, and service alerts on your iPhone.",
+        "appStore": "Download on the App Store"
+      },
+      "desktop": {
+        "title": "Open the live map and schedule",
+        "subtitle": "See where every train is right now and plan your next trip.",
+        "button": "Launch SMART trip"
+      }
+    },
+    "station": {
+      "title": "{{station}} SMART Train Station Schedule | {{site}}",
+      "description": "Full SMART train schedule for {{station}} station. Weekday and weekend departures, fares, and connections.",
+      "h1Main": "{{station}} SMART Train Station",
+      "h1Sub": "Schedule & Service Info",
+      "breadcrumb": "{{station}} Station",
+      "zonePill": "Zone {{zone}}",
+      "intro": {
+        "north-end": "{{station}} is the northern terminus of the SMART rail line, in fare zone {{zone}}. All northbound trains end here; southbound service begins from this platform.",
+        "south-end": "{{station}} is the southern terminus of the SMART rail line, in fare zone {{zone}}, with direct ferry connections to San Francisco. All southbound trains end here.",
+        "middle": "{{station}} is a mid-line SMART rail station in fare zone {{zone}}, served by northbound and southbound trains throughout the day."
+      },
+      "weekdayHeading": "Weekday Schedule at {{station}}",
+      "weekendHeading": "Weekend & Holiday Schedule at {{station}}",
+      "northbound": "Northbound (toward Windsor)",
+      "southbound": "Southbound (toward Larkspur)",
+      "tripColumn": "Train",
+      "timeColumn": "Time",
+      "noService": "No scheduled trains.",
+      "fareHeading": "Fares from {{station}}",
+      "fareZone": "{{station}} is in fare zone {{zone}}. Fares are zone-based; each zone adds $1.50 for adult fares.",
+      "ferryHeading": "Ferry Connection",
+      "ferryBody": "Larkspur SMART station connects directly to the Larkspur Ferry Terminal with onward service to San Francisco.",
+      "ferryLink": "See ferry schedule and connection details →",
+      "faqHeading": "Frequently Asked Questions",
+      "faq": {
+        "cost": {
+          "q": "How much does the SMART train cost from {{station}}?",
+          "a": "Fares from {{station}} depend on how many fare zones you travel. Adult fares are $1.50 per zone; youth (0-18) and seniors (65+) ride free."
+        },
+        "firstTrain": {
+          "q": "What time does the first SMART train leave {{station}}?",
+          "a": "Check the weekday and weekend schedule tables above for the first and last departures from {{station}}."
+        },
+        "parking": {
+          "q": "Is there parking at {{station}}?",
+          "a": "Most SMART stations offer free parking. Check the official SMART agency website for the latest information specific to {{station}}."
+        }
+      },
+      "otherStationsHeading": "Other SMART Stations",
+      "prev": "{{station}} (north)",
+      "next": "{{station}} (south)",
+      "lastUpdated": "Schedule data updated {{date}}.",
+      "schemaName": "{{station}} SMART Train Station",
+      "schemaDescription": "SMART (Sonoma-Marin Area Rail Transit) commuter rail station at {{station}}."
+    },
+    "route": {
+      "title": "{{from}} to {{to}} SMART Train Schedule | {{site}}",
+      "description": "SMART train schedule from {{from}} to {{to}}: weekday and weekend departures, trip time, and fares.",
+      "h1": "SMART Train: {{from}} to {{to}}",
+      "intro": "{{direction}} SMART rail service from {{from}} to {{to}}. Departure times, arrival times, and fares below.",
+      "breadcrumb": "to {{to}}",
+      "weekdayHeading": "Weekday Departures",
+      "weekendHeading": "Weekend & Holiday Departures",
+      "tripColumn": "Train",
+      "departColumn": "Depart {{from}}",
+      "arriveColumn": "Arrive {{to}}",
+      "durationColumn": "Duration",
+      "noService": "No scheduled trains in this direction.",
+      "minutes": "{{mins}} min",
+      "hours": "{{hours}} hr",
+      "hoursMinutes": "{{hours}} hr {{mins}} min",
+      "fareLabel": "Adult one-way fare",
+      "directionLabel": "Direction",
+      "dir": {
+        "northbound": "Northbound",
+        "southbound": "Southbound"
+      },
+      "zonesPill": "{{zones}} zones",
+      "relatedHeading": "Related Pages",
+      "viewStation": "{{station}} station schedule",
+      "viewReverse": "Reverse trip: {{from}} to {{to}}"
+    },
+    "ferry": {
+      "title": "Larkspur Ferry Connection | {{site}}",
+      "description": "Ferry schedule connecting the Larkspur SMART station to San Francisco. Weekday and weekend departures.",
+      "h1": "Larkspur Ferry Connection",
+      "intro": "The Larkspur SMART station connects directly to the Larkspur Ferry Terminal with regular service to San Francisco's Ferry Building. Combined ticketing options are available via Clipper.",
+      "breadcrumb": "Ferry Connection",
+      "weekdayHeading": "Weekday Ferries",
+      "weekendHeading": "Weekend Ferries",
+      "outboundHeading": "Larkspur → San Francisco",
+      "inboundHeading": "San Francisco → Larkspur",
+      "noService": "No scheduled ferries.",
+      "departColumn": "Depart",
+      "arriveColumn": "Arrive",
+      "relatedHeading": "Related Pages",
+      "larkspurLink": "Larkspur SMART station schedule"
+    }
   }
 }

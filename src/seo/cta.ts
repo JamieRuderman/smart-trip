@@ -61,13 +61,15 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
   const buttonClass =
     "inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90 transition no-underline";
 
-  // iOS CTA uses Apple's official App Store badge image per their marketing
-  // guidelines — no surrounding button background, no modifications to the
-  // artwork. h-[44px] is just above Apple's 40px minimum. We use the English
-  // badge in both languages because Apple distributes it that way and the
-  // mark is globally recognized; only the heading/subtitle translate.
+  // iOS CTA: app icon + Apple's official App Store badge in one tap target.
+  // The badge artwork is used unmodified per Apple's marketing guidelines;
+  // its minimum 1/10-of-height clear space is respected via the gap-3
+  // (12px) between icon and badge, well above the ~4.4px minimum at h-[44px].
+  // We use the English badge in both languages because Apple distributes
+  // it that way globally and the mark is internationally recognized.
   const badgeLinkClass =
-    "inline-block hover:opacity-90 transition no-underline";
+    "inline-flex items-center gap-3 hover:opacity-90 transition no-underline";
+  const appIconClass = "h-11 w-11 rounded-[10px] block";
   const badgeImgClass = "h-[44px] w-auto block";
 
   return `<aside class="${blockClass}" data-cta-position="${position}" aria-label="${escapeHtml(t("seo.cta.aria"))}">
@@ -75,6 +77,7 @@ export function renderCta({ lang, webappQuery, position }: CtaProps): string {
     <h2 class="${headingClass}">${escapeHtml(t("seo.cta.ios.title"))}</h2>
     <p class="${subtitleClass}">${escapeHtml(t("seo.cta.ios.subtitle"))}</p>
     <a class="${badgeLinkClass}" href="${escapeHtml(APP_STORE_URL)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(t("seo.cta.ios.appStore"))}">
+      <img src="/apple-touch-icon.png" alt="" class="${appIconClass}" width="44" height="44" />
       <img src="/badges/app-store-en.svg" alt="${escapeHtml(t("seo.cta.ios.appStore"))}" class="${badgeImgClass}" width="132" height="44" />
     </a>
   </div>

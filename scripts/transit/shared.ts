@@ -168,7 +168,8 @@ function formatGtfsDate(date: Date): string {
 
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
-  calendarDateRows: GtfsCalendarDate[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _calendarDateRows: GtfsCalendarDate[],
   referenceDate?: Date,
 ): Map<string, ScheduleType> {
   const ref = referenceDate ?? new Date();
@@ -177,14 +178,15 @@ export function deriveServiceTypes(
   horizon.setDate(horizon.getDate() + SERVICE_LOOKAHEAD_DAYS);
   const horizonDateStr = formatGtfsDate(horizon);
 
-  const addedServices = new Set<string>();
-  const removedServices = new Set<string>();
-  for (const row of calendarDateRows) {
-    if (row.date === refDateStr) {
-      if (row.exception_type === "1") addedServices.add(row.service_id);
-      if (row.exception_type === "2") removedServices.add(row.service_id);
-    }
-  }
+  // We intentionally ignore today-only calendar_dates exceptions when
+  // classifying services. The output of this transform is the *static*
+  // schedule shipped with the app — it should represent SMART's canonical
+  // weekday vs weekend operating patterns, not "what's running today."
+  // Previously, when today was a US federal weekday-holiday (e.g. Memorial
+  // Day), the weekday service was removed by exception_type=2 and the
+  // sanity floor at the end of the transform tripped on 0 weekday trips.
+  // The SPA has its own runtime getTodayScheduleType() that flips display
+  // to "weekend" on holidays — that's where today-awareness belongs.
 
   const serviceTypes = new Map<string, ScheduleType>();
 
@@ -192,15 +194,12 @@ export function deriveServiceTypes(
     const startDate = row.start_date ?? "";
     const endDate = row.end_date ?? "";
 
-    // Overlap [today, today + lookahead] with [startDate, endDate]: the
-    // service is either active today or scheduled to become active within
-    // the look-ahead horizon.
+    // Overlap [today, today + lookahead] with [startDate, endDate]: only
+    // consider services whose date window intersects the near future, so
+    // we don't classify services that haven't started or have expired.
     const overlapsWindow =
       startDate <= horizonDateStr && refDateStr <= endDate;
-    const isActive =
-      (overlapsWindow && !removedServices.has(row.service_id)) ||
-      addedServices.has(row.service_id);
-    if (!isActive) continue;
+    if (!overlapsWindow) continue;
 
     const weekdayActive = (
       ["monday", "tuesday", "wednesday", "thursday", "friday"] as const

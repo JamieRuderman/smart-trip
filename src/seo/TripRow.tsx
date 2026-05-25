@@ -97,7 +97,7 @@ export function TripRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border bg-card",
+        "flex items-center gap-3 pl-3 pr-4 py-2 rounded-lg border bg-card",
         muted && "opacity-50",
       )}
     >

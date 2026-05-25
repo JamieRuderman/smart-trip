@@ -111,17 +111,21 @@ export function TripRow({
         <TripIcon className="h-5 w-5" aria-hidden="true" />
         <span className="text-xl font-semibold tabular-nums">{tripNumber}</span>
       </div>
-      <span className="font-mono text-sm">{time}</span>
-      {arriveTime ? (
-        <>
-          <span className="text-muted-foreground" aria-hidden="true">
-            →
-          </span>
-          <span className="font-mono text-sm">{arriveTime}</span>
-        </>
-      ) : null}
+      {/* Times right-aligned via ml-auto so the column reads as a vertical
+          stack of monospace times regardless of the row's left content. */}
+      <div className="ml-auto flex items-center gap-2 font-mono text-sm tabular-nums">
+        <span>{time}</span>
+        {arriveTime ? (
+          <>
+            <span className="text-muted-foreground" aria-hidden="true">
+              →
+            </span>
+            <span>{arriveTime}</span>
+          </>
+        ) : null}
+      </div>
       {trailing ? (
-        <span className="ml-auto text-xs text-muted-foreground">{trailing}</span>
+        <span className="text-xs text-muted-foreground shrink-0">{trailing}</span>
       ) : null}
     </div>
   );

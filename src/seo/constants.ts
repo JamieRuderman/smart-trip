@@ -13,7 +13,9 @@ export const SITE_NAME = "SMART trip" as const;
 export const SITE_TAGLINE =
   "Community-built SMART train schedules for Sonoma-Marin Area Rail Transit" as const;
 export const SITE_DISCLAIMER =
-  "Not affiliated with Sonoma-Marin Area Rail Transit (SMART) | this is an open-source community project." as const;
+  "Not affiliated with Sonoma-Marin Area Rail Transit (SMART)." as const;
+export const SITE_COMMUNITY_NOTE =
+  "This is an open-source community project." as const;
 
 export const AUTHOR_NAME = "Jamie Ruderman" as const;
 

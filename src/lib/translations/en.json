@@ -286,7 +286,6 @@
       "noService": "No scheduled trains.",
       "fareHeading": "Fares from {{station}}",
       "fareZone": "{{station}} is in fare zone {{zone}}. Fares are zone-based; each zone adds $1.50 for adult fares.",
-      "fareRow": "{{from}} → {{to}} | ${{price}}",
       "ferryHeading": "Ferry Connection",
       "ferryBody": "Larkspur SMART station connects directly to the Larkspur Ferry Terminal with onward service to San Francisco.",
       "ferryLink": "See ferry schedule and connection details →",

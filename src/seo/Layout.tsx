@@ -11,6 +11,7 @@ import {
   SITE_NAME,
   DATA_ATTRIBUTION,
   SITE_DISCLAIMER,
+  SITE_COMMUNITY_NOTE,
   LANG_PATH_PREFIX,
   COMMUNITY_REPO_URL,
   type Lang,
@@ -110,6 +111,7 @@ export function Layout({
         <p>{t("seo.layout.lastUpdated", { date: generatedDate })}</p>
         <p>{DATA_ATTRIBUTION}</p>
         <p>{SITE_DISCLAIMER}</p>
+        <p>{SITE_COMMUNITY_NOTE}</p>
         <p>
           <a
             href={`${LANG_PATH_PREFIX[altLangCode]}${alternateLangPath}`}

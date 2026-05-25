@@ -286,7 +286,6 @@
       "noService": "Sin trenes programados.",
       "fareHeading": "Tarifas desde {{station}}",
       "fareZone": "{{station}} está en la zona tarifaria {{zone}}. Las tarifas son por zonas; cada zona añade $1.50 a la tarifa de adulto.",
-      "fareRow": "{{from}} → {{to}} | ${{price}}",
       "ferryHeading": "Conexión con Ferry",
       "ferryBody": "La estación SMART de Larkspur conecta directamente con la terminal de ferry de Larkspur con servicio hacia San Francisco.",
       "ferryLink": "Ver horario y detalles de la conexión →",

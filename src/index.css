@@ -79,8 +79,13 @@ All colors MUST be HSL.
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s ease;
 
-    /* Safe area insets */
+    /* Safe area insets.
+       --safe-area-bottom is 0 by default (so iOS content reaches the screen
+       edge as designed) and only picks up the system inset on Android, where
+       the WebView runs edge-to-edge under the nav bar. The override lives in
+       the .platform-android body class set by useNativeUi. */
     --safe-area-top: max(1rem, env(safe-area-inset-top, 0px));
+    --safe-area-bottom: 0px;
 
     --sidebar-background: 0 0% 98%;
 
@@ -284,6 +289,13 @@ body.keyboard-visible .pb-safe {
   /* Extra bottom padding for Android edge-to-edge navigation bar */
   .platform-android .pb-safe {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+
+  /* Android runs edge-to-edge under the nav bar — expose the real inset so
+     bottom-anchored containers (map, sheets) can lift above it. iOS keeps
+     the default 0 so designs reach the screen edge. */
+  .platform-android {
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .pt-safe {

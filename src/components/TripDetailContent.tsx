@@ -485,11 +485,12 @@ export function TripDetailContent({
         </div>
       )}
 
-      {/* Scrollable stop timeline */}
+      {/* Scrollable stop timeline. AppSheet pads its container for the
+          Android nav bar / iOS home indicator, so this just needs a normal
+          bottom gap. */}
       <div
         data-sheet-scroll-area="true"
-        className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1"
-        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1 pb-6"
       >
         <StopTimeline
           trip={trip}

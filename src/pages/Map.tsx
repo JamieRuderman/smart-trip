@@ -419,11 +419,16 @@ function MapContents() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      {/* Map container */}
+      {/* Map container — leave room for the Android nav bar so the map and
+          Mapbox attribution don't render behind it. --safe-area-bottom is 0
+          on iOS so the map still reaches the screen edge there. */}
       <div
         ref={mapContainerRef}
-        className="absolute inset-0"
-        style={cssVars as React.CSSProperties}
+        className="absolute inset-x-0 top-0"
+        style={{
+          ...(cssVars as React.CSSProperties),
+          bottom: "var(--safe-area-bottom)",
+        }}
       />
 
       {/* Back button – top-left */}

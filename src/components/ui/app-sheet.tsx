@@ -221,6 +221,9 @@ export function AppSheet({
         style={{
           transitionDuration: `${SHEET_TRANSITION_MS}ms`,
           transitionTimingFunction: SHEET_EASING,
+          // Keep inner content above the Android nav bar. --safe-area-bottom
+          // is 0 on iOS so the sheet still reaches the screen edge there.
+          paddingBottom: "var(--safe-area-bottom)",
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

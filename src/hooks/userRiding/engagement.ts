@@ -8,9 +8,11 @@ import {
   DEPARTURE_MATCH_WINDOW_MS,
   ENGAGE_COLOCATION_KM,
   ENGAGE_PROXIMITY_KM,
+  ENGAGE_PROXIMITY_MAX_KM,
   ENGAGE_SPEED_MPS,
   ON_CORRIDOR_KM,
   ON_CORRIDOR_SEARCH_KM,
+  PROXIMITY_LAG_BUDGET_S,
 } from "./constants";
 import { classifyHeading, distanceToCorridorKm } from "./corridor";
 import type {
@@ -139,10 +141,17 @@ function trackMotionMatch(
   const userDirId = classifyHeading(user.heading);
   if (userDirId == null) return null;
 
-  const sameDir = candidates.filter(
-    (c) => c.train.directionId === userDirId && c.distKm <= ON_CORRIDOR_SEARCH_KM,
+  // A train missing `direction_id` in the feed (happens intermittently)
+  // shouldn't kill the match — treat null as a pass and prefer an explicit
+  // same-direction candidate if one exists.
+  const compatible = candidates.filter(
+    (c) =>
+      c.distKm <= ON_CORRIDOR_SEARCH_KM &&
+      (c.train.directionId == null || c.train.directionId === userDirId),
   );
-  return sameDir.length > 0 ? sameDir[0].train.key : null;
+  if (compatible.length === 0) return null;
+  const sameDir = compatible.find((c) => c.train.directionId === userDirId);
+  return (sameDir ?? compatible[0]).train.key;
 }
 
 function buildCandidates(
@@ -235,9 +244,20 @@ function coldStartFallback(
   const colocatedPick = pickBest(colocated);
   if (colocatedPick) return colocatedPick.train.key;
 
-  // Tier 2: nearby — within 0.9 km, any candidate direction that matches.
+  // Tier 2: nearby. Radius scales with phone speed because GTFS-RT lag
+  // translates to "marker behind the rider" linearly with speed — at 30 m/s
+  // (~67 mph) a 60 s feed lag puts the train icon 1.8 km behind the true
+  // position. A fixed 0.9 km radius rejects the obvious match on fast
+  // trains. Capped so a noisy GPS speed can't latch something miles off.
+  const proximityKm = Math.min(
+    ENGAGE_PROXIMITY_MAX_KM,
+    Math.max(
+      ENGAGE_PROXIMITY_KM,
+      (user.speedMps ?? 0) * PROXIMITY_LAG_BUDGET_S / 1000,
+    ),
+  );
   const nearby = candidates.filter(
-    (c) => c.distKm <= ENGAGE_PROXIMITY_KM && directionMatches(c),
+    (c) => c.distKm <= proximityKm && directionMatches(c),
   );
   const nearbyPick = pickBest(nearby);
   if (nearbyPick) return nearbyPick.train.key;

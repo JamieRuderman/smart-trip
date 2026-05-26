@@ -32,11 +32,25 @@ export const TRAIN_AT_STATION_KM = 0.15;
 /** Co-location radius — fallback tier 1. */
 export const ENGAGE_COLOCATION_KM = 0.15;
 
-/** Proximity radius for fallback tier 2 (movement signal required). */
+/** Base proximity radius for fallback tier 2 (movement signal required).
+ *  Effective radius is widened per-tick by the user's speed × the GTFS-RT
+ *  lag budget — see `proximityBudgetKm()`. */
 export const ENGAGE_PROXIMITY_KM = 0.9;
 
-/** Perpendicular corridor tolerance for fallback tier 3. */
-export const ON_CORRIDOR_KM = 0.2;
+/** Seconds of GTFS-RT staleness to budget for when scaling the Tier 2
+ *  proximity radius by the user's current speed. Covers server-side cache
+ *  (15 s), client poll interval (15 s), and feed-side update cadence. */
+export const PROXIMITY_LAG_BUDGET_S = 60;
+
+/** Hard ceiling on the lag-budgeted proximity radius so a noisy speed
+ *  reading can't latch a train miles away. */
+export const ENGAGE_PROXIMITY_MAX_KM = 3.0;
+
+/** Perpendicular corridor tolerance for fallback tier 3. The rail polyline
+ *  is simplified to ~62 points, so a passenger on the bowed Petaluma↔Novato
+ *  stretch can sit > 200 m from the nearest segment. 400 m absorbs that
+ *  without picking up obviously-off-corridor positions. */
+export const ON_CORRIDOR_KM = 0.4;
 
 /** Search radius around the user when picking a corridor candidate. */
 export const ON_CORRIDOR_SEARCH_KM = 5.0;

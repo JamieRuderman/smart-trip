@@ -5,6 +5,9 @@ import type { TrainTransitionMap, UserSample } from "./types";
 
 // Coordinates near Santa Rosa North — squarely on the SMART rail corridor.
 const ON_RAIL = { lat: 38.4661, lng: -122.7268 } as const;
+// Roughly 1.4 km south along the rail from ON_RAIL — used to simulate a
+// GTFS-RT train marker lagging behind the user's true position.
+const SOUTH_OF_RAIL = { lat: 38.4536, lng: -122.7268 } as const;
 
 function makeUser(overrides: Partial<UserSample> = {}): UserSample {
   return {
@@ -99,6 +102,47 @@ describe("pickTrainToLatch — cold-start fallback", () => {
     const result = pickTrainToLatch({
       user: makeUser({ speedMps: 0 }),
       trains: [makeTrain({ speed: 20 })],
+      transitions: emptyTransitions,
+      recentDeparture: null,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("latches a same-direction train ~1.4 km behind when the user is fast (lag-budgeted Tier 2)", () => {
+    // At 28 m/s (~62 mph), the 60 s GTFS-RT lag budget widens Tier 2's
+    // proximity radius to ~1.68 km — enough to cover a train marker that's
+    // ~1.4 km south of the user's true position.
+    const result = pickTrainToLatch({
+      user: makeUser({ speedMps: 28, heading: 180 }),
+      trains: [
+        makeTrain({
+          key: "tLag",
+          latitude: SOUTH_OF_RAIL.lat,
+          longitude: SOUTH_OF_RAIL.lng,
+          directionId: 0,
+          speed: 28,
+        }),
+      ],
+      transitions: emptyTransitions,
+      recentDeparture: null,
+    });
+    expect(result).toEqual({ key: "tLag", source: "fallback" });
+  });
+
+  it("does NOT latch a 1.4 km-distant train when the user is barely moving", () => {
+    // Slow user (4 m/s) → lag budget is ~0.24 km, falls below the base
+    // 0.9 km radius. A train 1.4 km away stays unmatched.
+    const result = pickTrainToLatch({
+      user: makeUser({ speedMps: 4, heading: 180 }),
+      trains: [
+        makeTrain({
+          key: "tLag",
+          latitude: SOUTH_OF_RAIL.lat,
+          longitude: SOUTH_OF_RAIL.lng,
+          directionId: 0,
+          speed: 4,
+        }),
+      ],
       transitions: emptyTransitions,
       recentDeparture: null,
     });

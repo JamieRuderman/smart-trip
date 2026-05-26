@@ -43,11 +43,32 @@ function haversineMeters(
   return haversineKm(lat1, lng1, lat2, lng2) * 1000;
 }
 
+/** Initial bearing (degrees, 0=N) from point A to point B. */
+function bearingDegrees(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lng2 - lng1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/** Minimum movement (meters) between samples before a derived heading is
+ *  meaningful — below this, the bearing is dominated by GPS jitter. */
+const HEADING_DERIVE_MIN_METERS = 8;
+
 function normalizeCoordinates(
   pos: GeolocationPosition,
   previous: Coordinates | null,
 ): Coordinates {
   const rawSpeed = pos.coords.speed;
+  const rawHeading = pos.coords.heading;
   const timestampMs = Number.isFinite(pos.timestamp)
     ? pos.timestamp
     : Date.now();
@@ -56,8 +77,12 @@ function normalizeCoordinates(
     typeof rawSpeed === "number" && Number.isFinite(rawSpeed) && rawSpeed >= 0
       ? rawSpeed
       : null;
+  let heading =
+    typeof rawHeading === "number" && Number.isFinite(rawHeading)
+      ? rawHeading
+      : null;
 
-  if (speedMps == null && previous) {
+  if ((speedMps == null || heading == null) && previous) {
     const dtSeconds = (timestampMs - previous.timestampMs) / 1000;
     if (dtSeconds >= 1.5) {
       const meters = haversineMeters(
@@ -66,7 +91,18 @@ function normalizeCoordinates(
         pos.coords.latitude,
         pos.coords.longitude,
       );
-      speedMps = meters / dtSeconds;
+      if (speedMps == null) speedMps = meters / dtSeconds;
+      // Browsers (notably Mobile Safari) often omit `coords.heading` even
+      // when moving. Derive it from the position delta so the riding
+      // detector's direction-classification path can fire on web.
+      if (heading == null && meters >= HEADING_DERIVE_MIN_METERS) {
+        heading = bearingDegrees(
+          previous.lat,
+          previous.lng,
+          pos.coords.latitude,
+          pos.coords.longitude,
+        );
+      }
     }
   }
 
@@ -78,10 +114,7 @@ function normalizeCoordinates(
         ? pos.coords.accuracy
         : null,
     speedMps,
-    heading:
-      typeof pos.coords.heading === "number" && Number.isFinite(pos.coords.heading)
-        ? pos.coords.heading
-        : null,
+    heading,
     timestampMs,
   };
 }

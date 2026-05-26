@@ -3,6 +3,11 @@ import { AlertTriangle, Bell, BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useDepartureReminder } from "@/hooks/useDepartureReminder";
+import {
+  isIOSWebBrowser,
+  isReminderSupported,
+} from "@/lib/departureReminder";
+import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
 import type { Station } from "@/types/smartSchedule";
@@ -252,6 +257,28 @@ export function DepartureReminder({
 
   if (!pickerMounted) {
     if (departureAt <= Date.now() || tooLateToSchedule) return null;
+    // iOS Chrome (and iOS Safari outside of a home-screen PWA) doesn't expose
+    // the Notification API, so there's nothing useful to offer the user
+    // beyond the native app. Other unsupported browsers are rare enough that
+    // hiding the row outright is the cleanest fallback.
+    if (!isReminderSupported()) {
+      if (!isIOSWebBrowser()) return null;
+      return (
+        <GutterRow>
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t("departureReminder.appCta")}
+            >
+              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{t("departureReminder.appCta")}</span>
+            </a>
+          </Button>
+        </GutterRow>
+      );
+    }
     return (
       <GutterRow>
         <Button

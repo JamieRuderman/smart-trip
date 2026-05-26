@@ -10,16 +10,17 @@ import type { TFunction } from "i18next";
  */
 export const REALTIME_STALE_THRESHOLD_MIN = 60;
 
+export type RealtimeAgeTone = "fresh" | "stale" | "unavailable";
+
 /**
  * Format a "last updated X ago" label. Returns the rendered string and a
- * `isStale` flag so the caller can swap icons / color-code without
+ * `tone` discriminator so the caller can swap icons / color-code without
  * re-implementing the threshold.
  *
- * States:
- *   - loading (no data yet, no error):  "Loading…"            (isStale=false)
- *   - unavailable (no data, fetch errored): "Unavailable"     (isStale=true)
- *   - fresh:                                 "Just now" / "Xm ago"
- *   - stale (data older than threshold):     "Stale"          (isStale=true)
+ * Tones:
+ *   - "fresh":       "Loading…" / "Just now" / "Xm ago" — refresh icon, normal text
+ *   - "stale":       "Stale"                            — warning icon + gold text
+ *   - "unavailable": "Unavailable"                      — warning icon, normal text
  *
  * When `lastUpdated` is set we always trust the age label even if the latest
  * poll failed — react-query keeps cached data, and a brief network blip
@@ -31,24 +32,24 @@ export function computeRealtimeAgeLabel(
   lastUpdated: Date | null,
   currentTime: Date,
   isError = false,
-): { text: string; isStale: boolean } {
+): { text: string; tone: RealtimeAgeTone } {
   if (!lastUpdated) {
     if (isError) {
-      return { text: t("schedule.realtimeUnavailable"), isStale: true };
+      return { text: t("schedule.realtimeUnavailable"), tone: "unavailable" };
     }
-    return { text: t("schedule.lastUpdatedLoading"), isStale: false };
+    return { text: t("schedule.lastUpdatedLoading"), tone: "fresh" };
   }
   const diffMin = Math.floor(
     (currentTime.getTime() - lastUpdated.getTime()) / 60000,
   );
   if (diffMin >= REALTIME_STALE_THRESHOLD_MIN) {
-    return { text: t("schedule.stale"), isStale: true };
+    return { text: t("schedule.stale"), tone: "stale" };
   }
   if (diffMin < 1) {
-    return { text: t("schedule.updatedJustNow"), isStale: false };
+    return { text: t("schedule.updatedJustNow"), tone: "fresh" };
   }
   return {
     text: t("schedule.updatedMinutesAgo", { count: diffMin }),
-    isStale: false,
+    tone: "fresh",
   };
 }

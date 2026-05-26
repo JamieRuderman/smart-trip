@@ -4,7 +4,6 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { computeRealtimeAgeLabel } from "@/lib/realtimeAgeLabel";
-import { cn } from "@/lib/utils";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
@@ -26,12 +25,13 @@ export function ScheduleHeader({
   isError,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
-  const { text: updatedLabel, isStale } = computeRealtimeAgeLabel(
+  const { text: updatedLabel, tone } = computeRealtimeAgeLabel(
     t,
     lastUpdated,
     currentTime,
     isError,
   );
+  const isWarning = tone !== "fresh";
 
   return (
     <CardHeader className="p-3 md:p-6">
@@ -45,16 +45,13 @@ export function ScheduleHeader({
             : t("schedule.northboundSchedule")}
         </span>
         <div
-          className={cn(
-            "shrink-0 flex items-center gap-1 text-xs sm:text-sm font-medium text-right tracking-normal",
-            isStale ? "text-smart-gold" : "text-muted-foreground",
-          )}
-          role={isStale ? "status" : undefined}
+          className="shrink-0 flex items-center gap-1 text-xs sm:text-sm font-medium text-right tracking-normal text-muted-foreground"
+          role={isWarning ? "status" : undefined}
         >
           <span>{updatedLabel}</span>
-          {isStale ? (
+          {isWarning ? (
             <AlertTriangle
-              className="h-4 w-4 shrink-0"
+              className="h-4 w-4 shrink-0 text-smart-gold"
               strokeWidth={2}
               aria-hidden="true"
             />

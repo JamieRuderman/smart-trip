@@ -23,7 +23,7 @@ describe("computeRealtimeAgeLabel", () => {
     const result = computeRealtimeAgeLabel(t, null, NOW);
     expect(result).toEqual({
       text: "schedule.lastUpdatedLoading",
-      isStale: false,
+      tone: "fresh",
     });
   });
 
@@ -31,7 +31,7 @@ describe("computeRealtimeAgeLabel", () => {
     const result = computeRealtimeAgeLabel(t, null, NOW, true);
     expect(result).toEqual({
       text: "schedule.realtimeUnavailable",
-      isStale: true,
+      tone: "unavailable",
     });
   });
 
@@ -42,7 +42,7 @@ describe("computeRealtimeAgeLabel", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(2), NOW, true);
     expect(result).toEqual({
       text: "schedule.updatedMinutesAgo[2]",
-      isStale: false,
+      tone: "fresh",
     });
   });
 
@@ -50,7 +50,7 @@ describe("computeRealtimeAgeLabel", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(0), NOW);
     expect(result).toEqual({
       text: "schedule.updatedJustNow",
-      isStale: false,
+      tone: "fresh",
     });
   });
 
@@ -58,7 +58,7 @@ describe("computeRealtimeAgeLabel", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(3), NOW);
     expect(result).toEqual({
       text: "schedule.updatedMinutesAgo[3]",
-      isStale: false,
+      tone: "fresh",
     });
   });
 
@@ -68,7 +68,7 @@ describe("computeRealtimeAgeLabel", () => {
       minutesAgo(REALTIME_STALE_THRESHOLD_MIN - 1),
       NOW,
     );
-    expect(result.isStale).toBe(false);
+    expect(result.tone).toBe("fresh");
     expect(result.text).toBe(
       `schedule.updatedMinutesAgo[${REALTIME_STALE_THRESHOLD_MIN - 1}]`,
     );
@@ -80,11 +80,11 @@ describe("computeRealtimeAgeLabel", () => {
       minutesAgo(REALTIME_STALE_THRESHOLD_MIN),
       NOW,
     );
-    expect(result).toEqual({ text: "schedule.stale", isStale: true });
+    expect(result).toEqual({ text: "schedule.stale", tone: "stale" });
   });
 
   it("stays at 'Stale' for arbitrarily old data (no minute count)", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(101037), NOW);
-    expect(result).toEqual({ text: "schedule.stale", isStale: true });
+    expect(result).toEqual({ text: "schedule.stale", tone: "stale" });
   });
 });

@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 
 import { computeRealtimeAgeLabel } from "@/lib/realtimeAgeLabel";
-import { cn } from "@/lib/utils";
 
 interface MapLiveDataChipProps {
   /** Latest realtime feed timestamp from `useMapTrains().lastUpdated`. */
@@ -26,21 +25,19 @@ export function MapLiveDataChip({ lastUpdated }: MapLiveDataChipProps) {
   }, [lastUpdated]);
 
   if (!lastUpdated) return null;
-  const { text, isStale } = computeRealtimeAgeLabel(t, lastUpdated, now);
+  const { text, tone } = computeRealtimeAgeLabel(t, lastUpdated, now);
+  const isStale = tone === "stale";
 
   return (
     <div
-      className={cn(
-        "absolute right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/95 backdrop-blur-sm shadow-md border border-border text-xs font-medium",
-        isStale ? "text-smart-gold border-smart-gold/40" : "text-muted-foreground",
-      )}
+      className="absolute right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/95 backdrop-blur-sm shadow-md border border-border text-xs font-medium text-muted-foreground"
       style={{ top: "calc(56px + var(--safe-area-top))" }}
       role={isStale ? "status" : undefined}
       aria-live={isStale ? "polite" : undefined}
     >
       {isStale && (
         <AlertTriangle
-          className="h-3 w-3 shrink-0"
+          className="h-3 w-3 shrink-0 text-smart-gold"
           strokeWidth={2}
           aria-hidden="true"
         />

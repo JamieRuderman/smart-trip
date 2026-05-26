@@ -37,13 +37,7 @@ export function MapPreviewCard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={
-              showUnavailable
-                ? "text-xs font-semibold bg-smart-gold text-white rounded-full px-2.5 py-0.5 whitespace-nowrap"
-                : "text-xs font-semibold bg-muted-foreground text-background rounded-full px-2.5 py-0.5 whitespace-nowrap"
-            }
-          >
+          <span className="text-xs font-semibold bg-muted-foreground text-background rounded-full px-2.5 py-0.5 whitespace-nowrap">
             {showUnavailable
               ? t("schedule.realtimeUnavailable")
               : t("mapDiagram.trainsCount", { count: activeCount })}

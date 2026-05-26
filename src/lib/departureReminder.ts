@@ -109,6 +109,35 @@ export function listReminders(): DepartureReminder[] {
   return pruned;
 }
 
+/**
+ * Whether departure reminders can fire in the current environment. Native
+ * (Capacitor) always supports them via LocalNotifications. On the web we
+ * need the Notification API — which iOS Chrome / Firefox / Edge don't expose
+ * at all, and which iOS Safari only exposes for sites installed to the home
+ * screen as a PWA. Used by the UI to swap the picker trigger for an
+ * App Store CTA on iOS web browsers instead of letting the user hit a dead
+ * end on the permission flow.
+ */
+export function isReminderSupported(): boolean {
+  if (Capacitor.isNativePlatform()) return true;
+  if (typeof window === "undefined") return false;
+  return "Notification" in window;
+}
+
+/**
+ * iOS web-browser detection — used to decide whether surfacing the native-app
+ * download CTA is a reasonable fallback when reminders aren't supported.
+ * Excludes Capacitor native iOS (which already has working reminders).
+ *
+ * iPadOS 13+ in desktop mode (UA reports Mac) silently misses out, matching
+ * the existing seo/cta.ts policy.
+ */
+export function isIOSWebBrowser(): boolean {
+  if (Capacitor.isNativePlatform()) return false;
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPod|iPad/i.test(navigator.userAgent);
+}
+
 export async function ensureNotificationPermission(): Promise<boolean> {
   if (Capacitor.isNativePlatform()) {
     try {

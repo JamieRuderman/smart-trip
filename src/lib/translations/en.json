@@ -189,6 +189,7 @@
   "departureReminder": {
     "setReminder": "Add reminder",
     "setReminderConfirm": "Set reminder",
+    "appCta": "Get the app for reminders",
     "label": "How much time do you need?",
     "beforeDeparture": "before departure",
     "alarmAt": "Alarm at {{time}}",

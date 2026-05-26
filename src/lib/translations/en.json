@@ -44,6 +44,7 @@
     "showEarlierTrains": "Show earlier trains",
     "hideEarlierTrains": "Hide earlier trains",
     "lastUpdatedLoading": "Loading…",
+    "realtimeUnavailable": "Unavailable",
     "updatedJustNow": "Just now",
     "updatedMinutesAgo_one": "{{count}}m ago",
     "updatedMinutesAgo_other": "{{count}}m ago",

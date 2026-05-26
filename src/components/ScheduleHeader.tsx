@@ -13,6 +13,7 @@ interface ScheduleHeaderProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   lastUpdated: Date | null;
+  isError: boolean;
 }
 
 export function ScheduleHeader({
@@ -22,12 +23,14 @@ export function ScheduleHeader({
   showAllTrips,
   onToggleShowAllTrips,
   lastUpdated,
+  isError,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
   const { text: updatedLabel, isStale } = computeRealtimeAgeLabel(
     t,
     lastUpdated,
     currentTime,
+    isError,
   );
 
   return (

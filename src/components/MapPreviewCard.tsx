@@ -9,13 +9,14 @@ export function MapPreviewCard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { data } = useVehiclePositions();
+  const { data, isError } = useVehiclePositions();
   // Pre-warm the trip updates query so the map page has cached delay/cancel
   // data the moment it mounts (otherwise markers appear after the first fetch).
   useTripUpdates();
 
   const activeCount =
     data?.vehicles?.filter((v) => v.trip != null).length ?? 0;
+  const showUnavailable = isError && !data;
 
   return (
     <SectionCard className="overflow-hidden bg-muted/40 hover:bg-muted/60 transition-colors md:border-border">
@@ -36,8 +37,16 @@ export function MapPreviewCard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold bg-muted-foreground text-background rounded-full px-2.5 py-0.5 whitespace-nowrap">
-            {t("mapDiagram.trainsCount", { count: activeCount })}
+          <span
+            className={
+              showUnavailable
+                ? "text-xs font-semibold bg-smart-gold text-white rounded-full px-2.5 py-0.5 whitespace-nowrap"
+                : "text-xs font-semibold bg-muted-foreground text-background rounded-full px-2.5 py-0.5 whitespace-nowrap"
+            }
+          >
+            {showUnavailable
+              ? t("schedule.realtimeUnavailable")
+              : t("mapDiagram.trainsCount", { count: activeCount })}
           </span>
           <span className="text-muted-foreground text-lg">→</span>
         </div>

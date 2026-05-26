@@ -326,6 +326,8 @@ export interface TripRealtimeStatusMaps {
   canceledByStartTime: Map<string, TripRealtimeStatus>;
   /** When the GTFS-RT data was last successfully fetched (null if never). */
   lastUpdated: Date | null;
+  /** True when the underlying query is in an error state (last fetch failed). */
+  isError: boolean;
 }
 
 /**
@@ -342,12 +344,12 @@ export function useTripRealtimeStatusMap(
   toStation: Station | "",
   trips: ProcessedTrip[]
 ): TripRealtimeStatusMaps {
-  const { data } = useTripUpdates();
+  const { data, isError } = useTripUpdates();
 
   return useMemo(() => {
     const lastUpdated =
       data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isError };
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
@@ -403,6 +405,6 @@ export function useTripRealtimeStatusMap(
         canceledByStartTime.set(result.scheduledDeparture, result.status);
       }
     }
-    return { statusMap, canceledByStartTime, lastUpdated };
-  }, [data, fromStation, toStation, trips]);
+    return { statusMap, canceledByStartTime, lastUpdated, isError };
+  }, [data, isError, fromStation, toStation, trips]);
 }

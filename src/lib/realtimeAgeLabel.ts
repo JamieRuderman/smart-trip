@@ -15,16 +15,27 @@ export const REALTIME_STALE_THRESHOLD_MIN = 60;
  * `isStale` flag so the caller can swap icons / color-code without
  * re-implementing the threshold.
  *
- * Two states:
- *   - fresh (`isStale=false`): "Just now" or "Xm ago"
- *   - stale (`isStale=true`):  "Stale"
+ * States:
+ *   - loading (no data yet, no error):  "Loading…"            (isStale=false)
+ *   - unavailable (no data, fetch errored): "Unavailable"     (isStale=true)
+ *   - fresh:                                 "Just now" / "Xm ago"
+ *   - stale (data older than threshold):     "Stale"          (isStale=true)
+ *
+ * When `lastUpdated` is set we always trust the age label even if the latest
+ * poll failed — react-query keeps cached data, and a brief network blip
+ * shouldn't flip a working UI into a warning state. The stale threshold
+ * handles sustained outages.
  */
 export function computeRealtimeAgeLabel(
   t: TFunction,
   lastUpdated: Date | null,
   currentTime: Date,
+  isError = false,
 ): { text: string; isStale: boolean } {
   if (!lastUpdated) {
+    if (isError) {
+      return { text: t("schedule.realtimeUnavailable"), isStale: true };
+    }
     return { text: t("schedule.lastUpdatedLoading"), isStale: false };
   }
   const diffMin = Math.floor(

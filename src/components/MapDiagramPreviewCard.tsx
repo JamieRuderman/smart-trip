@@ -9,10 +9,11 @@ export function MapDiagramPreviewCard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { data } = useVehiclePositions();
+  const { data, isError } = useVehiclePositions();
   useTripUpdates();
 
   const activeCount = data?.vehicles?.filter((v) => v.trip != null).length ?? 0;
+  const showUnavailable = isError && !data;
 
   return (
     <SectionCard className="overflow-hidden bg-smart-train-green/5 hover:bg-smart-train-green/10 transition-colors md:border-smart-train-green/30">
@@ -35,8 +36,16 @@ export function MapDiagramPreviewCard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold bg-smart-train-green text-white rounded-full px-2.5 py-0.5 whitespace-nowrap">
-            {t("mapDiagram.trainsCount", { count: activeCount })}
+          <span
+            className={
+              showUnavailable
+                ? "text-xs font-semibold bg-smart-gold text-white rounded-full px-2.5 py-0.5 whitespace-nowrap"
+                : "text-xs font-semibold bg-smart-train-green text-white rounded-full px-2.5 py-0.5 whitespace-nowrap"
+            }
+          >
+            {showUnavailable
+              ? t("schedule.realtimeUnavailable")
+              : t("mapDiagram.trainsCount", { count: activeCount })}
           </span>
           <span className="text-smart-train-green text-lg">→</span>
         </div>

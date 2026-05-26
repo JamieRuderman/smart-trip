@@ -27,6 +27,25 @@ describe("computeRealtimeAgeLabel", () => {
     });
   });
 
+  it("returns the unavailable label when lastUpdated is null and isError", () => {
+    const result = computeRealtimeAgeLabel(t, null, NOW, true);
+    expect(result).toEqual({
+      text: "schedule.realtimeUnavailable",
+      isStale: true,
+    });
+  });
+
+  it("trusts the age label over isError once data has arrived", () => {
+    // A transient poll failure after a successful fetch should not flip the
+    // UI into a warning state — react-query keeps the cached data and the
+    // stale threshold handles sustained outages.
+    const result = computeRealtimeAgeLabel(t, minutesAgo(2), NOW, true);
+    expect(result).toEqual({
+      text: "schedule.updatedMinutesAgo[2]",
+      isStale: false,
+    });
+  });
+
   it("returns 'just now' for sub-minute deltas", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(0), NOW);
     expect(result).toEqual({

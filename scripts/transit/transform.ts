@@ -79,10 +79,11 @@ function emitPublicScheduleJson(
   trainSchedules: TrainSchedulesOutput,
   ferrySchedules: FerrySchedulesOutput,
   scheduleOverrides: ScheduleOverridesOutput,
+  generatedAt: string,
 ): void {
   fs.mkdirSync(PUBLIC_DATA_DIR, { recursive: true });
   const payload = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     trainSchedules,
     ferrySchedules,
     scheduleOverrides,
@@ -97,6 +98,13 @@ function emitPublicScheduleJson(
 export function transformRawToGenerated(): void {
   const smartFeed = readFeed(SMART_RAW_PATH, "SA");
   const ferryFeed = readFeed(FERRY_RAW_PATH, "GF");
+
+  // Anchor every "today" decision to the feed's fetch time so the build is
+  // reproducible: the same committed raw feeds always produce the same
+  // generated TypeScript, regardless of when Vercel runs the build. Without
+  // this, calendar edge cases (holiday Mondays, Friday-before-new-bundle,
+  // etc.) keep surfacing as one-off production failures.
+  const feedReferenceDate = new Date(smartFeed.fetchedAt);
 
   console.log("Processing SMART GTFS feed…");
   const stations = buildStations(smartFeed);
@@ -129,11 +137,12 @@ export function transformRawToGenerated(): void {
   );
 
   // Limit overrides to a recent + future window so the bundled map doesn't
-  // accumulate stale historical holidays. Use day arithmetic (not setMonth)
-  // to avoid rolling over when today's day-of-month doesn't exist a month
-  // back (e.g. Mar 31 → Feb 31 → Mar 3).
-  const overrideFloor = new Date();
-  overrideFloor.setDate(overrideFloor.getDate() - 31);
+  // accumulate stale historical holidays. Anchored to feedReferenceDate
+  // (not wall clock) so the floor moves only when the feed is refreshed.
+  // Use day arithmetic (not setMonth) to avoid rolling over when the
+  // reference day-of-month doesn't exist a month back (e.g. Mar 31 → Feb 31).
+  const overrideFloor = new Date(feedReferenceDate);
+  overrideFloor.setUTCDate(overrideFloor.getUTCDate() - 31);
   const scheduleOverrides = deriveScheduleOverrides(
     smartFeed.calendar,
     smartFeed.calendarDates,
@@ -157,7 +166,12 @@ export function transformRawToGenerated(): void {
     "ferrySchedule.generated.ts",
     renderFerrySchedulesFile(ferrySchedules),
   );
-  emitPublicScheduleJson(trainSchedules, ferrySchedules, scheduleOverrides);
+  emitPublicScheduleJson(
+    trainSchedules,
+    ferrySchedules,
+    scheduleOverrides,
+    smartFeed.fetchedAt,
+  );
 
   const trainTripCounts = {
     weekdaySouthbound: trainSchedules.weekday.southbound.length,

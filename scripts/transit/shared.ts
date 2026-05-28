@@ -157,38 +157,42 @@ function timeToMinutes(time: string): number {
 // the look-ahead, the Friday refresh sees zero weekend trips and the
 // sanity floor trips (issue #43). Two weeks comfortably covers the
 // typical publication cadence without admitting services many weeks out.
-//
-// This is the ONLY remaining today-relative behavior in deriveServiceTypes:
-// today-only calendar_dates exceptions used to filter classification but
-// no longer do — see commit 761ccc0.
 const SERVICE_LOOKAHEAD_DAYS = 14;
 
 function formatGtfsDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  // Use UTC components so the build is timezone-independent. Local-time
+  // getters would shift the reference date when Vercel (UTC) builds vs a
+  // local-tz dev box, reintroducing the non-determinism we're trying to kill.
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}${m}${d}`;
 }
 
+/**
+ * Classify each calendar.txt service as weekday or weekend.
+ *
+ * `referenceDate` is required and intentionally not defaulted to `new Date()`.
+ * This is the build-time transform — the output is the *static* schedule
+ * shipped with the app, and must be reproducible across builds. Call sites
+ * pass `new Date(feed.fetchedAt)` so the same committed feed produces the
+ * same output whether Vercel runs the build today, on Memorial Day, or six
+ * months from now. Wall-clock dependence here has caused a string of
+ * production failures (issues #43, holiday Mondays, etc.).
+ *
+ * Today-only calendar_dates exceptions are also intentionally ignored:
+ * classification is by canonical day-of-week flags. The SPA has its own
+ * runtime getTodayScheduleType() that flips display to "weekend" on
+ * holidays — that's where today-awareness belongs.
+ */
 export function deriveServiceTypes(
   calendarRows: GtfsCalendar[],
-  referenceDate?: Date,
+  referenceDate: Date,
 ): Map<string, ScheduleType> {
-  const ref = referenceDate ?? new Date();
-  const refDateStr = formatGtfsDate(ref);
-  const horizon = new Date(ref);
-  horizon.setDate(horizon.getDate() + SERVICE_LOOKAHEAD_DAYS);
+  const refDateStr = formatGtfsDate(referenceDate);
+  const horizon = new Date(referenceDate);
+  horizon.setUTCDate(horizon.getUTCDate() + SERVICE_LOOKAHEAD_DAYS);
   const horizonDateStr = formatGtfsDate(horizon);
-
-  // We intentionally ignore today-only calendar_dates exceptions when
-  // classifying services. The output of this transform is the *static*
-  // schedule shipped with the app — it should represent SMART's canonical
-  // weekday vs weekend operating patterns, not "what's running today."
-  // Previously, when today was a US federal weekday-holiday (e.g. Memorial
-  // Day), the weekday service was removed by exception_type=2 and the
-  // sanity floor at the end of the transform tripped on 0 weekday trips.
-  // The SPA has its own runtime getTodayScheduleType() that flips display
-  // to "weekend" on holidays — that's where today-awareness belongs.
 
   const serviceTypes = new Map<string, ScheduleType>();
 
@@ -342,7 +346,7 @@ export function deriveScheduleOverrides(
   }
 
   const minDateStr = options?.minDate
-    ? `${options.minDate.getFullYear()}${String(options.minDate.getMonth() + 1).padStart(2, "0")}${String(options.minDate.getDate()).padStart(2, "0")}`
+    ? formatGtfsDate(options.minDate)
     : null;
 
   const dates = [...exceptionsByDate.keys()].sort();
@@ -581,7 +585,7 @@ export function buildTrainSchedules(
 ): TrainSchedulesOutput {
   const stationCount = stations.length;
   const stationIndexByName = new Map(stations.map((s, i) => [s.name, i]));
-  const serviceTypes = deriveServiceTypes(feed.calendar);
+  const serviceTypes = deriveServiceTypes(feed.calendar, new Date(feed.fetchedAt));
 
   const schedules: TrainSchedulesOutput = {
     weekday: { northbound: [], southbound: [] },
@@ -666,7 +670,7 @@ export function buildTrainSchedules(
 }
 
 export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
-  const serviceTypes = deriveServiceTypes(feed.calendar);
+  const serviceTypes = deriveServiceTypes(feed.calendar, new Date(feed.fetchedAt));
 
   // Anchor on the route_id so the trip set doesn't depend on stop names.
   // If the route disappears the sanity floor fails the run.

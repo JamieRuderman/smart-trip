@@ -182,21 +182,23 @@ describe("deriveServiceTypes", () => {
 //
 // deriveServiceTypes tests above prove the classification step survives
 // holiday exceptions. This test goes one layer down: through the full
-// buildTrainSchedules pipeline that classify-then-filters trips, with a
-// mocked system clock fixed to Memorial Day. It's the most direct test
-// that the sanity floor in transform.ts can't trip on a holiday because
-// of this codepath again.
+// buildTrainSchedules pipeline that classify-then-filters trips. The
+// system clock is mocked to a non-Memorial-Day date to also prove the
+// build is anchored to feed.fetchedAt (not wall clock) — same feed +
+// same code = same output regardless of when Vercel runs the build.
 describe("buildTrainSchedules", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("emits weekday trips on a US federal holiday Monday (Memorial Day)", () => {
-    // Pin "today" to Memorial Day 2026 (Mon May 25). buildTrainSchedules
-    // calls deriveServiceTypes() with no reference date, so it reads
-    // new Date() — hence the system-clock mock.
+  it("emits weekday trips when the feed was fetched on a US federal holiday Monday", () => {
+    // Pin the system clock to a wall-clock date *far* from Memorial Day
+    // (Aug 15, 2027) — but the feed's fetchedAt is Memorial Day. If the
+    // build read `new Date()` anywhere, the wall-clock mock would change
+    // the output. With fetchedAt-anchored classification, only the feed
+    // contents matter.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 4, 25, 12, 0, 0));
+    vi.setSystemTime(new Date(2027, 7, 15, 12, 0, 0));
 
     // Minimal 2-station feed: Alpha (north) → Bravo (south). Northbound
     // would mean Bravo → Alpha. Both trips travel A → B = southbound.
@@ -212,7 +214,7 @@ describe("buildTrainSchedules", () => {
     const feed: GtfsFeed = {
       schemaVersion: 1,
       operatorId: "SA",
-      fetchedAt: "2026-05-24T00:00:00Z",
+      fetchedAt: "2026-05-25T12:00:00Z",
       sourceUrl: "",
       agency: [],
       routes: [],

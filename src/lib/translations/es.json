@@ -170,6 +170,7 @@
     "nextArrivals": "Próximas llegadas",
     "noUpcoming": "No hay llegadas próximas.",
     "toTerminus": "a {{terminus}}",
+    "toDestinationAt": "a {{destination}} a las {{time}}",
     "canceledSuffix": "· Cancelado",
     "delaySuffix": "· +{{minutes}} min de retraso",
     "minUnit": "min",

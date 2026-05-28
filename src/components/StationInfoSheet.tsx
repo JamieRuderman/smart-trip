@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { AppSheet } from "@/components/ui/app-sheet";
 import { TripIcon } from "@/components/icons/TripIcon";
-import { TimeDisplay } from "@/components/TimeDisplay";
+import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
 import {
   cardTripState,
   stateCardStyle,
@@ -440,30 +440,27 @@ function ArrivalRow({
         )}
       </div>
 
-      {/* Direction — lucide arrow + label, replacing the old "to Terminus".
-          When the train continues to a destination beyond this stop, the
-          arrival time at that destination sits underneath the direction
-          label so the row's "where & when" lives in one column. */}
+      {/* Direction (top) + ETA copy (bottom). ETA is indented `pl-5` so it
+          lines up with the "Southbound" / "Northbound" label rather than the
+          arrow icon — matches w-4 (16px) + gap-1 (4px) = 20px. */}
       <div className="flex-1 min-w-0 leading-tight">
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <DirArrow className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span className="font-medium truncate">{directionLabel}</span>
         </div>
-        {arrival.destinationTime && (
-          <div
-            className={cn(
-              "text-xs tabular-nums mt-0.5 flex items-center gap-1",
-              arrival.isCanceled ? "text-muted-foreground line-through" : "text-muted-foreground",
-            )}
-          >
-            <span aria-hidden="true">→</span>
-            <TimeDisplay time={arrival.destinationTime} />
-            <span className="font-medium truncate">{arrival.destinationStation}</span>
-          </div>
-        )}
+        <div
+          className={cn(
+            "text-xs tabular-nums mt-0.5 pl-5",
+            arrival.isCanceled ? "text-destructive font-medium" : "text-muted-foreground",
+            isDelayed && "text-smart-gold font-medium",
+          )}
+        >
+          {etaCopy}
+        </div>
       </div>
 
-      {/* Right: arrival at this station (large) + "in X min". */}
+      {/* Right: arrival time at this station (large) + "to {destination} at
+          {time}" beneath it when the train continues past this stop. */}
       <div className="shrink-0 text-right leading-tight">
         <div
           className={cn(
@@ -474,15 +471,19 @@ function ArrivalRow({
         >
           <TimeDisplay time={arrival.effectiveTime} />
         </div>
-        <div
-          className={cn(
-            "text-xs tabular-nums mt-0.5",
-            arrival.isCanceled ? "text-destructive font-medium" : "text-muted-foreground",
-            isDelayed && "text-smart-gold font-medium",
-          )}
-        >
-          {etaCopy}
-        </div>
+        {arrival.destinationTime && (
+          <div
+            className={cn(
+              "text-xs tabular-nums mt-0.5 text-muted-foreground",
+              arrival.isCanceled && "line-through",
+            )}
+          >
+            {t("stationInfo.toDestinationAt", {
+              destination: arrival.destinationStation,
+              time: formatTime(arrival.destinationTime),
+            })}
+          </div>
+        )}
         {isDelayed && (
           <TimeDisplay
             time={arrival.scheduledTime}

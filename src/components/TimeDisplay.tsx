@@ -10,8 +10,10 @@ interface TimeDisplayProps {
 
 /**
  * Formats a 24-hour time string (e.g., "14:35") into the specified format.
+ * Exported so consumers can interpolate the formatted time into translated
+ * strings (e.g. "to Larkspur at 5:26 PM") without re-implementing the parse.
  */
-function formatTime(
+export function formatTime(
   time: string,
   format: "12h" | "24h" = APP_CONSTANTS.DEFAULT_TIME_FORMAT
 ) {

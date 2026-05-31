@@ -142,6 +142,92 @@ npm run sync-live
 
 `sync-live` uses your Mac's Wi-Fi IP address. The device and development machine need to be on the same network.
 
+## Releases
+
+Releases are tagged `vX.Y.Z` and shipped to the App Store and Google Play. The web app deploys continuously from `main` via Vercel and is not gated by this process.
+
+### When to bump which number
+
+| Bump | When |
+| --- | --- |
+| `major` | Breaking changes to persisted state, removed features, or otherwise-incompatible behavior. |
+| `minor` | New user-visible features (e.g. departure reminders, station-sheet redesign). |
+| `patch` | Bug fixes, schedule data refreshes, and behind-the-scenes improvements only. |
+
+### Pre-flight
+
+From a clean checkout of `main`:
+
+```bash
+git checkout main
+git pull --tags
+npm install
+npm run test:unit
+npm run typecheck
+npm run prebuild        # should produce zero diff against committed generated files
+```
+
+If `prebuild` leaves a diff, land a `chore: refresh transit feeds` commit before tagging.
+
+### Bump the version
+
+`npm version` runs `scripts/version.sh`, which updates the native version metadata in lockstep so the three platforms can't drift:
+
+- `package.json` / `package-lock.json` — semver string
+- `android/app/build.gradle` — `versionName` and `versionCode` (incremented by 1)
+- `ios/App/App.xcodeproj/project.pbxproj` — `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` (build number, incremented by 1)
+
+```bash
+npm version minor       # or `patch` / `major`
+git push --follow-tags
+```
+
+That creates a commit titled e.g. `1.5.0` and pushes the matching `v1.5.0` tag.
+
+### Build the native bundle
+
+```bash
+npm run build-native    # prebuild + tsc --noEmit + vite build --mode native
+npm run sync            # npx cap sync — copies the web bundle into ios/ and android/
+```
+
+### Ship iOS
+
+```bash
+npm run open-ios
+```
+
+In Xcode:
+
+1. Select **Any iOS Device (arm64)** as the run destination.
+2. **Product → Archive**.
+3. When Organizer opens, **Distribute App → App Store Connect → Upload**.
+4. In App Store Connect, create a new version, paste the iOS release notes (see below), and submit for review.
+
+### Ship Android
+
+```bash
+npm run open-android
+```
+
+In Android Studio:
+
+1. **Build → Generate Signed App Bundle / APK → Android App Bundle**.
+2. Choose the upload keystore.
+3. Upload the resulting `.aab` in **Google Play Console → Production → Create new release**, paste the Android release notes, and roll out.
+
+### Writing release notes
+
+Keep store notes short and user-visible. Skip refactors, build-only changes, web-only SEO work, and platform-specific fixes that don't apply to the store you're publishing to (e.g. don't list an Android-only fix in the App Store notes).
+
+To gather candidates:
+
+```bash
+git log v<previous>..HEAD --oneline --no-merges
+```
+
+Group `feat(*)` first, then user-visible `fix(*)`. Trim anything users won't notice.
+
 ## Privacy Notes
 
 - The app can request location permission for closest-station selection and GPS-assisted trip detail messaging.

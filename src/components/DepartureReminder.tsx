@@ -128,7 +128,7 @@ export function DepartureReminder({
     focusedTrip,
     focusTrip,
     setReminder,
-    refreshFocusedTimes,
+    rescheduleReminder,
     clearFocusedTrip,
   } = useStationSelection();
 
@@ -140,13 +140,12 @@ export function DepartureReminder({
 
   const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
 
-  // Arrival timestamp at toStation. Reuse the departure builder, then push to
-  // the next day if the arrival HH:MM wrapped before departure (overnight run).
-  const effectiveArrival = realtimeArrivalTime ?? arrivalTime;
-  const arrivalAt = useMemo(() => {
-    const a = buildDepartureTimestamp(currentTime, effectiveArrival);
-    return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
-  }, [currentTime, effectiveArrival, departureAt]);
+  const serviceDate = useMemo(() => {
+    const d = new Date(departureAt);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }, [departureAt]);
 
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
@@ -156,17 +155,9 @@ export function DepartureReminder({
       fromStation,
       toStation,
       scheduleType: getTodayScheduleType(),
-      departureAt,
-      arrivalAt,
+      serviceDate,
     });
-  }, [
-    arrivalAt,
-    departureAt,
-    focusTrip,
-    fromStation,
-    toStation,
-    tripNumber,
-  ]);
+  }, [focusTrip, fromStation, toStation, tripNumber, serviceDate]);
 
   const handleGoClick = useCallback(() => {
     if (isOtherTripFocused) setConfirmSwitch(true);
@@ -217,21 +208,21 @@ export function DepartureReminder({
     [departureAt, fromStation, i18n.language, t, timeFormat, tripNumber]
   );
 
-  // Live drift: while this focused trip's detail sheet is open, keep the
-  // stored departure/arrival in sync with live updates so the reminder fires
-  // before the ACTUAL departure and auto-clear keys off the ACTUAL arrival.
-  // refreshFocusedTimes no-ops when times are unchanged, so this converges.
-  const storedDepartureAt = isThisTripFocused ? focusedTrip?.departureAt : undefined;
-  const storedArrivalAt = isThisTripFocused ? focusedTrip?.arrivalAt : undefined;
-  const focusedLead = isThisTripFocused
-    ? focusedTrip?.reminder?.leadMinutes ?? 0
-    : 0;
+  // Live drift: when this focused trip has a reminder and the live departure
+  // implies a different fire time than what's stored, reschedule it.
+  const focusedReminderAt = isThisTripFocused
+    ? focusedTrip?.reminder?.reminderAt ?? null
+    : null;
+  const focusedReminderLead = isThisTripFocused
+    ? focusedTrip?.reminder?.leadMinutes ?? null
+    : null;
   useEffect(() => {
-    if (storedDepartureAt == null || storedArrivalAt == null) return;
-    if (storedDepartureAt === departureAt && storedArrivalAt === arrivalAt) return;
-    void refreshFocusedTimes(departureAt, arrivalAt, buildText(focusedLead));
+    if (focusedReminderAt == null || focusedReminderLead == null) return;
+    const expected = departureAt - focusedReminderLead * 60_000;
+    if (expected === focusedReminderAt) return;
+    void rescheduleReminder(departureAt, buildText(focusedReminderLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departureAt, arrivalAt, storedDepartureAt, storedArrivalAt, focusedLead]);
+  }, [departureAt, focusedReminderAt, focusedReminderLead]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);
@@ -247,6 +238,7 @@ export function DepartureReminder({
   const handleSet = useCallback(async () => {
     const result = await setReminder(
       clampedSliderValue,
+      departureAt,
       buildText(clampedSliderValue),
     );
     if (result.ok === false) {
@@ -256,7 +248,7 @@ export function DepartureReminder({
       return;
     }
     closePicker();
-  }, [buildText, clampedSliderValue, closePicker, setReminder]);
+  }, [buildText, clampedSliderValue, closePicker, departureAt, setReminder]);
 
   // The "switch trains?" confirm dialog. Portals out of the gutter row, so it
   // can be rendered alongside whatever branch is active (only the Go branch
@@ -355,7 +347,7 @@ export function DepartureReminder({
             <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
-                onClick={() => void setReminder(null, buildText(0))}
+                onClick={() => void setReminder(null, departureAt, buildText(0))}
                 aria-label={t("departureReminder.cancel")}
                 className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
               >

@@ -246,7 +246,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     focusedTrip,
     focusTrip,
     setReminder,
-    refreshFocusedTimes,
+    rescheduleReminder,
     clearFocusedTrip,
   } = useFocusedTrip();
 
@@ -278,7 +278,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusedTrip,
       focusTrip,
       setReminder,
-      refreshFocusedTimes,
+      rescheduleReminder,
       clearFocusedTrip,
     }),
     [
@@ -294,7 +294,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusedTrip,
       focusTrip,
       setReminder,
-      refreshFocusedTimes,
+      rescheduleReminder,
       clearFocusedTrip,
     ],
   );

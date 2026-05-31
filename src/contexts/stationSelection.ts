@@ -21,13 +21,10 @@ export interface StationSelection {
   focusTrip: (input: FocusTripInput) => Promise<void>;
   setReminder: (
     leadMinutes: number | null,
+    departureAt: number,
     text: ReminderText,
   ) => Promise<SetReminderResult>;
-  refreshFocusedTimes: (
-    departureAt: number,
-    arrivalAt: number,
-    text: ReminderText,
-  ) => Promise<void>;
+  rescheduleReminder: (departureAt: number, text: ReminderText) => Promise<void>;
   clearFocusedTrip: () => Promise<void>;
 }
 

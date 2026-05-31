@@ -116,7 +116,7 @@ Realtime data flows through Vercel serverless routes:
   -> trip cards, trip detail sheets, and service alerts UI
 ```
 
-Trip updates are matched against static schedule entries by scheduled origin departure time because SMART trip IDs are regenerated per service date.
+Trip updates are currently matched against static schedule entries by scheduled origin departure time. **TODO (clean up soon):** this should move to the canonical GTFS-RT approach — direct `trip_id` match, then `route_id + direction_id + start_date + start_time` as fallback. A contemporaneous capture (`scripts/transit/captureRealtime.ts`) confirms SMART's realtime `trip_update.trip.trip_id` matches the static `trip_id`, so the older assumption that "SMART trip IDs are regenerated per service date" does not hold for this feed. See the `TODO(trip-matching)` note in `src/hooks/useTripUpdates.ts`.
 
 ## Mobile Development
 

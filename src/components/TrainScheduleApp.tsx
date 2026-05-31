@@ -48,6 +48,7 @@ export function TrainScheduleApp() {
     setScheduleType,
     swapStations,
     setSelectedTrip,
+    focusedTrip,
   } = useStationSelection();
 
   const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
@@ -167,6 +168,13 @@ export function TrainScheduleApp() {
     return param ? getDevFixture(param) : null;
   }, []);
 
+  const hiddenTripNumber =
+    focusedTrip &&
+    focusedTrip.fromStation === fromStation &&
+    focusedTrip.toStation === toStation
+      ? focusedTrip.tripNumber
+      : null;
+
   return (
     <div
       className="min-h-[100dvh] bg-card md:bg-background relative"
@@ -224,6 +232,7 @@ export function TrainScheduleApp() {
             onSelectTrip={setSelectedTrip}
             ridingTripNumber={ridingTripNumber}
             ridingIsSouthbound={ridingIsSouthbound}
+            hiddenTripNumber={hiddenTripNumber}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (

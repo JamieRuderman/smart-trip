@@ -26,6 +26,9 @@ interface ScheduleResultsProps {
   /** Direction of the riding train — disambiguates trip numbers that are
    *  reused across directions. */
   ridingIsSouthbound?: boolean | null;
+  /** A trip number to omit from the list (the focused trip, shown pinned
+   *  above). Only applied when it belongs to the displayed leg. */
+  hiddenTripNumber?: number | null;
 }
 
 export function ScheduleResults({
@@ -40,6 +43,7 @@ export function ScheduleResults({
   onSelectTrip,
   ridingTripNumber = null,
   ridingIsSouthbound = null,
+  hiddenTripNumber = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
   // Direction of the displayed schedule — used to confirm a riding trip
@@ -82,9 +86,14 @@ export function ScheduleResults({
         )
       : displayedTrips;
 
-  // First non-past index in visibleTrips — used to flag the "Next" row.
+  const dedupedTrips =
+    hiddenTripNumber != null
+      ? visibleTrips.filter((trip) => trip.trip !== hiddenTripNumber)
+      : visibleTrips;
+
+  // First non-past index in dedupedTrips — used to flag the "Next" row.
   // Single pass instead of per-row .slice().every() (O(n) total vs O(n²)).
-  const nextVisibleIndex = visibleTrips.findIndex(
+  const nextVisibleIndex = dedupedTrips.findIndex(
     (trip) => !isTimeInPast(currentTime, trip.departureTime),
   );
 
@@ -124,7 +133,7 @@ export function ScheduleResults({
           role="list"
           aria-label="Train schedule results"
         >
-          {visibleTrips.map((trip, index) => {
+          {dedupedTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;

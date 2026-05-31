@@ -6,41 +6,53 @@ vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform: () => false }
 import {
   loadFocusedTrip,
   saveFocusedTrip,
-  FOCUSED_TRIP_STORAGE_KEY,
   migrateLegacyReminders,
   reconstructFocusedTrip,
+  FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
 } from "./focusedTrip";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
 
-const base: FocusedTrip = {
-  source: "user",
-  tripNumber: 35,
-  fromStation: "San Rafael",
-  toStation: "Larkspur",
-  scheduleType: "weekday",
-  departureAt: Date.now() + 30 * 60_000,
-  arrivalAt: Date.now() + 50 * 60_000,
-  reminder: null,
-};
+const FROM = stations[0];
+const TO = stations[stations.length - 1];
+const SAMPLE = getFilteredTrips(FROM, TO, "weekday")[0];
+
+function makeFocused(overrides: Partial<FocusedTrip> = {}): FocusedTrip {
+  return {
+    source: "user",
+    tripNumber: SAMPLE.trip,
+    fromStation: FROM,
+    toStation: TO,
+    scheduleType: "weekday",
+    serviceDate: "2099-01-01",
+    reminder: null,
+    ...overrides,
+  };
+}
 
 describe("focusedTrip storage", () => {
   beforeEach(() => localStorage.clear());
 
-  it("round-trips a record", () => {
-    saveFocusedTrip(base);
-    expect(loadFocusedTrip()).toEqual(base);
+  it("round-trips a record (future service date)", () => {
+    const f = makeFocused();
+    saveFocusedTrip(f);
+    expect(loadFocusedTrip()).toEqual(f);
   });
 
   it("returns null when empty", () => {
     expect(loadFocusedTrip()).toBeNull();
   });
 
-  it("drops a record whose arrivalAt has passed", () => {
-    saveFocusedTrip({ ...base, arrivalAt: Date.now() - 1000 });
+  it("clears a record whose service-date arrival has passed", () => {
+    saveFocusedTrip(makeFocused({ serviceDate: "2020-01-01" }));
     expect(loadFocusedTrip()).toBeNull();
     expect(localStorage.getItem(FOCUSED_TRIP_STORAGE_KEY)).toBeNull();
+  });
+
+  it("clears a record whose trip is not in the schedule", () => {
+    saveFocusedTrip(makeFocused({ tripNumber: 999999 }));
+    expect(loadFocusedTrip()).toBeNull();
   });
 
   it("rejects malformed JSON", () => {
@@ -48,10 +60,27 @@ describe("focusedTrip storage", () => {
     expect(loadFocusedTrip()).toBeNull();
   });
 
+  it("rejects a record missing serviceDate", () => {
+    const bad = makeFocused() as unknown as Record<string, unknown>;
+    delete bad.serviceDate;
+    localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
+    expect(loadFocusedTrip()).toBeNull();
+  });
+
   it("clears when saving null", () => {
-    saveFocusedTrip(base);
+    saveFocusedTrip(makeFocused());
     saveFocusedTrip(null);
     expect(loadFocusedTrip()).toBeNull();
+  });
+});
+
+describe("reconstructFocusedTrip", () => {
+  it("finds the trip for the focused leg + number", () => {
+    expect(reconstructFocusedTrip(makeFocused())?.trip).toBe(SAMPLE.trip);
+  });
+
+  it("returns null when the trip is gone", () => {
+    expect(reconstructFocusedTrip(makeFocused({ tripNumber: 999999 }))).toBeNull();
   });
 });
 
@@ -60,75 +89,45 @@ const LEGACY_KEY = "smart-train-departure-reminders";
 describe("migrateLegacyReminders", () => {
   beforeEach(() => localStorage.clear());
 
-  it("promotes the most-recent future legacy reminder and deletes the old key", () => {
-    const now = Date.now();
+  it("promotes the most-recent future reminder with serviceDate + notificationId", () => {
+    const future = Date.now() + 40 * 60_000;
     localStorage.setItem(
       LEGACY_KEY,
       JSON.stringify([
-        { id: 1, tripNumber: 11, fromStation: "A", toStation: "B",
-          departureAt: now + 10 * 60_000, reminderAt: now + 5 * 60_000,
-          leadMinutes: 5, title: "t1", body: "b1" },
-        { id: 2, tripNumber: 22, fromStation: "C", toStation: "D",
-          departureAt: now + 40 * 60_000, reminderAt: now + 30 * 60_000,
-          leadMinutes: 10, title: "t2", body: "b2" },
+        {
+          id: 1,
+          tripNumber: SAMPLE.trip,
+          fromStation: FROM,
+          toStation: TO,
+          departureAt: future,
+          reminderAt: future - 10 * 60_000,
+          leadMinutes: 10,
+          title: "t",
+          body: "b",
+        },
       ]),
     );
-    const migrated = migrateLegacyReminders();
-    expect(migrated?.tripNumber).toBe(22); // later departure wins
-    expect(migrated?.reminder?.leadMinutes).toBe(10);
-    expect(migrated?.arrivalAt).toBe(migrated?.departureAt); // unknown → equals departure
+    const m = migrateLegacyReminders();
+    expect(m?.tripNumber).toBe(SAMPLE.trip);
+    expect(m?.serviceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(typeof m?.reminder?.notificationId).toBe("number");
+    expect(m).not.toHaveProperty("departureAt");
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
-    expect(loadFocusedTrip()?.tripNumber).toBe(22);
   });
 
-  it("returns null and deletes the key when all legacy reminders are past", () => {
+  it("returns null when all legacy reminders are past", () => {
     const past = Date.now() - 60 * 60_000;
     localStorage.setItem(
       LEGACY_KEY,
       JSON.stringify([
-        { id: 1, tripNumber: 11, fromStation: "A", toStation: "B",
-          departureAt: past, reminderAt: past, leadMinutes: 5, title: "t", body: "b" },
+        { id: 1, tripNumber: 11, fromStation: FROM, toStation: TO, departureAt: past, reminderAt: past, leadMinutes: 5, title: "t", body: "b" },
       ]),
     );
     expect(migrateLegacyReminders()).toBeNull();
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
   });
 
-  it("is a no-op when there is no legacy key", () => {
+  it("is a no-op without a legacy key", () => {
     expect(migrateLegacyReminders()).toBeNull();
-  });
-});
-
-describe("reconstructFocusedTrip", () => {
-  it("finds the ProcessedTrip for the focused leg + trip number", () => {
-    const from = stations[0];
-    const to = stations[stations.length - 1];
-    const trips = getFilteredTrips(from, to, "weekday");
-    const target = trips[0];
-    const focused = {
-      source: "user" as const,
-      tripNumber: target.trip,
-      fromStation: from,
-      toStation: to,
-      scheduleType: "weekday" as const,
-      departureAt: Date.now() + 60_000,
-      arrivalAt: Date.now() + 120_000,
-      reminder: null,
-    };
-    expect(reconstructFocusedTrip(focused)?.trip).toBe(target.trip);
-  });
-
-  it("returns null when the trip is no longer in the schedule", () => {
-    const focused = {
-      source: "user" as const,
-      tripNumber: 999999,
-      fromStation: stations[0],
-      toStation: stations[stations.length - 1],
-      scheduleType: "weekday" as const,
-      departureAt: Date.now(),
-      arrivalAt: Date.now(),
-      reminder: null,
-    };
-    expect(reconstructFocusedTrip(focused)).toBeNull();
   });
 });

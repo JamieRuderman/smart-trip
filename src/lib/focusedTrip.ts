@@ -1,35 +1,35 @@
 import type { Station } from "@/types/smartSchedule";
-import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { Capacitor } from "@capacitor/core";
+import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
-  /** Epoch ms the notification fires. */
+  /** Epoch ms the notification fires (snapshot; rescheduled on observed drift). */
   reminderAt: number;
+  /** Stable id used to schedule + cancel the notification. */
+  notificationId: number;
   title: string;
   body: string;
 }
 
 export interface FocusedTrip {
-  /** How the trip became focused. Only "user" is produced today; "riding" is
-   *  reserved for the deferred riding-detector integration. */
   source: "user";
   tripNumber: number;
   fromStation: Station;
   toStation: Station;
   scheduleType: "weekday" | "weekend";
-  /** Live-aware epoch ms of departure from fromStation. */
-  departureAt: number;
-  /** Live-aware epoch ms of arrival at toStation — drives auto-clear. */
-  arrivalAt: number;
-  /** null = focused with no reminder armed. */
+  /** "YYYY-MM-DD" — the run's service day. The only stored temporal anchor;
+   *  departure/arrival are derived from static schedule + this date. */
+  serviceDate: string;
   reminder: FocusedTripReminder | null;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
 export const FOCUSED_TRIP_CHANGED_EVENT = "smart-train-focused-trip-changed";
+
+const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isFocusedTrip(value: unknown): value is FocusedTrip {
   if (typeof value !== "object" || value === null) return false;
@@ -40,6 +40,7 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       r.reminder !== null &&
       typeof (r.reminder as Record<string, unknown>).leadMinutes === "number" &&
       typeof (r.reminder as Record<string, unknown>).reminderAt === "number" &&
+      typeof (r.reminder as Record<string, unknown>).notificationId === "number" &&
       typeof (r.reminder as Record<string, unknown>).title === "string" &&
       typeof (r.reminder as Record<string, unknown>).body === "string");
   return (
@@ -48,15 +49,49 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.fromStation === "string" &&
     typeof r.toStation === "string" &&
     (r.scheduleType === "weekday" || r.scheduleType === "weekend") &&
-    typeof r.departureAt === "number" &&
-    Number.isFinite(r.departureAt) &&
-    typeof r.arrivalAt === "number" &&
-    Number.isFinite(r.arrivalAt) &&
+    typeof r.serviceDate === "string" &&
+    SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk
   );
 }
 
-/** Read the focused trip, dropping (and clearing) it once its arrival passes. */
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.replace(/[*~]/g, "").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+/**
+ * Resolve a focused trip's static arrival to an absolute instant on its
+ * service date. Overnight trips (arrival clock-time before departure) roll to
+ * the next calendar day.
+ */
+function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
+  const [y, mo, d] = focused.serviceDate.split("-").map(Number);
+  const depMin = hhmmToMinutes(trip.departureTime);
+  const arrMin = hhmmToMinutes(trip.arrivalTime);
+  const dayOffset = arrMin < depMin ? 1 : 0;
+  return new Date(y, mo - 1, d + dayOffset, Math.floor(arrMin / 60), arrMin % 60, 0, 0).getTime();
+}
+
+/**
+ * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
+ * so the pinned card can render regardless of the home screen's current
+ * from/to. Null if the trip no longer exists in that schedule.
+ */
+export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | null {
+  const trips = getFilteredTrips(
+    focused.fromStation,
+    focused.toStation,
+    focused.scheduleType,
+  );
+  return trips.find((t) => t.trip === focused.tripNumber) ?? null;
+}
+
+/**
+ * Read the focused trip, clearing it once its (static) arrival on the service
+ * date has passed, or when the trip can no longer be found in the schedule
+ * (timetable changed under a stale focus).
+ */
 export function loadFocusedTrip(): FocusedTrip | null {
   if (typeof localStorage === "undefined") return null;
   try {
@@ -67,7 +102,12 @@ export function loadFocusedTrip(): FocusedTrip | null {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
-    if (parsed.arrivalAt <= Date.now()) {
+    const trip = reconstructFocusedTrip(parsed);
+    if (!trip) {
+      localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
+      return null;
+    }
+    if (arrivalInstant(parsed, trip) <= Date.now()) {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
@@ -90,16 +130,20 @@ export function saveFocusedTrip(trip: FocusedTrip | null): void {
   }
 }
 
+function toServiceDate(epochMs: number): string {
+  const d = new Date(epochMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const LEGACY_REMINDER_KEY = "smart-train-departure-reminders";
 
 /**
  * One-time migration from the old per-trip reminder array to the single
  * focused trip. Promotes the still-future reminder with the latest departure,
- * preserving its reminder; deletes the legacy key unconditionally. We can't
- * recover the original arrival time from a legacy reminder, so arrivalAt is
- * seeded to departureAt — the focus then clears at departure for migrated
- * records, which is acceptable for a one-shot upgrade path. scheduleType is
- * inferred from the departure date's day-of-week.
+ * deriving serviceDate from its departure epoch; deletes the legacy key.
  */
 export function migrateLegacyReminders(): FocusedTrip | null {
   if (typeof localStorage === "undefined") return null;
@@ -130,18 +174,20 @@ export function migrateLegacyReminders(): FocusedTrip | null {
   const day = new Date(departureAt).getDay();
   const scheduleType: "weekday" | "weekend" =
     day === 0 || day === 6 ? "weekend" : "weekday";
+  const tripNumber = r.tripNumber as number;
+  const serviceDate = toServiceDate(departureAt);
 
   const focused: FocusedTrip = {
     source: "user",
-    tripNumber: r.tripNumber as number,
+    tripNumber,
     fromStation: r.fromStation as Station,
     toStation: r.toStation as Station,
     scheduleType,
-    departureAt,
-    arrivalAt: departureAt,
+    serviceDate,
     reminder: {
       leadMinutes: r.leadMinutes as number,
       reminderAt: r.reminderAt as number,
+      notificationId: reminderIdFor(tripNumber, serviceDate),
       title: r.title as string,
       body: r.body as string,
     },
@@ -155,7 +201,6 @@ let booted = false;
 /**
  * One-time boot: migrate legacy reminders, then re-arm the web timer for a
  * surviving reminder (no-op on native — the OS owns scheduled notifications).
- * Safe to call multiple times; runs once per page load.
  */
 export function bootFocusedTrip(): void {
   if (booted) return;
@@ -166,7 +211,7 @@ export function bootFocusedTrip(): void {
   if (!focused?.reminder) return;
   armWebTimer(
     {
-      id: reminderIdFor(focused.tripNumber, focused.departureAt),
+      id: focused.reminder.notificationId,
       title: focused.reminder.title,
       body: focused.reminder.body,
       at: focused.reminder.reminderAt,
@@ -179,21 +224,4 @@ export function bootFocusedTrip(): void {
       }
     },
   );
-}
-
-/**
- * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
- * so the pinned card can render even when the home screen's current from/to is
- * a different leg. Returns null if the trip no longer exists in that schedule
- * (e.g. schedule data changed under a stale focus).
- */
-export function reconstructFocusedTrip(
-  focused: FocusedTrip,
-): ProcessedTrip | null {
-  const trips = getFilteredTrips(
-    focused.fromStation,
-    focused.toStation,
-    focused.scheduleType,
-  );
-  return trips.find((t) => t.trip === focused.tripNumber) ?? null;
 }

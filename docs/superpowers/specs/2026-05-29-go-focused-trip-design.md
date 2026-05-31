@@ -149,14 +149,37 @@ The `source` field is the only concession to the deferred riding integration: it
 
 Post-implementation, the pinned card showed **static** schedule times. Root fix: store the trip's *identity* and a date anchor, derive all times live.
 
-### Why not anchor on GTFS `trip_id`
+### Why we anchor on train number + `serviceDate` (not `trip_id`)
 
-Investigated the real feed (`data/511/raw/smart.json`) vs the realtime samples:
+**Correction (2026-05-31):** an earlier draft of this section claimed SMART's
+realtime `trip_id`s don't match the static `trip_id`s. **That was wrong** — it
+compared a fresh static feed against a *stale* realtime sample file (old build
+`b_86583`). A contemporaneous capture (`scripts/transit/captureRealtime.ts`,
+output saved under `data/511/raw/realtime/`) shows realtime
+`trip_update.trip.trip_id` matches the static `trip_id` **exactly** (build
+`b_86615` on both, 5/5 sampled), and that build id is unchanged across our
+daily refreshes. So `trip_id` IS a stable, valid identifier within a schedule
+build (it changes only when SMART publishes a new schedule version).
 
-- Static `trip_id`: `t_6153517_b_86615_tn_0` — a synthetic builder id.
-- Realtime `tripId` (vehiclepositions): `t_6043274_b_86583_tn_0` — **different build counters**.
+We still anchor on the **train number + leg + scheduleType** (already in the
+generated timetable) plus a **`serviceDate`**, for reasons unrelated to
+stability:
 
-SMART's `trip_id`s are regenerated per feed build, don't match between static and realtime (which is why the app matches realtime↔static by departure time), and our data refreshes daily — so a stored `trip_id` becomes a dangling reference after the next republication. The **stable public identity is the train number** (`trip_short_name` "Trip 2" → `ProcessedTrip.trip` `2`), which the app already uses. And no id (number, trip_id, service_id) encodes *which calendar day* you're riding — that requires a separate anchor.
+1. `trip_id` is not carried into the generated timetable; threading it through
+   `transform.ts` → `ProcessedTrip` is extra work for no functional gain for
+   this feature (the train number already uniquely keys a row within a
+   leg+scheduleType bucket).
+2. **No identifier — `trip_id`, train number, or `service_id` — encodes _which
+   calendar day_ you're riding.** The same trip runs every weekday under the
+   same id. The stale-focus-expiry problem (a focus left uncleared while the
+   app is closed past the trip) needs the service day, which only `serviceDate`
+   provides. Switching identity to `trip_id` would *not* remove the
+   `serviceDate` anchor.
+
+(Aside: the repo comment "SMART trip IDs are regenerated per service date" is
+not borne out by this capture — realtime and static agree within a build. The
+app still matches realtime↔static by departure time, which is robust
+regardless; changing that is out of scope here, but worth a future look.)
 
 ### Revised data model
 

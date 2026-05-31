@@ -128,3 +128,22 @@ describe("isSchedulePayload override validation", () => {
     ).toBe(false);
   });
 });
+
+describe("tripServesLeg", () => {
+  it("returns true for a trip number that runs on the given leg", async () => {
+    const { tripServesLeg, getFilteredTrips } = await import("@/lib/scheduleUtils");
+    const stations = (await import("@/data/stations")).default;
+    const from = stations[0];
+    const to = stations[stations.length - 1];
+    const sample = getFilteredTrips(from, to, "weekday")[0];
+    expect(tripServesLeg(sample.trip, from, to, "weekday")).toBe(true);
+  });
+
+  it("returns false for a trip number not on the leg", async () => {
+    const { tripServesLeg } = await import("@/lib/scheduleUtils");
+    const stations = (await import("@/data/stations")).default;
+    expect(
+      tripServesLeg(999999, stations[0], stations[stations.length - 1], "weekday"),
+    ).toBe(false);
+  });
+});

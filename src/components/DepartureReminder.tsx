@@ -15,7 +15,8 @@ import {
   isIOSWebBrowser,
   isReminderSupported,
 } from "@/lib/notificationScheduler";
-import { getTodayScheduleType } from "@/lib/scheduleUtils";
+import { getTodayScheduleType, tripServesLeg } from "@/lib/scheduleUtils";
+import { isSouthbound } from "@/lib/stationUtils";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,8 @@ export function DepartureReminder({
   );
 
   const {
+    fromStation: homeFromStation,
+    toStation: homeToStation,
     focusedTrip,
     focusTrip,
     setReminder,
@@ -138,7 +141,21 @@ export function DepartureReminder({
     focusedTrip.fromStation === fromStation &&
     focusedTrip.toStation === toStation;
 
-  const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
+  // The same train can be viewed under two different legs — its full corridor
+  // on the line map (origin→terminus) and the user's selected leg on the home
+  // schedule. Treat "same train number + same direction" as the same focused
+  // train so re-tapping Go on the line map doesn't prompt to "switch" to
+  // itself. Direction guards against the trip number being reused on the
+  // opposite-direction schedule.
+  const isSameTrainOtherLeg =
+    focusedTrip != null &&
+    !isThisTripFocused &&
+    focusedTrip.tripNumber === tripNumber &&
+    isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
+      isSouthbound(fromStation, toStation);
+
+  const isOtherTripFocused =
+    focusedTrip != null && !isThisTripFocused && !isSameTrainOtherLeg;
 
   const serviceDate = useMemo(() => {
     const d = new Date(departureAt);
@@ -150,14 +167,39 @@ export function DepartureReminder({
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
   const doFocus = useCallback(() => {
+    const scheduleType = getTodayScheduleType();
+    // The Go control can be opened from the line map, where the displayed trip
+    // runs origin→terminus. When the user has a home-screen leg selected and
+    // this train actually serves it, focus THAT leg so the pinned card shows
+    // the user's destination (and dedupes against the schedule row) rather
+    // than the full corridor.
+    let legFrom: Station = fromStation;
+    let legTo: Station = toStation;
+    if (
+      homeFromStation &&
+      homeToStation &&
+      (homeFromStation !== fromStation || homeToStation !== toStation) &&
+      tripServesLeg(tripNumber, homeFromStation, homeToStation, scheduleType)
+    ) {
+      legFrom = homeFromStation;
+      legTo = homeToStation;
+    }
     void focusTrip({
       tripNumber,
-      fromStation,
-      toStation,
-      scheduleType: getTodayScheduleType(),
+      fromStation: legFrom,
+      toStation: legTo,
+      scheduleType,
       serviceDate,
     });
-  }, [focusTrip, fromStation, toStation, tripNumber, serviceDate]);
+  }, [
+    focusTrip,
+    fromStation,
+    toStation,
+    tripNumber,
+    serviceDate,
+    homeFromStation,
+    homeToStation,
+  ]);
 
   const handleGoClick = useCallback(() => {
     if (isOtherTripFocused) setConfirmSwitch(true);

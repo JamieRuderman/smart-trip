@@ -385,6 +385,23 @@ export function getFilteredTrips(
 }
 
 /**
+ * Whether a given trip number runs on the leg fromStation→toStation under the
+ * given schedule type. Used by the "Go" control to decide whether a train
+ * tapped from the line map (which displays the full corridor origin→terminus)
+ * can adopt the user's selected home-screen leg instead of the terminus.
+ */
+export function tripServesLeg(
+  tripNumber: number,
+  fromStation: Station,
+  toStation: Station,
+  scheduleType: ScheduleType
+): boolean {
+  return getFilteredTrips(fromStation, toStation, scheduleType).some(
+    (trip) => trip.trip === tripNumber
+  );
+}
+
+/**
  * Look up a full-corridor trip by its GTFS-RT origin startTime and GTFS
  * directionId (0 = southbound, 1 = northbound). Searches today's active
  * schedule (weekday or weekend) so weekday/weekend trips that share an

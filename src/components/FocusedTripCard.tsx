@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Navigation } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -48,6 +48,10 @@ function FocusedTripCardInner({
   timeFormat: "12h" | "24h";
 }) {
   const { t } = useTranslation();
+  // The focused trip's row is hidden from the schedule list (deduped), so this
+  // pinned card is the place to open its detail and manage it (reminder, Stop).
+  // TripCard drives its detail sheet off selectedTripNumber, so hold that here.
+  const [detailOpen, setDetailOpen] = useState(false);
   const trips = useMemo(() => [trip], [trip]);
   const { statusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(
     focusedTrip.fromStation,
@@ -84,8 +88,8 @@ function FocusedTripCardInner({
         fromStation={focusedTrip.fromStation}
         toStation={focusedTrip.toStation}
         currentTime={currentTime}
-        selectedTripNumber={null}
-        onSelectTrip={() => undefined}
+        selectedTripNumber={detailOpen ? trip.trip : null}
+        onSelectTrip={(n) => setDetailOpen(n === trip.trip)}
       />
     </section>
   );

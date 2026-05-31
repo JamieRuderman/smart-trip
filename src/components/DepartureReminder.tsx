@@ -151,6 +151,7 @@ export function DepartureReminder({
     focusedTrip != null &&
     !isThisTripFocused &&
     focusedTrip.tripNumber === tripNumber &&
+    focusedTrip.scheduleType === getTodayScheduleType() &&
     isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
       isSouthbound(fromStation, toStation);
 
@@ -163,6 +164,15 @@ export function DepartureReminder({
     const dd = String(d.getDate()).padStart(2, "0");
     return `${d.getFullYear()}-${mm}-${dd}`;
   }, [departureAt]);
+
+  // Arrival instant for THIS displayed leg — used only to stop offering "Go"
+  // once the trip has actually finished (focusing is otherwise allowed right
+  // up to/through departure, unlike setting a reminder which needs lead time).
+  const effectiveArrival = realtimeArrivalTime ?? arrivalTime;
+  const arrivalAt = useMemo(() => {
+    const a = buildDepartureTimestamp(currentTime, effectiveArrival);
+    return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
+  }, [currentTime, effectiveArrival, departureAt]);
 
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
@@ -225,9 +235,6 @@ export function DepartureReminder({
     1,
     Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
   );
-
-  /** Need at least 2 minutes so the slider has a non-degenerate range. */
-  const tooLateToSchedule = minutesUntilDeparture < 2;
 
   const [sliderValue, setSliderValue] = useState(() =>
     Math.min(DEFAULT_LEAD_MINUTES, Math.max(1, maxLeadMinutes))
@@ -458,8 +465,50 @@ export function DepartureReminder({
     );
   }
 
+  // This is the focused train, but viewed under a different leg than the one
+  // it's focused on (e.g. the line map shows its full corridor while it's
+  // focused on the user's home leg). Show a "Going" status + Stop. We do NOT
+  // offer the reminder picker here because this view's departure time is for a
+  // different leg; reminder editing lives on the matching-leg detail (the home
+  // pinned card / schedule row). Stop is leg-independent, so it's safe here.
+  if (isSameTrainOtherLeg && !pickerMounted) {
+    return (
+      <GutterRow>
+        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
+              <Navigation
+                className="h-4 w-4 text-primary shrink-0"
+                aria-hidden="true"
+              />
+              <span className="truncate">{t("focusedTrip.going")}</span>
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {focusedTrip?.reminder && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {t("departureReminder.remindAt", {
+                    time: formatClockTime(
+                      focusedTrip.reminder.reminderAt,
+                      timeFormat,
+                      i18n.language,
+                    ),
+                  })}
+                </span>
+              )}
+              {stopButton}
+            </div>
+          </div>
+        </div>
+      </GutterRow>
+    );
+  }
+
   if (!pickerMounted) {
-    if (departureAt <= Date.now() || tooLateToSchedule) return null;
+    // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
+    // taking this train") doesn't need lead time — unlike the reminder picker —
+    // so it must NOT be gated on tooLateToSchedule, or the user couldn't
+    // re-focus a train shortly before departure (e.g. after tapping Stop).
+    if (arrivalAt <= Date.now()) return null;
     return (
       <GutterRow>
         <Button

@@ -208,6 +208,16 @@
     "notificationTitle": "Hora de salir hacia {{station}}",
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes)."
   },
+  "focusedTrip": {
+    "go": "Voy — Tomaré este",
+    "going": "En camino",
+    "stop": "Detener",
+    "pinnedLabel": "Tu viaje activo",
+    "switchTitle": "¿Cambiar de tren?",
+    "switchBody": "Vas a tomar el tren {{current}}. ¿Cambiar al tren {{next}}?",
+    "switchConfirm": "Cambiar",
+    "switchCancel": "Cancelar"
+  },
   "tracker": {
     "departsInHoursMinutes": "Llega en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Llega en {{minutes}} min",

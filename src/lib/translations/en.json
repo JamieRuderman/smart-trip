@@ -208,6 +208,16 @@
     "notificationTitle": "Time to leave for {{station}}",
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before)."
   },
+  "focusedTrip": {
+    "go": "Go — I'm taking this",
+    "going": "Going",
+    "stop": "Stop",
+    "pinnedLabel": "Your focused trip",
+    "switchTitle": "Switch trains?",
+    "switchBody": "You're set to take Train {{current}}. Switch to Train {{next}}?",
+    "switchConfirm": "Switch",
+    "switchCancel": "Cancel"
+  },
   "tracker": {
     "departsInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Arrives in {{minutes}} min",

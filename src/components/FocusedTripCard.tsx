@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { Navigation } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { reconstructFocusedTrip } from "@/lib/focusedTrip";
+import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
+import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { TripCard } from "./TripCard";
 
 interface FocusedTripCardProps {
@@ -13,20 +15,57 @@ interface FocusedTripCardProps {
 /**
  * Pinned representation of the user's focused trip ("Go"), shown above the
  * schedule. Always rendered the same way regardless of the home screen's
- * current from/to — the trip is reconstructed from static schedule data via
- * its stored leg. Returns null when nothing is focused or the trip can no
+ * current from/to — reconstructed from static schedule, with live realtime
+ * status overlaid. Returns null when nothing is focused or the trip can no
  * longer be found in the schedule.
  */
 export function FocusedTripCard({ currentTime, timeFormat }: FocusedTripCardProps) {
-  const { t } = useTranslation();
   const { focusedTrip } = useStationSelection();
-
   const trip = useMemo(
     () => (focusedTrip ? reconstructFocusedTrip(focusedTrip) : null),
     [focusedTrip],
   );
-
   if (!focusedTrip || !trip) return null;
+  return (
+    <FocusedTripCardInner
+      focusedTrip={focusedTrip}
+      trip={trip}
+      currentTime={currentTime}
+      timeFormat={timeFormat}
+    />
+  );
+}
+
+function FocusedTripCardInner({
+  focusedTrip,
+  trip,
+  currentTime,
+  timeFormat,
+}: {
+  focusedTrip: FocusedTrip;
+  trip: ProcessedTrip;
+  currentTime: Date;
+  timeFormat: "12h" | "24h";
+}) {
+  const { t } = useTranslation();
+  const trips = useMemo(() => [trip], [trip]);
+  const { statusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(
+    focusedTrip.fromStation,
+    focusedTrip.toStation,
+    trips,
+  );
+
+  const realtimeStatus = useMemo(() => {
+    const primary = statusMap.get(trip.departureTime);
+    if (primary) return primary;
+    if (canceledByStartTime.size > 0) {
+      for (const time of trip.times) {
+        const secondary = canceledByStartTime.get(time);
+        if (secondary) return secondary;
+      }
+    }
+    return null;
+  }, [statusMap, canceledByStartTime, trip]);
 
   return (
     <section aria-label={t("focusedTrip.pinnedLabel")} className="space-y-2">
@@ -40,7 +79,8 @@ export function FocusedTripCard({ currentTime, timeFormat }: FocusedTripCardProp
         isPastTrip={false}
         showFerry={false}
         timeFormat={timeFormat}
-        lastUpdated={null}
+        realtimeStatus={realtimeStatus}
+        lastUpdated={lastUpdated}
         fromStation={focusedTrip.fromStation}
         toStation={focusedTrip.toStation}
         currentTime={currentTime}

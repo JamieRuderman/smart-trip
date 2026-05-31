@@ -11,6 +11,8 @@ import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
+import { useFocusedTrip } from "@/hooks/useFocusedTrip";
+import { FOCUSED_TRIP_CHANGED_EVENT, loadFocusedTrip } from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
   type StationSelection,
@@ -240,6 +242,23 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
+  const { focusedTrip, focusTrip, setReminder, clearFocusedTrip } =
+    useFocusedTrip();
+
+  // Clear the focused trip once the train has arrived. loadFocusedTrip()
+  // already drops the record when its live-aware arrivalAt has passed; this
+  // tick just notices that just happened and nudges consumers to re-read so
+  // the pinned card disappears. A 30s cadence is prompt without busy-work.
+  useEffect(() => {
+    if (!focusedTrip) return;
+    const tick = window.setInterval(() => {
+      if (loadFocusedTrip() === null) {
+        window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+      }
+    }, 30_000);
+    return () => window.clearInterval(tick);
+  }, [focusedTrip]);
+
   const value = useMemo<StationSelection>(
     () => ({
       fromStation: state.fromStation,
@@ -251,6 +270,10 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      focusedTrip,
+      focusTrip,
+      setReminder,
+      clearFocusedTrip,
     }),
     [
       state.fromStation,
@@ -262,6 +285,10 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      focusedTrip,
+      focusTrip,
+      setReminder,
+      clearFocusedTrip,
     ],
   );
 

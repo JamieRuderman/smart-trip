@@ -142,3 +142,49 @@ The `source` field is the only concession to the deferred riding integration: it
 - `FocusedTrip.source` gains `"riding"`.
 - Define precedence when a user focus and a riding latch disagree (who wins, auto-promote, confirm).
 - Potentially feed a user focus into `useUserRiding` as a prior to bias/seed the latch.
+
+---
+
+## Revision 2026-05-31 — `serviceDate` anchor + live pinned card
+
+Post-implementation, the pinned card showed **static** schedule times. Root fix: store the trip's *identity* and a date anchor, derive all times live.
+
+### Why not anchor on GTFS `trip_id`
+
+Investigated the real feed (`data/511/raw/smart.json`) vs the realtime samples:
+
+- Static `trip_id`: `t_6153517_b_86615_tn_0` — a synthetic builder id.
+- Realtime `tripId` (vehiclepositions): `t_6043274_b_86583_tn_0` — **different build counters**.
+
+SMART's `trip_id`s are regenerated per feed build, don't match between static and realtime (which is why the app matches realtime↔static by departure time), and our data refreshes daily — so a stored `trip_id` becomes a dangling reference after the next republication. The **stable public identity is the train number** (`trip_short_name` "Trip 2" → `ProcessedTrip.trip` `2`), which the app already uses. And no id (number, trip_id, service_id) encodes *which calendar day* you're riding — that requires a separate anchor.
+
+### Revised data model
+
+```ts
+interface FocusedTripReminder {
+  leadMinutes: number;
+  reminderAt: number;       // epoch ms fire time (snapshot; rescheduled on drift)
+  notificationId: number;   // stable id used to schedule + cancel
+  title: string;
+  body: string;
+}
+interface FocusedTrip {
+  source: "user";
+  tripNumber: number;
+  fromStation: Station;
+  toStation: Station;
+  scheduleType: "weekday" | "weekend";
+  serviceDate: string;      // "YYYY-MM-DD" — the run's service day (the anchor)
+  reminder: FocusedTripReminder | null;
+}
+```
+
+`departureAt`/`arrivalAt` are **removed**. Times are derived: `reconstructFocusedTrip` → static `HH:MM` → resolved against `serviceDate` (overnight: arrival before departure → +1 day), with live status overlaid for display.
+
+### Behavior
+
+- **Auto-clear:** `loadFocusedTrip` reconstructs the trip and clears when the static arrival instant (on `serviceDate`) is past, or when the trip can no longer be found (timetable changed under a stale focus). Uses static arrival — acceptable; live-arrival expiry is a possible later refinement.
+- **Notification id:** generated once at arm time from `(tripNumber, serviceDate)`, **stored** in the reminder, and reused for reschedule/cancel — fully decoupled from the (drifting) times.
+- **Reminder fire time:** computed from the live-aware departure instant at arm time; rescheduled under the same stored id when the trip-detail sheet observes drift.
+- **Pinned card:** `FocusedTripCard` fetches realtime status for the focused leg (`useTripRealtimeStatusMap`) and passes it to `TripCard`, so it shows **live** times regardless of the home screen's current from/to. This is the actual fix for the static-times limitation.
+- **serviceDate** at focus time = the local `YYYY-MM-DD` of the live-aware departure instant (so a just-before-midnight focus anchors to the correct day).

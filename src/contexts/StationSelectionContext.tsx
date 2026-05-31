@@ -242,8 +242,13 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
-  const { focusedTrip, focusTrip, setReminder, clearFocusedTrip } =
-    useFocusedTrip();
+  const {
+    focusedTrip,
+    focusTrip,
+    setReminder,
+    refreshFocusedTimes,
+    clearFocusedTrip,
+  } = useFocusedTrip();
 
   // Clear the focused trip once the train has arrived. loadFocusedTrip()
   // already drops the record when its live-aware arrivalAt has passed; this
@@ -273,6 +278,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusedTrip,
       focusTrip,
       setReminder,
+      refreshFocusedTimes,
       clearFocusedTrip,
     }),
     [
@@ -288,6 +294,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusedTrip,
       focusTrip,
       setReminder,
+      refreshFocusedTimes,
       clearFocusedTrip,
     ],
   );

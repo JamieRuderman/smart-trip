@@ -124,8 +124,13 @@ export function DepartureReminder({
     [currentTime, effectiveTime]
   );
 
-  const { focusedTrip, focusTrip, setReminder, clearFocusedTrip } =
-    useStationSelection();
+  const {
+    focusedTrip,
+    focusTrip,
+    setReminder,
+    refreshFocusedTimes,
+    clearFocusedTrip,
+  } = useStationSelection();
 
   const isThisTripFocused =
     focusedTrip != null &&
@@ -151,14 +156,12 @@ export function DepartureReminder({
       fromStation,
       toStation,
       scheduleType: getTodayScheduleType(),
-      scheduledDepartureTime: departureTime,
       departureAt,
       arrivalAt,
     });
   }, [
     arrivalAt,
     departureAt,
-    departureTime,
     focusTrip,
     fromStation,
     toStation,
@@ -214,27 +217,21 @@ export function DepartureReminder({
     [departureAt, fromStation, i18n.language, t, timeFormat, tripNumber]
   );
 
-  // Live-departure drift: when a delay (or correction) shifts departureAt
-  // while this trip is focused with an armed reminder, re-arm it via the
-  // context so it fires the right number of minutes before the actual train.
-  //
-  // Only depend on values that actually decide whether we re-schedule (the
-  // lead and the two timestamps). buildText closes over the latest
-  // t/i18n.language via its reference and would otherwise re-trigger every
-  // render the parent recomputes — drowning the native scheduler in no-op
-  // calls.
-  const focusedReminderLead = isThisTripFocused
-    ? focusedTrip?.reminder?.leadMinutes ?? null
-    : null;
-  const focusedDepartureAt = isThisTripFocused
-    ? focusedTrip?.departureAt
-    : undefined;
+  // Live drift: while this focused trip's detail sheet is open, keep the
+  // stored departure/arrival in sync with live updates so the reminder fires
+  // before the ACTUAL departure and auto-clear keys off the ACTUAL arrival.
+  // refreshFocusedTimes no-ops when times are unchanged, so this converges.
+  const storedDepartureAt = isThisTripFocused ? focusedTrip?.departureAt : undefined;
+  const storedArrivalAt = isThisTripFocused ? focusedTrip?.arrivalAt : undefined;
+  const focusedLead = isThisTripFocused
+    ? focusedTrip?.reminder?.leadMinutes ?? 0
+    : 0;
   useEffect(() => {
-    if (focusedReminderLead == null || focusedDepartureAt == null) return;
-    if (focusedDepartureAt === departureAt) return;
-    void setReminder(focusedReminderLead, buildText(focusedReminderLead));
+    if (storedDepartureAt == null || storedArrivalAt == null) return;
+    if (storedDepartureAt === departureAt && storedArrivalAt === arrivalAt) return;
+    void refreshFocusedTimes(departureAt, arrivalAt, buildText(focusedLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departureAt, focusedReminderLead, focusedDepartureAt]);
+  }, [departureAt, arrivalAt, storedDepartureAt, storedArrivalAt, focusedLead]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);

@@ -174,6 +174,9 @@ export function bootFocusedTrip(): void {
     () => {
       const after = loadFocusedTrip();
       if (after) saveFocusedTrip({ ...after, reminder: null });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+      }
     },
   );
 }

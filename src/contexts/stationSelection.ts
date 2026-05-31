@@ -23,6 +23,11 @@ export interface StationSelection {
     leadMinutes: number | null,
     text: ReminderText,
   ) => Promise<SetReminderResult>;
+  refreshFocusedTimes: (
+    departureAt: number,
+    arrivalAt: number,
+    text: ReminderText,
+  ) => Promise<void>;
   clearFocusedTrip: () => Promise<void>;
 }
 

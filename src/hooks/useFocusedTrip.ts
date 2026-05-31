@@ -20,13 +20,17 @@ function notifyChange(): void {
   window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
 }
 
+function onReminderFired(): void {
+  const after = loadFocusedTrip();
+  if (after) saveFocusedTrip({ ...after, reminder: null });
+  notifyChange();
+}
+
 export interface FocusTripInput {
   tripNumber: number;
   fromStation: Station;
   toStation: Station;
   scheduleType: "weekday" | "weekend";
-  /** Scheduled HH:MM departure — stable id key across midnight drift. */
-  scheduledDepartureTime: string;
   departureAt: number;
   arrivalAt: number;
 }
@@ -100,11 +104,7 @@ export function useFocusedTrip() {
         at: reminderAt,
       };
       try {
-        await scheduleNotification(notification, () => {
-          const after = loadFocusedTrip();
-          if (after) saveFocusedTrip({ ...after, reminder: null });
-          notifyChange();
-        });
+        await scheduleNotification(notification, onReminderFired);
       } catch (error) {
         logger.warn("Failed to schedule focused-trip reminder", error);
         return { ok: false, reason: "schedule-failed" };
@@ -119,6 +119,53 @@ export function useFocusedTrip() {
     [],
   );
 
+  /**
+   * Sync the focused trip's live-aware times (called when the trip-detail
+   * sheet observes a delay/correction). Updates the stored departure/arrival
+   * so auto-clear keys off the actual arrival, and — if a reminder is armed —
+   * reschedules it for the new departure under a refreshed id. Cancels the
+   * previously-scheduled notification using the OLD stored departureAt (which
+   * always equals what was last scheduled), so nothing is orphaned.
+   */
+  const refreshFocusedTimes = useCallback(
+    async (
+      departureAt: number,
+      arrivalAt: number,
+      text: ReminderText,
+    ): Promise<void> => {
+      const current = loadFocusedTrip();
+      if (!current) return;
+      if (current.departureAt === departureAt && current.arrivalAt === arrivalAt) {
+        return;
+      }
+      let reminder = current.reminder;
+      if (reminder) {
+        const oldId = reminderIdFor(current.tripNumber, current.departureAt);
+        await cancelNotification(oldId);
+        const newId = reminderIdFor(current.tripNumber, departureAt);
+        const reminderAt = departureAt - reminder.leadMinutes * 60_000;
+        try {
+          await scheduleNotification(
+            { id: newId, title: text.title, body: text.body, at: reminderAt },
+            onReminderFired,
+          );
+          reminder = {
+            leadMinutes: reminder.leadMinutes,
+            reminderAt,
+            title: text.title,
+            body: text.body,
+          };
+        } catch (error) {
+          logger.warn("Failed to reschedule focused-trip reminder on drift", error);
+          // Keep the time update; leave the reminder sub-object as-is.
+        }
+      }
+      saveFocusedTrip({ ...current, departureAt, arrivalAt, reminder });
+      notifyChange();
+    },
+    [],
+  );
+
   const clearFocusedTrip = useCallback(async () => {
     const current = loadFocusedTrip();
     if (current?.reminder) {
@@ -128,5 +175,11 @@ export function useFocusedTrip() {
     notifyChange();
   }, []);
 
-  return { focusedTrip, focusTrip, setReminder, clearFocusedTrip };
+  return {
+    focusedTrip,
+    focusTrip,
+    setReminder,
+    refreshFocusedTimes,
+    clearFocusedTrip,
+  };
 }

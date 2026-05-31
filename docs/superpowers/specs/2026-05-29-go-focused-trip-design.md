@@ -27,7 +27,7 @@ A trip becomes **focused** when the user taps **Go** in the trip detail sheet. A
 
 - Renders as a **pinned card at the top of the home screen**, always, in one consistent presentation regardless of whether its leg matches the currently-selected stations.
 - Carries an **optional reminder** (lead-time notification), off by default.
-- **Auto-clears when the train departs** (its live-aware departure time passes).
+- **Auto-clears when the train arrives** at the focused destination (its live-aware arrival time passes) — so the trip stays focused for the whole journey, not just up to boarding. This aligns the focused-trip window with the ride itself (and with the riding-detection window the deferred spec will hook into).
 
 The reminder is no longer the headline feature — it is one capability of the focused trip.
 
@@ -57,7 +57,8 @@ type FocusedTrip = {
   fromStation: Station;              // the focused leg — independent of the
   toStation: Station;                //   home screen's current from/to
   scheduleType: "weekday" | "weekend"; // so the static lookup picks the right day
-  departureAt: number;               // live-aware epoch ms (origin departure)
+  departureAt: number;               // live-aware epoch ms (departure from fromStation)
+  arrivalAt: number;                 // live-aware epoch ms (arrival at toStation) — drives auto-clear
   reminder: {                        // null = focused, no reminder armed
     leadMinutes: number;
     reminderAt: number;              // epoch ms the notification fires
@@ -72,7 +73,7 @@ The `source` field is the only concession to the deferred riding integration: it
 ### Context API (added to the provider value)
 
 - `focusedTrip: FocusedTrip | null`
-- `setFocusedTrip(trip: { tripNumber; fromStation; toStation; scheduleType; departureAt }): void`
+- `setFocusedTrip(trip: { tripNumber; fromStation; toStation; scheduleType; departureAt; arrivalAt }): void`
   — focuses a trip with no reminder. Silent when nothing is focused or when re-focusing the same trip. **Callers are responsible for confirming a switch** when a *different* trip is already focused (see UI).
 - `setReminder(leadMinutes: number | null): void` — arms (number) or disarms (`null`) the reminder on the currently-focused trip. No-op if nothing is focused.
 - `clearFocusedTrip(): void` — un-focuses and cancels any armed reminder.
@@ -89,7 +90,7 @@ The `source` field is the only concession to the deferred riding integration: it
 - `setReminder(n)` → cancel any existing, compute `reminderAt`, schedule.
 - `setReminder(null)` / `clearFocusedTrip()` → cancel.
 
-**Live-departure drift:** the current `useDepartureReminder` hook recomputes `reminderAt` and reschedules when a trip's live departure time changes. That behavior must be preserved when the hook's logic moves into the provider: as the focused trip's live-aware `departureAt` drifts (delay/recovery), recompute `departureAt` + `reminder.reminderAt` and reschedule the notification. Auto-clear keys off the live-aware `departureAt`, so a delayed train stays focused until its actual departure.
+**Live drift:** the current `useDepartureReminder` hook recomputes `reminderAt` and reschedules when a trip's live departure time changes. That behavior must be preserved when the hook's logic moves into the provider: as the focused trip's live-aware times drift (delay/recovery), recompute `departureAt`, `arrivalAt`, and `reminder.reminderAt` and reschedule the notification. Auto-clear keys off the live-aware `arrivalAt`, so a delayed train stays focused until its actual arrival.
 
 ## UI behavior
 
@@ -115,7 +116,9 @@ The `source` field is the only concession to the deferred riding integration: it
 
 ## Lifecycle
 
-- The provider runs a minute-interval that calls `clearFocusedTrip()` once `focusedTrip.departureAt <= Date.now()`. The pinned card disappears and the train rejoins the list.
+- A trip stays focused from **Go** through the whole ride. The provider runs a minute-interval that calls `clearFocusedTrip()` once `focusedTrip.arrivalAt <= Date.now()` (live-aware). At that point the pinned card disappears.
+- Pre-departure, the focused trip is deduped out of the schedule list (its row is hidden under the pinned card). Post-departure it naturally falls out of the "upcoming from origin" list anyway, so the pinned card becomes its sole on-screen representation for the duration of the ride.
+- **Stop** (manual un-focus) is available throughout — including if the user tapped Go but never boarded; otherwise the focus self-clears at `arrivalAt`.
 - Boot rehydration of web reminder timers continues via the existing `rehydrateWebReminders()` path.
 
 ## Edge cases
@@ -129,7 +132,7 @@ The `source` field is the only concession to the deferred riding integration: it
 
 - Unit: migration from old array key → single focused trip (most-recent-future wins; old key deleted).
 - Unit: `setFocusedTrip` replace semantics; `setReminder(n|null)` arms/cancels via the scheduling layer (mock `departureReminder.ts`).
-- Unit: auto-clear when `departureAt` passes.
+- Unit: auto-clear when `arrivalAt` passes (and *not* at `departureAt`); delayed-arrival keeps it focused longer via live drift.
 - Unit: `FocusedTripCard` reconstruction picks the correct `ProcessedTrip` for a cross-leg focus.
 - Unit: `ScheduleResults` hides the focused trip's row only when on the matching leg.
 - Component/interaction: switch-confirmation appears only on a genuine train change.

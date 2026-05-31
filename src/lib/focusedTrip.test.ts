@@ -8,8 +8,11 @@ import {
   saveFocusedTrip,
   FOCUSED_TRIP_STORAGE_KEY,
   migrateLegacyReminders,
+  reconstructFocusedTrip,
   type FocusedTrip,
 } from "./focusedTrip";
+import { getFilteredTrips } from "@/lib/scheduleUtils";
+import stations from "@/data/stations";
 
 const base: FocusedTrip = {
   source: "user",
@@ -93,5 +96,39 @@ describe("migrateLegacyReminders", () => {
 
   it("is a no-op when there is no legacy key", () => {
     expect(migrateLegacyReminders()).toBeNull();
+  });
+});
+
+describe("reconstructFocusedTrip", () => {
+  it("finds the ProcessedTrip for the focused leg + trip number", () => {
+    const from = stations[0];
+    const to = stations[stations.length - 1];
+    const trips = getFilteredTrips(from, to, "weekday");
+    const target = trips[0];
+    const focused = {
+      source: "user" as const,
+      tripNumber: target.trip,
+      fromStation: from,
+      toStation: to,
+      scheduleType: "weekday" as const,
+      departureAt: Date.now() + 60_000,
+      arrivalAt: Date.now() + 120_000,
+      reminder: null,
+    };
+    expect(reconstructFocusedTrip(focused)?.trip).toBe(target.trip);
+  });
+
+  it("returns null when the trip is no longer in the schedule", () => {
+    const focused = {
+      source: "user" as const,
+      tripNumber: 999999,
+      fromStation: stations[0],
+      toStation: stations[stations.length - 1],
+      scheduleType: "weekday" as const,
+      departureAt: Date.now(),
+      arrivalAt: Date.now(),
+      reminder: null,
+    };
+    expect(reconstructFocusedTrip(focused)).toBeNull();
   });
 });

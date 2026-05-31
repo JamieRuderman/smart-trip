@@ -1,4 +1,5 @@
 import type { Station } from "@/types/smartSchedule";
+import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
@@ -144,4 +145,21 @@ export function migrateLegacyReminders(): FocusedTrip | null {
   };
   saveFocusedTrip(focused);
   return focused;
+}
+
+/**
+ * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
+ * so the pinned card can render even when the home screen's current from/to is
+ * a different leg. Returns null if the trip no longer exists in that schedule
+ * (e.g. schedule data changed under a stale focus).
+ */
+export function reconstructFocusedTrip(
+  focused: FocusedTrip,
+): ProcessedTrip | null {
+  const trips = getFilteredTrips(
+    focused.fromStation,
+    focused.toStation,
+    focused.scheduleType,
+  );
+  return trips.find((t) => t.trip === focused.tripNumber) ?? null;
 }

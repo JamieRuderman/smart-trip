@@ -24,6 +24,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
+import { FocusedTripCard } from "./FocusedTripCard";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
@@ -199,6 +200,9 @@ export function TrainScheduleApp() {
 
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
+
+        {/* Focused Trip — pinned above the schedule */}
+        <FocusedTripCard currentTime={currentTime} timeFormat="12h" />
 
         {/* Live Train Map */}
         <MapDiagramPreviewCard />

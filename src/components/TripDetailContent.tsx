@@ -479,6 +479,8 @@ export function TripDetailContent({
             toStation={toStation}
             departureTime={trip.departureTime}
             liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
+            arrivalTime={trip.arrivalTime}
+            realtimeArrivalTime={realtimeStatus?.liveArrivalTime ?? null}
             currentTime={currentTime}
             timeFormat={timeFormat}
           />

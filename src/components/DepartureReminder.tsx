@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, BellRing, X } from "lucide-react";
+import { AlertTriangle, Bell, BellRing, Navigation, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
-import { useDepartureReminder } from "@/hooks/useDepartureReminder";
+import { useStationSelection } from "@/contexts/stationSelection";
 import {
   isIOSWebBrowser,
   isReminderSupported,
-} from "@/lib/departureReminder";
+} from "@/lib/notificationScheduler";
+import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
@@ -33,6 +42,10 @@ interface DepartureReminderProps {
   departureTime: string;
   /** Live override; takes precedence over the scheduled time when set. */
   liveDepartureTime?: string | null;
+  /** Scheduled arrival time at toStation as "HH:MM". */
+  arrivalTime: string;
+  /** Live arrival override; takes precedence when set. */
+  realtimeArrivalTime?: string | null;
   currentTime: Date;
   /** "12h" — controls the time format shown in the active reminder pill. */
   timeFormat: "12h" | "24h";
@@ -80,6 +93,8 @@ export function DepartureReminder({
   toStation,
   departureTime,
   liveDepartureTime,
+  arrivalTime,
+  realtimeArrivalTime,
   currentTime,
   timeFormat,
 }: DepartureReminderProps) {
@@ -109,6 +124,56 @@ export function DepartureReminder({
     [currentTime, effectiveTime]
   );
 
+  const { focusedTrip, focusTrip, setReminder, clearFocusedTrip } =
+    useStationSelection();
+
+  const isThisTripFocused =
+    focusedTrip != null &&
+    focusedTrip.tripNumber === tripNumber &&
+    focusedTrip.fromStation === fromStation &&
+    focusedTrip.toStation === toStation;
+
+  const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
+
+  // Arrival timestamp at toStation. Reuse the departure builder, then push to
+  // the next day if the arrival HH:MM wrapped before departure (overnight run).
+  const effectiveArrival = realtimeArrivalTime ?? arrivalTime;
+  const arrivalAt = useMemo(() => {
+    const a = buildDepartureTimestamp(currentTime, effectiveArrival);
+    return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
+  }, [currentTime, effectiveArrival, departureAt]);
+
+  const [confirmSwitch, setConfirmSwitch] = useState(false);
+
+  const doFocus = useCallback(() => {
+    void focusTrip({
+      tripNumber,
+      fromStation,
+      toStation,
+      scheduleType: getTodayScheduleType(),
+      scheduledDepartureTime: departureTime,
+      departureAt,
+      arrivalAt,
+    });
+  }, [
+    arrivalAt,
+    departureAt,
+    departureTime,
+    focusTrip,
+    fromStation,
+    toStation,
+    tripNumber,
+  ]);
+
+  const handleGoClick = useCallback(() => {
+    if (isOtherTripFocused) setConfirmSwitch(true);
+    else doFocus();
+  }, [doFocus, isOtherTripFocused]);
+
+  /** This trip's armed reminder, if any. Sourced from the focused-trip
+   *  context rather than the old per-trip hook. */
+  const reminder = isThisTripFocused ? focusedTrip?.reminder ?? null : null;
+
   /**
    * Whole minutes until departure, computed as the diff between epoch-minute
    * numbers so it matches the "Arrives in X min" countdown elsewhere in the
@@ -136,15 +201,6 @@ export function DepartureReminder({
    *  drifted past the shrinking max as currentTime ticked forward. */
   const clampedSliderValue = Math.min(sliderValue, maxLeadMinutes);
 
-  const { reminder, setReminderForLead, reschedule, cancel } =
-    useDepartureReminder({
-      tripNumber,
-      fromStation,
-      toStation,
-      scheduledDepartureTime: departureTime,
-      departureAt,
-    });
-
   const buildText = useCallback(
     (leadMinutes: number) => ({
       title: t("departureReminder.notificationTitle", { station: fromStation }),
@@ -159,23 +215,26 @@ export function DepartureReminder({
   );
 
   // Live-departure drift: when a delay (or correction) shifts departureAt
-  // and we already have a scheduled reminder, re-arm it under the same id
-  // so it fires the right number of minutes before the actual train.
+  // while this trip is focused with an armed reminder, re-arm it via the
+  // context so it fires the right number of minutes before the actual train.
   //
-  // Only depend on values that actually decide whether we re-schedule
-  // (reminder id, the two timestamps, and the lead). buildText and the
-  // reschedule callback close over the latest t/i18n.language via the
-  // function reference and would otherwise re-trigger every render the
-  // parent recomputes — drowning the native scheduler in no-op calls.
-  const reminderId = reminder?.id;
-  const reminderDepartureAt = reminder?.departureAt;
-  const reminderLeadMinutes = reminder?.leadMinutes;
+  // Only depend on values that actually decide whether we re-schedule (the
+  // lead and the two timestamps). buildText closes over the latest
+  // t/i18n.language via its reference and would otherwise re-trigger every
+  // render the parent recomputes — drowning the native scheduler in no-op
+  // calls.
+  const focusedReminderLead = isThisTripFocused
+    ? focusedTrip?.reminder?.leadMinutes ?? null
+    : null;
+  const focusedDepartureAt = isThisTripFocused
+    ? focusedTrip?.departureAt
+    : undefined;
   useEffect(() => {
-    if (reminderId == null || reminderDepartureAt == null) return;
-    if (reminderDepartureAt === departureAt) return;
-    void reschedule(buildText(reminderLeadMinutes ?? 0));
+    if (focusedReminderLead == null || focusedDepartureAt == null) return;
+    if (focusedDepartureAt === departureAt) return;
+    void setReminder(focusedReminderLead, buildText(focusedReminderLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departureAt, reminderId, reminderDepartureAt, reminderLeadMinutes]);
+  }, [departureAt, focusedReminderLead, focusedDepartureAt]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);
@@ -189,29 +248,87 @@ export function DepartureReminder({
   }, [maxLeadMinutes]);
 
   const handleSet = useCallback(async () => {
-    const result = await setReminderForLead(
+    const result = await setReminder(
       clampedSliderValue,
       buildText(clampedSliderValue),
     );
     if (result.ok === false) {
-      setPickerError(result.reason);
+      setPickerError(
+        result.reason === "permission" ? "permission" : "schedule-failed",
+      );
       return;
     }
     closePicker();
-  }, [buildText, clampedSliderValue, closePicker, setReminderForLead]);
+  }, [buildText, clampedSliderValue, closePicker, setReminder]);
+
+  // The "switch trains?" confirm dialog. Portals out of the gutter row, so it
+  // can be rendered alongside whatever branch is active (only the Go branch
+  // ever sets confirmSwitch, but rendering it unconditionally keeps it mounted
+  // across the brief states the user can't trigger it from).
+  const switchDialog = confirmSwitch ? (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) setConfirmSwitch(false);
+      }}
+    >
+      <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
+        <DialogHeader>
+          <DialogTitle>{t("focusedTrip.switchTitle")}</DialogTitle>
+          <DialogDescription>
+            {t("focusedTrip.switchBody", {
+              current: focusedTrip?.tripNumber,
+              next: tripNumber,
+            })}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={() => setConfirmSwitch(false)}>
+            {t("focusedTrip.switchCancel")}
+          </Button>
+          <Button
+            onClick={() => {
+              setConfirmSwitch(false);
+              doFocus();
+            }}
+          >
+            {t("focusedTrip.switchConfirm")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
+  /** A small "Stop" button that un-focuses this trip entirely. */
+  const stopButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => void clearFocusedTrip()}
+      aria-label={t("focusedTrip.stop")}
+      className="h-8 shrink-0"
+    >
+      {t("focusedTrip.stop")}
+    </Button>
+  );
 
   // Order matters here:
-  //   1. Active pill — show the user's existing reminder. Has highest
-  //      priority once the picker is fully unmounted, regardless of
+  //   1. Going + reminder pill — this trip is focused and has an armed
+  //      reminder. The X disarms the reminder (keeps focus); Stop un-focuses.
+  //      Highest priority once the picker is fully unmounted, regardless of
   //      tooLateToSchedule, so a just-set reminder for an imminent train
   //      still surfaces.
-  //   2. Picker — if it's mounted (either open or mid-exit-animation),
+  //   2. Going (no reminder) — this trip is focused but no reminder armed;
+  //      offer to open the reminder picker plus a Stop action.
+  //   3. Picker — if it's mounted (either open or mid-exit-animation),
   //      keep it on screen. Don't yank it out from under the user even if
   //      the window closes mid-interaction.
-  //   3. Trigger button — only the default empty state respects
-  //      tooLateToSchedule and the departure-already-passed gate.
+  //   4. Go button — the default not-focused state. Respects
+  //      tooLateToSchedule and the departure-already-passed gate. Unlike the
+  //      reminder, focusing works without notification support, so Go shows
+  //      regardless of isReminderSupported().
 
-  if (reminder && !pickerMounted) {
+  if (isThisTripFocused && reminder && !pickerMounted) {
     return (
       <GutterRow>
         <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
@@ -238,17 +355,72 @@ export function DepartureReminder({
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => void cancel()}
-              aria-label={t("departureReminder.cancel")}
-              className="h-8 w-8 -mr-1 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
-            >
-              <X
-                className="h-4 w-4 text-muted-foreground"
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => void setReminder(null, buildText(0))}
+                aria-label={t("departureReminder.cancel")}
+                className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
+              >
+                <X
+                  className="h-4 w-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </button>
+              {stopButton}
+            </div>
+          </div>
+        </div>
+      </GutterRow>
+    );
+  }
+
+  if (isThisTripFocused && !reminder && !pickerMounted) {
+    // The reminder sub-control needs notification support. When unsupported,
+    // offer the native-app CTA on iOS web (where the Notification API is
+    // absent) and otherwise just drop the reminder affordance — focusing the
+    // trip itself still works without notifications.
+    const reminderSupported = isReminderSupported();
+    const showAppCta = !reminderSupported && isIOSWebBrowser();
+    const reminderAffordance = reminderSupported ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={openPicker}
+        aria-label={t("departureReminder.setReminder")}
+        className="h-8 gap-1.5"
+      >
+        <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>{t("departureReminder.setReminder")}</span>
+      </Button>
+    ) : showAppCta ? (
+      <Button asChild variant="outline" size="sm" className="h-8 gap-1.5">
+        <a
+          href={APP_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("departureReminder.appCta")}
+        >
+          <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{t("departureReminder.appCta")}</span>
+        </a>
+      </Button>
+    ) : null;
+    return (
+      <GutterRow>
+        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
+              <Navigation
+                className="h-4 w-4 text-primary shrink-0"
                 aria-hidden="true"
               />
-            </button>
+              <span className="truncate">{t("focusedTrip.going")}</span>
+            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              {reminderAffordance}
+              {stopButton}
+            </div>
           </div>
         </div>
       </GutterRow>
@@ -257,40 +429,19 @@ export function DepartureReminder({
 
   if (!pickerMounted) {
     if (departureAt <= Date.now() || tooLateToSchedule) return null;
-    // iOS Chrome (and iOS Safari outside of a home-screen PWA) doesn't expose
-    // the Notification API, so there's nothing useful to offer the user
-    // beyond the native app. Other unsupported browsers are rare enough that
-    // hiding the row outright is the cleanest fallback.
-    if (!isReminderSupported()) {
-      if (!isIOSWebBrowser()) return null;
-      return (
-        <GutterRow>
-          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
-            <a
-              href={APP_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={t("departureReminder.appCta")}
-            >
-              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{t("departureReminder.appCta")}</span>
-            </a>
-          </Button>
-        </GutterRow>
-      );
-    }
     return (
       <GutterRow>
         <Button
           variant="outline"
           size="sm"
-          onClick={openPicker}
-          aria-label={t("departureReminder.setReminder")}
+          onClick={handleGoClick}
+          aria-label={t("focusedTrip.go")}
           className="h-9 gap-1.5"
         >
-          <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>{t("departureReminder.setReminder")}</span>
+          <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{t("focusedTrip.go")}</span>
         </Button>
+        {switchDialog}
       </GutterRow>
     );
   }

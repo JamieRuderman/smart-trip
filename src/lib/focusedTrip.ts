@@ -1,5 +1,8 @@
 import type { Station } from "@/types/smartSchedule";
 import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
+import { Capacitor } from "@capacitor/core";
+import { armWebTimer } from "@/lib/notificationScheduler";
+import { reminderIdFor } from "@/lib/notificationId";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
@@ -145,6 +148,34 @@ export function migrateLegacyReminders(): FocusedTrip | null {
   };
   saveFocusedTrip(focused);
   return focused;
+}
+
+let booted = false;
+
+/**
+ * One-time boot: migrate legacy reminders, then re-arm the web timer for a
+ * surviving reminder (no-op on native — the OS owns scheduled notifications).
+ * Safe to call multiple times; runs once per page load.
+ */
+export function bootFocusedTrip(): void {
+  if (booted) return;
+  booted = true;
+  migrateLegacyReminders();
+  if (Capacitor.isNativePlatform()) return;
+  const focused = loadFocusedTrip();
+  if (!focused?.reminder) return;
+  armWebTimer(
+    {
+      id: reminderIdFor(focused.tripNumber, focused.departureAt),
+      title: focused.reminder.title,
+      body: focused.reminder.body,
+      at: focused.reminder.reminderAt,
+    },
+    () => {
+      const after = loadFocusedTrip();
+      if (after) saveFocusedTrip({ ...after, reminder: null });
+    },
+  );
 }
 
 /**

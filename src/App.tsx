@@ -9,7 +9,7 @@ import { Capacitor } from "@capacitor/core";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
-import { rehydrateWebReminders } from "@/lib/departureReminder";
+import { bootFocusedTrip } from "@/lib/focusedTrip";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
@@ -37,10 +37,10 @@ const App = () => {
     await queryClient.refetchQueries({ type: "active" });
   });
 
-  // Re-arm any persisted departure reminders after a page reload (web only;
-  // native notifications survive launches on their own).
+  // Run boot sequence: migrate legacy reminders and re-arm the web timer for
+  // any surviving reminder (native notifications survive launches on their own).
   useEffect(() => {
-    rehydrateWebReminders();
+    bootFocusedTrip();
   }, []);
 
   return (

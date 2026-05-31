@@ -85,3 +85,63 @@ export function saveFocusedTrip(trip: FocusedTrip | null): void {
     // localStorage unavailable — no-op
   }
 }
+
+const LEGACY_REMINDER_KEY = "smart-train-departure-reminders";
+
+/**
+ * One-time migration from the old per-trip reminder array to the single
+ * focused trip. Promotes the still-future reminder with the latest departure,
+ * preserving its reminder; deletes the legacy key unconditionally. We can't
+ * recover the original arrival time from a legacy reminder, so arrivalAt is
+ * seeded to departureAt — the focus then clears at departure for migrated
+ * records, which is acceptable for a one-shot upgrade path. scheduleType is
+ * inferred from the departure date's day-of-week.
+ */
+export function migrateLegacyReminders(): FocusedTrip | null {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(LEGACY_REMINDER_KEY);
+  if (!raw) return null;
+  localStorage.removeItem(LEGACY_REMINDER_KEY);
+  let list: unknown;
+  try {
+    list = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(list)) return null;
+
+  const now = Date.now();
+  const future = list.filter(
+    (r): r is Record<string, unknown> =>
+      typeof r === "object" &&
+      r !== null &&
+      typeof (r as Record<string, unknown>).departureAt === "number" &&
+      ((r as Record<string, unknown>).departureAt as number) > now,
+  );
+  if (future.length === 0) return null;
+
+  future.sort((a, b) => (b.departureAt as number) - (a.departureAt as number));
+  const r = future[0];
+  const departureAt = r.departureAt as number;
+  const day = new Date(departureAt).getDay();
+  const scheduleType: "weekday" | "weekend" =
+    day === 0 || day === 6 ? "weekend" : "weekday";
+
+  const focused: FocusedTrip = {
+    source: "user",
+    tripNumber: r.tripNumber as number,
+    fromStation: r.fromStation as Station,
+    toStation: r.toStation as Station,
+    scheduleType,
+    departureAt,
+    arrivalAt: departureAt,
+    reminder: {
+      leadMinutes: r.leadMinutes as number,
+      reminderAt: r.reminderAt as number,
+      title: r.title as string,
+      body: r.body as string,
+    },
+  };
+  saveFocusedTrip(focused);
+  return focused;
+}

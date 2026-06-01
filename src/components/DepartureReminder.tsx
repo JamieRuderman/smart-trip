@@ -492,6 +492,10 @@ export function DepartureReminder({
 
 
   if (!pickerMounted) {
+    // "Going" means going somewhere — require a selected journey (origin +
+    // destination). Without one (e.g. tapping a train on the line map before
+    // planning a trip) there's no real destination to focus, so hide Go.
+    if (!homeFromStation || !homeToStation) return null;
     // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
     // taking this train") doesn't need lead time — unlike the reminder picker —
     // so it must NOT be gated on tooLateToSchedule, or the user couldn't

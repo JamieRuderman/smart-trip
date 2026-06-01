@@ -6,6 +6,8 @@ import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { SectionCard } from "@/components/ui/section-card";
+import { CardContent } from "@/components/ui/card";
 import { TripCard } from "./TripCard";
 
 interface FocusedTripCardProps {
@@ -107,26 +109,31 @@ function FocusedTripCardInner({
   }, [statusMap, canceledByStartTime, trip]);
 
   return (
-    <section aria-label={t("focusedTrip.pinnedLabel")} className="space-y-2">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-primary uppercase tracking-wide">
-        <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
-        {t("focusedTrip.going")}
-      </div>
-      <TripCard
-        trip={trip}
-        isNextTrip={false}
-        isPastTrip={false}
-        isFocused
-        showFerry={false}
-        timeFormat={timeFormat}
-        realtimeStatus={realtimeStatus}
-        lastUpdated={lastUpdated}
-        fromStation={focusedTrip.fromStation}
-        toStation={focusedTrip.toStation}
-        currentTime={currentTime}
-        selectedTripNumber={detailOpen ? trip.trip : null}
-        onSelectTrip={(n) => setDetailOpen(n === trip.trip)}
-      />
-    </section>
+    <SectionCard
+      aria-label={t("focusedTrip.pinnedLabel")}
+      className="bg-user-location/10 border-user-location/30"
+    >
+      <CardContent className="p-3 md:p-6 space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-user-location uppercase tracking-wide">
+          <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("focusedTrip.going")}
+        </div>
+        <TripCard
+          trip={trip}
+          isNextTrip={false}
+          isPastTrip={false}
+          isFocused
+          showFerry={false}
+          timeFormat={timeFormat}
+          realtimeStatus={realtimeStatus}
+          lastUpdated={lastUpdated}
+          fromStation={focusedTrip.fromStation}
+          toStation={focusedTrip.toStation}
+          currentTime={currentTime}
+          selectedTripNumber={detailOpen ? trip.trip : null}
+          onSelectTrip={(n) => setDetailOpen(n === trip.trip)}
+        />
+      </CardContent>
+    </SectionCard>
   );
 }

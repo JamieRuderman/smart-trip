@@ -17,6 +17,7 @@ import {
 } from "@/lib/notificationScheduler";
 import { getTodayScheduleType, tripServesLeg } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
+import { focusedDepartureInstant } from "@/lib/focusedTrip";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
@@ -135,28 +136,30 @@ export function DepartureReminder({
     clearFocusedTrip,
   } = useStationSelection();
 
+  // The same train can be viewed under different legs — its full corridor on
+  // the line map (origin→terminus) and the user's selected leg on the home
+  // schedule. Recognize "this is the focused train" by trip number + direction
+  // + schedule type (NOT exact leg) so the control behaves identically wherever
+  // it's opened. Direction guards against the trip number being reused on the
+  // opposite-direction schedule.
   const isThisTripFocused =
     focusedTrip != null &&
-    focusedTrip.tripNumber === tripNumber &&
-    focusedTrip.fromStation === fromStation &&
-    focusedTrip.toStation === toStation;
-
-  // The same train can be viewed under two different legs — its full corridor
-  // on the line map (origin→terminus) and the user's selected leg on the home
-  // schedule. Treat "same train number + same direction" as the same focused
-  // train so re-tapping Go on the line map doesn't prompt to "switch" to
-  // itself. Direction guards against the trip number being reused on the
-  // opposite-direction schedule.
-  const isSameTrainOtherLeg =
-    focusedTrip != null &&
-    !isThisTripFocused &&
     focusedTrip.tripNumber === tripNumber &&
     focusedTrip.scheduleType === getTodayScheduleType() &&
     isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
       isSouthbound(fromStation, toStation);
 
-  const isOtherTripFocused =
-    focusedTrip != null && !isThisTripFocused && !isSameTrainOtherLeg;
+  // Whether the displayed leg IS the focused leg. When true, this view's
+  // (live) departureAt is the user's actual boarding departure; when false
+  // (e.g. the line-map corridor view), it isn't, so reminder math falls back
+  // to the focused leg's scheduled departure.
+  const focusedExactLeg =
+    isThisTripFocused &&
+    focusedTrip != null &&
+    focusedTrip.fromStation === fromStation &&
+    focusedTrip.toStation === toStation;
+
+  const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
 
   const serviceDate = useMemo(() => {
     const d = new Date(departureAt);
@@ -220,13 +223,25 @@ export function DepartureReminder({
    *  context rather than the old per-trip hook. */
   const reminder = isThisTripFocused ? focusedTrip?.reminder ?? null : null;
 
+  // Departure used for ALL reminder math (picker range, fire time, drift). When
+  // the displayed leg is the focused leg, use this view's live departureAt.
+  // Otherwise (the focused train viewed under another leg, e.g. the line map)
+  // use the focused leg's scheduled departure so the reminder still targets the
+  // user's boarding station — not the corridor origin.
+  const reminderDepartureAt = useMemo(() => {
+    if (isThisTripFocused && !focusedExactLeg && focusedTrip) {
+      return focusedDepartureInstant(focusedTrip) ?? departureAt;
+    }
+    return departureAt;
+  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt]);
+
   /**
    * Whole minutes until departure, computed as the diff between epoch-minute
    * numbers so it matches the "Arrives in X min" countdown elsewhere in the
    * sheet (which uses getMinutes() and ignores sub-minute remainders).
    */
   const minutesUntilDeparture =
-    Math.floor(departureAt / 60_000) -
+    Math.floor(reminderDepartureAt / 60_000) -
     Math.floor(currentTime.getTime() / 60_000);
 
   /** Maximum lead time we'll allow. Picking the max fires the alarm
@@ -244,21 +259,30 @@ export function DepartureReminder({
    *  drifted past the shrinking max as currentTime ticked forward. */
   const clampedSliderValue = Math.min(sliderValue, maxLeadMinutes);
 
+  // Boarding station for the reminder text: the focused leg's origin when this
+  // trip is focused (so the line-map corridor view still names the user's
+  // station), otherwise this displayed leg's origin.
+  const reminderFromStation =
+    isThisTripFocused && focusedTrip ? focusedTrip.fromStation : fromStation;
+
   const buildText = useCallback(
     (leadMinutes: number) => ({
-      title: t("departureReminder.notificationTitle", { station: fromStation }),
+      title: t("departureReminder.notificationTitle", { station: reminderFromStation }),
       body: t("departureReminder.notificationBody", {
         leadMinutes,
-        station: fromStation,
-        time: formatClockTime(departureAt, timeFormat, i18n.language),
+        station: reminderFromStation,
+        time: formatClockTime(reminderDepartureAt, timeFormat, i18n.language),
         trip: tripNumber,
       }),
     }),
-    [departureAt, fromStation, i18n.language, t, timeFormat, tripNumber]
+    [reminderDepartureAt, reminderFromStation, i18n.language, t, timeFormat, tripNumber]
   );
 
   // Live drift: when this focused trip has a reminder and the live departure
-  // implies a different fire time than what's stored, reschedule it.
+  // implies a different fire time than what's stored, reschedule it. Only runs
+  // from the focused leg's own view, where reminderDepartureAt is the live
+  // boarding departure — the line-map corridor view's static time must not
+  // clobber a live-adjusted reminder.
   const focusedReminderAt = isThisTripFocused
     ? focusedTrip?.reminder?.reminderAt ?? null
     : null;
@@ -266,12 +290,13 @@ export function DepartureReminder({
     ? focusedTrip?.reminder?.leadMinutes ?? null
     : null;
   useEffect(() => {
+    if (!focusedExactLeg) return;
     if (focusedReminderAt == null || focusedReminderLead == null) return;
-    const expected = departureAt - focusedReminderLead * 60_000;
+    const expected = reminderDepartureAt - focusedReminderLead * 60_000;
     if (expected === focusedReminderAt) return;
-    void rescheduleReminder(departureAt, buildText(focusedReminderLead));
+    void rescheduleReminder(reminderDepartureAt, buildText(focusedReminderLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departureAt, focusedReminderAt, focusedReminderLead]);
+  }, [reminderDepartureAt, focusedExactLeg, focusedReminderAt, focusedReminderLead]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);
@@ -287,7 +312,7 @@ export function DepartureReminder({
   const handleSet = useCallback(async () => {
     const result = await setReminder(
       clampedSliderValue,
-      departureAt,
+      reminderDepartureAt,
       buildText(clampedSliderValue),
     );
     if (result.ok === false) {
@@ -297,7 +322,7 @@ export function DepartureReminder({
       return;
     }
     closePicker();
-  }, [buildText, clampedSliderValue, closePicker, departureAt, setReminder]);
+  }, [buildText, clampedSliderValue, closePicker, reminderDepartureAt, setReminder]);
 
   // The "switch trains?" confirm dialog. Portals out of the gutter row, so it
   // can be rendered alongside whatever branch is active (only the Go branch
@@ -396,7 +421,7 @@ export function DepartureReminder({
             <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
-                onClick={() => void setReminder(null, departureAt, buildText(0))}
+                onClick={() => void setReminder(null, reminderDepartureAt, buildText(0))}
                 aria-label={t("departureReminder.cancel")}
                 className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
               >
@@ -465,43 +490,6 @@ export function DepartureReminder({
     );
   }
 
-  // This is the focused train, but viewed under a different leg than the one
-  // it's focused on (e.g. the line map shows its full corridor while it's
-  // focused on the user's home leg). Show a "Going" status + Stop. We do NOT
-  // offer the reminder picker here because this view's departure time is for a
-  // different leg; reminder editing lives on the matching-leg detail (the home
-  // pinned card / schedule row). Stop is leg-independent, so it's safe here.
-  if (isSameTrainOtherLeg && !pickerMounted) {
-    return (
-      <GutterRow>
-        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
-              <Navigation
-                className="h-4 w-4 text-primary shrink-0"
-                aria-hidden="true"
-              />
-              <span className="truncate">{t("focusedTrip.going")}</span>
-            </span>
-            <div className="flex items-center gap-2 shrink-0">
-              {focusedTrip?.reminder && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {t("departureReminder.remindAt", {
-                    time: formatClockTime(
-                      focusedTrip.reminder.reminderAt,
-                      timeFormat,
-                      i18n.language,
-                    ),
-                  })}
-                </span>
-              )}
-              {stopButton}
-            </div>
-          </div>
-        </div>
-      </GutterRow>
-    );
-  }
 
   if (!pickerMounted) {
     // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
@@ -531,7 +519,7 @@ export function DepartureReminder({
   // quick-transfer warning).
   const isCloseToDeparture =
     clampedSliderValue <= CLOSE_TO_DEPARTURE_THRESHOLD;
-  const alarmAt = departureAt - clampedSliderValue * 60_000;
+  const alarmAt = reminderDepartureAt - clampedSliderValue * 60_000;
   const alarmAtLabel = formatClockTime(alarmAt, timeFormat, i18n.language);
 
   const errorMessage =

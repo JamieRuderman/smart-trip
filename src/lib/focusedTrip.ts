@@ -88,6 +88,21 @@ export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | nu
 }
 
 /**
+ * Resolve the focused trip's departure (at its fromStation) to an absolute
+ * instant on its service date. Lets the reminder control compute a fire time
+ * for the user's actual boarding station regardless of which leg/view the
+ * control is rendered in (e.g. the line map's full-corridor view). Null if the
+ * trip can't be reconstructed.
+ */
+export function focusedDepartureInstant(focused: FocusedTrip): number | null {
+  const trip = reconstructFocusedTrip(focused);
+  if (!trip) return null;
+  const [y, mo, d] = focused.serviceDate.split("-").map(Number);
+  const min = hhmmToMinutes(trip.departureTime);
+  return new Date(y, mo - 1, d, Math.floor(min / 60), min % 60, 0, 0).getTime();
+}
+
+/**
  * Read the focused trip, clearing it once its (static) arrival on the service
  * date has passed, or when the trip can no longer be found in the schedule
  * (timetable changed under a stale focus).

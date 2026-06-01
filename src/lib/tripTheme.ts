@@ -78,6 +78,17 @@ export const stateCardStyle: Record<TripState, string> = {
 };
 
 /**
+ * Blue "you're on / taking this train" card style. Blue == riding throughout
+ * the app, so this OVERRIDES the semantic state style (green/gold/red) for the
+ * riding trip (GPS-detected) and the user-focused trip ("Go"). Includes the
+ * ring so the row pops out of the list at a glance.
+ */
+export const ridingCardStyle =
+  "bg-user-location/5 border-user-location/40 hover:bg-user-location/10 " +
+  "ring-2 ring-user-location ring-offset-2 ring-offset-background " +
+  "focus:border-user-location/80 focus:shadow-[0_0_0_1px_hsl(var(--user-location)/0.8)]";
+
+/**
  * Derives a card's TripState from the realtime boolean flags, in priority order.
  * Used by TripCard, TrainBadge, and anywhere else that maps raw flags to a
  * single semantic state for visual styling.

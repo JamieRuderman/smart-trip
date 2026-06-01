@@ -26,9 +26,10 @@ interface ScheduleResultsProps {
   /** Direction of the riding train — disambiguates trip numbers that are
    *  reused across directions. */
   ridingIsSouthbound?: boolean | null;
-  /** A trip number to omit from the list (the focused trip, shown pinned
-   *  above). Only applied when it belongs to the displayed leg. */
-  hiddenTripNumber?: number | null;
+  /** The user's focused ("Go") trip number when it belongs to the displayed
+   *  leg — that row is highlighted blue (it also appears pinned above; we
+   *  intentionally keep it in the list rather than hiding it). */
+  focusedTripNumber?: number | null;
 }
 
 export function ScheduleResults({
@@ -43,7 +44,7 @@ export function ScheduleResults({
   onSelectTrip,
   ridingTripNumber = null,
   ridingIsSouthbound = null,
-  hiddenTripNumber = null,
+  focusedTripNumber = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
   // Direction of the displayed schedule — used to confirm a riding trip
@@ -86,14 +87,9 @@ export function ScheduleResults({
         )
       : displayedTrips;
 
-  const dedupedTrips =
-    hiddenTripNumber != null
-      ? visibleTrips.filter((trip) => trip.trip !== hiddenTripNumber)
-      : visibleTrips;
-
-  // First non-past index in dedupedTrips — used to flag the "Next" row.
+  // First non-past index in visibleTrips — used to flag the "Next" row.
   // Single pass instead of per-row .slice().every() (O(n) total vs O(n²)).
-  const nextVisibleIndex = dedupedTrips.findIndex(
+  const nextVisibleIndex = visibleTrips.findIndex(
     (trip) => !isTimeInPast(currentTime, trip.departureTime),
   );
 
@@ -133,7 +129,7 @@ export function ScheduleResults({
           role="list"
           aria-label="Train schedule results"
         >
-          {dedupedTrips.map((trip, index) => {
+          {visibleTrips.map((trip, index) => {
             const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;
@@ -142,6 +138,11 @@ export function ScheduleResults({
 
             const isRiding =
               ridingMatchesSchedule && trip.trip === ridingTripNumber;
+            // The focused trip stays in the list (also pinned above) and is
+            // highlighted blue. focusedTripNumber is only set when the focus
+            // is on this displayed leg, so a number match is sufficient.
+            const isFocused =
+              focusedTripNumber != null && trip.trip === focusedTripNumber;
             return (
               <TripCard
                 key={trip.trip}
@@ -149,6 +150,7 @@ export function ScheduleResults({
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
                 isRiding={isRiding}
+                isFocused={isFocused}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}

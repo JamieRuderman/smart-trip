@@ -168,7 +168,10 @@ export function TrainScheduleApp() {
     return param ? getDevFixture(param) : null;
   }, []);
 
-  const hiddenTripNumber =
+  // Highlight the focused trip's row blue when it's on the displayed leg. The
+  // row stays in the list (it also appears pinned above) rather than being
+  // hidden — the duplication is intentional.
+  const focusedTripNumber =
     focusedTrip &&
     focusedTrip.fromStation === fromStation &&
     focusedTrip.toStation === toStation
@@ -232,7 +235,7 @@ export function TrainScheduleApp() {
             onSelectTrip={setSelectedTrip}
             ridingTripNumber={ridingTripNumber}
             ridingIsSouthbound={ridingIsSouthbound}
-            hiddenTripNumber={hiddenTripNumber}
+            focusedTripNumber={focusedTripNumber}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (

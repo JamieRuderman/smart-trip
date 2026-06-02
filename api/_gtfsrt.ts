@@ -13,6 +13,13 @@ export const transit_realtime = (GtfsRealtimeBindings as GtfsRealtimeModule).tra
 
 const BASE = "http://api.511.org/transit";
 
+/** Abort the upstream 511 fetch if it stalls. 511 intermittently hangs for
+ *  ~60s before returning a 504; without this the serverless function (and the
+ *  user's request behind it) would block that whole time. Failing fast lets
+ *  the client fall back to its cached data / static schedule and surface that
+ *  the live feed is down, instead of spinning. */
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
 /** Thrown when the upstream 511.org feed responds non-OK (e.g. 429 rate limit,
  *  503 maintenance). The handler maps these to 502 Bad Gateway so clients can
  *  tell upstream issues apart from real bugs in our own code. */
@@ -34,7 +41,17 @@ export async function fetchGtfsRt(
   if (!apiKey) throw new Error("Missing TRANSIT_511_API_KEY");
 
   const url = `${BASE}/${feed}?api_key=${apiKey}&agency=SA`;
-  const res = await fetch(url);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+  } catch {
+    // Timeout (AbortError) or a network failure reaching 511. Treat it like an
+    // upstream gateway timeout so the handler maps it to 502 with a 504-style
+    // status — the same signal a real 511 504 produces — rather than a generic
+    // 500 that would look like a bug in our own code.
+    throw new UpstreamGtfsRtError(feed, 504);
+  }
   if (!res.ok) throw new UpstreamGtfsRtError(feed, res.status);
 
   const buffer = await res.arrayBuffer();

@@ -24,6 +24,25 @@ describe("computeRealtimeAgeLabel", () => {
     expect(result).toEqual({
       text: "schedule.lastUpdatedLoading",
       isStale: false,
+      isUnavailable: false,
+    });
+  });
+
+  it("returns the unavailable label when the feed is down and we have no timestamp", () => {
+    const result = computeRealtimeAgeLabel(t, null, NOW, true);
+    expect(result).toEqual({
+      text: "schedule.liveDataUnavailable",
+      isStale: true,
+      isUnavailable: true,
+    });
+  });
+
+  it("keeps showing the age when the feed is down but we still have a timestamp", () => {
+    const result = computeRealtimeAgeLabel(t, minutesAgo(3), NOW, true);
+    expect(result).toEqual({
+      text: "schedule.updatedMinutesAgo[3]",
+      isStale: false,
+      isUnavailable: false,
     });
   });
 
@@ -32,6 +51,7 @@ describe("computeRealtimeAgeLabel", () => {
     expect(result).toEqual({
       text: "schedule.updatedJustNow",
       isStale: false,
+      isUnavailable: false,
     });
   });
 
@@ -40,6 +60,7 @@ describe("computeRealtimeAgeLabel", () => {
     expect(result).toEqual({
       text: "schedule.updatedMinutesAgo[3]",
       isStale: false,
+      isUnavailable: false,
     });
   });
 
@@ -61,11 +82,19 @@ describe("computeRealtimeAgeLabel", () => {
       minutesAgo(REALTIME_STALE_THRESHOLD_MIN),
       NOW,
     );
-    expect(result).toEqual({ text: "schedule.stale", isStale: true });
+    expect(result).toEqual({
+      text: "schedule.stale",
+      isStale: true,
+      isUnavailable: false,
+    });
   });
 
   it("stays at 'Stale' for arbitrarily old data (no minute count)", () => {
     const result = computeRealtimeAgeLabel(t, minutesAgo(101037), NOW);
-    expect(result).toEqual({ text: "schedule.stale", isStale: true });
+    expect(result).toEqual({
+      text: "schedule.stale",
+      isStale: true,
+      isUnavailable: false,
+    });
   });
 });

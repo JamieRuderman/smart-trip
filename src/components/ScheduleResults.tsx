@@ -50,7 +50,7 @@ export function ScheduleResults({
     ridingTripNumber != null &&
     ridingIsSouthbound != null &&
     ridingIsSouthbound === scheduleIsSouthbound;
-  const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
+  const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated, isUpstreamDown } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
     filteredTrips.length > 0
@@ -116,6 +116,7 @@ export function ScheduleResults({
         showAllTrips={showAllTrips}
         onToggleShowAllTrips={onToggleShowAllTrips}
         lastUpdated={lastUpdated}
+        isUpstreamDown={isUpstreamDown}
       />
       <CardContent className="p-3 md:p-6 md:pt-0">
         {nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />}

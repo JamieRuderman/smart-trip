@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 import { applyCors } from "./_cors.js";
-import { fetchGtfsRt, UpstreamGtfsRtError } from "./_gtfsrt.js";
+import { fetchGtfsRtBytes, decodeFeed, UpstreamGtfsRtError } from "./_gtfsrt.js";
+import { fetchFeedCached } from "./_feedCache.js";
 
 type Feed = "vehiclepositions" | "tripupdates" | "servicealerts";
 type FeedMessage = GtfsRealtime.IFeedMessage;
@@ -12,6 +13,12 @@ interface GtfsRtHandlerOptions<T> {
   feed: Feed;
   sampleFile: string;
   cacheControl: string;
+  /**
+   * Max age (ms) before the shared Redis cache refreshes this feed from 511.
+   * Bounds the GLOBAL upstream poll rate — one fetch per window no matter how
+   * many users/regions hit us — to stay under 511's rate limit.
+   */
+  freshnessMs: number;
   transform: (feed: FeedMessage, req: VercelRequest) => T;
   /** Enable ?raw=true passthrough — returns full parsed protobuf feed as JSON */
   supportRaw?: boolean;
@@ -26,7 +33,7 @@ interface GtfsRtHandlerOptions<T> {
  * Each endpoint provides only the feed-specific `transform` callback.
  */
 export function createGtfsRtHandler<T>(options: GtfsRtHandlerOptions<T>) {
-  const { feed, sampleFile, cacheControl, transform, supportRaw = false } = options;
+  const { feed, sampleFile, cacheControl, freshnessMs, transform, supportRaw = false } = options;
 
   return async function handler(req: VercelRequest, res: VercelResponse) {
     if (applyCors(req, res)) return;
@@ -39,7 +46,12 @@ export function createGtfsRtHandler<T>(options: GtfsRtHandlerOptions<T>) {
         return res.json(sample);
       }
 
-      const feedData = await fetchGtfsRt(feed);
+      const { bytes, servedStale } = await fetchFeedCached(
+        feed,
+        freshnessMs,
+        () => fetchGtfsRtBytes(feed),
+      );
+      const feedData = decodeFeed(bytes);
 
       if (supportRaw && req.query.raw === "true") {
         // Return the full parsed-but-unnormalized protobuf feed for debugging.
@@ -49,7 +61,10 @@ export function createGtfsRtHandler<T>(options: GtfsRtHandlerOptions<T>) {
       }
 
       const result = transform(feedData, req);
-      res.setHeader("Cache-Control", cacheControl);
+      // Only let the CDN cache genuinely-fresh responses. A snapshot served
+      // because 511 was down (servedStale) must not be pinned at the edge, or
+      // it would outlive 511's recovery.
+      res.setHeader("Cache-Control", servedStale ? "no-store" : cacheControl);
       return res.json(result);
     } catch (err) {
       // Distinguish upstream 511.org failures (rate limit, outage) from real

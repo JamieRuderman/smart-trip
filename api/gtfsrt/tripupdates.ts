@@ -10,6 +10,7 @@ export default createGtfsRtHandler({
   feed: "tripupdates",
   sampleFile: "data/511/realtime-samples/tripupdates.json",
   cacheControl: "s-maxage=30, stale-while-revalidate=15",
+  freshnessMs: 40_000, // ≤90 upstream calls/hr
   transform(feed) {
     const timestamp = Number(feed.header?.timestamp ?? 0);
 

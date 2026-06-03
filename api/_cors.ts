@@ -1,68 +1,41 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const STATIC_ALLOWED = [
-  "capacitor://localhost",
-  "ionic://localhost",
-];
-
-const STATIC_ALLOWED_PREFIXES = [
-  "http://localhost",
-  "http://127.0.0.1",
-  "https://localhost",
-];
-
-function envAllowedOrigins(): string[] {
-  const raw = process.env.ALLOWED_ORIGINS;
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function isAllowedOrigin(origin: string): boolean {
-  if (STATIC_ALLOWED.includes(origin)) return true;
-  if (STATIC_ALLOWED_PREFIXES.some((p) => origin.startsWith(p))) return true;
-  return envAllowedOrigins().includes(origin);
-}
-
 /**
- * Apply CORS. Returns `true` if the caller should stop further processing
- * (either a handled preflight, or a rejected cross-origin request).
+ * Apply CORS for the public GTFS-RT data endpoints. Returns `true` if the
+ * caller should stop further processing (a handled preflight).
  *
- * Policy:
- *  - Browser requests with an `Origin` header are only allowed from the
- *    static allowlist (capacitor/ionic/localhost) or `ALLOWED_ORIGINS` env.
- *  - Disallowed origins get no `Access-Control-Allow-Origin` header, which
- *    blocks browser reads. Preflights from disallowed origins get 403.
- *  - Requests without an `Origin` header (same-origin, server-to-server,
- *    curl) pass through; CORS can't gate those — rate limiting must.
+ * Policy: a single wildcard `Access-Control-Allow-Origin: *` and NO
+ * `Vary: Origin`.
+ *
+ * Why wildcard instead of an origin allowlist:
+ *  - These endpoints serve public, uncredentialed GTFS-RT data that is byte-for-
+ *    byte identical for every caller. There is nothing origin-specific to
+ *    protect.
+ *  - An Origin allowlist only constrains *browser* requests anyway — any server,
+ *    script, or curl can omit/spoof the Origin header (and the previous code
+ *    already let originless requests through). So it never actually prevented
+ *    scraping or upstream load; it only blocked other websites' in-browser use.
+ *  - Crucially, `Vary: Origin` forced Vercel's edge cache to keep a SEPARATE
+ *    cached copy per Origin (web domain, capacitor://localhost, https://localhost,
+ *    every preview URL, originless). Each variant missed independently and
+ *    triggered its own upstream 511 fetch, multiplying our load against 511's
+ *    rate limit. Dropping Vary collapses those to ONE shared cache entry per
+ *    feed per edge — the actual lever for reducing 511 traffic.
+ *
+ * Abuse/load is controlled by the Cache-Control on each endpoint (shared edge
+ * cache) and the upstream 511 rate limit — not by CORS.
  */
 export function applyCors(req: VercelRequest, res: VercelResponse): boolean {
-  const originHeader = req.headers.origin;
-  const origin =
-    typeof originHeader === "string" ? originHeader : undefined;
-  const allowed = origin ? isAllowedOrigin(origin) : true;
-
-  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With"
+    "Content-Type, X-Requested-With"
   );
   res.setHeader("Access-Control-Max-Age", "86400");
 
-  if (origin && allowed) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-
   if (req.method === "OPTIONS") {
-    res.status(allowed ? 204 : 403).end();
-    return true;
-  }
-
-  if (origin && !allowed) {
-    res.status(403).json({ error: "Origin not allowed" });
+    res.status(204).end();
     return true;
   }
 

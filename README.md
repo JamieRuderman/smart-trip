@@ -81,6 +81,7 @@ Default local URL:
 | `USE_SAMPLE_DATA` | `.env.local` | Serve fixtures from `sample/` instead of the live API |
 | `DEV_API_PROXY_TARGET` | `.env.local` | Dev-only `/api` proxy target for `npm run dev`; defaults to `http://localhost:3000` |
 | `VITE_API_BASE_URL` | `.env.native` or `.env.native.local` | Absolute API base URL for native builds |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Vercel env (auto-injected) | Upstash Redis credentials for the shared GTFS-RT cache. Created by the Vercel ↔ Upstash integration; if absent, the cache falls back to direct 511 fetches |
 
 For production on Vercel, keep `TRANSIT_511_API_KEY` server-side only.
 
@@ -106,17 +107,37 @@ For production on Vercel, keep `TRANSIT_511_API_KEY` server-side only.
 
 Static schedule data is generated into `src/data/generated/` and published to `public/data/schedules.json` during `prebuild`.
 
-Realtime data flows through Vercel serverless routes:
+Realtime data flows through Vercel serverless routes, fronted by a shared
+Redis cache so 511 is polled once per window globally (see below):
 
 ```text
 511.org GTFS-Realtime
-  -> /api/gtfsrt/alerts
-  -> /api/gtfsrt/tripupdates
+  -> Upstash Redis cache (poll-on-read + lock, api/_feedCache.ts)
+  -> /api/gtfsrt/{alerts,tripupdates,vehiclepositions}
   -> React Query hooks
-  -> trip cards, trip detail sheets, and service alerts UI
+  -> trip cards, trip detail sheets, map, and service alerts UI
 ```
 
 Trip updates are currently matched against static schedule entries by scheduled origin departure time. **TODO (clean up soon):** this should move to the canonical GTFS-RT approach — direct `trip_id` match, then `route_id + direction_id + start_date + start_time` as fallback. A contemporaneous capture (`scripts/transit/captureRealtime.ts`) confirms SMART's realtime `trip_update.trip.trip_id` matches the static `trip_id`, so the older assumption that "SMART trip IDs are regenerated per service date" does not hold for this feed. See the `TODO(trip-matching)` note in `src/hooks/useTripUpdates.ts`.
+
+### Realtime cache (511 rate limit)
+
+511's Open Data API allows ~370 requests/hour for our token, and explicitly
+expects a single central backend to fetch once and fan out to all clients —
+the upstream rate must not scale with users. `api/_feedCache.ts` implements
+that: each feed is fetched from 511 at most once per freshness window
+(vehicles 15s, trip updates 40s, alerts 5min ≈ 342 calls/hr total), cached in
+Upstash Redis, and served to every region/user from that one snapshot. A short
+lock prevents concurrent refreshes, and the last-known-good snapshot is served
+if 511 is down.
+
+> **Realtime cache region (TODO: consider moving west).** The Redis primary
+> region and the Vercel serverless functions both run in `iad1` (Washington,
+> D.C.) — co-located so cache reads/writes stay in-region. Riders and the 511
+> upstream are in the SF Bay Area, so relocating **both** the functions
+> (`regions: ["sfo1"]`) **and** the Redis primary region to SF would cut
+> latency. Move them together — splitting across coasts adds a cross-country
+> hop to every cache op. Deferred for now; revisit if realtime latency matters.
 
 ## Mobile Development
 

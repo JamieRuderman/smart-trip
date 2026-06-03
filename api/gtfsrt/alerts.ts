@@ -22,6 +22,7 @@ export default createGtfsRtHandler({
   feed: "servicealerts",
   sampleFile: "data/511/realtime-samples/alert.json",
   cacheControl: "s-maxage=60, stale-while-revalidate=30",
+  freshnessMs: 300_000, // 5 min → ≤12 upstream calls/hr
   transform(feed) {
     const timestamp = Number(feed.header?.timestamp ?? 0);
 

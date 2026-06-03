@@ -34,9 +34,14 @@ export class UpstreamGtfsRtError extends Error {
   }
 }
 
-export async function fetchGtfsRt(
+/**
+ * Fetch the raw GTFS-RT protobuf bytes for a feed from 511. Kept separate from
+ * decoding so the shared cache (see _feedCache.ts) can store and serve the
+ * exact upstream bytes.
+ */
+export async function fetchGtfsRtBytes(
   feed: "servicealerts" | "vehiclepositions" | "tripupdates"
-): Promise<transitRealtimeTypes.FeedMessage> {
+): Promise<Uint8Array> {
   const apiKey = process.env.TRANSIT_511_API_KEY;
   if (!apiKey) throw new Error("Missing TRANSIT_511_API_KEY");
 
@@ -55,7 +60,14 @@ export async function fetchGtfsRt(
   if (!res.ok) throw new UpstreamGtfsRtError(feed, res.status);
 
   const buffer = await res.arrayBuffer();
-  return transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
+  return new Uint8Array(buffer);
+}
+
+/** Decode GTFS-RT protobuf bytes into a FeedMessage. */
+export function decodeFeed(
+  bytes: Uint8Array
+): transitRealtimeTypes.FeedMessage {
+  return transit_realtime.FeedMessage.decode(bytes);
 }
 
 export function getTranslation(

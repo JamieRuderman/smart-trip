@@ -12,6 +12,7 @@ export default createGtfsRtHandler({
   feed: "vehiclepositions",
   sampleFile: "data/511/realtime-samples/vehiclepositions.json",
   cacheControl: "s-maxage=15",
+  freshnessMs: 15_000, // ≤240 upstream calls/hr
   supportRaw: true,
   transform(feed) {
     const feedTimestamp = Number(feed.header?.timestamp ?? 0);

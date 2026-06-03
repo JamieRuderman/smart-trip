@@ -94,7 +94,7 @@ export default function Map() {
 function MapContents() {
   const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
-  const { trains, lastUpdated } = useMapTrains();
+  const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
   // The user's currently-selected schedule leg comes from the shared
   // StationSelectionContext. Used only to mark matching rows in the trip
@@ -461,7 +461,7 @@ function MapContents() {
       {/* Live-data freshness chip — beneath the train-count pill. Color and
           copy mirror ScheduleHeader so the same "stale" mental model carries
           over to the map. Only renders when we have a feed timestamp. */}
-      <MapLiveDataChip lastUpdated={lastUpdated} />
+      <MapLiveDataChip lastUpdated={lastUpdated} isUpstreamDown={isUpstreamDown} />
 
       {/* Offline banner overlay — only renders when offline */}
       {!isOnline && (

@@ -8,14 +8,21 @@ import { cn } from "@/lib/utils";
 interface MapLiveDataChipProps {
   /** Latest realtime feed timestamp from `useMapTrains().lastUpdated`. */
   lastUpdated: Date | null;
+  /** True when the 511 live feed is failing — shows "Live data unavailable". */
+  isUpstreamDown?: boolean;
 }
 
 /**
  * Floating chip on the map showing how recent the live train data is.
  * Mirrors `ScheduleHeader`'s "X min ago / stale" wording so the same mental
- * model carries over to the map. Hidden until we have a feed timestamp.
+ * model carries over to the map. Hidden until we have a feed timestamp — unless
+ * the 511 feed is down, in which case it surfaces "Live data unavailable" so a
+ * blank map reads as an upstream outage rather than "no trains running".
  */
-export function MapLiveDataChip({ lastUpdated }: MapLiveDataChipProps) {
+export function MapLiveDataChip({
+  lastUpdated,
+  isUpstreamDown = false,
+}: MapLiveDataChipProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => new Date());
 
@@ -25,8 +32,13 @@ export function MapLiveDataChip({ lastUpdated }: MapLiveDataChipProps) {
     return () => window.clearInterval(id);
   }, [lastUpdated]);
 
-  if (!lastUpdated) return null;
-  const { text, isStale } = computeRealtimeAgeLabel(t, lastUpdated, now);
+  if (!lastUpdated && !isUpstreamDown) return null;
+  const { text, isStale } = computeRealtimeAgeLabel(
+    t,
+    lastUpdated,
+    now,
+    isUpstreamDown,
+  );
 
   return (
     <div

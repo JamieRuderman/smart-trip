@@ -57,6 +57,12 @@ export function createGtfsRtHandler<T>(options: GtfsRtHandlerOptions<T>) {
       // status, no caching. Lets clients (and humans reading the console)
       // tell "transit feed is throttling us" apart from "we have a bug".
       if (err instanceof UpstreamGtfsRtError) {
+        // Surface upstream 511 failures in Vercel's function logs. The response
+        // body carries upstreamStatus, but the Logs view doesn't show bodies —
+        // so without this line a 511 outage is invisible in observability.
+        console.warn(
+          `[gtfsrt] upstream ${err.feed} failed: ${err.upstreamStatus}`,
+        );
         res.setHeader("Cache-Control", "no-store");
         return res.status(502).json({
           error: err.message,

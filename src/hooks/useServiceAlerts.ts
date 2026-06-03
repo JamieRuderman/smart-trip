@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiBaseUrl } from "@/lib/env";
+import { fetchGtfsRtJson } from "@/lib/gtfsRtFetch";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import { buildAlertFingerprint } from "@/lib/alertFingerprint";
 import type { GtfsRtAlertsResponse, GtfsRtAlert, GtfsRtInformedEntity } from "@/types/gtfsRt";
@@ -7,10 +7,8 @@ import type { ServiceAlertData, Station } from "@/types/smartSchedule";
 
 const ALERTS_POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchAlerts(): Promise<GtfsRtAlertsResponse> {
-  const res = await fetch(`${apiBaseUrl}/api/gtfsrt/alerts`);
-  if (!res.ok) throw new Error(`Alerts fetch failed: ${res.status}`);
-  return res.json() as Promise<GtfsRtAlertsResponse>;
+function fetchAlerts(): Promise<GtfsRtAlertsResponse> {
+  return fetchGtfsRtJson<GtfsRtAlertsResponse>("/api/gtfsrt/alerts");
 }
 
 /** Convert ALL-CAPS agency text to sentence case for readability. */

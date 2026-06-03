@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { UpstreamGtfsRtError } from "./_gtfsrt.js";
 
 // Connection is auto-injected by the Vercel ↔ Upstash integration. When it's
 // absent (e.g. local dev, or before the integration is wired up) the cache
@@ -68,37 +69,66 @@ export async function fetchFeedCached(
     return { bytes: await fetchBytes(), servedStale: false };
   }
 
+  try {
+    return await fetchViaCache(redis, feed, freshnessMs, fetchBytes);
+  } catch (err) {
+    // A genuine 511 failure must propagate (handler → 502, possibly after
+    // serving stale). But a *Redis* problem — auth (WRONGPASS), network,
+    // anything — must not take the endpoint down: fall back to a direct fetch
+    // so trains still load. Logged loudly so the misconfiguration shows up in
+    // Vercel logs rather than being silently masked.
+    if (err instanceof UpstreamGtfsRtError) throw err;
+    console.warn(
+      `[gtfsrt] Redis cache unavailable for ${feed}; serving direct from 511: ${String(err)}`,
+    );
+    return { bytes: await fetchBytes(), servedStale: false };
+  }
+}
+
+async function fetchViaCache(
+  client: Redis,
+  feed: string,
+  freshnessMs: number,
+  fetchBytes: () => Promise<Uint8Array>
+): Promise<CachedFeedResult> {
   const now = Date.now();
-  const cached = await redis.get<CachedFeed>(dataKey(feed));
+  const cached = await client.get<CachedFeed>(dataKey(feed));
 
   if (cached && now - cached.fetchedAt < freshnessMs) {
     return { bytes: fromB64(cached.data), servedStale: false };
   }
 
-  // Snapshot is stale or missing. Only the lock winner refreshes 511.
-  const gotLock = await redis.set(lockKey(feed), "1", {
+  // Snapshot is stale or missing. Only the lock winner refreshes 511; the lock
+  // doubles as a backoff (see the catch) so a failing 511 isn't re-hit on every
+  // request during an outage.
+  const gotLock = await client.set(lockKey(feed), "1", {
     nx: true,
     px: LOCK_TTL_MS,
   });
 
   if (!gotLock) {
-    // Another instance is already refreshing. Serve the existing snapshot
-    // rather than pile onto 511; it's at most ~freshness + lock-TTL old, which
-    // the client treats as current. Only a truly cold cache fetches directly.
-    if (cached) return { bytes: fromB64(cached.data), servedStale: false };
+    // Another instance holds the lock — either refreshing now or backing off
+    // after a failed refresh. Serve the existing snapshot, which is by
+    // definition past its freshness window here, marked stale so the CDN won't
+    // pin it. Only a truly cold cache falls back to a direct fetch.
+    if (cached) return { bytes: fromB64(cached.data), servedStale: true };
     return { bytes: await fetchBytes(), servedStale: false };
   }
 
   try {
     const bytes = await fetchBytes();
     const entry: CachedFeed = { data: toB64(bytes), fetchedAt: now };
-    await redis.set(dataKey(feed), entry, { ex: STALE_TTL_SECONDS });
+    await client.set(dataKey(feed), entry, { ex: STALE_TTL_SECONDS });
+    // Success — release the lock so the next freshness window can refresh.
+    await client.del(lockKey(feed));
     return { bytes, servedStale: false };
   } catch (err) {
-    // 511 failed. Prefer last-known-good over surfacing the outage to users.
+    // 511 failed. Keep the lock as a backoff (~one freshness window) instead of
+    // releasing it, so we don't re-hit a down upstream on every request — a
+    // failed refresh then costs the same poll budget as a healthy one. Serve
+    // last-known-good if we have it; otherwise propagate the error (→ 502).
+    await client.set(lockKey(feed), "1", { px: freshnessMs });
     if (cached) return { bytes: fromB64(cached.data), servedStale: true };
     throw err;
-  } finally {
-    await redis.del(lockKey(feed));
   }
 }

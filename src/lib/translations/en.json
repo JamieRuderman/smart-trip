@@ -47,7 +47,8 @@
     "updatedJustNow": "Just now",
     "updatedMinutesAgo_one": "{{count}}m ago",
     "updatedMinutesAgo_other": "{{count}}m ago",
-    "stale": "Data Stale"
+    "stale": "Data Stale",
+    "liveDataUnavailable": "Live data unavailable"
   },
   "fare": {
     "fareInformation": "Fare Information",

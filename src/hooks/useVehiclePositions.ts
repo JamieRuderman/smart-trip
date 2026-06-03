@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { apiBaseUrl } from "@/lib/env";
+import { fetchGtfsRtJson } from "@/lib/gtfsRtFetch";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import type {
   GtfsRtVehiclePositionsResponse,
@@ -11,17 +11,14 @@ const VEHICLE_POSITIONS_POLL_INTERVAL = 15 * 1000; // 15 seconds
 const FEED_STALE_THRESHOLD_SECONDS = 90;  // feed header age
 const VEHICLE_STALE_THRESHOLD_SECONDS = 60; // individual vehicle age
 
-async function fetchVehiclePositions(): Promise<GtfsRtVehiclePositionsResponse> {
-  const res = await fetch(`${apiBaseUrl}/api/gtfsrt/vehiclepositions`);
-  if (!res.ok) throw new Error(`Vehicle positions fetch failed: ${res.status}`);
-  return res.json() as Promise<GtfsRtVehiclePositionsResponse>;
-}
-
 /** Raw vehicle positions feed, polled every 15 seconds. */
 export function useVehiclePositions() {
   return useQuery({
     queryKey: ["gtfsrt", "vehiclepositions"],
-    queryFn: fetchVehiclePositions,
+    queryFn: () =>
+      fetchGtfsRtJson<GtfsRtVehiclePositionsResponse>(
+        "/api/gtfsrt/vehiclepositions",
+      ),
     refetchInterval: VEHICLE_POSITIONS_POLL_INTERVAL,
     staleTime: 10 * 1000,
     retry: 2,

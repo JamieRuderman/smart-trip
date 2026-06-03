@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useVehiclePositions } from "@/hooks/useVehiclePositions";
 import { useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
+import { isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
@@ -59,9 +60,18 @@ function buildTripNumberIndex(): Map<string, number> {
   return index;
 }
 
-export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null } {
-  const { data: vehicleData } = useVehiclePositions();
-  const { data: tripData } = useTripUpdates();
+export function useMapTrains(): {
+  trains: MapTrain[];
+  lastUpdated: Date | null;
+  isUpstreamDown: boolean;
+} {
+  const { data: vehicleData, error: vehicleError } = useVehiclePositions();
+  const { data: tripData, error: tripError } = useTripUpdates();
+  // The live train layer is driven by vehicle positions; trip updates only
+  // annotate delays. So "feed down" tracks the vehicle feed primarily, falling
+  // back to the trip feed when vehicles haven't errored yet.
+  const isUpstreamDown =
+    isUpstreamFeedDown(vehicleError) || isUpstreamFeedDown(tripError);
   // Re-run lookups when cached/remote schedule data swaps in.
   const { version: scheduleVersion } = useScheduleData();
 
@@ -77,7 +87,7 @@ export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null }
         ? new Date(vehicleData.timestamp * 1000)
         : null;
 
-    if (!vehicleData?.vehicles) return { trains: [], lastUpdated };
+    if (!vehicleData?.vehicles) return { trains: [], lastUpdated, isUpstreamDown };
 
     const tripDelays = new Map<string, { delayMinutes: number | null; isCanceled: boolean }>();
     if (tripData?.updates) {
@@ -130,6 +140,6 @@ export function useMapTrains(): { trains: MapTrain[]; lastUpdated: Date | null }
       });
     }
 
-    return { trains, lastUpdated };
-  }, [vehicleData, tripData, tripNumberIndex]);
+    return { trains, lastUpdated, isUpstreamDown };
+  }, [vehicleData, tripData, tripNumberIndex, isUpstreamDown]);
 }

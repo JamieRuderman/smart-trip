@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { apiBaseUrl } from "@/lib/env";
+import { fetchGtfsRtJson, isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
   stationIndexMap,
@@ -19,10 +19,8 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
 const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
 
-async function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
-  const res = await fetch(`${apiBaseUrl}/api/gtfsrt/tripupdates`);
-  if (!res.ok) throw new Error(`Trip updates fetch failed: ${res.status}`);
-  return res.json() as Promise<GtfsRtTripUpdatesResponse>;
+function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
+  return fetchGtfsRtJson<GtfsRtTripUpdatesResponse>("/api/gtfsrt/tripupdates");
 }
 
 /** Convert a Unix timestamp (seconds) to "HH:MM" string in local time */
@@ -326,6 +324,8 @@ export interface TripRealtimeStatusMaps {
   canceledByStartTime: Map<string, TripRealtimeStatus>;
   /** When the GTFS-RT data was last successfully fetched (null if never). */
   lastUpdated: Date | null;
+  /** True when the 511 upstream feed is failing (so the UI can say so). */
+  isUpstreamDown: boolean;
 }
 
 /**
@@ -355,12 +355,13 @@ export function useTripRealtimeStatusMap(
   toStation: Station | "",
   trips: ProcessedTrip[]
 ): TripRealtimeStatusMaps {
-  const { data } = useTripUpdates();
+  const { data, error } = useTripUpdates();
+  const isUpstreamDown = isUpstreamFeedDown(error);
 
   return useMemo(() => {
     const lastUpdated =
       data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated };
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isUpstreamDown };
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
@@ -416,6 +417,6 @@ export function useTripRealtimeStatusMap(
         canceledByStartTime.set(result.scheduledDeparture, result.status);
       }
     }
-    return { statusMap, canceledByStartTime, lastUpdated };
-  }, [data, fromStation, toStation, trips]);
+    return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown };
+  }, [data, fromStation, toStation, trips, isUpstreamDown]);
 }

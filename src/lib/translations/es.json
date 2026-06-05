@@ -214,6 +214,8 @@
     "go": "Voy — Tomaré este",
     "going": "En camino",
     "stop": "Detener",
+    "myTrip": "Mi viaje",
+    "viewDetails": "Ver detalles completos del viaje",
     "pinnedLabel": "Tu viaje activo",
     "switchTitle": "¿Cambiar de tren?",
     "switchBody": "Vas a tomar el tren {{current}}. ¿Cambiar al tren {{next}}?",

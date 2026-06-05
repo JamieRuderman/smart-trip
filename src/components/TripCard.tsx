@@ -345,6 +345,7 @@ export const TripCard = memo(function TripCard({
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}
           showFerry={showFerry}
+          isFocused={isFocused || isRiding}
         />
       )}
     </>

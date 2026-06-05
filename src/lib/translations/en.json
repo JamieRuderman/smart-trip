@@ -214,6 +214,8 @@
     "go": "Go — I'm taking this",
     "going": "Going",
     "stop": "Stop",
+    "myTrip": "My Trip",
+    "viewDetails": "View full trip details",
     "pinnedLabel": "Your focused trip",
     "switchTitle": "Switch trains?",
     "switchBody": "You're set to take Train {{current}}. Switch to Train {{next}}?",

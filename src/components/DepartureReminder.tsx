@@ -204,6 +204,15 @@ export function DepartureReminder({
       scheduleType,
       serviceDate,
     });
+    // Drop straight into the reminder slider so the lead-time picker is one
+    // tap away. The picker render path is independent of focus state, so it's
+    // safe to open before the (async) focus settles. Skip where notifications
+    // aren't supported — there's no reminder to configure there.
+    if (isReminderSupported()) {
+      setSliderValue(DEFAULT_LEAD_MINUTES);
+      setPickerError(null);
+      setPickerOpen(true);
+    }
   }, [
     focusTrip,
     fromStation,
@@ -504,13 +513,11 @@ export function DepartureReminder({
     return (
       <GutterRow>
         <Button
-          variant="outline"
-          size="sm"
           onClick={handleGoClick}
           aria-label={t("focusedTrip.go")}
-          className="h-9 gap-1.5"
+          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-user-location text-white shadow-sm hover:bg-user-location/90 active:bg-user-location/90"
         >
-          <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+          <Navigation className="h-5 w-5" aria-hidden="true" />
           <span>{t("focusedTrip.go")}</span>
         </Button>
         {switchDialog}

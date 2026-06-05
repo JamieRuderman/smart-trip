@@ -57,6 +57,7 @@ export function useTripProgress({
   realtimeStatus,
   isNextTrip,
   isOpen,
+  isFocused = false,
   vehiclePositionOverride,
 }: {
   trip: ProcessedTrip;
@@ -67,6 +68,10 @@ export function useTripProgress({
   isNextTrip: boolean;
   /** Whether the sheet is open — gates geolocation watching. */
   isOpen: boolean;
+  /** When true, this is the user's focused ("Go") / riding trip. The header
+   *  band turns blue to match the blue card style, overriding the semantic
+   *  state colour (green/gold/red) — blue == "the train I'm taking". */
+  isFocused?: boolean;
   /** Dev-only: override the live vehicle position hook result. */
   vehiclePositionOverride?: VehiclePositionMatch | null;
 }): TripProgressResult {
@@ -174,9 +179,13 @@ export function useTripProgress({
         : "schedule";
 
   // ── Header background ─────────────────────────────────────────────────────
+  // Blue == "the train I'm taking" and overrides the semantic state colour
+  // (green/gold/red) for the focused / riding trip, matching the blue card.
   const headerBg = isEnded
     ? "bg-smart-neutral"
-    : stateBg[currentAccent === "future" && isNextTrip ? "ontime" : currentAccent];
+    : isFocused
+      ? "bg-user-location"
+      : stateBg[currentAccent === "future" && isNextTrip ? "ontime" : currentAccent];
 
   // ── Next stop target & distances ──────────────────────────────────────────
   const nextStop =

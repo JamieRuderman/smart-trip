@@ -213,7 +213,7 @@
   "focusedTrip": {
     "go": "Tomar este tren",
     "going": "En camino",
-    "stop": "Detener",
+    "stop": "Cancelar",
     "myTrip": "Mi viaje",
     "details": "Detalles",
     "viewDetails": "Ver detalles completos del viaje",

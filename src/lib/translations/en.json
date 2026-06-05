@@ -213,7 +213,7 @@
   "focusedTrip": {
     "go": "Take this train",
     "going": "Going",
-    "stop": "Stop",
+    "stop": "Cancel",
     "myTrip": "My Trip",
     "details": "Details",
     "viewDetails": "View full trip details",

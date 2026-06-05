@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Bell, BellRing, Navigation, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +51,10 @@ interface DepartureReminderProps {
   currentTime: Date;
   /** "12h" — controls the time format shown in the active reminder pill. */
   timeFormat: "12h" | "24h";
+  /** When true, open the lead-time picker on mount (used when the home "My
+   *  Trip" card deep-links into the sheet to add a reminder). Only fires for a
+   *  focused trip with no reminder yet, where notifications are supported. */
+  autoOpenPicker?: boolean;
 }
 
 /** Hours of past-ness before we assume a HH:MM refers to tomorrow's run. */
@@ -99,6 +103,7 @@ export function DepartureReminder({
   realtimeArrivalTime,
   currentTime,
   timeFormat,
+  autoOpenPicker = false,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -317,6 +322,17 @@ export function DepartureReminder({
     setPickerError(null);
     setPickerOpen(true);
   }, [maxLeadMinutes]);
+
+  // Deep-link from the home "My Trip" card: open the picker on mount when the
+  // card's "Add reminder" launched the sheet. Runs once, and only when there's
+  // a reminder to configure (focused trip, none armed, notifications work).
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenPicker || autoOpenedRef.current) return;
+    if (!isThisTripFocused || reminder || !isReminderSupported()) return;
+    autoOpenedRef.current = true;
+    openPicker();
+  }, [autoOpenPicker, isThisTripFocused, reminder, openPicker]);
 
   const handleSet = useCallback(async () => {
     const result = await setReminder(

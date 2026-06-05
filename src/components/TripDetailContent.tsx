@@ -53,6 +53,9 @@ export interface TripDetailContentProps {
    *  intermediate rows that match the user's chosen leg. */
   userFromStation?: Station | null;
   userToStation?: Station | null;
+  /** Open the reminder lead-time picker on mount (home "My Trip" card → "Add
+   *  reminder" deep-link). */
+  autoOpenReminderPicker?: boolean;
 }
 
 
@@ -70,6 +73,7 @@ export function TripDetailContent({
   showCloseButton = true,
   userFromStation = null,
   userToStation = null,
+  autoOpenReminderPicker = false,
 }: TripDetailContentProps) {
   const { t } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -483,6 +487,7 @@ export function TripDetailContent({
             realtimeArrivalTime={realtimeStatus?.liveArrivalTime ?? null}
             currentTime={currentTime}
             timeFormat={timeFormat}
+            autoOpenPicker={autoOpenReminderPicker}
           />
         </div>
       )}

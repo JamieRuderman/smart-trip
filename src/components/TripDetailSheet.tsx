@@ -23,6 +23,9 @@ export interface TripDetailSheetProps {
   /** When true, this is the user's focused ("Go") / riding trip — the header
    *  band turns blue to match the blue card style. */
   isFocused?: boolean;
+  /** Open the reminder lead-time picker on mount (home "My Trip" card → "Add
+   *  reminder" deep-link). */
+  autoOpenReminderPicker?: boolean;
   /** Dev-only: override the live vehicle position hook result (used by devFixtures). */
   vehiclePositionOverride?: VehiclePositionMatch | null;
   /** User's selected origin/destination, used to mark matching intermediate

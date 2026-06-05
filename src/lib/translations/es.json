@@ -211,10 +211,11 @@
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes)."
   },
   "focusedTrip": {
-    "go": "Voy — este es mi viaje",
+    "go": "Tomar este tren",
     "going": "En camino",
     "stop": "Detener",
     "myTrip": "Mi viaje",
+    "details": "Detalles",
     "viewDetails": "Ver detalles completos del viaje",
     "pinnedLabel": "Mi viaje",
     "switchTitle": "¿Cambiar mi viaje?",

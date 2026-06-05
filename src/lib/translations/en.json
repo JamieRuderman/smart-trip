@@ -211,10 +211,11 @@
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before)."
   },
   "focusedTrip": {
-    "go": "Go — make this my trip",
+    "go": "Take this train",
     "going": "Going",
     "stop": "Stop",
     "myTrip": "My Trip",
+    "details": "Details",
     "viewDetails": "View full trip details",
     "pinnedLabel": "My trip",
     "switchTitle": "Change my trip?",

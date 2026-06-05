@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Navigation, Timer } from "lucide-react";
+import { Bell, BellRing, ChevronRight, Navigation, Timer } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { useCountdown } from "@/hooks/useCountdown";
+import { isReminderSupported } from "@/lib/notificationScheduler";
 import { isSouthbound } from "@/lib/stationUtils";
 import {
   SHEET_ENTER_DELAY_MS,
@@ -14,10 +14,8 @@ import {
 } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { SectionCard } from "@/components/ui/section-card";
-import { CardContent } from "@/components/ui/card";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
-import { DepartureReminder } from "./DepartureReminder";
 import { TripDetailSheet } from "./TripDetailSheet";
 
 interface FocusedTripCardProps {
@@ -32,14 +30,14 @@ interface FocusedTripCardProps {
  * status overlaid. Returns null when nothing is focused or the trip can no
  * longer be found in the schedule.
  *
- * The card leads with a solid-blue header band (matching the trip-detail
- * sheet header) carrying the train identity and live times, then surfaces the
- * departure countdown and the reminder-management controls inline — so "My
- * Trip" answers "how long until I need to leave?" without opening the sheet.
+ * Rendered as one solid-blue "My Trip" card (blue == the train you're taking):
+ * train identity + live times + departure countdown up top, a frosted actions
+ * row (reminder status / add-reminder + Stop) below. Tapping the summary opens
+ * the full trip-detail sheet, where the lead-time picker and timeline live.
  *
- * When the focus is cleared (Stop) while this card's detail sheet is open, the
- * card stays mounted for one transition so the sheet animates closed instead
- * of vanishing instantly.
+ * When the focus is cleared (Stop) while the detail sheet is open, the card
+ * stays mounted for one transition so the sheet animates closed instead of
+ * vanishing instantly.
  */
 export function FocusedTripCard({ currentTime, timeFormat }: FocusedTripCardProps) {
   const { focusedTrip } = useStationSelection();
@@ -103,7 +101,7 @@ function FocusedTripCardInner({
   detailOpen: boolean;
   setDetailOpen: (open: boolean) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const trips = useMemo(() => [trip], [trip]);
   const { statusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(
     focusedTrip.fromStation,
@@ -125,6 +123,7 @@ function FocusedTripCardInner({
 
   const { isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
+  const { clearFocusedTrip } = useStationSelection();
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
@@ -145,6 +144,31 @@ function FocusedTripCardInner({
   // Once the train has departed the "leave now" countdown is moot — let the
   // reminder/Stop controls and the full sheet carry the en-route story.
   const showCountdown = !isCanceledOrSkipped && minutesUntil >= 0;
+
+  const reminder = focusedTrip.reminder;
+  const reminderTimeLabel = reminder
+    ? new Date(reminder.reminderAt).toLocaleTimeString(i18n.language, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: timeFormat === "12h",
+      })
+    : null;
+
+  // ── Detail-sheet open: "details" opens it plain; "add reminder" opens it
+  //    with the lead-time picker already up. ─────────────────────────────────
+  const [openWithPicker, setOpenWithPicker] = useState(false);
+  const openDetails = useCallback(() => {
+    setOpenWithPicker(false);
+    setDetailOpen(true);
+  }, [setDetailOpen]);
+  const openReminderPicker = useCallback(() => {
+    setOpenWithPicker(true);
+    setDetailOpen(true);
+  }, [setDetailOpen]);
+  const closeDetails = useCallback(() => {
+    setOpenWithPicker(false);
+    setDetailOpen(false);
+  }, [setDetailOpen]);
 
   // ── Detail-sheet mount + open/close animation (mirrors TripCard) ───────────
   const [sheetMounted, setSheetMounted] = useState(detailOpen);
@@ -186,103 +210,126 @@ function FocusedTripCardInner({
     [],
   );
 
+  const showAddReminder = !isCanceledOrSkipped && !reminder && isReminderSupported();
+
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-my-trip/40 p-0"
+      className="overflow-hidden border-0 md:border-0 bg-my-trip text-white shadow-lg shadow-my-trip/20"
     >
-      {/* Solid-blue header band — tap to open the full trip-detail sheet. */}
+      {/* Tappable summary → opens the full trip-detail sheet. */}
       <button
         type="button"
-        onClick={() => setDetailOpen(true)}
+        onClick={openDetails}
         aria-label={t("focusedTrip.viewDetails")}
-        className="w-full text-left bg-my-trip text-white transition-colors hover:bg-my-trip/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-inset"
+        className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-inset"
       >
-        <div className="flex items-center gap-3 px-4 py-3 md:px-6">
-          {/* Train number — w-[5rem] gutter matches the body rows below. */}
-          <div className="flex flex-col items-end shrink-0 w-[5rem] pr-3">
-            <span className="flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-white/80 mb-0.5">
-              <Navigation className="h-3 w-3" aria-hidden="true" />
+        <div className="p-4 md:p-6 space-y-4">
+          {/* Eyebrow + "details" affordance */}
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
+              <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
               {t("focusedTrip.myTrip")}
             </span>
-            <span className="text-4xl font-semibold leading-none">
-              {trip.trip}
+            <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">
+              {t("focusedTrip.details")}
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </span>
           </div>
 
-          {/* Status + direction + times */}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white/80 mb-0.5 truncate">
-              {statusText}
-              <span className="text-white/60"> · </span>
-              {directionLabel}
-            </p>
-            <TimePair
-              departure={departureTime}
-              arrival={arrivalTime}
-              format={timeFormat}
-              strikethrough={isCanceledOrSkipped}
-              className="text-2xl font-semibold"
-            />
-            {isDelayed && (
+          {/* Train number + times */}
+          <div className="flex items-end gap-4">
+            <div className="flex flex-col leading-none shrink-0">
+              <span className="text-[0.65rem] font-medium uppercase tracking-wide text-white/70 mb-1">
+                {t("tracker.tripLabel")}
+              </span>
+              <span className="text-5xl font-bold leading-none tabular-nums">
+                {trip.trip}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
               <TimePair
-                departure={trip.departureTime}
-                arrival={trip.arrivalTime}
+                departure={departureTime}
+                arrival={arrivalTime}
                 format={timeFormat}
-                className="text-xs mt-0.5 text-white/50"
-                strikethrough
+                strikethrough={isCanceledOrSkipped}
+                className="text-2xl font-semibold text-white"
               />
-            )}
+              {isDelayed && (
+                <TimePair
+                  departure={trip.departureTime}
+                  arrival={trip.arrivalTime}
+                  format={timeFormat}
+                  className="text-xs mt-0.5 text-white/50"
+                  strikethrough
+                />
+              )}
+              <p className="text-xs font-medium text-white/80 mt-1 truncate">
+                {statusText}
+                <span className="text-white/50"> · </span>
+                {directionLabel}
+              </p>
+            </div>
           </div>
 
-          <ChevronRight
-            className="h-5 w-5 text-white/70 shrink-0"
-            aria-hidden="true"
-          />
+          {/* Departure countdown — "how long until I need to leave?" */}
+          {showCountdown && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-2.5">
+              <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <span className="text-lg font-semibold tracking-tight">
+                <CountdownLabel minutesUntil={minutesUntil} />
+              </span>
+            </div>
+          )}
         </div>
       </button>
 
-      <CardContent className="p-4 space-y-3">
-        {/* Departure countdown — "how long until I need to leave?" */}
-        {showCountdown && (
-          <div className="flex items-center gap-3">
-            <div className="w-[5rem] shrink-0 flex justify-end pr-3">
-              <Timer
-                className="h-6 w-6 text-my-trip"
-                aria-hidden="true"
-              />
-            </div>
-            <span
-              className={cn(
-                "text-[1.7rem] leading-tight font-semibold tracking-[-0.02em]",
-                isDelayed ? "text-smart-gold" : "text-foreground",
-              )}
-            >
-              <CountdownLabel minutesUntil={minutesUntil} />
+      {/* Actions — siblings of the summary button (no nested interactives). */}
+      <div className="flex items-center gap-2 px-4 md:px-6 pb-4">
+        {reminder ? (
+          <button
+            type="button"
+            onClick={openDetails}
+            className="flex-1 min-w-0 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
+          >
+            <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {t("departureReminder.remindAt", { time: reminderTimeLabel })}
+              <span className="text-white/70">
+                {" · "}
+                {t("departureReminder.minutesBefore", {
+                  count: reminder.leadMinutes,
+                })}
+              </span>
             </span>
-          </div>
+          </button>
+        ) : showAddReminder ? (
+          <button
+            type="button"
+            onClick={openReminderPicker}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/15 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
+          >
+            <Bell className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {t("departureReminder.setReminder")}
+          </button>
+        ) : (
+          <span className="flex-1" />
         )}
 
-        {/* Reminder management + Stop — same controls as the trip sheet. */}
-        {!isCanceledOrSkipped && (
-          <DepartureReminder
-            tripNumber={trip.trip}
-            fromStation={focusedTrip.fromStation}
-            toStation={focusedTrip.toStation}
-            departureTime={trip.departureTime}
-            liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
-            arrivalTime={trip.arrivalTime}
-            realtimeArrivalTime={realtimeStatus?.liveArrivalTime ?? null}
-            currentTime={currentTime}
-            timeFormat={timeFormat}
-          />
-        )}
-      </CardContent>
+        <button
+          type="button"
+          onClick={() => void clearFocusedTrip()}
+          aria-label={t("focusedTrip.stop")}
+          className="shrink-0 rounded-lg bg-white/10 px-3.5 h-9 text-sm font-semibold text-white/90 transition-colors hover:bg-white/20"
+        >
+          {t("focusedTrip.stop")}
+        </button>
+      </div>
 
       {sheetMounted && (
         <TripDetailSheet
           isOpen={sheetOpen}
-          onClose={() => setDetailOpen(false)}
+          onClose={closeDetails}
           trip={trip}
           fromStation={focusedTrip.fromStation}
           toStation={focusedTrip.toStation}
@@ -293,6 +340,7 @@ function FocusedTripCardInner({
           isNextTrip={false}
           showFerry={false}
           isFocused
+          autoOpenReminderPicker={openWithPicker}
         />
       )}
     </SectionCard>

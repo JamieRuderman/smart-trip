@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
@@ -115,11 +114,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   const isSharedLinkRef = useRef(isSharedLinkOnMount);
 
   const [state, setState] = useState<ProviderState>(() => {
-    const persisted = Capacitor.isNativePlatform() ? loadPersistedState() : null;
-    // The focused trip ("My Trip") persists in localStorage on every platform,
-    // but the station selection only persists via the URL on web (localStorage
-    // is native-only). So a bare-URL reload would keep My Trip yet forget the
-    // leg. Fall back to the focused trip's own leg to keep the two in sync.
+    // Source precedence for the selected leg: URL params (shared/bookmarked
+    // links win) → localStorage (last selection, web + native, 24h expiry) →
+    // the focused trip's own leg (so My Trip and the schedule stay in sync even
+    // if the persisted selection has expired). All three may be absent on a
+    // truly cold start, leaving the empty state.
+    const persisted = loadPersistedState();
     const focusedOnMount = loadFocusedTrip();
     return {
       fromStation:
@@ -175,19 +175,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     setSearchParams,
   ]);
 
-  // Persist state to localStorage on native so it survives app restarts (24h expiry).
+  // Persist the selected leg to localStorage (web + native) so it survives
+  // reloads / app restarts (24h expiry). The URL still takes precedence on the
+  // next load; this is the fallback when the URL has no from/to params.
   const isInitialRender = useRef(true);
   useEffect(() => {
     if (isInitialRender.current) {
       isInitialRender.current = false;
       return;
     }
-    if (
-      !Capacitor.isNativePlatform() ||
-      !state.fromStation ||
-      !state.toStation
-    )
-      return;
+    if (!state.fromStation || !state.toStation) return;
     savePersistedState(
       state.fromStation,
       state.toStation,

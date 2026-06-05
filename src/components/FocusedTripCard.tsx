@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, BellRing, ChevronRight, Navigation, Timer } from "lucide-react";
+import { Bell, BellRing, ChevronRight, Timer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { SectionCard } from "@/components/ui/section-card";
+import { TripIcon } from "./icons/TripIcon";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
 import { TripDetailSheet } from "./TripDetailSheet";
@@ -228,7 +229,7 @@ function FocusedTripCardInner({
           {/* Eyebrow + "details" affordance */}
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
-              <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+              <TripIcon className="h-3.5 w-3.5" aria-hidden="true" />
               {t("focusedTrip.myTrip")}
             </span>
             <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">

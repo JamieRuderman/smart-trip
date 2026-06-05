@@ -84,7 +84,7 @@ export default function MapDiagram() {
   const ridingIsSouthbound =
     ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
   const userStation = useMemo<Station | null>(() => {
-    // While riding, the user-location dot rides the train marker — suppress
+    // While riding, the my-trip dot rides the train marker — suppress
     // the duplicate station-anchored dot so we don't show two blue dots.
     if (ridingTrainKey || userLat == null || userLng == null) return null;
     return getClosestStation(userLat, userLng);

@@ -211,14 +211,14 @@
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes)."
   },
   "focusedTrip": {
-    "go": "Voy — Tomaré este",
+    "go": "Voy — este es mi viaje",
     "going": "En camino",
     "stop": "Detener",
     "myTrip": "Mi viaje",
     "viewDetails": "Ver detalles completos del viaje",
-    "pinnedLabel": "Tu viaje activo",
-    "switchTitle": "¿Cambiar de tren?",
-    "switchBody": "Vas a tomar el tren {{current}}. ¿Cambiar al tren {{next}}?",
+    "pinnedLabel": "Mi viaje",
+    "switchTitle": "¿Cambiar mi viaje?",
+    "switchBody": "Tu viaje es el tren {{current}}. ¿Cambiarlo al tren {{next}}?",
     "switchConfirm": "Cambiar",
     "switchCancel": "Cancelar"
   },

@@ -79,10 +79,11 @@ export const TOKEN = {
   stationFill: "hsl(var(--background))",
   detailStroke: "hsl(var(--muted-foreground))",
   mutedTrack: "hsl(var(--border))",
-  userLocation: "hsl(var(--user-location))",
+  // Shared "my trip / you" blue — the user-location dot and the riding train marker.
+  myTrip: "hsl(var(--my-trip))",
 } as const;
 
-/** Pulse-animation timing shared by the user-location and train markers. */
+/** Pulse-animation timing shared by the my-trip and train markers. */
 export const ANIM = {
   pulseDur: "2s",
   userPulseR: `${TOKEN.userPulseRMin};${TOKEN.userPulseRMax};${TOKEN.userPulseRMin}`,

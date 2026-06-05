@@ -515,7 +515,7 @@ export function DepartureReminder({
         <Button
           onClick={handleGoClick}
           aria-label={t("focusedTrip.go")}
-          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-user-location text-white shadow-sm hover:bg-user-location/90 active:bg-user-location/90"
+          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip text-white shadow-sm hover:bg-my-trip/90 active:bg-my-trip/90"
         >
           <Navigation className="h-5 w-5" aria-hidden="true" />
           <span>{t("focusedTrip.go")}</span>

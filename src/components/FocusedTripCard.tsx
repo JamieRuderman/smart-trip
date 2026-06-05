@@ -189,14 +189,14 @@ function FocusedTripCardInner({
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-user-location/40 p-0"
+      className="overflow-hidden border-my-trip/40 p-0"
     >
       {/* Solid-blue header band — tap to open the full trip-detail sheet. */}
       <button
         type="button"
         onClick={() => setDetailOpen(true)}
         aria-label={t("focusedTrip.viewDetails")}
-        className="w-full text-left bg-user-location text-white transition-colors hover:bg-user-location/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-inset"
+        className="w-full text-left bg-my-trip text-white transition-colors hover:bg-my-trip/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-3 px-4 py-3 md:px-6">
           {/* Train number — w-[5rem] gutter matches the body rows below. */}
@@ -248,7 +248,7 @@ function FocusedTripCardInner({
           <div className="flex items-center gap-3">
             <div className="w-[5rem] shrink-0 flex justify-end pr-3">
               <Timer
-                className="h-6 w-6 text-user-location"
+                className="h-6 w-6 text-my-trip"
                 aria-hidden="true"
               />
             </div>

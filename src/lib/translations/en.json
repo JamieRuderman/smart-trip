@@ -211,15 +211,15 @@
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before)."
   },
   "focusedTrip": {
-    "go": "Go — I'm taking this",
+    "go": "Go — make this my trip",
     "going": "Going",
     "stop": "Stop",
     "myTrip": "My Trip",
     "viewDetails": "View full trip details",
-    "pinnedLabel": "Your focused trip",
-    "switchTitle": "Switch trains?",
-    "switchBody": "You're set to take Train {{current}}. Switch to Train {{next}}?",
-    "switchConfirm": "Switch",
+    "pinnedLabel": "My trip",
+    "switchTitle": "Change my trip?",
+    "switchBody": "Your trip is set to Train {{current}}. Change it to Train {{next}}?",
+    "switchConfirm": "Change",
     "switchCancel": "Cancel"
   },
   "tracker": {

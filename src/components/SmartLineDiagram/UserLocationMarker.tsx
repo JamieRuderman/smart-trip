@@ -9,7 +9,7 @@ export function UserLocationMarker({ x, y }: { x: number; y: number }) {
     <g transform={`translate(${x}, ${y})`} pointerEvents="none">
       <circle
         r={TOKEN.userPulseR}
-        fill={TOKEN.userLocation}
+        fill={TOKEN.myTrip}
         opacity={TOKEN.userPulseOpacity}
       >
         <animate
@@ -27,7 +27,7 @@ export function UserLocationMarker({ x, y }: { x: number; y: number }) {
       </circle>
       <circle
         r={TOKEN.userInnerR}
-        fill={TOKEN.userLocation}
+        fill={TOKEN.myTrip}
         stroke={TOKEN.stationFill}
         strokeWidth={TOKEN.userInnerStroke}
       />

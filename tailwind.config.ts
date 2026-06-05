@@ -99,8 +99,9 @@ export default {
           4: "hsl(var(--zone-4))",
           5: "hsl(var(--zone-5))",
         },
-        // User-location dot on the line diagram (matches --user-location).
-        "user-location": "hsl(var(--user-location))",
+        // "My trip / you" blue — the focused & riding trip theme and the
+        // user-location dot on the line diagram. Matches --my-trip.
+        "my-trip": "hsl(var(--my-trip))",
         // Transit-specific colors
         transit: {
           primary: "hsl(var(--transit-primary))",

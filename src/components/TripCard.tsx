@@ -202,7 +202,7 @@ export const TripCard = memo(function TripCard({
         />
         {isRiding && (
           <span
-            className="ml-1 mr-2 shrink-0 self-center px-1.5 py-0.5 rounded-md bg-user-location text-white text-[10px] font-bold uppercase tracking-wider leading-none"
+            className="ml-1 mr-2 shrink-0 self-center px-1.5 py-0.5 rounded-md bg-my-trip text-white text-[10px] font-bold uppercase tracking-wider leading-none"
             aria-label={t("tripCard.ridingAria", "Currently riding this train")}
           >
             {t("stationInfo.riding")}

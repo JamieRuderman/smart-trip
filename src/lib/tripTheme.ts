@@ -84,9 +84,9 @@ export const stateCardStyle: Record<TripState, string> = {
  * ring so the row pops out of the list at a glance.
  */
 export const ridingCardStyle =
-  "bg-user-location/5 border-user-location/40 hover:bg-user-location/10 " +
-  "ring-2 ring-user-location ring-offset-2 ring-offset-background " +
-  "focus:border-user-location/80 focus:shadow-[0_0_0_1px_hsl(var(--user-location)/0.8)]";
+  "bg-my-trip/5 border-my-trip/40 hover:bg-my-trip/10 " +
+  "ring-2 ring-my-trip ring-offset-2 ring-offset-background " +
+  "focus:border-my-trip/80 focus:shadow-[0_0_0_1px_hsl(var(--my-trip)/0.8)]";
 
 /**
  * Derives a card's TripState from the realtime boolean flags, in priority order.

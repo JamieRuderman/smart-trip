@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Bell, BellRing, Navigation, X } from "lucide-react";
+import { AlertTriangle, Bell, BellRing, X } from "lucide-react";
+import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -499,7 +500,7 @@ export function DepartureReminder({
         <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
-              <Navigation
+              <TripIcon
                 className="h-4 w-4 text-primary shrink-0"
                 aria-hidden="true"
               />
@@ -533,7 +534,7 @@ export function DepartureReminder({
           aria-label={t("focusedTrip.go")}
           className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip text-white shadow-sm hover:bg-my-trip/90 active:bg-my-trip/90"
         >
-          <Navigation className="h-5 w-5" aria-hidden="true" />
+          <TripIcon className="h-5 w-5" aria-hidden="true" />
           <span>{t("focusedTrip.go")}</span>
         </Button>
         {switchDialog}

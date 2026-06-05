@@ -116,13 +116,20 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
 
   const [state, setState] = useState<ProviderState>(() => {
     const persisted = Capacitor.isNativePlatform() ? loadPersistedState() : null;
+    // The focused trip ("My Trip") persists in localStorage on every platform,
+    // but the station selection only persists via the URL on web (localStorage
+    // is native-only). So a bare-URL reload would keep My Trip yet forget the
+    // leg. Fall back to the focused trip's own leg to keep the two in sync.
+    const focusedOnMount = loadFocusedTrip();
     return {
       fromStation:
         (searchParams.get("from") as Station) ||
-        (persisted ? persisted.fromStation : ""),
+        (persisted ? persisted.fromStation : "") ||
+        (focusedOnMount ? focusedOnMount.fromStation : ""),
       toStation:
         (searchParams.get("to") as Station) ||
-        (persisted ? persisted.toStation : ""),
+        (persisted ? persisted.toStation : "") ||
+        (focusedOnMount ? focusedOnMount.toStation : ""),
       scheduleType:
         isSharedLinkOnMount && initialUrlType
           ? initialUrlType

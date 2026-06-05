@@ -237,6 +237,13 @@ function FocusedTripCardInner({
             </span>
           </div>
 
+          {/* Route — origin → destination */}
+          <p className="text-base font-semibold leading-snug text-white">
+            {focusedTrip.fromStation}
+            <span className="px-1.5 font-normal text-white/60">→</span>
+            {focusedTrip.toStation}
+          </p>
+
           {/* Train number + times */}
           <div className="flex items-end gap-4">
             <div className="flex flex-col leading-none shrink-0">

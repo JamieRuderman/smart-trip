@@ -238,11 +238,13 @@ function FocusedTripCardInner({
             </span>
           </div>
 
-          {/* Route — origin → destination */}
-          <p className="text-base font-semibold leading-snug text-white">
-            {focusedTrip.fromStation}
-            <span className="px-1.5 font-normal text-white/60">→</span>
-            {focusedTrip.toStation}
+          {/* Route — origin → destination. Each station name is an
+              unbreakable unit so a long name wraps as a whole rather than
+              splitting mid-name. */}
+          <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug text-white">
+            <span className="whitespace-nowrap">{focusedTrip.fromStation}</span>
+            <span className="font-normal text-white/60">→</span>
+            <span className="whitespace-nowrap">{focusedTrip.toStation}</span>
           </p>
 
           {/* Train number + times */}

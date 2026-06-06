@@ -130,12 +130,17 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
         (searchParams.get("to") as Station) ||
         (persisted ? persisted.toStation : "") ||
         (focusedOnMount ? focusedOnMount.toStation : ""),
+      // Schedule type is derived from the calendar day, never restored from
+      // persistence: a leg saved on a weekday must not force the weekday
+      // schedule when reopened on a weekend (and vice-versa). Restoring it
+      // desynced the schedule list from "today", which — because train numbers
+      // repeat across weekday/weekend — made the pinned trip reconstruct a
+      // different run than the one shown in the list. Shared links still honor
+      // their explicit ?type so the recipient sees the sender's day.
       scheduleType:
         isSharedLinkOnMount && initialUrlType
           ? initialUrlType
-          : persisted
-            ? persisted.scheduleType
-            : todayScheduleType(),
+          : todayScheduleType(),
       selectedTripNumber: !isNaN(initialUrlTripNumber)
         ? initialUrlTripNumber
         : persisted

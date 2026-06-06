@@ -75,11 +75,33 @@ export function decideReminderChannel(args: {
 }
 
 /**
+ * Whether a time-of-day alarm for `fireAt` will land on the intended instant.
+ *
+ * `@capgo/capacitor-alarm`'s `createAlarm` takes only an hour/minute and fires
+ * at the NEXT occurrence of that clock time — it cannot target a specific
+ * calendar date. So it's only safe to use for a `fireAt` that is itself the
+ * next occurrence of its own HH:MM (i.e. later today, or tomorrow when that
+ * time has already passed today). For anything further out — e.g. a weekend
+ * train focused on a weekday, or a "tomorrow" departure whose HH:MM recurs
+ * earlier today — the next occurrence would fire on the wrong (earlier) day, so
+ * the caller must fall back to the dated local notification instead.
+ *
+ * Pure; exported for unit testing.
+ */
+export function alarmFiresOnIntendedDay(fireAt: number, now: number): boolean {
+  const target = new Date(fireAt);
+  const next = new Date(now);
+  next.setHours(target.getHours(), target.getMinutes(), 0, 0);
+  if (next.getTime() <= now) next.setDate(next.getDate() + 1);
+  // fireAt is minute-aligned; allow sub-minute slack for safety.
+  return Math.abs(next.getTime() - fireAt) < 60_000;
+}
+
+/**
  * Create a one-time AlarmKit alarm at `fireAt` (epoch ms), or return
  * `{ scheduled: false }` when an alarm can't/shouldn't be used (non-iOS,
- * unavailable, unauthorized, or the create call failed). The plugin takes a
- * time-of-day; the *next* occurrence of that HH:MM is the fire time, which is
- * correct for us because leave times are always within the next ~24h.
+ * unavailable, unauthorized, the create call failed, or `fireAt` isn't the next
+ * occurrence of its clock time — see `alarmFiresOnIntendedDay`).
  *
  * Does NOT cancel any previous alarm — the caller retires the prior channel
  * only after a new one is confirmed scheduled, so a failed (re)schedule never
@@ -89,6 +111,10 @@ export async function scheduleLeaveAlarm(opts: {
   label: string;
   fireAt: number;
 }): Promise<{ scheduled: boolean; alarmId?: string }> {
+  // Date-safety first (cheap + pure): bail before any plugin/permission calls
+  // when a time-of-day alarm would fire on the wrong day.
+  if (!alarmFiresOnIntendedDay(opts.fireAt, Date.now())) return { scheduled: false };
+
   const platform = Capacitor.getPlatform();
   const alarmAvailable = await isAlarmAvailable();
   let alarmStatus: AlarmAuthStatus = "unavailable";

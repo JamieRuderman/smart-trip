@@ -27,12 +27,19 @@ vi.mock("@capgo/capacitor-alarm", () => ({
 }));
 
 import {
+  alarmFiresOnIntendedDay,
   cancelLeaveAlarm,
   decideReminderChannel,
   scheduleLeaveAlarm,
 } from "@/lib/native/leaveAlarm";
 
+// Fixed "now" so the date-safety guard (which compares against Date.now()) is
+// deterministic: Sat 2026-06-06 07:00 local.
+const NOW = new Date(2026, 5, 6, 7, 0, 0, 0).getTime();
+
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
   getPlatform.mockReturnValue("ios");
   getOSInfo.mockResolvedValue({ supportsNativeAlarms: true });
   checkPermissions.mockResolvedValue({ granted: true });
@@ -41,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -147,6 +155,34 @@ describe("scheduleLeaveAlarm", () => {
     createAlarm.mockResolvedValue({ success: false });
     const result = await scheduleLeaveAlarm({ label: "Leave", fireAt });
     expect(result).toEqual({ scheduled: false });
+  });
+
+  it("does not use an alarm when the fire time isn't the next occurrence of its clock time (wrong day)", async () => {
+    // Tomorrow 10:00, but 10:00 still occurs later TODAY — a time-of-day alarm
+    // would fire today, ~24h early, so it must fall back to the notification.
+    const tomorrowLater = new Date(2026, 5, 7, 10, 0, 0, 0).getTime();
+    const result = await scheduleLeaveAlarm({ label: "Leave", fireAt: tomorrowLater });
+    expect(result).toEqual({ scheduled: false });
+    expect(createAlarm).not.toHaveBeenCalled();
+  });
+});
+
+describe("alarmFiresOnIntendedDay", () => {
+  it("is true for a fire time later today", () => {
+    expect(alarmFiresOnIntendedDay(new Date(2026, 5, 6, 8, 42).getTime(), NOW)).toBe(true);
+  });
+
+  it("is true for tomorrow when that clock time already passed today", () => {
+    // now 07:00; 06:30 tomorrow is the next occurrence of 06:30.
+    expect(alarmFiresOnIntendedDay(new Date(2026, 5, 7, 6, 30).getTime(), NOW)).toBe(true);
+  });
+
+  it("is false for tomorrow when that clock time still occurs today", () => {
+    expect(alarmFiresOnIntendedDay(new Date(2026, 5, 7, 10, 0).getTime(), NOW)).toBe(false);
+  });
+
+  it("is false for a multi-day-out fire time (weekend trip on a weekday)", () => {
+    expect(alarmFiresOnIntendedDay(new Date(2026, 5, 9, 8, 15).getTime(), NOW)).toBe(false);
   });
 });
 

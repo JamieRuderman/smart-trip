@@ -39,62 +39,98 @@ function onReminderFired(): void {
   notifyChange();
 }
 
+type ArmResult = { ok: true } | { ok: false; reason: "permission" | "schedule-failed" };
+
+/** Whether two focused trips are the same run (identity, ignoring the reminder
+ *  sub-object). Used to detect a focus change that happened while we awaited a
+ *  permission prompt, so we don't clobber it. */
+function sameFocusIdentity(
+  a: FocusedTrip | null,
+  b: FocusedTrip | null,
+): boolean {
+  return (
+    a != null &&
+    b != null &&
+    a.tripNumber === b.tripNumber &&
+    a.serviceDate === b.serviceDate &&
+    a.fromStation === b.fromStation &&
+    a.toStation === b.toStation &&
+    a.scheduleType === b.scheduleType
+  );
+}
+
 /**
  * Schedule `reminder` on the best available channel and, on success, persist it
- * onto `current` and notify consumers. Shared by the arm + drift-reschedule
- * paths. Returns whether the schedule was accepted.
+ * onto the focused trip and notify consumers. Shared by the arm + drift-
+ * reschedule paths.
  *
  * Prefers a true AlarmKit "Leave Alarm" on iOS (it breaks through Silent
  * Mode/Focus), falling back to a local notification everywhere else (Android,
- * web, AlarmKit unavailable/denied, or a create failure). The alarm REPLACES
- * the notification — never both, so the user gets a single alert.
+ * web, AlarmKit unavailable/denied/off-day, or a create failure). The alarm
+ * REPLACES the notification — never both, so the user gets a single alert.
+ * Notification permission is requested ONLY on the fallback path, so an
+ * alarm-only user who denied notifications can still get a Leave Alarm.
  *
  * The new channel is always scheduled BEFORE the previous one is retired, so a
  * failed (re)schedule degrades to "fires on the old channel/time" rather than
- * silently vanishing — preserving the drift-reschedule safety guarantee.
+ * silently vanishing. After scheduling, the focus is re-read: a permission
+ * prompt can block long enough for the user to Stop / switch trains / the trip
+ * to auto-clear, so if the focus changed we roll back the freshly scheduled
+ * channel instead of resurrecting the stale trip.
  */
 async function armAndPersistReminder(
   current: FocusedTrip,
   reminder: FocusedTripReminder,
   failureMessage: string,
-): Promise<boolean> {
+): Promise<ArmResult> {
   const prev = current.reminder;
 
   const alarm = await scheduleLeaveAlarm({
     label: reminder.title,
     fireAt: reminder.reminderAt,
   });
-  if (alarm.scheduled && alarm.alarmId) {
-    if (prev?.alarmId && prev.alarmId !== alarm.alarmId) {
-      await cancelLeaveAlarm(prev.alarmId);
+  const alarmId = alarm.scheduled ? alarm.alarmId : undefined;
+
+  if (!alarmId) {
+    const granted = await ensureNotificationPermission();
+    if (!granted) return { ok: false, reason: "permission" };
+    try {
+      await scheduleNotification(
+        {
+          id: reminder.notificationId,
+          title: reminder.title,
+          body: reminder.body,
+          at: reminder.reminderAt,
+        },
+        onReminderFired,
+      );
+    } catch (error) {
+      logger.warn(failureMessage, error);
+      return { ok: false, reason: "schedule-failed" };
     }
-    // Drop any stale notification under this id so we don't double-alert.
-    await cancelNotification(reminder.notificationId);
-    saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId: alarm.alarmId } });
-    notifyChange();
-    return true;
   }
 
-  // Notification fallback. Scheduling under the same id atomically replaces any
-  // existing notification; only retire a prior alarm once this has succeeded.
-  try {
-    await scheduleNotification(
-      {
-        id: reminder.notificationId,
-        title: reminder.title,
-        body: reminder.body,
-        at: reminder.reminderAt,
-      },
-      onReminderFired,
-    );
-  } catch (error) {
-    logger.warn(failureMessage, error);
-    return false;
+  // Commit only if the focus is still the same run we scheduled for.
+  const latest = loadFocusedTrip();
+  if (!sameFocusIdentity(latest, current)) {
+    if (alarmId) await cancelLeaveAlarm(alarmId);
+    else await cancelNotification(reminder.notificationId);
+    return { ok: false, reason: "schedule-failed" };
   }
-  if (prev?.alarmId) await cancelLeaveAlarm(prev.alarmId);
-  saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId: undefined } });
+
+  // Retire the previous channel now that the replacement is committed.
+  if (alarmId) {
+    if (prev?.alarmId && prev.alarmId !== alarmId) await cancelLeaveAlarm(prev.alarmId);
+    // Drop any stale notification under this id so we don't double-alert.
+    await cancelNotification(reminder.notificationId);
+  } else if (prev?.alarmId) {
+    await cancelLeaveAlarm(prev.alarmId);
+  }
+  // Identity matches `current`, so it's safe (and type-clean vs the nullable
+  // `latest`) to persist from `current` with the freshly scheduled reminder.
+  saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId } });
   notifyChange();
-  return true;
+  return { ok: true };
 }
 
 export interface FocusTripInput {
@@ -161,20 +197,19 @@ export function useFocusedTrip() {
         return { ok: true };
       }
 
-      const granted = await ensureNotificationPermission();
-      if (!granted) return { ok: false, reason: "permission" };
-
       const notificationId = reminderIdFor(current.tripNumber, current.serviceDate);
       if (current.reminder && current.reminder.notificationId !== notificationId) {
         await cancelNotification(current.reminder.notificationId);
       }
       const reminderAt = departureAt - leadMinutes * 60_000;
-      const ok = await armAndPersistReminder(
+      // armAndPersistReminder picks the channel (alarm vs notification) and
+      // requests notification permission only if it actually falls back, so an
+      // alarm-only user who denied notifications isn't blocked here.
+      return armAndPersistReminder(
         current,
         { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
         "Failed to schedule focused-trip reminder",
       );
-      return ok ? { ok: true } : { ok: false, reason: "schedule-failed" };
     },
     [],
   );

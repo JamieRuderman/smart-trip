@@ -247,11 +247,26 @@ export function StationInfoSheet({
         className="px-5 pt-2 pb-4 flex items-start justify-between gap-4 shrink-0"
         style={{ backgroundColor: zoneColor }}
       >
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-bold tracking-widest uppercase text-white/80">
             {t("stationInfo.zoneLabel", { zone })}
           </p>
           <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
+          {fromStation && toStation && (
+            // Route summary — mirrors the home "My Trip" card. The current
+            // station collapses to "Here" so the user can see at a glance
+            // whether they're looking at their origin, destination, or an
+            // intermediate stop.
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
+              <span className="whitespace-nowrap">
+                {fromStation === station ? t("stationInfo.here") : fromStation}
+              </span>
+              <span className="font-normal text-white/60">→</span>
+              <span className="whitespace-nowrap">
+                {toStation === station ? t("stationInfo.here") : toStation}
+              </span>
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -497,8 +512,7 @@ function ArrivalRow({
               arrival.isCanceled && "line-through",
             )}
           >
-            {t("stationInfo.toDestinationAt", {
-              destination: arrival.destinationStation,
+            {t("stationInfo.arrivingAt", {
               time: formatTime(arrival.destinationTime),
             })}
           </div>

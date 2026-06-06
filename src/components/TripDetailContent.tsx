@@ -255,7 +255,7 @@ export function TripDetailContent({
         {/* Trip number — w-[5rem] aligns with the stop timeline icon gutter */}
         <div className="flex flex-col items-end shrink-0 w-[5rem] pr-3">
           <p className="text-xs text-white/80 font-medium mb-0.5">
-            {t("tracker.tripLabel")}
+            {isFocused ? t("focusedTrip.myTrip") : t("tracker.tripLabel")}
           </p>
           <span className="text-4xl font-semibold text-white leading-none">
             {trip.trip}

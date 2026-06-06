@@ -6,6 +6,7 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
+import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
 import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
@@ -95,6 +96,17 @@ export default function MapDiagram() {
   const nowSeconds = useNow(15_000);
   const nowMinute = Math.floor(nowSeconds / 60);
   const currentTime = useMemo(() => new Date(nowMinute * 60_000), [nowMinute]);
+
+  // Promote a GPS-detected ride to the focused / "Going" state — same hook
+  // used on the home page, so the auto-focus fires regardless of which page
+  // the user is on when their ride is detected.
+  useAutoFocusOnRiding({
+    ridingTripNumber,
+    ridingIsSouthbound,
+    currentTime,
+    homeFromStation: fromSelection,
+    homeToStation: toSelection,
+  });
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
   const [stationSheet, setStationSheet] = useState<Station | null>(null);

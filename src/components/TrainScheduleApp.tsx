@@ -10,6 +10,7 @@ import { useMapTrains } from "@/hooks/useMapTrains";
 import { useUserRiding } from "@/hooks/useUserRiding";
 import { getClosestStation, isSouthbound } from "@/lib/stationUtils";
 import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
+import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -114,6 +115,14 @@ export function TrainScheduleApp() {
   const ridingTripNumber = ridingTrain?.tripNumber ?? null;
   const ridingIsSouthbound =
     ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
+
+  useAutoFocusOnRiding({
+    ridingTripNumber,
+    ridingIsSouthbound,
+    currentTime,
+    homeFromStation: fromStation,
+    homeToStation: toStation,
+  });
 
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.

@@ -539,7 +539,7 @@ export function DepartureReminder({
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
               <TripIcon
-                className="h-4 w-4 text-primary shrink-0"
+                className="h-4 w-4 text-my-trip shrink-0"
                 aria-hidden="true"
               />
               <span className="truncate">{t("focusedTrip.going")}</span>

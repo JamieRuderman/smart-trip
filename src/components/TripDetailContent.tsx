@@ -64,6 +64,10 @@ export interface TripDetailContentProps {
   /** Schedule (weekday/weekend) the displayed trip belongs to — forwarded to
    *  the reminder/focus control so it never has to infer it from today. */
   scheduleType: "weekday" | "weekend";
+  /** When true the displayed trip is the user's focused / riding trip — passed
+   *  to the stop timeline so its on-time accent reads my-trip blue instead of
+   *  the default green, matching the blue header band. */
+  isFocused?: boolean;
 }
 
 
@@ -83,6 +87,7 @@ export function TripDetailContent({
   userToStation = null,
   autoOpenReminderPicker = false,
   scheduleType,
+  isFocused = false,
 }: TripDetailContentProps) {
   const { t, i18n } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -552,6 +557,7 @@ export function TripDetailContent({
           stopInference={stopInference}
           userFromStation={userFromStation}
           userToStation={userToStation}
+          isRiding={isFocused}
         />
 
         {showFerry && trip.outboundFerry && (

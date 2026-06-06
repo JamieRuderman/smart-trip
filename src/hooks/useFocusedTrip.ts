@@ -12,12 +12,24 @@ import {
   ensureNotificationPermission,
   scheduleNotification,
 } from "@/lib/notificationScheduler";
+import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
 import { reminderIdFor } from "@/lib/notificationId";
 import { logger } from "@/lib/logger";
 
 function notifyChange(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+}
+
+/** Cancel both channels a reminder might own — the local notification and, if
+ *  it was scheduled as a true Leave Alarm, the AlarmKit alarm. Cancelling the
+ *  channel that wasn't used is a harmless no-op. */
+async function cancelReminderChannels(
+  reminder: FocusedTripReminder | null,
+): Promise<void> {
+  if (!reminder) return;
+  await cancelNotification(reminder.notificationId);
+  if (reminder.alarmId) await cancelLeaveAlarm(reminder.alarmId);
 }
 
 /** Web-fire cleanup: drop only the reminder sub-object, keep the focus. */
@@ -28,17 +40,43 @@ function onReminderFired(): void {
 }
 
 /**
- * Schedule `reminder`'s notification and, on success, persist it onto `current`
- * and notify consumers. Shared by the arm + drift-reschedule paths. Does NOT
- * pre-cancel: scheduling under the same id atomically replaces any existing
- * notification, so a failure leaves the prior one intact. Returns whether the
- * platform accepted the schedule.
+ * Schedule `reminder` on the best available channel and, on success, persist it
+ * onto `current` and notify consumers. Shared by the arm + drift-reschedule
+ * paths. Returns whether the schedule was accepted.
+ *
+ * Prefers a true AlarmKit "Leave Alarm" on iOS (it breaks through Silent
+ * Mode/Focus), falling back to a local notification everywhere else (Android,
+ * web, AlarmKit unavailable/denied, or a create failure). The alarm REPLACES
+ * the notification — never both, so the user gets a single alert.
+ *
+ * The new channel is always scheduled BEFORE the previous one is retired, so a
+ * failed (re)schedule degrades to "fires on the old channel/time" rather than
+ * silently vanishing — preserving the drift-reschedule safety guarantee.
  */
 async function armAndPersistReminder(
   current: FocusedTrip,
   reminder: FocusedTripReminder,
   failureMessage: string,
 ): Promise<boolean> {
+  const prev = current.reminder;
+
+  const alarm = await scheduleLeaveAlarm({
+    label: reminder.title,
+    fireAt: reminder.reminderAt,
+  });
+  if (alarm.scheduled && alarm.alarmId) {
+    if (prev?.alarmId && prev.alarmId !== alarm.alarmId) {
+      await cancelLeaveAlarm(prev.alarmId);
+    }
+    // Drop any stale notification under this id so we don't double-alert.
+    await cancelNotification(reminder.notificationId);
+    saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId: alarm.alarmId } });
+    notifyChange();
+    return true;
+  }
+
+  // Notification fallback. Scheduling under the same id atomically replaces any
+  // existing notification; only retire a prior alarm once this has succeeded.
   try {
     await scheduleNotification(
       {
@@ -53,7 +91,8 @@ async function armAndPersistReminder(
     logger.warn(failureMessage, error);
     return false;
   }
-  saveFocusedTrip({ ...current, reminder });
+  if (prev?.alarmId) await cancelLeaveAlarm(prev.alarmId);
+  saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId: undefined } });
   notifyChange();
   return true;
 }
@@ -91,7 +130,7 @@ export function useFocusedTrip() {
    *  reminder. Caller handles any "switch trains?" confirmation. */
   const focusTrip = useCallback(async (input: FocusTripInput) => {
     const prev = loadFocusedTrip();
-    if (prev?.reminder) await cancelNotification(prev.reminder.notificationId);
+    if (prev?.reminder) await cancelReminderChannels(prev.reminder);
     saveFocusedTrip({
       source: "user",
       tripNumber: input.tripNumber,
@@ -116,7 +155,7 @@ export function useFocusedTrip() {
       if (!current) return { ok: false, reason: "no-focus" };
 
       if (leadMinutes === null) {
-        if (current.reminder) await cancelNotification(current.reminder.notificationId);
+        if (current.reminder) await cancelReminderChannels(current.reminder);
         saveFocusedTrip({ ...current, reminder: null });
         notifyChange();
         return { ok: true };
@@ -172,7 +211,7 @@ export function useFocusedTrip() {
 
   const clearFocusedTrip = useCallback(async () => {
     const current = loadFocusedTrip();
-    if (current?.reminder) await cancelNotification(current.reminder.notificationId);
+    if (current?.reminder) await cancelReminderChannels(current.reminder);
     saveFocusedTrip(null);
     notifyChange();
   }, []);

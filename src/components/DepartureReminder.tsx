@@ -492,9 +492,13 @@ export function DepartureReminder({
                   })}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {t("departureReminder.minutesBefore", {
-                    count: reminder.leadMinutes,
-                  })}
+                  {reminder.alarmId
+                    ? t("departureReminder.leaveAlarmActive", {
+                        count: reminder.leadMinutes,
+                      })
+                    : t("departureReminder.minutesBefore", {
+                        count: reminder.leadMinutes,
+                      })}
                 </div>
               </div>
             </div>

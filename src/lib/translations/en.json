@@ -202,6 +202,8 @@
     "remindAt": "Remind at {{time}}",
     "minutesBefore_one": "{{count}} min before",
     "minutesBefore_other": "{{count}} min before",
+    "leaveAlarmActive_one": "Leave alarm · {{count}} min before",
+    "leaveAlarmActive_other": "Leave alarm · {{count}} min before",
     "permissionDenied": "Enable notifications in your settings to receive reminders.",
     "scheduleFailed": "Couldn't schedule the reminder. Try again in a moment.",
     "warningTitle": "Close to departure",

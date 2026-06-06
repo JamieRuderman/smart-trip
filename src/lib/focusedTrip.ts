@@ -13,6 +13,10 @@ export interface FocusedTripReminder {
   notificationId: number;
   title: string;
   body: string;
+  /** AlarmKit alarm id (iOS 26+) when this reminder was scheduled as a true
+   *  "Leave Alarm" rather than a local notification. Absent on the notification
+   *  path (Android, web, AlarmKit unavailable/denied, or scheduling failure). */
+  alarmId?: string;
 }
 
 export interface FocusedTrip {
@@ -65,7 +69,9 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       typeof (r.reminder as Record<string, unknown>).reminderAt === "number" &&
       typeof (r.reminder as Record<string, unknown>).notificationId === "number" &&
       typeof (r.reminder as Record<string, unknown>).title === "string" &&
-      typeof (r.reminder as Record<string, unknown>).body === "string");
+      typeof (r.reminder as Record<string, unknown>).body === "string" &&
+      ((r.reminder as Record<string, unknown>).alarmId === undefined ||
+        typeof (r.reminder as Record<string, unknown>).alarmId === "string"));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&

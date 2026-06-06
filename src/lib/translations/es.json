@@ -202,6 +202,8 @@
     "remindAt": "Aviso a las {{time}}",
     "minutesBefore_one": "{{count}} min antes",
     "minutesBefore_other": "{{count}} min antes",
+    "leaveAlarmActive_one": "Alarma de salida · {{count}} min antes",
+    "leaveAlarmActive_other": "Alarma de salida · {{count}} min antes",
     "permissionDenied": "Activa las notificaciones en tu configuración para recibir recordatorios.",
     "scheduleFailed": "No se pudo programar el recordatorio. Inténtalo de nuevo.",
     "warningTitle": "Cerca de la salida",

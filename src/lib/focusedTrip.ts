@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
+import { isSouthbound } from "@/lib/stationUtils";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
@@ -28,6 +29,28 @@ export interface FocusedTrip {
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
 export const FOCUSED_TRIP_CHANGED_EVENT = "smart-train-focused-trip-changed";
+
+/**
+ * Whether `focused` belongs to the same schedule as a displayed leg/arrival —
+ * matched by direction + weekday/weekend schedule type, NOT exact leg. The same
+ * physical train is shown under different legs (home schedule, line-map
+ * corridor, station arrivals); this is the single source of truth for "is this
+ * the focused train" so every surface (schedule row, station sheet, detail
+ * sheet) highlights it identically. Callers that highlight a specific row still
+ * AND this with their own trip-number equality. Direction guards against a trip
+ * number being reused on the opposite-direction schedule.
+ */
+export function focusedTripMatchesSchedule(
+  focused: FocusedTrip | null,
+  isSouthboundLeg: boolean,
+  scheduleType: "weekday" | "weekend",
+): focused is FocusedTrip {
+  return (
+    focused != null &&
+    focused.scheduleType === scheduleType &&
+    isSouthbound(focused.fromStation, focused.toStation) === isSouthboundLeg
+  );
+}
 
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -61,16 +84,37 @@ function hhmmToMinutes(hhmm: string): number {
 }
 
 /**
+ * Absolute (local) instant of `minutesOfDay` on a "YYYY-MM-DD" service date,
+ * with an optional whole-day offset for overnight rollovers. Single source of
+ * truth for turning a stored serviceDate + a schedule clock-time into an epoch.
+ */
+function serviceDateInstant(
+  serviceDate: string,
+  minutesOfDay: number,
+  dayOffset = 0,
+): number {
+  const [y, mo, d] = serviceDate.split("-").map(Number);
+  return new Date(
+    y,
+    mo - 1,
+    d + dayOffset,
+    Math.floor(minutesOfDay / 60),
+    minutesOfDay % 60,
+    0,
+    0,
+  ).getTime();
+}
+
+/**
  * Resolve a focused trip's static arrival to an absolute instant on its
  * service date. Overnight trips (arrival clock-time before departure) roll to
  * the next calendar day.
  */
 function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
-  const [y, mo, d] = focused.serviceDate.split("-").map(Number);
   const depMin = hhmmToMinutes(trip.departureTime);
   const arrMin = hhmmToMinutes(trip.arrivalTime);
   const dayOffset = arrMin < depMin ? 1 : 0;
-  return new Date(y, mo - 1, d + dayOffset, Math.floor(arrMin / 60), arrMin % 60, 0, 0).getTime();
+  return serviceDateInstant(focused.serviceDate, arrMin, dayOffset);
 }
 
 /**
@@ -97,9 +141,7 @@ export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | nu
 export function focusedDepartureInstant(focused: FocusedTrip): number | null {
   const trip = reconstructFocusedTrip(focused);
   if (!trip) return null;
-  const [y, mo, d] = focused.serviceDate.split("-").map(Number);
-  const min = hhmmToMinutes(trip.departureTime);
-  return new Date(y, mo - 1, d, Math.floor(min / 60), min % 60, 0, 0).getTime();
+  return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));
 }
 
 /**
@@ -192,6 +234,18 @@ export function migrateLegacyReminders(): FocusedTrip | null {
   const tripNumber = r.tripNumber as number;
   const serviceDate = toServiceDate(departureAt);
 
+  // Reuse the legacy reminder's own id as the notification id. The old system
+  // scheduled the native notification under `r.id`, so that — not a freshly
+  // derived id — is what the OS actually has queued. Keying the migrated record
+  // on it keeps cancel/reschedule/Stop able to reach (and suppress) the
+  // pre-upgrade notification; deriving a new id would orphan it. Fall back to a
+  // derived id only if the legacy record somehow lacks a usable one.
+  const legacyId = r.id;
+  const notificationId =
+    typeof legacyId === "number" && Number.isFinite(legacyId)
+      ? legacyId
+      : reminderIdFor(tripNumber, serviceDate);
+
   const focused: FocusedTrip = {
     source: "user",
     tripNumber,
@@ -202,7 +256,7 @@ export function migrateLegacyReminders(): FocusedTrip | null {
     reminder: {
       leadMinutes: r.leadMinutes as number,
       reminderAt: r.reminderAt as number,
-      notificationId: reminderIdFor(tripNumber, serviceDate),
+      notificationId,
       title: r.title as string,
       body: r.body as string,
     },

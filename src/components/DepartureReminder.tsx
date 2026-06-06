@@ -18,7 +18,10 @@ import {
 } from "@/lib/notificationScheduler";
 import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
-import { focusedDepartureInstant } from "@/lib/focusedTrip";
+import {
+  focusedDepartureInstant,
+  focusedTripMatchesSchedule,
+} from "@/lib/focusedTrip";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
@@ -159,14 +162,14 @@ export function DepartureReminder({
   // the line map (origin→terminus) and the user's selected leg on the home
   // schedule. Recognize "this is the focused train" by trip number + direction
   // + schedule type (NOT exact leg) so the control behaves identically wherever
-  // it's opened. Direction guards against the trip number being reused on the
-  // opposite-direction schedule.
+  // it's opened. Shared predicate keeps this in lockstep with the schedule-row
+  // and station-arrival highlights.
   const isThisTripFocused =
-    focusedTrip != null &&
-    focusedTrip.tripNumber === tripNumber &&
-    focusedTrip.scheduleType === scheduleType &&
-    isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
-      isSouthbound(fromStation, toStation);
+    focusedTripMatchesSchedule(
+      focusedTrip,
+      isSouthbound(fromStation, toStation),
+      scheduleType,
+    ) && focusedTrip.tripNumber === tripNumber;
 
   // Whether the displayed leg IS the focused leg. When true, this view's
   // (live) departureAt is the user's actual boarding departure; when false
@@ -376,6 +379,14 @@ export function DepartureReminder({
       buildText(clampedSliderValue),
     );
     if (result.ok === false) {
+      // "no-focus" means the focus was cleared out from under the picker (e.g.
+      // the trip auto-cleared on arrival, or Stop on another surface) — there's
+      // nothing to configure, so just close rather than show a misleading
+      // "couldn't schedule" error. The control re-renders to its Go state.
+      if (result.reason === "no-focus") {
+        closePicker();
+        return;
+      }
       setPickerError(
         result.reason === "permission" ? "permission" : "schedule-failed",
       );

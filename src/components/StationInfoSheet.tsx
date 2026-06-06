@@ -10,7 +10,7 @@ import {
 } from "@/lib/scheduleUtils";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { stationIndexMap, stationZoneMap, isSouthbound } from "@/lib/stationUtils";
+import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { cn } from "@/lib/utils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
@@ -18,6 +18,7 @@ import { AppSheet } from "@/components/ui/app-sheet";
 import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import {
   cardTripState,
   stateCardStyle,
@@ -309,15 +310,15 @@ export function StationInfoSheet({
                 a.tripNumber === ridingTripNumber &&
                 a.isSouthbound === ridingIsSouthbound;
               // Highlight the user's focused ("Go") train blue here too,
-              // matching the schedule rows and pinned card. Match by number +
-              // direction + schedule type (the trip number is reused across
-              // directions / weekday-weekend).
+              // matching the schedule rows and pinned card. Shared predicate:
+              // number + direction + schedule type (the trip number is reused
+              // across directions / weekday-weekend).
               const isFocused =
-                focusedTrip != null &&
-                focusedTrip.tripNumber === a.tripNumber &&
-                focusedTrip.scheduleType === scheduleType &&
-                isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
-                  a.isSouthbound;
+                focusedTripMatchesSchedule(
+                  focusedTrip,
+                  a.isSouthbound,
+                  scheduleType,
+                ) && focusedTrip.tripNumber === a.tripNumber;
               return (
                 <ArrivalRow
                   key={`${a.tripNumber}-${a.isSouthbound}`}

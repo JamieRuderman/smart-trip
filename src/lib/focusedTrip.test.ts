@@ -110,9 +110,32 @@ describe("migrateLegacyReminders", () => {
     const m = migrateLegacyReminders();
     expect(m?.tripNumber).toBe(SAMPLE.trip);
     expect(m?.serviceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(typeof m?.reminder?.notificationId).toBe("number");
+    // Reuses the legacy reminder's own id — that's the id the OS scheduled the
+    // pre-upgrade notification under, so keeping it lets Stop/cancel reach it.
+    expect(m?.reminder?.notificationId).toBe(1);
     expect(m).not.toHaveProperty("departureAt");
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+  });
+
+  it("falls back to a derived id when the legacy reminder lacks one", () => {
+    const future = Date.now() + 40 * 60_000;
+    localStorage.setItem(
+      LEGACY_KEY,
+      JSON.stringify([
+        {
+          tripNumber: SAMPLE.trip,
+          fromStation: FROM,
+          toStation: TO,
+          departureAt: future,
+          reminderAt: future - 10 * 60_000,
+          leadMinutes: 10,
+          title: "t",
+          body: "b",
+        },
+      ]),
+    );
+    const m = migrateLegacyReminders();
+    expect(typeof m?.reminder?.notificationId).toBe("number");
   });
 
   it("returns null when all legacy reminders are past", () => {

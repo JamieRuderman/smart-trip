@@ -8,7 +8,8 @@ import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMapTrains } from "@/hooks/useMapTrains";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { getClosestStation } from "@/lib/stationUtils";
+import { getClosestStation, isSouthbound } from "@/lib/stationUtils";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -168,13 +169,20 @@ export function TrainScheduleApp() {
     return param ? getDevFixture(param) : null;
   }, []);
 
-  // Highlight the focused trip's row blue when it's on the displayed leg. The
-  // row stays in the list (it also appears pinned above) rather than being
-  // hidden — the duplication is intentional.
+  // Highlight the focused trip's row blue whenever the focused train runs in
+  // the displayed schedule's direction (same shared predicate as the station
+  // sheet and detail sheet), not only when the home leg exactly equals the
+  // focused leg — otherwise the same train reads as focused in the sheets but
+  // not in the list. The row stays in the list (it also appears pinned above);
+  // the duplication is intentional.
   const focusedTripNumber =
-    focusedTrip &&
-    focusedTrip.fromStation === fromStation &&
-    focusedTrip.toStation === toStation
+    fromStation &&
+    toStation &&
+    focusedTripMatchesSchedule(
+      focusedTrip,
+      isSouthbound(fromStation, toStation),
+      scheduleType,
+    )
       ? focusedTrip.tripNumber
       : null;
 

@@ -115,7 +115,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
 
   const [state, setState] = useState<ProviderState>(() => {
     // Source precedence for the selected leg: URL params (shared/bookmarked
-    // links win) → localStorage (last selection, web + native, 24h expiry) →
+    // links win) → localStorage (last selection, web + native, 7-day expiry) →
     // the focused trip's own leg (so My Trip and the schedule stay in sync even
     // if the persisted selection has expired). All three may be absent on a
     // truly cold start, leaving the empty state.
@@ -181,7 +181,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   ]);
 
   // Persist the selected leg to localStorage (web + native) so it survives
-  // reloads / app restarts (24h expiry). The URL still takes precedence on the
+  // reloads / app restarts (7-day expiry). The URL still takes precedence on the
   // next load; this is the fallback when the URL has no from/to params.
   const isInitialRender = useRef(true);
   useEffect(() => {

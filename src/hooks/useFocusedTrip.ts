@@ -5,6 +5,7 @@ import {
   loadFocusedTrip,
   saveFocusedTrip,
   type FocusedTrip,
+  type FocusedTripReminder,
 } from "@/lib/focusedTrip";
 import {
   cancelNotification,
@@ -24,6 +25,37 @@ function onReminderFired(): void {
   const after = loadFocusedTrip();
   if (after) saveFocusedTrip({ ...after, reminder: null });
   notifyChange();
+}
+
+/**
+ * Schedule `reminder`'s notification and, on success, persist it onto `current`
+ * and notify consumers. Shared by the arm + drift-reschedule paths. Does NOT
+ * pre-cancel: scheduling under the same id atomically replaces any existing
+ * notification, so a failure leaves the prior one intact. Returns whether the
+ * platform accepted the schedule.
+ */
+async function armAndPersistReminder(
+  current: FocusedTrip,
+  reminder: FocusedTripReminder,
+  failureMessage: string,
+): Promise<boolean> {
+  try {
+    await scheduleNotification(
+      {
+        id: reminder.notificationId,
+        title: reminder.title,
+        body: reminder.body,
+        at: reminder.reminderAt,
+      },
+      onReminderFired,
+    );
+  } catch (error) {
+    logger.warn(failureMessage, error);
+    return false;
+  }
+  saveFocusedTrip({ ...current, reminder });
+  notifyChange();
+  return true;
 }
 
 export interface FocusTripInput {
@@ -98,27 +130,12 @@ export function useFocusedTrip() {
         await cancelNotification(current.reminder.notificationId);
       }
       const reminderAt = departureAt - leadMinutes * 60_000;
-      try {
-        await scheduleNotification(
-          { id: notificationId, title: text.title, body: text.body, at: reminderAt },
-          onReminderFired,
-        );
-      } catch (error) {
-        logger.warn("Failed to schedule focused-trip reminder", error);
-        return { ok: false, reason: "schedule-failed" };
-      }
-      saveFocusedTrip({
-        ...current,
-        reminder: {
-          leadMinutes,
-          reminderAt,
-          notificationId,
-          title: text.title,
-          body: text.body,
-        },
-      });
-      notifyChange();
-      return { ok: true };
+      const ok = await armAndPersistReminder(
+        current,
+        { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
+        "Failed to schedule focused-trip reminder",
+      );
+      return ok ? { ok: true } : { ok: false, reason: "schedule-failed" };
     },
     [],
   );
@@ -140,30 +157,15 @@ export function useFocusedTrip() {
       const { notificationId, leadMinutes } = current.reminder;
       // Re-arm under the SAME id, which atomically replaces the existing
       // notification (native overwrites same-id; web's armWebTimer clears the
-      // prior timer first). Crucially we do NOT cancel first: if scheduling
-      // throws (permission revoked, exact-alarm denied), the original reminder
-      // is still armed, so a failed drift-reschedule degrades to "fires at the
-      // old time" rather than silently losing the reminder entirely.
-      try {
-        await scheduleNotification(
-          { id: notificationId, title: text.title, body: text.body, at: reminderAt },
-          onReminderFired,
-        );
-      } catch (error) {
-        logger.warn("Failed to reschedule focused-trip reminder on drift", error);
-        return;
-      }
-      saveFocusedTrip({
-        ...current,
-        reminder: {
-          leadMinutes,
-          reminderAt,
-          notificationId,
-          title: text.title,
-          body: text.body,
-        },
-      });
-      notifyChange();
+      // prior timer first). Crucially armAndPersistReminder does NOT cancel
+      // first: if scheduling throws (permission revoked, exact-alarm denied),
+      // the original reminder is still armed, so a failed drift-reschedule
+      // degrades to "fires at the old time" rather than silently vanishing.
+      await armAndPersistReminder(
+        current,
+        { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
+        "Failed to reschedule focused-trip reminder on drift",
+      );
     },
     [],
   );

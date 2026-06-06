@@ -544,25 +544,24 @@ export function DepartureReminder({
               />
               <span className="truncate">{t("focusedTrip.going")}</span>
             </span>
-            <div className="flex items-center gap-1 shrink-0">
-              {showAddReminder && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={openPicker}
-                  aria-label={t("departureReminder.setReminder")}
-                  className="h-8 gap-1.5"
-                >
-                  <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>{t("departureReminder.setReminder")}</span>
-                </Button>
-              )}
-              {stopButton}
-            </div>
+            {stopButton}
           </div>
-          {/* The native-app CTA on iOS web is too wide to sit inline with the
-              "Going" label and Cancel without overflowing the sheet, so give it
-              its own full-width row below. */}
+          {/* "Add reminder" and the iOS-web app CTA both get their own
+              full-width row — inline with the "Going" label and Cancel they
+              squeeze the label down to a clipped single letter on narrow
+              viewports. */}
+          {showAddReminder && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPicker}
+              aria-label={t("departureReminder.setReminder")}
+              className="mt-2 h-9 w-full gap-1.5"
+            >
+              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{t("departureReminder.setReminder")}</span>
+            </Button>
+          )}
           {showAppCta && (
             <Button
               asChild

@@ -225,13 +225,14 @@ export function DepartureReminder({
   }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
 
   /**
-   * Whole minutes until departure, computed as the diff between epoch-minute
-   * numbers so it matches the "Arrives in X min" countdown elsewhere in the
-   * sheet (which uses getMinutes() and ignores sub-minute remainders).
+   * Whole minutes of lead time we can offer without putting reminderAt in the
+   * past. Uses the strict ms delta — a minute-floor-diff would overcount when
+   * the current second is past :00 (e.g. 61s remaining would otherwise return
+   * 2, letting the slider land on lead=2 and schedule for 59s in the past).
    */
-  const minutesUntilDeparture =
-    Math.floor(reminderDepartureAt / 60_000) -
-    Math.floor(currentTime.getTime() / 60_000);
+  const minutesUntilDeparture = Math.floor(
+    (reminderDepartureAt - currentTime.getTime()) / 60_000,
+  );
 
   /** Maximum lead time we'll allow. Picking the max fires the alarm
    *  immediately — fine as a "leave now" nudge since the user chose it. */

@@ -200,6 +200,41 @@ export function DepartureReminder({
     return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
   }, [currentTime, effectiveArrival, departureAt]);
 
+  // Departure used for ALL reminder math (picker range, fire time, drift). When
+  // the displayed leg is the focused leg, use this view's live departureAt.
+  // Otherwise (the focused train viewed under another leg, e.g. the line map)
+  // use the focused leg's scheduled departure so the reminder still targets the
+  // user's boarding station — not the corridor origin.
+  const reminderDepartureAt = useMemo(() => {
+    if (isThisTripFocused && !focusedExactLeg && focusedTrip) {
+      return focusedDepartureInstant(focusedTrip) ?? departureAt;
+    }
+    return departureAt;
+  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt]);
+
+  /**
+   * Whole minutes until departure, computed as the diff between epoch-minute
+   * numbers so it matches the "Arrives in X min" countdown elsewhere in the
+   * sheet (which uses getMinutes() and ignores sub-minute remainders).
+   */
+  const minutesUntilDeparture =
+    Math.floor(reminderDepartureAt / 60_000) -
+    Math.floor(currentTime.getTime() / 60_000);
+
+  /** Maximum lead time we'll allow. Picking the max fires the alarm
+   *  immediately — fine as a "leave now" nudge since the user chose it. */
+  const maxLeadMinutes = Math.max(
+    1,
+    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
+  );
+
+  /** Need at least 2 minutes of lead before we'll offer the reminder picker:
+   *  fewer leaves the slider a degenerate min===max range and would let the
+   *  reminder be scheduled at/after departure (a past reminderAt fires
+   *  immediately on web / is rejected on native). Gates every entry into the
+   *  picker. Focusing ("Go") itself is still allowed right up to arrival. */
+  const tooLateToScheduleReminder = minutesUntilDeparture < 2;
+
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
   const doFocus = useCallback(() => {
@@ -229,9 +264,10 @@ export function DepartureReminder({
     // Drop straight into the reminder slider so the lead-time picker is one
     // tap away. The picker render path is independent of focus state, so it's
     // safe to open before the (async) focus settles. Skip where notifications
-    // aren't supported — there's no reminder to configure there.
-    if (isReminderSupported()) {
-      setSliderValue(DEFAULT_LEAD_MINUTES);
+    // aren't supported, or when there's too little lead left to schedule a
+    // useful reminder — there's nothing worth configuring in either case.
+    if (isReminderSupported() && !tooLateToScheduleReminder) {
+      setSliderValue(Math.min(DEFAULT_LEAD_MINUTES, maxLeadMinutes));
       setPickerError(null);
       setPickerOpen(true);
     }
@@ -244,6 +280,8 @@ export function DepartureReminder({
     scheduleType,
     homeFromStation,
     homeToStation,
+    tooLateToScheduleReminder,
+    maxLeadMinutes,
   ]);
 
   const handleGoClick = useCallback(() => {
@@ -254,34 +292,6 @@ export function DepartureReminder({
   /** This trip's armed reminder, if any. Sourced from the focused-trip
    *  context rather than the old per-trip hook. */
   const reminder = isThisTripFocused ? focusedTrip?.reminder ?? null : null;
-
-  // Departure used for ALL reminder math (picker range, fire time, drift). When
-  // the displayed leg is the focused leg, use this view's live departureAt.
-  // Otherwise (the focused train viewed under another leg, e.g. the line map)
-  // use the focused leg's scheduled departure so the reminder still targets the
-  // user's boarding station — not the corridor origin.
-  const reminderDepartureAt = useMemo(() => {
-    if (isThisTripFocused && !focusedExactLeg && focusedTrip) {
-      return focusedDepartureInstant(focusedTrip) ?? departureAt;
-    }
-    return departureAt;
-  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt]);
-
-  /**
-   * Whole minutes until departure, computed as the diff between epoch-minute
-   * numbers so it matches the "Arrives in X min" countdown elsewhere in the
-   * sheet (which uses getMinutes() and ignores sub-minute remainders).
-   */
-  const minutesUntilDeparture =
-    Math.floor(reminderDepartureAt / 60_000) -
-    Math.floor(currentTime.getTime() / 60_000);
-
-  /** Maximum lead time we'll allow. Picking the max fires the alarm
-   *  immediately — fine as a "leave now" nudge since the user chose it. */
-  const maxLeadMinutes = Math.max(
-    1,
-    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
-  );
 
   const [sliderValue, setSliderValue] = useState(() =>
     Math.min(DEFAULT_LEAD_MINUTES, Math.max(1, maxLeadMinutes))
@@ -348,9 +358,16 @@ export function DepartureReminder({
   useEffect(() => {
     if (!autoOpenPicker || autoOpenedRef.current) return;
     if (!isThisTripFocused || reminder || !isReminderSupported()) return;
+    if (tooLateToScheduleReminder) return;
     autoOpenedRef.current = true;
     openPicker();
-  }, [autoOpenPicker, isThisTripFocused, reminder, openPicker]);
+  }, [
+    autoOpenPicker,
+    isThisTripFocused,
+    reminder,
+    openPicker,
+    tooLateToScheduleReminder,
+  ]);
 
   const handleSet = useCallback(async () => {
     const result = await setReminder(
@@ -488,7 +505,10 @@ export function DepartureReminder({
     // trip itself still works without notifications.
     const reminderSupported = isReminderSupported();
     const showAppCta = !reminderSupported && isIOSWebBrowser();
-    const reminderAffordance = reminderSupported ? (
+    // Once there's too little lead left, drop the "Set reminder" affordance —
+    // the picker would only offer a degenerate, fire-immediately range. The
+    // trip stays focused; the user just can't add a reminder this close in.
+    const reminderAffordance = reminderSupported && !tooLateToScheduleReminder ? (
       <Button
         variant="outline"
         size="sm"

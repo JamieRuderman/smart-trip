@@ -229,7 +229,16 @@ function FocusedTripCardInner({
     [],
   );
 
-  const showAddReminder = !isCanceledOrSkipped && !reminder && isReminderSupported();
+  // Match DepartureReminder's lead requirement: hide "Add reminder" once
+  // there's under ~2 min of lead (or the train has departed — minutesUntil
+  // goes negative), so the deep-link can't land on a sheet whose picker would
+  // only offer a degenerate, fire-immediately range. Future-service trips keep
+  // the affordance (their countdown is day-relative, not a live lead).
+  const showAddReminder =
+    !isCanceledOrSkipped &&
+    !reminder &&
+    isReminderSupported() &&
+    (isFutureService || minutesUntil >= 2);
 
   return (
     <SectionCard

@@ -138,7 +138,12 @@ export function useFocusedTrip() {
         return;
       }
       const { notificationId, leadMinutes } = current.reminder;
-      await cancelNotification(notificationId);
+      // Re-arm under the SAME id, which atomically replaces the existing
+      // notification (native overwrites same-id; web's armWebTimer clears the
+      // prior timer first). Crucially we do NOT cancel first: if scheduling
+      // throws (permission revoked, exact-alarm denied), the original reminder
+      // is still armed, so a failed drift-reschedule degrades to "fires at the
+      // old time" rather than silently losing the reminder entirely.
       try {
         await scheduleNotification(
           { id: notificationId, title: text.title, body: text.body, at: reminderAt },

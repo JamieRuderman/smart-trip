@@ -203,17 +203,26 @@ export function DepartureReminder({
     return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
   }, [currentTime, effectiveArrival, departureAt]);
 
-  // Departure used for ALL reminder math (picker range, fire time, drift). When
-  // the displayed leg is the focused leg, use this view's live departureAt.
-  // Otherwise (the focused train viewed under another leg, e.g. the line map)
-  // use the focused leg's scheduled departure so the reminder still targets the
-  // user's boarding station — not the corridor origin.
+  // Departure used for ALL reminder math (picker range, fire time, drift). Use
+  // this view's live departureAt ONLY for the focused leg on today's service —
+  // there the displayed HH:MM is correctly anchored to today and reflects
+  // realtime drift. In every other focused case the displayed departureAt is
+  // mis-anchored, so resolve the focused leg's serviceDate-anchored departure:
+  //   • a different leg (e.g. the line-map corridor view) → target the user's
+  //     boarding station, not the corridor origin; and
+  //   • a non-today service (e.g. a weekend train picked on a weekday) →
+  //     buildDepartureTimestamp would anchor to today/tomorrow and arm the
+  //     reminder on the wrong day, so use the stored serviceDate instead.
   const reminderDepartureAt = useMemo(() => {
-    if (isThisTripFocused && !focusedExactLeg && focusedTrip) {
-      return focusedDepartureInstant(focusedTrip) ?? departureAt;
+    if (isThisTripFocused && focusedTrip) {
+      const focusedServiceIsToday =
+        focusedTrip.scheduleType === getTodayScheduleType(currentTime);
+      if (!focusedExactLeg || !focusedServiceIsToday) {
+        return focusedDepartureInstant(focusedTrip) ?? departureAt;
+      }
     }
     return departureAt;
-  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt]);
+  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
 
   /**
    * Whole minutes until departure, computed as the diff between epoch-minute

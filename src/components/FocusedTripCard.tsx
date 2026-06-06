@@ -339,7 +339,7 @@ function FocusedTripCardInner({
           >
             <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="truncate">
-              {t("departureReminder.remindAt", { time: reminderTimeLabel })}
+              {reminderTimeLabel}
               <span className="text-white/70">
                 {" · "}
                 {t("departureReminder.minutesBefore", {

@@ -519,30 +519,7 @@ export function DepartureReminder({
     // Once there's too little lead left, drop the "Set reminder" affordance —
     // the picker would only offer a degenerate, fire-immediately range. The
     // trip stays focused; the user just can't add a reminder this close in.
-    const reminderAffordance = reminderSupported && !tooLateToScheduleReminder ? (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={openPicker}
-        aria-label={t("departureReminder.setReminder")}
-        className="h-8 gap-1.5"
-      >
-        <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{t("departureReminder.setReminder")}</span>
-      </Button>
-    ) : showAppCta ? (
-      <Button asChild variant="outline" size="sm" className="h-8 gap-1.5">
-        <a
-          href={APP_STORE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("departureReminder.appCta")}
-        >
-          <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>{t("departureReminder.appCta")}</span>
-        </a>
-      </Button>
-    ) : null;
+    const showAddReminder = reminderSupported && !tooLateToScheduleReminder;
     return (
       <GutterRow>
         <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
@@ -555,10 +532,42 @@ export function DepartureReminder({
               <span className="truncate">{t("focusedTrip.going")}</span>
             </span>
             <div className="flex items-center gap-1 shrink-0">
-              {reminderAffordance}
+              {showAddReminder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openPicker}
+                  aria-label={t("departureReminder.setReminder")}
+                  className="h-8 gap-1.5"
+                >
+                  <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{t("departureReminder.setReminder")}</span>
+                </Button>
+              )}
               {stopButton}
             </div>
           </div>
+          {/* The native-app CTA on iOS web is too wide to sit inline with the
+              "Going" label and Cancel without overflowing the sheet, so give it
+              its own full-width row below. */}
+          {showAppCta && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="mt-2 h-9 w-full gap-1.5"
+            >
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("departureReminder.appCta")}
+              >
+                <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{t("departureReminder.appCta")}</span>
+              </a>
+            </Button>
+          )}
         </div>
       </GutterRow>
     );

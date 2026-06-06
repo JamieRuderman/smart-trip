@@ -503,20 +503,21 @@ export function DepartureReminder({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => void setReminder(null, reminderDepartureAt, buildText(0))}
-                aria-label={t("departureReminder.cancel")}
-                className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
-              >
-                <X
-                  className="h-4 w-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </button>
-              {stopButton}
-            </div>
+            {/* Only the X (cancel reminder) here — the focused-trip Cancel
+                lives on the "Going" row, which the X transitions back to. The
+                reminder pill text is long enough that adding Cancel would
+                squeeze it into 3-line wrap on narrower viewports. */}
+            <button
+              type="button"
+              onClick={() => void setReminder(null, reminderDepartureAt, buildText(0))}
+              aria-label={t("departureReminder.cancel")}
+              className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md hover:bg-accent active:bg-accent"
+            >
+              <X
+                className="h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </button>
           </div>
         </div>
       </GutterRow>

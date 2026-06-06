@@ -92,6 +92,7 @@ export function TripDetailSheet({
         onClose={onClose}
         progress={progress}
         showCloseButton={!isMobile}
+        isFocused={isFocused}
       />
     </AppSheet>
   );

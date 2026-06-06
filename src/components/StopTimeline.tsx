@@ -33,6 +33,10 @@ interface StopTimelineProps {
   userFromStation?: Station | null;
   /** The user's selected destination (from URL/schedule). See userFromStation. */
   userToStation?: Station | null;
+  /** When true the displayed trip is the user's focused / riding trip — swap
+   *  the green on-time accent for my-trip blue to match the blue header band
+   *  and the ridingCardStyle elsewhere. */
+  isRiding?: boolean;
 }
 
 export function StopTimeline({
@@ -45,6 +49,7 @@ export function StopTimeline({
   stopInference,
   userFromStation = null,
   userToStation = null,
+  isRiding = false,
 }: StopTimelineProps) {
   const { t } = useTranslation();
   void trip;
@@ -108,6 +113,17 @@ export function StopTimeline({
             ? "past"
             : "future";
 
+          // For the focused / riding trip, the current-stop highlight reads
+          // blue (matches the my-trip header / card style) rather than the
+          // default green. Only the "ontime" accent — delayed / canceled keep
+          // their warning colors.
+          const ridingAccent = isRiding && accent === "ontime";
+          const accentText = ridingAccent ? "text-my-trip" : stateText[accent];
+          const accentIconText = ridingAccent
+            ? "text-my-trip"
+            : stateIconText[accent];
+          const accentTint = ridingAccent ? "bg-my-trip/10" : stateTint[accent];
+
           // Delay pill — orange "X min delay" when the trip itself is delayed,
           // muted "+N" indicator when only a mid-trip wobble is reported.
           const pill = !showStopDelay
@@ -124,7 +140,7 @@ export function StopTimeline({
 
           // Stop-point icon — uses theme maps so colours stay in sync with text
           const endpointIconColor = isCurrent
-            ? stateText[accent]
+            ? accentText
             : isPast
             ? stateIconText["past"]
             : stateIconText["future"];
@@ -161,14 +177,14 @@ export function StopTimeline({
             // / canceled are unchanged because both maps share them.
             // strokeWidth applied via style to defeat any inherited CSS.
             <CircleDot
-              className={cn("h-4 w-4 shrink-0", stateText[accent])}
+              className={cn("h-4 w-4 shrink-0", accentText)}
               style={{ strokeWidth: 3 }}
             />
           ) : (
             <Circle
               className={cn(
                 "h-2.5 w-2.5 shrink-0",
-                stateIconText[accent],
+                accentIconText,
                 isCurrent ? "fill-current" : "fill-transparent",
               )}
             />
@@ -195,7 +211,7 @@ export function StopTimeline({
               className={cn(
                 "flex items-center gap-3 relative",
                 isCurrent && "rounded-lg",
-                isCurrent && stateTint[accent],
+                isCurrent && accentTint,
               )}
             >
               {/*
@@ -207,7 +223,7 @@ export function StopTimeline({
                 <div className="flex items-center justify-end w-8 shrink-0">
                   {isCurrent && (
                     <TripIcon
-                      className={cn("h-4 w-4", stateText[accent])}
+                      className={cn("h-4 w-4", accentText)}
                     />
                   )}
                 </div>
@@ -231,7 +247,7 @@ export function StopTimeline({
                     "text-sm flex-1 min-w-0 truncate",
                     (isCurrent || isTo || (isFrom && !isPast)) && "font-semibold",
                     isCanceled && "line-through",
-                    stateText[accent],
+                    accentText,
                   )}
                 >
                   {station}
@@ -254,19 +270,19 @@ export function StopTimeline({
                       <TimeDisplay
                         time={realtimeStatus!.liveDepartureTime!}
                         format={timeFormat}
-                        className={cn("text-sm", stateText[accent])}
+                        className={cn("text-sm", accentText)}
                       />
                     ) : showLiveTo ? (
                       <TimeDisplay
                         time={realtimeStatus!.liveArrivalTime!}
                         format={timeFormat}
-                        className={cn("text-sm", stateText[accent])}
+                        className={cn("text-sm", accentText)}
                       />
                     ) : showLiveStopTime ? (
                       <TimeDisplay
                         time={liveStopTime!}
                         format={timeFormat}
-                        className={cn("text-sm", stateText[accent])}
+                        className={cn("text-sm", accentText)}
                       />
                     ) : (
                       <TimeDisplay
@@ -275,7 +291,7 @@ export function StopTimeline({
                         className={cn(
                           "text-sm",
                           isCanceled && "line-through",
-                          stateText[accent],
+                          accentText,
                         )}
                       />
                     )}

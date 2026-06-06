@@ -13,6 +13,10 @@ export interface FocusedTripReminder {
   notificationId: number;
   title: string;
   body: string;
+  /** AlarmKit alarm id (iOS 26+) when this reminder was scheduled as a true
+   *  "Leave Alarm" rather than a local notification. Absent on the notification
+   *  path (Android, web, AlarmKit unavailable/denied, or scheduling failure). */
+  alarmId?: string;
 }
 
 export interface FocusedTrip {
@@ -65,7 +69,9 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       typeof (r.reminder as Record<string, unknown>).reminderAt === "number" &&
       typeof (r.reminder as Record<string, unknown>).notificationId === "number" &&
       typeof (r.reminder as Record<string, unknown>).title === "string" &&
-      typeof (r.reminder as Record<string, unknown>).body === "string");
+      typeof (r.reminder as Record<string, unknown>).body === "string" &&
+      ((r.reminder as Record<string, unknown>).alarmId === undefined ||
+        typeof (r.reminder as Record<string, unknown>).alarmId === "string"));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -167,6 +173,16 @@ export function loadFocusedTrip(): FocusedTrip | null {
     if (arrivalInstant(parsed, trip) <= Date.now()) {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
+    }
+    // The reminder has already fired — drop the sub-object so the "active
+    // reminder" pill doesn't linger. On native the OS delivered the alert at
+    // fire time but there's no JS callback (bootFocusedTrip skips the timer
+    // re-arm on native); on web a closed-tab miss has no way to deliver late
+    // anyway. Either way, "reminderAt is in the past" means we're done.
+    if (parsed.reminder && parsed.reminder.reminderAt <= Date.now()) {
+      const cleaned: FocusedTrip = { ...parsed, reminder: null };
+      saveFocusedTrip(cleaned);
+      return cleaned;
     }
     return parsed;
   } catch {

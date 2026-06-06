@@ -75,7 +75,8 @@ export function FerryLabels({
         textAnchor="middle"
         fontSize={etaSize}
         fontWeight={TOKEN.ferryEtaWeight}
-        className="fill-muted-foreground"
+        fill={muted ? TOKEN.mutedTrack : undefined}
+        className={muted ? undefined : "fill-muted-foreground"}
         letterSpacing={TOKEN.ferryEtaTracking}
         style={{ fontFamily: FONT_FAMILY }}
       >

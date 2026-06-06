@@ -243,7 +243,7 @@ function FocusedTripCardInner({
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-0 md:border-0 bg-my-trip text-white shadow-lg shadow-my-trip/20"
+      className="overflow-hidden border-0 md:border-0 bg-my-trip text-white"
     >
       {/* Tappable summary → opens the full trip-detail sheet. */}
       <button

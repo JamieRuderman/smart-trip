@@ -225,13 +225,14 @@ export function DepartureReminder({
   }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
 
   /**
-   * Whole minutes until departure, computed as the diff between epoch-minute
-   * numbers so it matches the "Arrives in X min" countdown elsewhere in the
-   * sheet (which uses getMinutes() and ignores sub-minute remainders).
+   * Whole minutes of lead time we can offer without putting reminderAt in the
+   * past. Uses the strict ms delta — a minute-floor-diff would overcount when
+   * the current second is past :00 (e.g. 61s remaining would otherwise return
+   * 2, letting the slider land on lead=2 and schedule for 59s in the past).
    */
-  const minutesUntilDeparture =
-    Math.floor(reminderDepartureAt / 60_000) -
-    Math.floor(currentTime.getTime() / 60_000);
+  const minutesUntilDeparture = Math.floor(
+    (reminderDepartureAt - currentTime.getTime()) / 60_000,
+  );
 
   /** Maximum lead time we'll allow. Picking the max fires the alarm
    *  immediately — fine as a "leave now" nudge since the user chose it. */
@@ -478,7 +479,7 @@ export function DepartureReminder({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <BellRing
-                className="h-4 w-4 text-primary shrink-0"
+                className="h-4 w-4 text-my-trip shrink-0"
                 aria-hidden="true"
               />
               <div className="min-w-0">
@@ -492,9 +493,13 @@ export function DepartureReminder({
                   })}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {t("departureReminder.minutesBefore", {
-                    count: reminder.leadMinutes,
-                  })}
+                  {reminder.alarmId
+                    ? t("departureReminder.leaveAlarmActive", {
+                        count: reminder.leadMinutes,
+                      })
+                    : t("departureReminder.minutesBefore", {
+                        count: reminder.leadMinutes,
+                      })}
                 </div>
               </div>
             </div>
@@ -535,30 +540,29 @@ export function DepartureReminder({
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
               <TripIcon
-                className="h-4 w-4 text-primary shrink-0"
+                className="h-4 w-4 text-my-trip shrink-0"
                 aria-hidden="true"
               />
               <span className="truncate">{t("focusedTrip.going")}</span>
             </span>
-            <div className="flex items-center gap-1 shrink-0">
-              {showAddReminder && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={openPicker}
-                  aria-label={t("departureReminder.setReminder")}
-                  className="h-8 gap-1.5"
-                >
-                  <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>{t("departureReminder.setReminder")}</span>
-                </Button>
-              )}
-              {stopButton}
-            </div>
+            {stopButton}
           </div>
-          {/* The native-app CTA on iOS web is too wide to sit inline with the
-              "Going" label and Cancel without overflowing the sheet, so give it
-              its own full-width row below. */}
+          {/* "Add reminder" and the iOS-web app CTA both get their own
+              full-width row — inline with the "Going" label and Cancel they
+              squeeze the label down to a clipped single letter on narrow
+              viewports. */}
+          {showAddReminder && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPicker}
+              aria-label={t("departureReminder.setReminder")}
+              className="mt-2 h-9 w-full gap-1.5"
+            >
+              <Bell className="h-3.5 w-3.5 text-my-trip" aria-hidden="true" />
+              <span>{t("departureReminder.setReminder")}</span>
+            </Button>
+          )}
           {showAppCta && (
             <Button
               asChild
@@ -636,7 +640,7 @@ export function DepartureReminder({
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium flex items-center gap-1.5 text-foreground">
             <Bell
-              className="h-3.5 w-3.5 text-muted-foreground"
+              className="h-3.5 w-3.5 text-my-trip"
               aria-hidden="true"
             />
             {t("departureReminder.label")}
@@ -695,6 +699,8 @@ export function DepartureReminder({
               count: clampedSliderValue,
             })}
             thumbLabel={t("departureReminder.label")}
+            rangeClassName="bg-my-trip"
+            thumbClassName="border-my-trip"
           />
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
             <span>
@@ -731,7 +737,7 @@ export function DepartureReminder({
         <Button
           type="button"
           onClick={() => void handleSet()}
-          className="w-full h-11"
+          className="w-full h-11 bg-my-trip text-white hover:bg-my-trip/90"
         >
           {t("departureReminder.setReminderConfirm")}
         </Button>

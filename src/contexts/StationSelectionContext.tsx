@@ -259,14 +259,24 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     clearFocusedTrip,
   } = useFocusedTrip();
 
-  // Clear the focused trip once the train has arrived. loadFocusedTrip()
-  // already drops the record when its live-aware arrivalAt has passed; this
-  // tick just notices that just happened and nudges consumers to re-read so
-  // the pinned card disappears. A 30s cadence is prompt without busy-work.
+  // Clear the focused trip once the train has arrived AND reconcile a
+  // past-fire reminder. loadFocusedTrip() drops the trip record on arrival and
+  // strips the reminder sub-object once reminderAt has passed; this tick just
+  // notices and dispatches so the pinned card / reminder pill re-renders. On
+  // native there's no JS callback when the OS-scheduled alarm fires, so this
+  // tick is the only thing that catches up the UI within ~30s. A 30s cadence
+  // is prompt without busy-work.
   useEffect(() => {
     if (!focusedTrip) return;
     const tick = window.setInterval(() => {
       if (loadFocusedTrip() === null) {
+        window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+        return;
+      }
+      if (
+        focusedTrip.reminder &&
+        focusedTrip.reminder.reminderAt <= Date.now()
+      ) {
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
       }
     }, 30_000);

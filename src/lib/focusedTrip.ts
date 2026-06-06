@@ -174,6 +174,16 @@ export function loadFocusedTrip(): FocusedTrip | null {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
+    // The reminder has already fired — drop the sub-object so the "active
+    // reminder" pill doesn't linger. On native the OS delivered the alert at
+    // fire time but there's no JS callback (bootFocusedTrip skips the timer
+    // re-arm on native); on web a closed-tab miss has no way to deliver late
+    // anyway. Either way, "reminderAt is in the past" means we're done.
+    if (parsed.reminder && parsed.reminder.reminderAt <= Date.now()) {
+      const cleaned: FocusedTrip = { ...parsed, reminder: null };
+      saveFocusedTrip(cleaned);
+      return cleaned;
+    }
     return parsed;
   } catch {
     return null;

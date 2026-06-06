@@ -334,6 +334,24 @@ export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
   return day === 0 || day === 6 ? "weekend" : "weekday";
 }
 
+/**
+ * The next calendar date ("YYYY-MM-DD"), starting from `from`, whose schedule
+ * type matches `scheduleType` (honoring calendar overrides). Lets a trip browsed
+ * under a non-today schedule (e.g. a weekday train viewed on a weekend) anchor
+ * to the day it actually runs ("Departs Monday") instead of today.
+ */
+export function nextServiceDate(
+  from: Date,
+  scheduleType: ScheduleType,
+): string {
+  const d = new Date(from);
+  for (let i = 0; i < 8; i++) {
+    if (getTodayScheduleType(d) === scheduleType) return localDateKey(d);
+    d.setDate(d.getDate() + 1);
+  }
+  return localDateKey(from);
+}
+
 export function setScheduleData(
   payload: SchedulePayload,
   source: ScheduleSource = "remote",

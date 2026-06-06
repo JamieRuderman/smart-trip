@@ -4,6 +4,7 @@ import {
   X,
   AlertTriangle,
   Timer,
+  Calendar,
   Clock,
   MapPin,
   LocateFixed,
@@ -16,7 +17,11 @@ import {
 import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
-import { calculateFare } from "@/lib/scheduleUtils";
+import {
+  calculateFare,
+  getTodayScheduleType,
+  nextServiceDate,
+} from "@/lib/scheduleUtils";
 import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -79,10 +84,27 @@ export function TripDetailContent({
   autoOpenReminderPicker = false,
   scheduleType,
 }: TripDetailContentProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const nowSec = useNow(1000, showDebugPanel);
   const { preferences } = useUserPreferences();
+
+  // The displayed trip belongs to a schedule (weekday/weekend) that may not be
+  // today's. When it isn't, every "today-relative" readout — the live
+  // countdown, distance-to-next-stop, GPS — is meaningless: the train runs on a
+  // different day. Show the service day ("Departs Monday") and hide the live
+  // tracking instead. (A future calendar-date picker would supersede this.)
+  const isOtherDay = scheduleType !== getTodayScheduleType(currentTime);
+  const serviceDayLabel = isOtherDay
+    ? (() => {
+        const [y, mo, d] = nextServiceDate(currentTime, scheduleType)
+          .split("-")
+          .map(Number);
+        return new Date(y, mo - 1, d).toLocaleDateString(i18n.language, {
+          weekday: "long",
+        });
+      })()
+    : null;
 
   const {
     headerBg,
@@ -285,12 +307,28 @@ export function TripDetailContent({
         GutterRow handles this automatically for metadata rows.
       */}
 
-      {/* Countdown / Ended — always shown */}
+      {/* Countdown / Ended for today's run; the service day for another day. */}
       <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
         <div className="w-[5rem] shrink-0 flex justify-end pr-3">
-          <Timer className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          {isOtherDay ? (
+            <Calendar
+              className="h-6 w-6 text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : (
+            <Timer
+              className="h-6 w-6 text-muted-foreground"
+              aria-hidden="true"
+            />
+          )}
         </div>
-        <AlarmStatusLabel status={alarmStatus} />
+        {isOtherDay ? (
+          <span className="text-[1.7rem] leading-tight font-semibold tracking-[-0.02em] capitalize">
+            {t("focusedTrip.departsOn", { day: serviceDayLabel })}
+          </span>
+        ) : (
+          <AlarmStatusLabel status={alarmStatus} />
+        )}
       </div>
 
       {/* Metadata: duration · stops · fare · [debug toggle] */}
@@ -338,7 +376,7 @@ export function TripDetailContent({
           </button>
         </GutterRow>
 
-        {!isEnded && distanceToNextStopMi != null && nextStop != null && (
+        {!isOtherDay && !isEnded && distanceToNextStopMi != null && nextStop != null && (
           <GutterRow className="text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <LocateFixed
@@ -357,7 +395,7 @@ export function TripDetailContent({
           </GutterRow>
         )}
 
-        {!hasLocation && (
+        {!isOtherDay && !hasLocation && (
           <GutterRow>
             <button
               onClick={requestLocation}

@@ -16,7 +16,7 @@ import {
   isIOSWebBrowser,
   isReminderSupported,
 } from "@/lib/notificationScheduler";
-import { getTodayScheduleType, tripServesLeg } from "@/lib/scheduleUtils";
+import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { focusedDepartureInstant } from "@/lib/focusedTrip";
 import { APP_STORE_URL } from "@/seo/constants";
@@ -90,23 +90,6 @@ function dateKey(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-/**
- * The next calendar date (starting today) whose schedule type matches the
- * given type. Lets a weekend train chosen on a weekday anchor to the coming
- * weekend — "this train isn't running until Saturday" — rather than today.
- */
-function nextDateForScheduleType(
-  from: Date,
-  scheduleType: "weekday" | "weekend"
-): string {
-  const d = new Date(from);
-  for (let i = 0; i < 8; i++) {
-    if (getTodayScheduleType(d) === scheduleType) return dateKey(d);
-    d.setDate(d.getDate() + 1);
-  }
-  return dateKey(from);
 }
 
 function formatClockTime(
@@ -205,7 +188,7 @@ export function DepartureReminder({
     if (scheduleType === getTodayScheduleType(currentTime)) {
       return dateKey(new Date(departureAt));
     }
-    return nextDateForScheduleType(currentTime, scheduleType);
+    return nextServiceDate(currentTime, scheduleType);
   }, [departureAt, scheduleType, currentTime]);
 
   // Arrival instant for THIS displayed leg — used only to stop offering "Go"

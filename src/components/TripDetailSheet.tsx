@@ -26,6 +26,8 @@ export interface TripDetailSheetProps {
   /** Open the reminder lead-time picker on mount (home "My Trip" card → "Add
    *  reminder" deep-link). */
   autoOpenReminderPicker?: boolean;
+  /** Schedule (weekday/weekend) the displayed trip belongs to. */
+  scheduleType: "weekday" | "weekend";
   /** Dev-only: override the live vehicle position hook result (used by devFixtures). */
   vehiclePositionOverride?: VehiclePositionMatch | null;
   /** User's selected origin/destination, used to mark matching intermediate

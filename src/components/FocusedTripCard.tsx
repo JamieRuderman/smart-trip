@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, BellRing, ChevronRight, Timer } from "lucide-react";
+import { Bell, BellRing, Calendar, ChevronRight, Timer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
@@ -142,9 +142,27 @@ function FocusedTripCardInner({
     realtimeStatus?.liveDepartureTime ?? undefined,
     currentTime,
   );
+
+  // Whether the focused run is on a later calendar day than today (e.g. a
+  // weekend train chosen on a weekday). The "leave in X" countdown only makes
+  // sense for today's run; for a future day we show its weekday instead so the
+  // bare clock times aren't read as "today".
+  const todayKey = `${currentTime.getFullYear()}-${String(
+    currentTime.getMonth() + 1,
+  ).padStart(2, "0")}-${String(currentTime.getDate()).padStart(2, "0")}`;
+  const isFutureService = focusedTrip.serviceDate !== todayKey;
+  const serviceDayLabel = isFutureService
+    ? (() => {
+        const [y, mo, d] = focusedTrip.serviceDate.split("-").map(Number);
+        return new Date(y, mo - 1, d).toLocaleDateString(i18n.language, {
+          weekday: "long",
+        });
+      })()
+    : null;
   // Once the train has departed the "leave now" countdown is moot — let the
   // reminder/Stop controls and the full sheet carry the en-route story.
-  const showCountdown = !isCanceledOrSkipped && minutesUntil >= 0;
+  const showCountdown =
+    !isCanceledOrSkipped && !isFutureService && minutesUntil >= 0;
 
   const reminder = focusedTrip.reminder;
   const reminderTimeLabel = reminder
@@ -282,15 +300,23 @@ function FocusedTripCardInner({
             </div>
           </div>
 
-          {/* Departure countdown — "how long until I need to leave?" */}
-          {showCountdown && (
+          {/* Departure countdown ("how long until I need to leave?") for
+              today's run, or the service day for a future run. */}
+          {showCountdown ? (
             <div className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-2.5">
               <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
               <span className="text-lg font-semibold tracking-tight">
                 <CountdownLabel minutesUntil={minutesUntil} />
               </span>
             </div>
-          )}
+          ) : isFutureService && serviceDayLabel ? (
+            <div className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-2.5">
+              <Calendar className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <span className="text-lg font-semibold tracking-tight capitalize">
+                {t("focusedTrip.departsOn", { day: serviceDayLabel })}
+              </span>
+            </div>
+          ) : null}
         </div>
       </button>
 
@@ -350,6 +376,7 @@ function FocusedTripCardInner({
           isNextTrip={false}
           showFerry={false}
           isFocused
+          scheduleType={focusedTrip.scheduleType}
           autoOpenReminderPicker={openWithPicker}
         />
       )}

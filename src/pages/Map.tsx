@@ -21,7 +21,7 @@ import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
 import { stationIndexMap } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -492,6 +492,7 @@ function MapContents() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          scheduleType={getTodayScheduleType()}
           userFromStation={userFromStation}
           userToStation={userToStation}
         />

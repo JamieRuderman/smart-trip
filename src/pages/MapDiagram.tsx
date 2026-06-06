@@ -6,7 +6,7 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -315,6 +315,7 @@ export default function MapDiagram() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          scheduleType={getTodayScheduleType()}
           userFromStation={fromStation}
           userToStation={toStation}
         />

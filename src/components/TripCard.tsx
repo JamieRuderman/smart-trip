@@ -26,6 +26,9 @@ interface TripCardProps {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  /** Schedule (weekday/weekend) this row belongs to — forwarded to the trip
+   *  sheet's reminder/focus control so it never infers the type from today. */
+  scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
   /** When true, the user is currently riding this train (GPS-detected) — the
@@ -48,6 +51,7 @@ export const TripCard = memo(function TripCard({
   fromStation,
   toStation,
   currentTime,
+  scheduleType,
   selectedTripNumber,
   onSelectTrip,
   isRiding = false,
@@ -346,6 +350,7 @@ export const TripCard = memo(function TripCard({
           isNextTrip={isNextTrip}
           showFerry={showFerry}
           isFocused={isFocused || isRiding}
+          scheduleType={scheduleType}
         />
       )}
     </>

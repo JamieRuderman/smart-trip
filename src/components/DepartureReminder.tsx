@@ -52,6 +52,12 @@ interface DepartureReminderProps {
   currentTime: Date;
   /** "12h" — controls the time format shown in the active reminder pill. */
   timeFormat: "12h" | "24h";
+  /** The schedule (weekday/weekend) the displayed trip belongs to — passed in
+   *  from whatever surface rendered it (home list = the user's selected type,
+   *  pinned card = the focused trip's type, line map = today). NEVER inferred
+   *  from "today" here: train numbers repeat across weekday/weekend, so an
+   *  inferred type would focus/recognize the wrong run. */
+  scheduleType: "weekday" | "weekend";
   /** When true, open the lead-time picker on mount (used when the home "My
    *  Trip" card deep-links into the sheet to add a reminder). Only fires for a
    *  focused trip with no reminder yet, where notifications are supported. */
@@ -80,6 +86,29 @@ function buildDepartureTimestamp(currentTime: Date, hhmm: string): number {
   return d.getTime();
 }
 
+function dateKey(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * The next calendar date (starting today) whose schedule type matches the
+ * given type. Lets a weekend train chosen on a weekday anchor to the coming
+ * weekend — "this train isn't running until Saturday" — rather than today.
+ */
+function nextDateForScheduleType(
+  from: Date,
+  scheduleType: "weekday" | "weekend"
+): string {
+  const d = new Date(from);
+  for (let i = 0; i < 8; i++) {
+    if (getTodayScheduleType(d) === scheduleType) return dateKey(d);
+    d.setDate(d.getDate() + 1);
+  }
+  return dateKey(from);
+}
+
 function formatClockTime(
   epoch: number,
   timeFormat: "12h" | "24h",
@@ -104,6 +133,7 @@ export function DepartureReminder({
   realtimeArrivalTime,
   currentTime,
   timeFormat,
+  scheduleType,
   autoOpenPicker = false,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
@@ -151,7 +181,7 @@ export function DepartureReminder({
   const isThisTripFocused =
     focusedTrip != null &&
     focusedTrip.tripNumber === tripNumber &&
-    focusedTrip.scheduleType === getTodayScheduleType() &&
+    focusedTrip.scheduleType === scheduleType &&
     isSouthbound(focusedTrip.fromStation, focusedTrip.toStation) ===
       isSouthbound(fromStation, toStation);
 
@@ -168,11 +198,15 @@ export function DepartureReminder({
   const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
 
   const serviceDate = useMemo(() => {
-    const d = new Date(departureAt);
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${d.getFullYear()}-${mm}-${dd}`;
-  }, [departureAt]);
+    // When the displayed schedule is today's service, anchor to the
+    // (rollover-aware) displayed departure date. When it's a different service
+    // (e.g. a weekend train chosen on a weekday), anchor to the next date that
+    // actually runs that service so the trip is correctly "this coming weekend".
+    if (scheduleType === getTodayScheduleType(currentTime)) {
+      return dateKey(new Date(departureAt));
+    }
+    return nextDateForScheduleType(currentTime, scheduleType);
+  }, [departureAt, scheduleType, currentTime]);
 
   // Arrival instant for THIS displayed leg — used only to stop offering "Go"
   // once the trip has actually finished (focusing is otherwise allowed right
@@ -186,7 +220,6 @@ export function DepartureReminder({
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
   const doFocus = useCallback(() => {
-    const scheduleType = getTodayScheduleType();
     // The Go control can be opened from the line map, where the displayed trip
     // runs origin→terminus. When the user has a home-screen leg selected and
     // this train actually serves it, focus THAT leg so the pinned card shows
@@ -225,6 +258,7 @@ export function DepartureReminder({
     toStation,
     tripNumber,
     serviceDate,
+    scheduleType,
     homeFromStation,
     homeToStation,
   ]);

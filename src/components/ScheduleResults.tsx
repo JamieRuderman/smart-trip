@@ -18,6 +18,9 @@ interface ScheduleResultsProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   timeFormat: "12h" | "24h";
+  /** Schedule (weekday/weekend) these results belong to — forwarded to each
+   *  row's trip sheet so the reminder/focus control uses it instead of today. */
+  scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
   /** Trip number of the train the user is currently riding (if any) — the
@@ -40,6 +43,7 @@ export function ScheduleResults({
   showAllTrips,
   onToggleShowAllTrips,
   timeFormat,
+  scheduleType,
   selectedTripNumber,
   onSelectTrip,
   ridingTripNumber = null,
@@ -159,6 +163,7 @@ export function ScheduleResults({
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}
+                scheduleType={scheduleType}
                 selectedTripNumber={selectedTripNumber}
                 onSelectTrip={onSelectTrip}
               />

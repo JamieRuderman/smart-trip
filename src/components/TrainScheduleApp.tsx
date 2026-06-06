@@ -231,6 +231,7 @@ export function TrainScheduleApp() {
             showAllTrips={showAllTrips}
             onToggleShowAllTrips={toggleShowAllTrips}
             timeFormat="12h"
+            scheduleType={scheduleType}
             selectedTripNumber={selectedTripNumber}
             onSelectTrip={setSelectedTrip}
             ridingTripNumber={ridingTripNumber}
@@ -270,6 +271,7 @@ export function TrainScheduleApp() {
           timeFormat="12h"
           isNextTrip={false}
           showFerry={false}
+          scheduleType={scheduleType}
           vehiclePositionOverride={devFixture.vehiclePosition}
         />
       )}

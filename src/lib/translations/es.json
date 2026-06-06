@@ -216,6 +216,7 @@
     "stop": "Cancelar",
     "myTrip": "Mi viaje",
     "details": "Detalles",
+    "departsOn": "Sale el {{day}}",
     "viewDetails": "Ver detalles completos del viaje",
     "pinnedLabel": "Mi viaje",
     "switchTitle": "¿Cambiar mi viaje?",

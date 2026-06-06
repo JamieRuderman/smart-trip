@@ -216,6 +216,7 @@
     "stop": "Cancel",
     "myTrip": "My Trip",
     "details": "Details",
+    "departsOn": "Departs {{day}}",
     "viewDetails": "View full trip details",
     "pinnedLabel": "My trip",
     "switchTitle": "Change my trip?",

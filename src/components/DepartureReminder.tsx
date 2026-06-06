@@ -478,7 +478,7 @@ export function DepartureReminder({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <BellRing
-                className="h-4 w-4 text-primary shrink-0"
+                className="h-4 w-4 text-my-trip shrink-0"
                 aria-hidden="true"
               />
               <div className="min-w-0">
@@ -558,7 +558,7 @@ export function DepartureReminder({
               aria-label={t("departureReminder.setReminder")}
               className="mt-2 h-9 w-full gap-1.5"
             >
-              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+              <Bell className="h-3.5 w-3.5 text-my-trip" aria-hidden="true" />
               <span>{t("departureReminder.setReminder")}</span>
             </Button>
           )}
@@ -639,7 +639,7 @@ export function DepartureReminder({
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium flex items-center gap-1.5 text-foreground">
             <Bell
-              className="h-3.5 w-3.5 text-muted-foreground"
+              className="h-3.5 w-3.5 text-my-trip"
               aria-hidden="true"
             />
             {t("departureReminder.label")}
@@ -698,6 +698,8 @@ export function DepartureReminder({
               count: clampedSliderValue,
             })}
             thumbLabel={t("departureReminder.label")}
+            rangeClassName="bg-my-trip"
+            thumbClassName="border-my-trip"
           />
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
             <span>
@@ -734,7 +736,7 @@ export function DepartureReminder({
         <Button
           type="button"
           onClick={() => void handleSet()}
-          className="w-full h-11"
+          className="w-full h-11 bg-my-trip text-white hover:bg-my-trip/90"
         >
           {t("departureReminder.setReminderConfirm")}
         </Button>

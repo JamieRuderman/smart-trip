@@ -11,6 +11,7 @@ import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils"
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
 import {
   SHEET_ENTER_DELAY_MS,
@@ -49,6 +50,7 @@ export default function MapDiagram() {
     toStation: toSelection,
     setFromStation,
     setToStation,
+    focusedTrip,
   } = useStationSelection();
   const fromStation =
     fromSelection && stationIndexMap[fromSelection] != null
@@ -327,6 +329,11 @@ export default function MapDiagram() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          isFocused={focusedTripMatchesSchedule(
+            focusedTrip,
+            detailTrip.toStation === LARKSPUR,
+            getTodayScheduleType(),
+          ) && focusedTrip.tripNumber === detailTrip.trip.trip}
           scheduleType={getTodayScheduleType()}
           userFromStation={fromStation}
           userToStation={toStation}

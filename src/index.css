@@ -53,8 +53,12 @@ All colors MUST be HSL.
     --zone-4: 12 65% 55%; /* terracotta */
     --zone-5: 222 51% 47%; /* blue */
 
-    /* User location dot on the line diagram. */
+    /* Lighter blue used for accent icons, borders, and subtle tints. */
     --my-trip: 211 81% 55%;
+    /* Darker blue used on solid surfaces that carry white text (pinned
+       card, focused sheet header, CTAs, "Riding" pill). Shared between
+       light and dark themes — the lighter accent above adapts per mode. */
+    --my-trip-background: 211 75% 48%;
 
     /* Transit-specific colors */
     --transit-primary: var(--smart-train-green);
@@ -137,10 +141,8 @@ All colors MUST be HSL.
 
     /* SMART Train dark theme colors */
 
-    /* Darker my-trip blue in dark mode so the solid-blue surfaces (pinned
-       card, focused sheet header) don't glow harsh against dark backgrounds.
-       Saturation stays high so the blue still reads as branded. */
-    --my-trip: 211 75% 48%;
+    /* Brighter my-trip dot so it stays vivid against dark backgrounds. */
+    --my-trip: 211 90% 60%;
 
     /* Transit-specific dark colors */
     --transit-primary: var(--smart-train-green);

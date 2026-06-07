@@ -468,7 +468,7 @@ function ArrivalRow({
           {arrival.tripNumber}
         </span>
         {isRiding && (
-          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-my-trip text-white text-[10px] font-bold uppercase tracking-wider leading-none">
+          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-my-trip-background text-white text-[10px] font-bold uppercase tracking-wider leading-none">
             {t("stationInfo.riding")}
           </span>
         )}

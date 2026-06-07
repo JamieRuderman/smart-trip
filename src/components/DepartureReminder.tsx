@@ -603,7 +603,7 @@ export function DepartureReminder({
         <Button
           onClick={handleGoClick}
           aria-label={t("focusedTrip.go")}
-          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip text-white shadow-sm hover:bg-my-trip/90 active:bg-my-trip/90"
+          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip-background text-white shadow-sm hover:bg-my-trip-background/90 active:bg-my-trip-background/90"
         >
           <TripIcon className="h-5 w-5" aria-hidden="true" />
           <span>{t("focusedTrip.go")}</span>
@@ -738,7 +738,7 @@ export function DepartureReminder({
         <Button
           type="button"
           onClick={() => void handleSet()}
-          className="w-full h-11 bg-my-trip text-white hover:bg-my-trip/90"
+          className="w-full h-11 bg-my-trip-background text-white hover:bg-my-trip-background/90"
         >
           {t("departureReminder.setReminderConfirm")}
         </Button>

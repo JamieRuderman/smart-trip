@@ -184,7 +184,7 @@ export function useTripProgress({
   const headerBg = isEnded
     ? "bg-smart-neutral"
     : isFocused
-      ? "bg-my-trip"
+      ? "bg-my-trip-background"
       : stateBg[currentAccent === "future" && isNextTrip ? "ontime" : currentAccent];
 
   // ── Next stop target & distances ──────────────────────────────────────────

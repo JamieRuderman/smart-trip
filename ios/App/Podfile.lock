@@ -19,6 +19,8 @@ PODS:
     - Capacitor
   - CapacitorStatusBar (8.0.2):
     - Capacitor
+  - CapgoCapacitorAlarm (8.1.2):
+    - Capacitor
   - IONGeolocationLib (2.0.0)
 
 DEPENDENCIES:
@@ -32,6 +34,7 @@ DEPENDENCIES:
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
+  - "CapgoCapacitorAlarm (from `../../node_modules/@capgo/capacitor-alarm`)"
 
 SPEC REPOS:
   trunk:
@@ -58,6 +61,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
+  CapgoCapacitorAlarm:
+    :path: "../../node_modules/@capgo/capacitor-alarm"
 
 SPEC CHECKSUMS:
   Capacitor: 22e541237135648c9aa736232bb4d2eec35fddcb
@@ -70,8 +75,9 @@ SPEC CHECKSUMS:
   CapacitorLocalNotifications: 2615aa008f608b95d3921a778ee1988abf1e6148
   CapacitorSplashScreen: 4b46c72298db552b3c57ce021ef028b6dc7f1fa7
   CapacitorStatusBar: 01d5763b4ed720de5ce2edbc938de6a98f4c8f32
+  CapgoCapacitorAlarm: 0fef7b0f7a1a651bcf359423d576c1c6058610fc
   IONGeolocationLib: a5e40b54edc2ee9902036eda5aaa41ddf07bb68d
 
-PODFILE CHECKSUM: 622884ae780226c2407322d89e20d7ebc8482221
+PODFILE CHECKSUM: b2d79b876bbd5cc028008c2dfa36d3bae48d42e4
 
 COCOAPODS: 1.16.2

@@ -64,7 +64,7 @@ export function TrainMarker({
     : isDelayed
       ? TRAIN_COLORS.delayed
       : userRiding
-        ? TOKEN.userLocation
+        ? TOKEN.myTrip
         : TRAIN_COLORS.onTime;
 
   const label = train.tripNumber != null ? String(train.tripNumber) : "•";
@@ -127,7 +127,7 @@ export function TrainMarker({
           strokeDasharray={TOKEN.trainSelectedDash}
         />
       )}
-      {userRiding && accent !== TOKEN.userLocation && (
+      {userRiding && accent !== TOKEN.myTrip && (
         // Small blue badge in the lower-right of the marker — used when the
         // accent stays gold/gray (delayed/canceled) so the riding signal is
         // still visible. Skipped when the whole marker is already blue.
@@ -135,7 +135,7 @@ export function TrainMarker({
           cx={TOKEN.trainInnerR * 0.7}
           cy={TOKEN.trainInnerR * 0.7}
           r={TOKEN.userOnTrainR}
-          fill={TOKEN.userLocation}
+          fill={TOKEN.myTrip}
           stroke={TOKEN.stationFill}
           strokeWidth={TOKEN.userOnTrainStroke}
         />

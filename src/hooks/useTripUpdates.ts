@@ -336,6 +336,19 @@ export interface TripRealtimeStatusMaps {
  * Delay detection: 511 always sends departureDelay: 0 and only shifts departure.time,
  * so we match each RT update to a static trip via startTime and compute the delay
  * by diffing the live departure.time against the static scheduled time.
+ *
+ * TODO(trip-matching): clean this up soon. We currently match RT→static by
+ * origin departure time ("HH:MM") only. The canonical GTFS-RT approach (and
+ * what 511's regional feed supports — verified: realtime trip_update.trip.trip_id
+ * matches static trips.txt trip_id, see scripts/transit/captureRealtime.ts) is:
+ *   1. direct match on trip_id,
+ *   2. verify the service day via start_date against calendar/calendar_dates,
+ *   3. anchor with the stop_time_update stop_id sequence + scheduled times,
+ *   4. fall back to route_id + direction_id + start_date + start_time,
+ *   5. never key app state on trip_id alone (frequency/duplicated trips need
+ *      date/time context).
+ * Requires threading trip_id (and start_date) through the generated timetable.
+ * Departure-time-only matching is fragile around duplicate/overnight times.
  */
 export function useTripRealtimeStatusMap(
   fromStation: Station | "",

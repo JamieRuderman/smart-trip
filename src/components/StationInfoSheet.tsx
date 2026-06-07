@@ -17,10 +17,13 @@ import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { AppSheet } from "@/components/ui/app-sheet";
 import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
+import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import {
   cardTripState,
   stateCardStyle,
   stateText,
+  ridingCardStyle,
   type TripState,
 } from "@/lib/tripTheme";
 import type { Station } from "@/types/smartSchedule";
@@ -111,6 +114,7 @@ export function StationInfoSheet({
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = getTodayScheduleType();
+  const { focusedTrip } = useStationSelection();
 
   const southboundTrips = useMemo(
     () => getFilteredTrips(WINDSOR, LARKSPUR, scheduleType),
@@ -243,11 +247,26 @@ export function StationInfoSheet({
         className="px-5 pt-2 pb-4 flex items-start justify-between gap-4 shrink-0"
         style={{ backgroundColor: zoneColor }}
       >
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-bold tracking-widest uppercase text-white/80">
             {t("stationInfo.zoneLabel", { zone })}
           </p>
           <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
+          {fromStation && toStation && (
+            // Route summary — mirrors the home "My Trip" card. The current
+            // station collapses to "Here" so the user can see at a glance
+            // whether they're looking at their origin, destination, or an
+            // intermediate stop.
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
+              <span className="whitespace-nowrap">
+                {fromStation === station ? t("stationInfo.here") : fromStation}
+              </span>
+              <span className="font-normal text-white/60">→</span>
+              <span className="whitespace-nowrap">
+                {toStation === station ? t("stationInfo.here") : toStation}
+              </span>
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -305,11 +324,22 @@ export function StationInfoSheet({
                 ridingIsSouthbound != null &&
                 a.tripNumber === ridingTripNumber &&
                 a.isSouthbound === ridingIsSouthbound;
+              // Highlight the user's focused ("Go") train blue here too,
+              // matching the schedule rows and pinned card. Shared predicate:
+              // number + direction + schedule type (the trip number is reused
+              // across directions / weekday-weekend).
+              const isFocused =
+                focusedTripMatchesSchedule(
+                  focusedTrip,
+                  a.isSouthbound,
+                  scheduleType,
+                ) && focusedTrip.tripNumber === a.tripNumber;
               return (
                 <ArrivalRow
                   key={`${a.tripNumber}-${a.isSouthbound}`}
                   arrival={a}
                   isRiding={isRiding}
+                  isFocused={isFocused}
                   onClick={
                     onArrivalClick
                       ? () => onArrivalClick(a.trip, station, a.terminus)
@@ -388,12 +418,16 @@ function FromToColumn({
 function ArrivalRow({
   arrival,
   isRiding = false,
+  isFocused = false,
   onClick,
 }: {
   arrival: Arrival;
   /** True when the user is currently riding this train — adds a "Riding"
-   *  badge and a primary-tinted ring around the row so it stands out. */
+   *  badge and a blue card treatment so it stands out. */
   isRiding?: boolean;
+  /** True when this is the user's focused ("Go") trip — same blue card
+   *  treatment as riding (no "Riding" pill; that's GPS-only). */
+  isFocused?: boolean;
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
@@ -434,7 +468,7 @@ function ArrivalRow({
           {arrival.tripNumber}
         </span>
         {isRiding && (
-          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-user-location text-white text-[10px] font-bold uppercase tracking-wider leading-none">
+          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-my-trip-background text-white text-[10px] font-bold uppercase tracking-wider leading-none">
             {t("stationInfo.riding")}
           </span>
         )}
@@ -478,8 +512,7 @@ function ArrivalRow({
               arrival.isCanceled && "line-through",
             )}
           >
-            {t("stationInfo.toDestinationAt", {
-              destination: arrival.destinationStation,
+            {t("stationInfo.arrivingAt", {
               time: formatTime(arrival.destinationTime),
             })}
           </div>
@@ -496,10 +529,9 @@ function ArrivalRow({
 
   const cardClasses = cn(
     "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
-    stateCardStyle[cardState],
-    // Currently-riding train gets a primary-tinted ring so it pops out of
-    // the list at a glance — overlays whatever state tint is already in use.
-    isRiding && "ring-2 ring-user-location ring-offset-2 ring-offset-background",
+    // Blue == riding / "you're taking this train" — overrides the semantic
+    // state colour for the GPS-riding trip and the user-focused ("Go") trip.
+    isRiding || isFocused ? ridingCardStyle : stateCardStyle[cardState],
   );
 
   return (

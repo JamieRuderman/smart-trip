@@ -8,7 +8,9 @@ import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMapTrains } from "@/hooks/useMapTrains";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { getClosestStation } from "@/lib/stationUtils";
+import { getClosestStation, isSouthbound } from "@/lib/stationUtils";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
+import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -24,6 +26,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
+import { FocusedTripCard } from "./FocusedTripCard";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
@@ -47,6 +50,7 @@ export function TrainScheduleApp() {
     setScheduleType,
     swapStations,
     setSelectedTrip,
+    focusedTrip,
   } = useStationSelection();
 
   const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
@@ -112,6 +116,14 @@ export function TrainScheduleApp() {
   const ridingIsSouthbound =
     ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
 
+  useAutoFocusOnRiding({
+    ridingTripNumber,
+    ridingIsSouthbound,
+    currentTime,
+    homeFromStation: fromStation,
+    homeToStation: toStation,
+  });
+
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.
   const didAutoSelect = useRef(false);
@@ -166,6 +178,23 @@ export function TrainScheduleApp() {
     return param ? getDevFixture(param) : null;
   }, []);
 
+  // Highlight the focused trip's row blue whenever the focused train runs in
+  // the displayed schedule's direction (same shared predicate as the station
+  // sheet and detail sheet), not only when the home leg exactly equals the
+  // focused leg — otherwise the same train reads as focused in the sheets but
+  // not in the list. The row stays in the list (it also appears pinned above);
+  // the duplication is intentional.
+  const focusedTripNumber =
+    fromStation &&
+    toStation &&
+    focusedTripMatchesSchedule(
+      focusedTrip,
+      isSouthbound(fromStation, toStation),
+      scheduleType,
+    )
+      ? focusedTrip.tripNumber
+      : null;
+
   return (
     <div
       className="min-h-[100dvh] bg-card md:bg-background relative"
@@ -200,6 +229,9 @@ export function TrainScheduleApp() {
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
 
+        {/* Focused Trip — pinned above the schedule */}
+        <FocusedTripCard currentTime={currentTime} timeFormat="12h" />
+
         {/* Live Train Map */}
         <MapDiagramPreviewCard />
 
@@ -216,10 +248,12 @@ export function TrainScheduleApp() {
             showAllTrips={showAllTrips}
             onToggleShowAllTrips={toggleShowAllTrips}
             timeFormat="12h"
+            scheduleType={scheduleType}
             selectedTripNumber={selectedTripNumber}
             onSelectTrip={setSelectedTrip}
             ridingTripNumber={ridingTripNumber}
             ridingIsSouthbound={ridingIsSouthbound}
+            focusedTripNumber={focusedTripNumber}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (
@@ -254,6 +288,7 @@ export function TrainScheduleApp() {
           timeFormat="12h"
           isNextTrip={false}
           showFerry={false}
+          scheduleType={scheduleType}
           vehiclePositionOverride={devFixture.vehiclePosition}
         />
       )}

@@ -7,10 +7,11 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
 import type { Station } from "@/types/smartSchedule";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
+import { useFocusedTrip } from "@/hooks/useFocusedTrip";
+import { FOCUSED_TRIP_CHANGED_EVENT, loadFocusedTrip } from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
   type StationSelection,
@@ -26,7 +27,7 @@ interface PersistedState {
   savedAt: number;
 }
 
-const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function loadPersistedState(): PersistedState | null {
   try {
@@ -113,20 +114,33 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   const isSharedLinkRef = useRef(isSharedLinkOnMount);
 
   const [state, setState] = useState<ProviderState>(() => {
-    const persisted = Capacitor.isNativePlatform() ? loadPersistedState() : null;
+    // Source precedence for the selected leg: URL params (shared/bookmarked
+    // links win) → localStorage (last selection, web + native, 7-day expiry) →
+    // the focused trip's own leg (so My Trip and the schedule stay in sync even
+    // if the persisted selection has expired). All three may be absent on a
+    // truly cold start, leaving the empty state.
+    const persisted = loadPersistedState();
+    const focusedOnMount = loadFocusedTrip();
     return {
       fromStation:
         (searchParams.get("from") as Station) ||
-        (persisted ? persisted.fromStation : ""),
+        (persisted ? persisted.fromStation : "") ||
+        (focusedOnMount ? focusedOnMount.fromStation : ""),
       toStation:
         (searchParams.get("to") as Station) ||
-        (persisted ? persisted.toStation : ""),
+        (persisted ? persisted.toStation : "") ||
+        (focusedOnMount ? focusedOnMount.toStation : ""),
+      // Schedule type is derived from the calendar day, never restored from
+      // persistence: a leg saved on a weekday must not force the weekday
+      // schedule when reopened on a weekend (and vice-versa). Restoring it
+      // desynced the schedule list from "today", which — because train numbers
+      // repeat across weekday/weekend — made the pinned trip reconstruct a
+      // different run than the one shown in the list. Shared links still honor
+      // their explicit ?type so the recipient sees the sender's day.
       scheduleType:
         isSharedLinkOnMount && initialUrlType
           ? initialUrlType
-          : persisted
-            ? persisted.scheduleType
-            : todayScheduleType(),
+          : todayScheduleType(),
       selectedTripNumber: !isNaN(initialUrlTripNumber)
         ? initialUrlTripNumber
         : persisted
@@ -166,19 +180,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     setSearchParams,
   ]);
 
-  // Persist state to localStorage on native so it survives app restarts (24h expiry).
+  // Persist the selected leg to localStorage (web + native) so it survives
+  // reloads / app restarts (7-day expiry). The URL still takes precedence on the
+  // next load; this is the fallback when the URL has no from/to params.
   const isInitialRender = useRef(true);
   useEffect(() => {
     if (isInitialRender.current) {
       isInitialRender.current = false;
       return;
     }
-    if (
-      !Capacitor.isNativePlatform() ||
-      !state.fromStation ||
-      !state.toStation
-    )
-      return;
+    if (!state.fromStation || !state.toStation) return;
     savePersistedState(
       state.fromStation,
       state.toStation,
@@ -240,6 +251,38 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
+  const {
+    focusedTrip,
+    focusTrip,
+    setReminder,
+    rescheduleReminder,
+    clearFocusedTrip,
+  } = useFocusedTrip();
+
+  // Clear the focused trip once the train has arrived AND reconcile a
+  // past-fire reminder. loadFocusedTrip() drops the trip record on arrival and
+  // strips the reminder sub-object once reminderAt has passed; this tick just
+  // notices and dispatches so the pinned card / reminder pill re-renders. On
+  // native there's no JS callback when the OS-scheduled alarm fires, so this
+  // tick is the only thing that catches up the UI within ~30s. A 30s cadence
+  // is prompt without busy-work.
+  useEffect(() => {
+    if (!focusedTrip) return;
+    const tick = window.setInterval(() => {
+      if (loadFocusedTrip() === null) {
+        window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+        return;
+      }
+      if (
+        focusedTrip.reminder &&
+        focusedTrip.reminder.reminderAt <= Date.now()
+      ) {
+        window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+      }
+    }, 30_000);
+    return () => window.clearInterval(tick);
+  }, [focusedTrip]);
+
   const value = useMemo<StationSelection>(
     () => ({
       fromStation: state.fromStation,
@@ -251,6 +294,11 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      focusedTrip,
+      focusTrip,
+      setReminder,
+      rescheduleReminder,
+      clearFocusedTrip,
     }),
     [
       state.fromStation,
@@ -262,6 +310,11 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      focusedTrip,
+      focusTrip,
+      setReminder,
+      rescheduleReminder,
+      clearFocusedTrip,
     ],
   );
 

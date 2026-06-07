@@ -18,6 +18,9 @@ interface ScheduleResultsProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   timeFormat: "12h" | "24h";
+  /** Schedule (weekday/weekend) these results belong to — forwarded to each
+   *  row's trip sheet so the reminder/focus control uses it instead of today. */
+  scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
   /** Trip number of the train the user is currently riding (if any) — the
@@ -26,6 +29,10 @@ interface ScheduleResultsProps {
   /** Direction of the riding train — disambiguates trip numbers that are
    *  reused across directions. */
   ridingIsSouthbound?: boolean | null;
+  /** The user's focused ("Go") trip number when it belongs to the displayed
+   *  leg — that row is highlighted blue (it also appears pinned above; we
+   *  intentionally keep it in the list rather than hiding it). */
+  focusedTripNumber?: number | null;
 }
 
 export function ScheduleResults({
@@ -36,10 +43,12 @@ export function ScheduleResults({
   showAllTrips,
   onToggleShowAllTrips,
   timeFormat,
+  scheduleType,
   selectedTripNumber,
   onSelectTrip,
   ridingTripNumber = null,
   ridingIsSouthbound = null,
+  focusedTripNumber = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
   // Direction of the displayed schedule — used to confirm a riding trip
@@ -134,6 +143,11 @@ export function ScheduleResults({
 
             const isRiding =
               ridingMatchesSchedule && trip.trip === ridingTripNumber;
+            // The focused trip stays in the list (also pinned above) and is
+            // highlighted blue. focusedTripNumber is only set when the focus
+            // is on this displayed leg, so a number match is sufficient.
+            const isFocused =
+              focusedTripNumber != null && trip.trip === focusedTripNumber;
             return (
               <TripCard
                 key={trip.trip}
@@ -141,6 +155,7 @@ export function ScheduleResults({
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
                 isRiding={isRiding}
+                isFocused={isFocused}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
@@ -148,6 +163,7 @@ export function ScheduleResults({
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}
+                scheduleType={scheduleType}
                 selectedTripNumber={selectedTripNumber}
                 onSelectTrip={onSelectTrip}
               />

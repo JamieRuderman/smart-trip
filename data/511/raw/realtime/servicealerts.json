@@ -1,0 +1,44 @@
+{
+  "fetchedAt": "2026-05-31T19:12:35.978Z",
+  "agency": "SA",
+  "header": {
+    "gtfsRealtimeVersion": "1.0",
+    "incrementality": "FULL_DATASET",
+    "timestamp": "1780254756"
+  },
+  "entity": [
+    {
+      "id": "SA_4ac01198-9cb9-4eb0-b433-e53d2566fa6d",
+      "alert": {
+        "activePeriod": [
+          {
+            "start": "1780082280"
+          }
+        ],
+        "informedEntity": [
+          {
+            "agencyId": "SA"
+          }
+        ],
+        "cause": "OTHER_CAUSE",
+        "effect": "OTHER_EFFECT",
+        "headerText": {
+          "translation": [
+            {
+              "text": "Final Reminder: Rider Alerts Move to Transit App June 1",
+              "language": "en"
+            }
+          ]
+        },
+        "descriptionText": {
+          "translation": [
+            {
+              "text": "Effective Monday, June 1, 2026, SMART rider alerts will move to the Transit app and Nixle will no longer be used. Download the Transit app and enable notifications to continue receiving updates.  Learn more at sonomamarintrain.org/transitapp.",
+              "language": "en"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

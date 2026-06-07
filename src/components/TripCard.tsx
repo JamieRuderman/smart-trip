@@ -9,7 +9,7 @@ import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
-import { stateText, stateCardStyle, cardTripState } from "@/lib/tripTheme";
+import { stateText, stateCardStyle, ridingCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -26,11 +26,18 @@ interface TripCardProps {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  /** Schedule (weekday/weekend) this row belongs to — forwarded to the trip
+   *  sheet's reminder/focus control so it never infers the type from today. */
+  scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
-  /** When true, the user is currently riding this train — the card gets
-   *  a blue ring and a "Riding" pill near the trip number. */
+  /** When true, the user is currently riding this train (GPS-detected) — the
+   *  card turns blue and shows a "Riding" pill near the trip number. */
   isRiding?: boolean;
+  /** When true, this is the user's focused ("Go") trip — the card turns blue
+   *  (same as riding) so it reads as "the trip I'm taking", overriding the
+   *  delay/cancel/on-time state colour. No "Riding" pill (that's GPS-only). */
+  isFocused?: boolean;
 }
 
 export const TripCard = memo(function TripCard({
@@ -44,9 +51,11 @@ export const TripCard = memo(function TripCard({
   fromStation,
   toStation,
   currentTime,
+  scheduleType,
   selectedTripNumber,
   onSelectTrip,
   isRiding = false,
+  isFocused = false,
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -171,11 +180,10 @@ export const TripCard = memo(function TripCard({
           "flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
-          stateCardStyle[cardState],
-          // Riding indicator — blue ring overlays whatever state tint the
-          // row already has so a delayed/canceled/on-time train can still
-          // be recognized as the one the user is on.
-          isRiding && "ring-2 ring-user-location ring-offset-2 ring-offset-background",
+          // Blue == "you're on/taking this train" and overrides the semantic
+          // state colour (green/gold/red). Applies to the GPS-riding trip and
+          // the user-focused ("Go") trip alike.
+          isRiding || isFocused ? ridingCardStyle : stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -198,7 +206,7 @@ export const TripCard = memo(function TripCard({
         />
         {isRiding && (
           <span
-            className="ml-1 mr-2 shrink-0 self-center px-1.5 py-0.5 rounded-md bg-user-location text-white text-[10px] font-bold uppercase tracking-wider leading-none"
+            className="ml-1 mr-2 shrink-0 self-center px-1.5 py-0.5 rounded-md bg-my-trip-background text-white text-[10px] font-bold uppercase tracking-wider leading-none"
             aria-label={t("tripCard.ridingAria", "Currently riding this train")}
           >
             {t("stationInfo.riding")}
@@ -341,6 +349,8 @@ export const TripCard = memo(function TripCard({
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}
           showFerry={showFerry}
+          isFocused={isFocused || isRiding}
+          scheduleType={scheduleType}
         />
       )}
     </>

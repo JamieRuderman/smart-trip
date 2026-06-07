@@ -4,7 +4,7 @@
  * Layout has two sibling SVG groups:
  *
  *   1. Zoomable group — wraps the path, zone segments, station dots, train
- *      markers, user-location dot, and ferry glyph. Pan/zoom transform on
+ *      markers, my-trip dot, and ferry glyph. Pan/zoom transform on
  *      this `<g>` makes everything inside scale together.
  *   2. Label layer — station labels, zone labels, and ferry text. Lives
  *      outside the zoomable group so its font sizes can stay at constant
@@ -180,7 +180,7 @@ export function SmartLineDiagram({
         }}
       >
         {/* Zoomable group — track, zone segments, station dots, train
-            markers, user-location dot, ferry glyph. */}
+            markers, my-trip dot, ferry glyph. */}
         <g transform={transform}>
           {showFerry && (
             <g opacity={0.9}>

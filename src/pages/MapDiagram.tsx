@@ -6,10 +6,12 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
+import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
 import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
 import {
   SHEET_ENTER_DELAY_MS,
@@ -48,6 +50,7 @@ export default function MapDiagram() {
     toStation: toSelection,
     setFromStation,
     setToStation,
+    focusedTrip,
   } = useStationSelection();
   const fromStation =
     fromSelection && stationIndexMap[fromSelection] != null
@@ -84,7 +87,7 @@ export default function MapDiagram() {
   const ridingIsSouthbound =
     ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
   const userStation = useMemo<Station | null>(() => {
-    // While riding, the user-location dot rides the train marker — suppress
+    // While riding, the my-trip dot rides the train marker — suppress
     // the duplicate station-anchored dot so we don't show two blue dots.
     if (ridingTrainKey || userLat == null || userLng == null) return null;
     return getClosestStation(userLat, userLng);
@@ -95,6 +98,17 @@ export default function MapDiagram() {
   const nowSeconds = useNow(15_000);
   const nowMinute = Math.floor(nowSeconds / 60);
   const currentTime = useMemo(() => new Date(nowMinute * 60_000), [nowMinute]);
+
+  // Promote a GPS-detected ride to the focused / "Going" state — same hook
+  // used on the home page, so the auto-focus fires regardless of which page
+  // the user is on when their ride is detected.
+  useAutoFocusOnRiding({
+    ridingTripNumber,
+    ridingIsSouthbound,
+    currentTime,
+    homeFromStation: fromSelection,
+    homeToStation: toSelection,
+  });
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
   const [stationSheet, setStationSheet] = useState<Station | null>(null);
@@ -315,6 +329,12 @@ export default function MapDiagram() {
           timeFormat="12h"
           isNextTrip={true}
           showFerry={false}
+          isFocused={focusedTripMatchesSchedule(
+            focusedTrip,
+            detailTrip.toStation === LARKSPUR,
+            getTodayScheduleType(),
+          ) && focusedTrip.tripNumber === detailTrip.trip.trip}
+          scheduleType={getTodayScheduleType()}
           userFromStation={fromStation}
           userToStation={toStation}
         />

@@ -20,6 +20,14 @@ export interface TripDetailSheetProps {
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
   showFerry: boolean;
+  /** When true, this is the user's focused ("Go") / riding trip — the header
+   *  band turns blue to match the blue card style. */
+  isFocused?: boolean;
+  /** Open the reminder lead-time picker on mount (home "My Trip" card → "Add
+   *  reminder" deep-link). */
+  autoOpenReminderPicker?: boolean;
+  /** Schedule (weekday/weekend) the displayed trip belongs to. */
+  scheduleType: "weekday" | "weekend";
   /** Dev-only: override the live vehicle position hook result (used by devFixtures). */
   vehiclePositionOverride?: VehiclePositionMatch | null;
   /** User's selected origin/destination, used to mark matching intermediate
@@ -39,6 +47,7 @@ export interface TripDetailSheetProps {
 export function TripDetailSheet({
   isOpen,
   onClose,
+  isFocused = false,
   ...rest
 }: TripDetailSheetProps) {
   const { t } = useTranslation();
@@ -54,6 +63,7 @@ export function TripDetailSheet({
     realtimeStatus: rest.realtimeStatus,
     isNextTrip: rest.isNextTrip,
     isOpen,
+    isFocused,
     vehiclePositionOverride: rest.vehiclePositionOverride,
   });
 
@@ -82,6 +92,7 @@ export function TripDetailSheet({
         onClose={onClose}
         progress={progress}
         showCloseButton={!isMobile}
+        isFocused={isFocused}
       />
     </AppSheet>
   );

@@ -11,6 +11,17 @@ function fetchAlerts(): Promise<GtfsRtAlertsResponse> {
   return fetchGtfsRtJson<GtfsRtAlertsResponse>("/api/gtfsrt/alerts");
 }
 
+/** Drop alerts whose copy plugs SMART's preferred third-party Transit app —
+ *  this is a community project and the user doesn't want to advertise a
+ *  competitor in their own UI. */
+function mentionsCompetingApp(alert: GtfsRtAlert): boolean {
+  const needle = "transit app";
+  return (
+    alert.headerText.toLowerCase().includes(needle) ||
+    alert.descriptionText.toLowerCase().includes(needle)
+  );
+}
+
 /** Convert ALL-CAPS agency text to sentence case for readability. */
 function humanize(text: string): string {
   if (!text) return text;
@@ -152,6 +163,7 @@ export function useServiceAlerts(
 
   const alerts: ServiceAlertData[] =
     query.data?.alerts
+      .filter((alert) => !mentionsCompetingApp(alert))
       .filter((alert) => {
         // No active periods = always active (system-wide standing notice)
         if (alert.activePeriods.length === 0) return true;

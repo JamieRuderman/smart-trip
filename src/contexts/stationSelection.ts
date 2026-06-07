@@ -1,5 +1,11 @@
 import { createContext, useContext } from "react";
 import type { Station } from "@/types/smartSchedule";
+import type { FocusedTrip } from "@/lib/focusedTrip";
+import type {
+  FocusTripInput,
+  ReminderText,
+  SetReminderResult,
+} from "@/hooks/useFocusedTrip";
 
 export interface StationSelection {
   fromStation: Station | "";
@@ -11,6 +17,15 @@ export interface StationSelection {
   swapStations: () => void;
   setScheduleType: (type: "weekday" | "weekend") => void;
   setSelectedTrip: (tripNumber: number | null) => void;
+  focusedTrip: FocusedTrip | null;
+  focusTrip: (input: FocusTripInput) => Promise<void>;
+  setReminder: (
+    leadMinutes: number | null,
+    departureAt: number,
+    text: ReminderText,
+  ) => Promise<SetReminderResult>;
+  rescheduleReminder: (departureAt: number, text: ReminderText) => Promise<void>;
+  clearFocusedTrip: () => Promise<void>;
 }
 
 export const StationSelectionContext = createContext<StationSelection | null>(

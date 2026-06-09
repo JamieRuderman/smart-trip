@@ -8,6 +8,8 @@ import {
   saveFocusedTrip,
   migrateLegacyReminders,
   reconstructFocusedTrip,
+  focusedArrivalInstant,
+  focusedDepartureInstant,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
 } from "./focusedTrip";
@@ -71,6 +73,35 @@ describe("focusedTrip storage", () => {
     saveFocusedTrip(makeFocused());
     saveFocusedTrip(null);
     expect(loadFocusedTrip()).toBeNull();
+  });
+
+  it("round-trips an optional liveActivityId", () => {
+    const f = makeFocused({ liveActivityId: "trip-activity-1" });
+    saveFocusedTrip(f);
+    expect(loadFocusedTrip()).toEqual(f);
+  });
+
+  it("rejects a non-string liveActivityId", () => {
+    const bad = makeFocused() as unknown as Record<string, unknown>;
+    bad.liveActivityId = 123;
+    localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
+    expect(loadFocusedTrip()).toBeNull();
+  });
+});
+
+describe("focusedArrivalInstant / focusedDepartureInstant", () => {
+  it("resolves arrival after departure on the same service date", () => {
+    const f = makeFocused();
+    const dep = focusedDepartureInstant(f);
+    const arr = focusedArrivalInstant(f);
+    expect(dep).not.toBeNull();
+    expect(arr).not.toBeNull();
+    // SAMPLE is a normal (non-overnight) daytime run: arrival is after departure.
+    expect(arr!).toBeGreaterThan(dep!);
+  });
+
+  it("returns null when the trip is no longer in the schedule", () => {
+    expect(focusedArrivalInstant(makeFocused({ tripNumber: 999999 }))).toBeNull();
   });
 });
 

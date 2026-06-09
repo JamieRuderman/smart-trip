@@ -8,7 +8,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUserRiding } from "@/hooks/useUserRiding";
 import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
 import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
-import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { stationIndexMap, getClosestStation, isSouthbound } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
@@ -92,6 +92,29 @@ export default function MapDiagram() {
     if (ridingTrainKey || userLat == null || userLng == null) return null;
     return getClosestStation(userLat, userLng);
   }, [userLat, userLng, ridingTrainKey]);
+
+  // A self-selected ("Go") focused trip should also read as "my train" on the
+  // map — the same blue treatment a focused trip gets in every card — even when
+  // GPS hasn't independently latched the ride. Match the focused run to its
+  // live marker by trip number + direction on today's schedule. GPS riding
+  // still wins (it also drives the position override below); this is the
+  // fallback when only a focus exists.
+  const focusedTrainKey = useMemo<string | null>(() => {
+    if (ridingTrainKey || !focusedTrip) return null;
+    const sb = isSouthbound(focusedTrip.fromStation, focusedTrip.toStation);
+    if (!focusedTripMatchesSchedule(focusedTrip, sb, getTodayScheduleType())) {
+      return null;
+    }
+    const dir = sb ? 0 : 1;
+    const match = trains.find(
+      (tr) => tr.tripNumber === focusedTrip.tripNumber && tr.directionId === dir,
+    );
+    return match?.key ?? null;
+  }, [ridingTrainKey, focusedTrip, trains]);
+
+  // The marker painted blue as "my train". GPS-confirmed riding takes
+  // precedence; otherwise fall back to the self-selected focused trip.
+  const myTrainKey = ridingTrainKey ?? focusedTrainKey;
 
   // Stable Date that only advances on minute boundaries, so child sheets'
   // memos (arrivals/ETA) don't invalidate on every parent render.
@@ -291,9 +314,9 @@ export default function MapDiagram() {
           fromStation={fromStation}
           toStation={toStation}
           userStation={userStation}
-          userRidingTrainKey={ridingTrainKey}
-          userLat={userLat}
-          userLng={userLng}
+          userRidingTrainKey={myTrainKey}
+          userLat={ridingTrainKey ? userLat : null}
+          userLng={ridingTrainKey ? userLng : null}
           className="min-h-full"
         />
       </div>

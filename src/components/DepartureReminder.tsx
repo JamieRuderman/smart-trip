@@ -22,6 +22,7 @@ import {
   focusedDepartureInstant,
   focusedTripMatchesSchedule,
 } from "@/lib/focusedTrip";
+import { derivePhase } from "@/lib/native/liveActivity";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,9 @@ interface DepartureReminderProps {
   arrivalTime: string;
   /** Live arrival override; takes precedence when set. */
   realtimeArrivalTime?: string | null;
+  /** Live delay at fromStation in whole minutes (undefined/null == on time).
+   *  Drives the Live Activity status pill; not used for reminder math. */
+  delayMinutes?: number | null;
   currentTime: Date;
   /** "12h" — controls the time format shown in the active reminder pill. */
   timeFormat: "12h" | "24h";
@@ -117,6 +121,7 @@ export function DepartureReminder({
   liveDepartureTime,
   arrivalTime,
   realtimeArrivalTime,
+  delayMinutes,
   currentTime,
   timeFormat,
   scheduleType,
@@ -155,6 +160,7 @@ export function DepartureReminder({
     focusTrip,
     setReminder,
     rescheduleReminder,
+    updateLiveActivity,
     clearFocusedTrip,
   } = useStationSelection();
 
@@ -352,6 +358,42 @@ export function DepartureReminder({
     void rescheduleReminder(reminderDepartureAt, buildText(focusedReminderLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderDepartureAt, focusedExactLeg, focusedReminderAt, focusedReminderLead]);
+
+  // Live Activity sync: keep the lock-screen / Dynamic Island countdown
+  // aligned with the live departure/arrival and delay — INDEPENDENT of any
+  // armed reminder (the activity tracks the focused train itself). Same
+  // exact-leg guard as the reminder drift above, plus a today's-service guard:
+  // only on today's service are this view's departureAt/arrivalAt anchored to
+  // the right day (for a future-service focus the start already seeded correct
+  // serviceDate-anchored targets, and there's no realtime to track yet).
+  // `activityPhase` is in the deps so crossing departure pushes exactly one
+  // update that flips the headline from the departure to the arrival
+  // countdown; the hook dedupes unchanged content, so the re-fires from the
+  // clock tick / RT poll are free.
+  const focusedServiceIsToday =
+    isThisTripFocused &&
+    focusedTrip != null &&
+    focusedTrip.scheduleType === getTodayScheduleType(currentTime);
+  const activityPhase = derivePhase({
+    departureEpochMs: reminderDepartureAt,
+    now: currentTime.getTime(),
+  });
+  useEffect(() => {
+    if (!focusedExactLeg || !focusedServiceIsToday) return;
+    void updateLiveActivity({
+      departureAt: reminderDepartureAt,
+      arrivalAt,
+      delayMinutes: delayMinutes ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    focusedExactLeg,
+    focusedServiceIsToday,
+    reminderDepartureAt,
+    arrivalAt,
+    delayMinutes,
+    activityPhase,
+  ]);
 
   const closePicker = useCallback(() => {
     setPickerOpen(false);

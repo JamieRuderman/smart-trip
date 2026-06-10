@@ -5,6 +5,7 @@ import {
   focusedArrivalInstant,
   focusedDepartureInstant,
   loadFocusedTrip,
+  reconstructFocusedTrip,
   saveFocusedTrip,
   type FocusedTrip,
   type FocusedTripReminder,
@@ -24,6 +25,12 @@ import {
   updateTripActivity,
   type TripActivityAttributes,
 } from "@/lib/native/liveActivity";
+import {
+  deregisterPushActivity,
+  isLiveActivityPushEnabled,
+  startAndRegisterPushActivity,
+} from "@/lib/native/liveActivityPush";
+import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 import { isSouthbound } from "@/lib/stationUtils";
 import { reminderIdFor } from "@/lib/notificationId";
 import { logger } from "@/lib/logger";
@@ -76,11 +83,15 @@ function sameFocusIdentity(
 const lastSentActivityContent = new Map<string, string>();
 
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
- *  Island), if one is running. Safe no-op everywhere else. */
+ *  Island), if one is running. Also deregisters it from the push backend when
+ *  push updates are enabled. Safe no-op everywhere else. */
 async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
+  if (isLiveActivityPushEnabled()) {
+    await deregisterPushActivity(focused.liveActivityId);
+  }
 }
 
 /**
@@ -117,7 +128,32 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isEnded: false,
     now: Date.now(),
   });
-  const { started } = await startTripActivity(id, attributes, content);
+  // Push-enabled builds register the trip + APNs token with the backend so the
+  // countdown is corrected while the phone is locked; everything else uses the
+  // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
+  let started: boolean;
+  if (isLiveActivityPushEnabled()) {
+    const trip = reconstructFocusedTrip(saved);
+    const registration: LiveActivityRegistration | null = trip
+      ? {
+          id,
+          tripNumber: saved.tripNumber,
+          serviceDate: saved.serviceDate,
+          fromStation: saved.fromStation,
+          toStation: saved.toStation,
+          direction: attributes.direction,
+          scheduledDeparture: trip.departureTime,
+          scheduledArrival: trip.arrivalTime,
+          departureEpochMs: departureAt,
+          arrivalEpochMs: arrivalAt,
+        }
+      : null;
+    started = registration
+      ? (await startAndRegisterPushActivity(registration, attributes, content)).started
+      : (await startTripActivity(id, attributes, content)).started;
+  } else {
+    started = (await startTripActivity(id, attributes, content)).started;
+  }
   if (!started) return;
   lastSentActivityContent.set(id, JSON.stringify(content));
   const latest = loadFocusedTrip();

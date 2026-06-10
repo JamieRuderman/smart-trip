@@ -1,0 +1,191 @@
+import { describe, it, expect } from "vitest";
+import {
+  computeLiveTripStatus,
+  decidePushAction,
+  type FeedTripUpdate,
+} from "./_liveActivityStatus.js";
+import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
+
+// Real SMART platform stop_ids from the generated map: Larkspur northbound =
+// "71011", San Rafael northbound = "71021". Using northbound platforms so they
+// resolve against a northbound registration.
+const FROM_STOP = "71011"; // Larkspur / northbound
+const TO_STOP = "71021"; // San Rafael / northbound
+
+const SCHED_DEP_MS = Date.parse("2026-06-09T08:30:00-07:00");
+const SCHED_ARR_MS = Date.parse("2026-06-09T08:50:00-07:00");
+
+const REG: LiveActivityRegistration = {
+  id: "trip-7-2026-06-09",
+  tripNumber: 7,
+  serviceDate: "2026-06-09",
+  fromStation: "Larkspur",
+  toStation: "San Rafael",
+  direction: "northbound",
+  scheduledDeparture: "08:30",
+  scheduledArrival: "08:50",
+  departureEpochMs: SCHED_DEP_MS,
+  arrivalEpochMs: SCHED_ARR_MS,
+};
+
+function feed(opts: {
+  depUnix: number;
+  arrUnix?: number;
+  canceled?: boolean;
+}): FeedTripUpdate[] {
+  return [
+    {
+      scheduleRelationship: opts.canceled ? "CANCELED" : "SCHEDULED",
+      stopTimeUpdates: [
+        { stopId: FROM_STOP, departureTime: opts.depUnix },
+        ...(opts.arrUnix != null
+          ? [{ stopId: TO_STOP, arrivalTime: opts.arrUnix }]
+          : []),
+      ],
+    },
+  ];
+}
+
+describe("computeLiveTripStatus", () => {
+  it("returns on-time status (delay 0) when live matches scheduled", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: SCHED_DEP_MS / 1000, arrUnix: SCHED_ARR_MS / 1000 }),
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(status).not.toBeNull();
+    expect(status!.delayMinutes).toBe(0);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+    expect(status!.isEnded).toBe(false);
+  });
+
+  it("computes a delay and shifts both targets when the live departure is late", () => {
+    const lateDep = SCHED_DEP_MS / 1000 + 5 * 60; // +5 min
+    const lateArr = SCHED_ARR_MS / 1000 + 5 * 60;
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: lateDep, arrUnix: lateArr }),
+      now: SCHED_DEP_MS,
+    });
+    expect(status!.delayMinutes).toBe(5);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 5 * 60_000);
+    expect(status!.arrivalEpochMs).toBe(lateArr * 1000);
+  });
+
+  it("falls back to scheduled-arrival + delay when the feed omits arrival", () => {
+    const lateDep = SCHED_DEP_MS / 1000 + 3 * 60;
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: lateDep }),
+      now: SCHED_DEP_MS,
+    });
+    expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 3 * 60_000);
+  });
+
+  it("does not count an early live departure as negative delay", () => {
+    const earlyDep = SCHED_DEP_MS / 1000 - 2 * 60;
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: earlyDep }),
+      now: SCHED_DEP_MS - 5 * 60_000,
+    });
+    expect(status!.delayMinutes).toBe(0);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+  });
+
+  it("flags cancellation", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: SCHED_DEP_MS / 1000, canceled: true }),
+      now: SCHED_DEP_MS,
+    });
+    expect(status!.isCanceled).toBe(true);
+  });
+
+  it("marks ended once now is past live arrival", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: SCHED_DEP_MS / 1000, arrUnix: SCHED_ARR_MS / 1000 }),
+      now: SCHED_ARR_MS + 1000,
+    });
+    expect(status!.isEnded).toBe(true);
+  });
+
+  it("returns null when no update resolves to the boarding station/direction", () => {
+    const wrongDirection: FeedTripUpdate[] = [
+      { stopTimeUpdates: [{ stopId: "71012", departureTime: SCHED_DEP_MS / 1000 }] }, // Larkspur SOUTHbound
+    ];
+    expect(
+      computeLiveTripStatus({ reg: REG, updates: wrongDirection, now: SCHED_DEP_MS }),
+    ).toBeNull();
+  });
+
+  it("ignores a departure far outside the match window", () => {
+    const farOff = SCHED_DEP_MS / 1000 + 4 * 60 * 60; // +4h
+    expect(
+      computeLiveTripStatus({ reg: REG, updates: feed({ depUnix: farOff }), now: SCHED_DEP_MS }),
+    ).toBeNull();
+  });
+});
+
+describe("decidePushAction", () => {
+  const base = {
+    departureEpochMs: SCHED_DEP_MS,
+    arrivalEpochMs: SCHED_ARR_MS,
+    delayMinutes: 0,
+    isCanceled: false,
+    isEnded: false,
+  };
+
+  it("pushes update when there is no prior send", () => {
+    const { action, phase } = decidePushAction({
+      status: base,
+      lastSent: null,
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(action).toBe("update");
+    expect(phase).toBe("pre-departure");
+  });
+
+  it("skips when delay + phase are unchanged", () => {
+    const { action } = decidePushAction({
+      status: base,
+      lastSent: { delayMinutes: 0, phase: "pre-departure", isEnded: false },
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(action).toBe("none");
+  });
+
+  it("pushes update when the delay changed", () => {
+    const { action } = decidePushAction({
+      status: { ...base, delayMinutes: 4 },
+      lastSent: { delayMinutes: 0, phase: "pre-departure", isEnded: false },
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(action).toBe("update");
+  });
+
+  it("pushes update on the departure→arrival phase flip even at the same delay", () => {
+    const { action, phase } = decidePushAction({
+      status: base,
+      lastSent: { delayMinutes: 0, phase: "pre-departure", isEnded: false },
+      now: SCHED_DEP_MS + 1000,
+    });
+    expect(phase).toBe("en-route");
+    expect(action).toBe("update");
+  });
+
+  it("ends once when arrived, then goes quiet", () => {
+    const ended = { ...base, isEnded: true };
+    expect(
+      decidePushAction({ status: ended, lastSent: null, now: SCHED_ARR_MS + 1000 }).action,
+    ).toBe("end");
+    expect(
+      decidePushAction({
+        status: ended,
+        lastSent: { delayMinutes: 0, phase: "en-route", isEnded: true },
+        now: SCHED_ARR_MS + 1000,
+      }).action,
+    ).toBe("none");
+  });
+});

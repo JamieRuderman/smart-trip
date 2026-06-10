@@ -1,0 +1,64 @@
+import { describe, it, expect } from "vitest";
+import {
+  isLiveActivityRegistration,
+  isLiveActivityTokenPayload,
+} from "./liveActivityPushTypes";
+
+const VALID_REG = {
+  id: "trip-7-2026-06-09",
+  tripNumber: 7,
+  serviceDate: "2026-06-09",
+  fromStation: "Larkspur",
+  toStation: "Santa Rosa Downtown",
+  direction: "northbound",
+  scheduledDeparture: "08:30",
+  scheduledArrival: "09:45",
+  departureEpochMs: 1_780_000_000_000,
+  arrivalEpochMs: 1_780_004_500_000,
+};
+
+describe("isLiveActivityRegistration", () => {
+  it("accepts a well-formed registration", () => {
+    expect(isLiveActivityRegistration(VALID_REG)).toBe(true);
+  });
+
+  it("rejects a bad direction", () => {
+    expect(isLiveActivityRegistration({ ...VALID_REG, direction: "east" })).toBe(false);
+  });
+
+  it("rejects a malformed serviceDate", () => {
+    expect(isLiveActivityRegistration({ ...VALID_REG, serviceDate: "2026/06/09" })).toBe(false);
+  });
+
+  it.each(["id", "tripNumber", "departureEpochMs", "arrivalEpochMs"])(
+    "rejects when %s is missing",
+    (key) => {
+      const bad = { ...VALID_REG } as Record<string, unknown>;
+      delete bad[key];
+      expect(isLiveActivityRegistration(bad)).toBe(false);
+    },
+  );
+
+  it("rejects non-objects", () => {
+    expect(isLiveActivityRegistration(null)).toBe(false);
+    expect(isLiveActivityRegistration("x")).toBe(false);
+  });
+});
+
+describe("isLiveActivityTokenPayload", () => {
+  it("accepts a well-formed token payload", () => {
+    expect(
+      isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token: "abc" }),
+    ).toBe(true);
+  });
+
+  it("rejects an empty token", () => {
+    expect(
+      isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token: "" }),
+    ).toBe(false);
+  });
+
+  it("rejects a missing id", () => {
+    expect(isLiveActivityTokenPayload({ activityId: "sys-1", token: "abc" })).toBe(false);
+  });
+});

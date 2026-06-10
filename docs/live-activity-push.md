@@ -54,7 +54,7 @@ You get a `.p8` file + a 10-char **Key ID**; the **Team ID** is `6YH3537ZY9`.
 | `APNS_PRIVATE_KEY` | the `.p8` PEM contents (newlines as literal `\n` are accepted) |
 | `APNS_WIDGET_BUNDLE_ID` | the widget bundle id |
 | `APNS_HOST` | optional; defaults to `api.push.apple.com` (use `api.sandbox.push.apple.com` for dev builds) |
-| `CRON_SECRET` | shared secret; Vercel sends it as `Authorization: Bearer …` to the cron |
+| `CRON_SECRET` | shared secret; the scheduler must send it as `Authorization: Bearer …` |
 | `PUBLIC_BASE_URL` | optional; the cron's base for its internal `/api/gtfsrt/tripupdates` fetch (falls back to `VERCEL_URL`) |
 
 Redis is already wired via the existing `KV_REST_API_URL` / `KV_REST_API_TOKEN`
@@ -64,10 +64,31 @@ Redis is already wired via the existing `KV_REST_API_URL` / `KV_REST_API_TOKEN`
 Build the native app with `VITE_LIVE_ACTIVITY_PUSH=1`. Until then the app uses
 the Phase 1 local-only start (`startTripActivity`), so nothing registers.
 
-### 5. Cron
-`vercel.json` schedules `/api/liveactivity/push` every minute. **Minute-level
-crons require a Vercel Pro plan**; on Hobby, lengthen the schedule (the countdown
-still ticks natively between pushes).
+### 5. Schedule the cron — **stay on the Vercel free (Hobby) plan**
+`/api/liveactivity/push` is an ordinary, `CRON_SECRET`-protected function, so any
+scheduler can drive it. **Do not use Vercel's built-in cron on Hobby:** it caps
+cron jobs at *once per day* and an every-minute `crons` entry in `vercel.json`
+**fails the deploy** ("Hobby accounts are limited to daily cron jobs"). That's
+why there is no `crons` block in `vercel.json`.
+
+Instead point a **free external scheduler** at the endpoint:
+
+- **[cron-job.org](https://cron-job.org/en/)** (simplest — no code): add a job
+  hitting `https://<your-app>/api/liveactivity/push` every 1 minute, with a
+  custom header `Authorization: Bearer <CRON_SECRET>`. Free tier allows
+  once-per-minute.
+- **[Cloudflare Workers Cron](https://developers.cloudflare.com/workers/configuration/cron-triggers/)**
+  (free, reliable, 1-min): a few-line Worker that `fetch`es the endpoint with the
+  same header on a `* * * * *` trigger.
+
+Frequency is a cost/latency knob, not a correctness one: the native
+`Text(timerInterval:)` keeps ticking between pushes, so **every 2–3 minutes** is
+plenty (a newly-appearing delay reflects on the locked screen within that window)
+and keeps you well inside free quotas. SMART delays don't change minute-to-minute.
+
+> If you later move to Vercel **Pro**, you can instead add a `crons` block to
+> `vercel.json` (`{ "path": "/api/liveactivity/push", "schedule": "* * * * *" }`)
+> and drop the external scheduler — the endpoint is identical either way.
 
 ## Files
 

@@ -131,20 +131,26 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
- * Boot/foreground reconciliation: end any OS-side Live Activity that no longer
- * belongs to the current focus — a stale focus auto-cleared by
+ * Boot/foreground reconciliation, two-way. (1) End any OS-side Live Activity
+ * that no longer belongs to the current focus — a stale focus auto-cleared by
  * `loadFocusedTrip` (arrival passed, timetable changed) leaves its activity
  * orphaned on the lock screen since the storage layer can't reach the plugin.
- * Instant no-op off-iOS (`listTripActivities` returns []). Call alongside
- * `bootFocusedTrip`.
+ * (2) Self-heal the opposite gap: a focus with NO committed activity (start
+ * failed, app killed between start and commit, or Live Activities were
+ * disabled when the trip was focused and enabled since) gets a fresh start —
+ * `startActivityForFocus` re-gates internally, so attempting every boot is
+ * safe. A user-dismissed activity is NOT respawned: swiping it away leaves
+ * `liveActivityId` committed, which skips the heal. Instant no-op off-iOS.
+ * Call alongside `bootFocusedTrip`.
  */
 export async function reconcileTripActivities(): Promise<void> {
+  const focused = loadFocusedTrip();
+  const keep = focused?.liveActivityId;
   const ids = await listTripActivities();
-  if (ids.length === 0) return;
-  const keep = loadFocusedTrip()?.liveActivityId;
   await Promise.all(
     ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
   );
+  if (focused && !focused.liveActivityId) await startActivityForFocus(focused);
 }
 
 /**

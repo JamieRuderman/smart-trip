@@ -44,6 +44,9 @@ export interface TripActivityContentState {
   remainingStops: number | null;
   /** Humanized status pill, e.g. "On time" | "+4 min" | "Cancelled". */
   statusText: string;
+  /** Explicit cancellation flag — the widget keys its visual treatment (red
+   *  pill, no countdown) on this, never on parsing `statusText`. */
+  isCanceled: boolean;
   isEnded: boolean;
   /** ActivityKit staleDate (epoch ms): when the OS should mark the activity
    *  visually stale because JS may not have corrected it (phone locked). */
@@ -175,6 +178,7 @@ export function buildContentState(args: {
       isEnded: args.isEnded,
       phase,
     }),
+    isCanceled: args.isCanceled,
     isEnded: args.isEnded,
     staleAfterEpochMs:
       phase === "pre-departure" ? args.departureEpochMs : args.arrivalEpochMs,
@@ -214,6 +218,7 @@ export function encodeContentState(
     nextStop: c.nextStop ?? "",
     remainingStops: c.remainingStops == null ? "" : String(c.remainingStops),
     statusText: c.statusText,
+    isCanceled: String(c.isCanceled),
     isEnded: String(c.isEnded),
     ...(c.staleAfterEpochMs != null
       ? { staleAfterEpochMs: String(c.staleAfterEpochMs) }

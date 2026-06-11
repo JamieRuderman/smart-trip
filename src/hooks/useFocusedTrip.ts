@@ -36,6 +36,7 @@ import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { reminderIdFor } from "@/lib/notificationId";
 import { logger } from "@/lib/logger";
+import i18n from "@/lib/i18n";
 
 function notifyChange(): void {
   if (typeof window === "undefined") return;
@@ -265,6 +266,12 @@ async function armAndPersistReminder(
   const alarm = await scheduleLeaveAlarm({
     label: reminder.title,
     fireAt: reminder.reminderAt,
+    // Module code (not a component) — use the global i18n instance for the
+    // alert's button labels; the title/body already arrive localized.
+    buttons: {
+      stop: i18n.t("departureReminder.alarmStop"),
+      viewTrip: i18n.t("departureReminder.alarmViewTrip"),
+    },
   });
   const alarmId = alarm.scheduled ? alarm.alarmId : undefined;
 

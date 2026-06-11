@@ -1,55 +1,87 @@
-import { Capacitor } from "@capacitor/core";
-import { CapgoAlarm } from "@capgo/capacitor-alarm";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { logger } from "../logger";
 
 /**
- * Thin, mockable wrapper around `@capgo/capacitor-alarm` for the "Leave Alarm"
- * feature. We deliberately scope true alarms to **iOS only** (Apple AlarmKit,
- * iOS 26+). On Android the plugin merely hands off to the system Clock app via
- * an AlarmClock intent — it can't be cancelled programmatically and pops the
- * clock UI — so it doesn't fit our auto-scheduled, per-trip, cancellable model.
- * Android (and web) therefore stay on the existing local-notification path.
+ * Thin, mockable wrapper around the app's LOCAL `LeaveAlarm` Capacitor plugin
+ * (ios/App/App/LeaveAlarm/) for the "Leave Alarm" feature. We deliberately
+ * scope true alarms to **iOS only** (Apple AlarmKit, iOS 26+); Android and web
+ * stay on the existing local-notification path.
+ *
+ * The local plugin replaced `@capgo/capacitor-alarm`, whose JS API could only
+ * target the NEXT occurrence of an hour/minute — so any reminder more than
+ * ~24h out (e.g. a weekend trip focused midweek) silently fell back to a
+ * notification. Scheduling is now date-based (any future instant), and the
+ * alert carries the app's own presentation: brand tint, a stop button, and a
+ * "View trip" secondary button that opens the app.
  *
  * AlarmKit makes the leave reminder break through Silent Mode / Focus, instead
- * of a notification that's easy to miss. Keeping the vendor API behind this
+ * of a notification that's easy to miss. Keeping the plugin API behind this
  * module means the focused-trip scheduler and its unit tests depend on our
- * stable surface, and any upstream naming drift is isolated here.
+ * stable surface, and any native-side drift is isolated here.
  */
 
 export type AlarmAuthStatus = "authorized" | "denied" | "unavailable";
+
+/** The local plugin's surface (see ios/App/App/LeaveAlarm/LeaveAlarmPlugin.swift).
+ *  Exported for tests. */
+export interface LeaveAlarmNativePlugin {
+  isAvailable(): Promise<{ value: boolean }>;
+  checkAuthorization(): Promise<{ status: string }>;
+  requestAuthorization(): Promise<{ status: string }>;
+  schedule(options: {
+    /** Absolute fire instant, epoch ms — any future date. */
+    fireAtMs: number;
+    /** Alert title (already localized by the caller). */
+    title: string;
+    stopButtonTitle?: string;
+    /** When set, adds a secondary button that opens the app. */
+    openButtonTitle?: string;
+  }): Promise<{ id: string }>;
+  cancel(options: { id: string }): Promise<void>;
+}
+
+const LeaveAlarm = registerPlugin<LeaveAlarmNativePlugin>("LeaveAlarm");
 
 /** Whether a real AlarmKit alarm can be scheduled on this device. iOS-only. */
 export async function isAlarmAvailable(): Promise<boolean> {
   if (Capacitor.getPlatform() !== "ios") return false;
   try {
-    const info = await CapgoAlarm.getOSInfo();
-    return info.supportsNativeAlarms === true;
+    const { value } = await LeaveAlarm.isAvailable();
+    return value === true;
   } catch (error) {
-    logger.warn("CapgoAlarm.getOSInfo failed", error);
+    logger.warn("LeaveAlarm.isAvailable failed", error);
     return false;
   }
+}
+
+function toAuthStatus(status: string): AlarmAuthStatus {
+  if (status === "authorized") return "authorized";
+  if (status === "unavailable") return "unavailable";
+  // "denied", "notDetermined", or anything unrecognized: not authorized yet —
+  // callers follow up with requestAlarmAuth, which prompts when undetermined.
+  return "denied";
 }
 
 /** Current AlarmKit authorization without prompting. */
 export async function checkAlarmAuth(): Promise<AlarmAuthStatus> {
   if (Capacitor.getPlatform() !== "ios") return "unavailable";
   try {
-    const result = await CapgoAlarm.checkPermissions();
-    return result.granted ? "authorized" : "denied";
+    const { status } = await LeaveAlarm.checkAuthorization();
+    return toAuthStatus(status);
   } catch (error) {
-    logger.warn("CapgoAlarm.checkPermissions failed", error);
+    logger.warn("LeaveAlarm.checkAuthorization failed", error);
     return "denied";
   }
 }
 
-/** Prompt for AlarmKit authorization (granted or not — no tri-state). */
+/** Prompt for AlarmKit authorization (no re-prompt if already decided). */
 export async function requestAlarmAuth(): Promise<AlarmAuthStatus> {
   if (Capacitor.getPlatform() !== "ios") return "unavailable";
   try {
-    const result = await CapgoAlarm.requestPermissions();
-    return result.granted ? "authorized" : "denied";
+    const { status } = await LeaveAlarm.requestAuthorization();
+    return toAuthStatus(status);
   } catch (error) {
-    logger.warn("CapgoAlarm.requestPermissions failed", error);
+    logger.warn("LeaveAlarm.requestAuthorization failed", error);
     return "denied";
   }
 }
@@ -74,34 +106,18 @@ export function decideReminderChannel(args: {
   return "alarm";
 }
 
-/**
- * Whether a time-of-day alarm for `fireAt` will land on the intended instant.
- *
- * `@capgo/capacitor-alarm`'s `createAlarm` takes only an hour/minute and fires
- * at the NEXT occurrence of that clock time — it cannot target a specific
- * calendar date. So it's only safe to use for a `fireAt` that is itself the
- * next occurrence of its own HH:MM (i.e. later today, or tomorrow when that
- * time has already passed today). For anything further out — e.g. a weekend
- * train focused on a weekday, or a "tomorrow" departure whose HH:MM recurs
- * earlier today — the next occurrence would fire on the wrong (earlier) day, so
- * the caller must fall back to the dated local notification instead.
- *
- * Pure; exported for unit testing.
- */
-export function alarmFiresOnIntendedDay(fireAt: number, now: number): boolean {
-  const target = new Date(fireAt);
-  const next = new Date(now);
-  next.setHours(target.getHours(), target.getMinutes(), 0, 0);
-  if (next.getTime() <= now) next.setDate(next.getDate() + 1);
-  // fireAt is minute-aligned; allow sub-minute slack for safety.
-  return Math.abs(next.getTime() - fireAt) < 60_000;
+/** Localized labels for the alarm alert's buttons. Optional end to end — the
+ *  native side falls back to sensible defaults when omitted. */
+export interface LeaveAlarmButtonText {
+  stop?: string;
+  viewTrip?: string;
 }
 
 /**
- * Create a one-time AlarmKit alarm at `fireAt` (epoch ms), or return
+ * Create a one-time AlarmKit alarm at `fireAt` (epoch ms — ANY future date,
+ * not just the next occurrence of its clock time), or return
  * `{ scheduled: false }` when an alarm can't/shouldn't be used (non-iOS,
- * unavailable, unauthorized, the create call failed, or `fireAt` isn't the next
- * occurrence of its clock time — see `alarmFiresOnIntendedDay`).
+ * unavailable, unauthorized, or the schedule call failed).
  *
  * Does NOT cancel any previous alarm — the caller retires the prior channel
  * only after a new one is confirmed scheduled, so a failed (re)schedule never
@@ -110,11 +126,8 @@ export function alarmFiresOnIntendedDay(fireAt: number, now: number): boolean {
 export async function scheduleLeaveAlarm(opts: {
   label: string;
   fireAt: number;
+  buttons?: LeaveAlarmButtonText;
 }): Promise<{ scheduled: boolean; alarmId?: string }> {
-  // Date-safety first (cheap + pure): bail before any plugin/permission calls
-  // when a time-of-day alarm would fire on the wrong day.
-  if (!alarmFiresOnIntendedDay(opts.fireAt, Date.now())) return { scheduled: false };
-
   const platform = Capacitor.getPlatform();
   const alarmAvailable = await isAlarmAvailable();
   let alarmStatus: AlarmAuthStatus = "unavailable";
@@ -126,20 +139,20 @@ export async function scheduleLeaveAlarm(opts: {
     return { scheduled: false };
   }
 
-  const fireDate = new Date(opts.fireAt);
   try {
-    const result = await CapgoAlarm.createAlarm({
-      hour: fireDate.getHours(),
-      minute: fireDate.getMinutes(),
-      label: opts.label,
+    const { id } = await LeaveAlarm.schedule({
+      fireAtMs: opts.fireAt,
+      title: opts.label,
+      stopButtonTitle: opts.buttons?.stop,
+      openButtonTitle: opts.buttons?.viewTrip,
     });
-    if (!result.success || !result.id) {
-      logger.warn("CapgoAlarm.createAlarm did not return an id", result.message);
+    if (!id) {
+      logger.warn("LeaveAlarm.schedule did not return an id");
       return { scheduled: false };
     }
-    return { scheduled: true, alarmId: result.id };
+    return { scheduled: true, alarmId: id };
   } catch (error) {
-    logger.warn("CapgoAlarm.createAlarm failed", error);
+    logger.warn("LeaveAlarm.schedule failed", error);
     return { scheduled: false };
   }
 }
@@ -147,8 +160,8 @@ export async function scheduleLeaveAlarm(opts: {
 /** Cancel a previously scheduled leave alarm by id. Best-effort; logs on failure. */
 export async function cancelLeaveAlarm(id: string): Promise<void> {
   try {
-    await CapgoAlarm.cancelAlarm({ id });
+    await LeaveAlarm.cancel({ id });
   } catch (error) {
-    logger.warn("CapgoAlarm.cancelAlarm failed", error);
+    logger.warn("LeaveAlarm.cancel failed", error);
   }
 }

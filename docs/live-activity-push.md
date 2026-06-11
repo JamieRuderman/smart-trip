@@ -26,13 +26,30 @@ POST /api/liveactivity/register  ────────▶  store {id → regi
 clear / arrival → DELETE /api/liveactivity/register?id=…
 ```
 
-- The **logical activity id** (`tripActivityId(tripNumber, serviceDate)`) joins
-  the client registration with the iOS-posted token.
+- The **logical activity id** (`tripActivityId(...)` = trip + service date + a
+  random slug) joins the client registration with the iOS-posted token. The
+  slug makes the id unguessable — it is the *capability* protecting the record,
+  since register/deregister are necessarily public endpoints (no accounts).
 - `Text(timerInterval:)` ticks natively, so the cron only pushes when the
   **delay**, the **departure→arrival phase**, or **cancellation** changes, and an
   `end` once arrived. Unchanged state = no push (APNs throttles updates).
+  Cancellation is detected two ways: from the matched trip update's
+  `CANCELED` relationship, or — when 511 strips the cancelled run's stop
+  updates entirely — by matching the feed `startTime` against the
+  registration's `originStartTime` (the same fallback the client UI uses).
+- The signed APNs provider JWT is **cached in Redis for 45 min** and reused
+  across cron runs: APNs throttles provider-token churn
+  (`TooManyProviderTokenUpdates`), so a fresh signature per 1-minute run would
+  get pushes rejected. An `ExpiredProviderToken` response drops the cache.
 - The content state pushed by the server is the **same** `Record<string,string>`
   the client sends (`encodeContentState`), so the widget decodes one shape.
+- Registration is self-healing: the client re-POSTs it on every app boot
+  (idempotent upsert), so a failed register at focus time (offline) is
+  repaired at the next launch, and server-side TTLs are refreshed.
+- Abuse bounds on the public endpoints: every string field is length-capped at
+  validation, and new registrations are refused past **200 active activities**
+  (re-registrations always pass), so junk can't grow the cron's fan-out or the
+  Redis footprint unboundedly.
 
 ## Required to go live
 
@@ -54,7 +71,7 @@ You get a `.p8` file + a 10-char **Key ID**; the **Team ID** is `6YH3537ZY9`.
 | `APNS_PRIVATE_KEY` | the `.p8` PEM contents (newlines as literal `\n` are accepted) |
 | `APNS_WIDGET_BUNDLE_ID` | the widget bundle id |
 | `APNS_HOST` | optional; defaults to `api.push.apple.com` (use `api.sandbox.push.apple.com` for dev builds) |
-| `CRON_SECRET` | shared secret; the scheduler must send it as `Authorization: Bearer …` |
+| `CRON_SECRET` | shared secret; the scheduler must send it as `Authorization: Bearer …`. **Required** — the push endpoint treats a missing secret as "not configured" and no-ops, so it can never run unauthenticated |
 | `PUBLIC_BASE_URL` | optional; the cron's base for its internal `/api/gtfsrt/tripupdates` fetch (falls back to `VERCEL_URL`) |
 
 Redis is already wired via the existing `KV_REST_API_URL` / `KV_REST_API_TOKEN`

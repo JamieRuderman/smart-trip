@@ -40,7 +40,8 @@ export function isLiveActivityPushEnabled(): boolean {
  * across launches) and POSTs the trip identity the server needs to re-derive
  * live arrival/delay from GTFS-RT. Returns whether the activity started; a
  * registration network failure is logged but does NOT fail the start (the
- * activity still shows the local countdown).
+ * activity still shows the local countdown, and the boot-time
+ * `registerPushActivity` heal retries on the next launch).
  */
 export async function startAndRegisterPushActivity(
   registration: LiveActivityRegistration,
@@ -56,6 +57,19 @@ export async function startAndRegisterPushActivity(
     content,
   );
   if (!started) return { started: false };
+  await registerPushActivity(registration);
+  return { started: true };
+}
+
+/**
+ * (Re-)POST a registration to the backend. Idempotent upsert keyed on the
+ * activity id, so it doubles as the boot-time heal for a start whose original
+ * registration POST failed (offline at focus time) — and refreshes the
+ * server-side TTLs as a bonus. Best-effort; never throws.
+ */
+export async function registerPushActivity(
+  registration: LiveActivityRegistration,
+): Promise<void> {
   try {
     await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
       method: "POST",
@@ -63,11 +77,10 @@ export async function startAndRegisterPushActivity(
       body: JSON.stringify(registration),
     });
   } catch (error) {
-    // The activity is live with a working local countdown; only the locked-
+    // The activity stays live with a working local countdown; only the locked-
     // screen delay correction is degraded until the next registration attempt.
     logger.warn("Live Activity push registration failed", error);
   }
-  return { started: true };
 }
 
 /** Tell the backend to stop pushing to this activity (on clear / arrival /

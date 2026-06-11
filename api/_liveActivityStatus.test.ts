@@ -126,6 +126,54 @@ describe("computeLiveTripStatus", () => {
       computeLiveTripStatus({ reg: REG, updates: feed({ depUnix: farOff }), now: SCHED_DEP_MS }),
     ).toBeNull();
   });
+
+  describe("cancelled-without-stop-updates fallback", () => {
+    const CANCELED_NO_STOPS: FeedTripUpdate[] = [
+      { scheduleRelationship: "CANCELED", startTime: "08:10:00", stopTimeUpdates: [] },
+    ];
+    const regWithOrigin = { ...REG, originStartTime: "08:10" };
+
+    it("flags cancellation by origin start time when stop updates are gone", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: CANCELED_NO_STOPS,
+        now: SCHED_DEP_MS - 60_000,
+      });
+      expect(status).not.toBeNull();
+      expect(status!.isCanceled).toBe(true);
+      // No stop data → no delay to derive; scheduled targets stand.
+      expect(status!.delayMinutes).toBe(0);
+      expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+      expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS);
+    });
+
+    it("does not fire without originStartTime on the registration", () => {
+      expect(
+        computeLiveTripStatus({
+          reg: REG,
+          updates: CANCELED_NO_STOPS,
+          now: SCHED_DEP_MS,
+        }),
+      ).toBeNull();
+    });
+
+    it("does not match a non-cancelled update or a different start time", () => {
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: [{ scheduleRelationship: "SCHEDULED", startTime: "08:10:00", stopTimeUpdates: [] }],
+          now: SCHED_DEP_MS,
+        }),
+      ).toBeNull();
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: [{ scheduleRelationship: "CANCELED", startTime: "09:10:00", stopTimeUpdates: [] }],
+          now: SCHED_DEP_MS,
+        }),
+      ).toBeNull();
+    });
+  });
 });
 
 describe("decidePushAction", () => {
@@ -173,6 +221,40 @@ describe("decidePushAction", () => {
     });
     expect(phase).toBe("en-route");
     expect(action).toBe("update");
+  });
+
+  it("pushes update when cancellation flips even at the same delay + phase", () => {
+    const lastSent = {
+      delayMinutes: 0,
+      phase: "pre-departure" as const,
+      isEnded: false,
+      isCanceled: false,
+    };
+    expect(
+      decidePushAction({
+        status: { ...base, isCanceled: true },
+        lastSent,
+        now: SCHED_DEP_MS - 60_000,
+      }).action,
+    ).toBe("update");
+    // …and once the cancelled state was sent, it goes quiet again.
+    expect(
+      decidePushAction({
+        status: { ...base, isCanceled: true },
+        lastSent: { ...lastSent, isCanceled: true },
+        now: SCHED_DEP_MS - 60_000,
+      }).action,
+    ).toBe("none");
+  });
+
+  it("treats a legacy lastSent without isCanceled as not-cancelled", () => {
+    expect(
+      decidePushAction({
+        status: { ...base, isCanceled: true },
+        lastSent: { delayMinutes: 0, phase: "pre-departure", isEnded: false },
+        now: SCHED_DEP_MS - 60_000,
+      }).action,
+    ).toBe("update");
   });
 
   it("ends once when arrived, then goes quiet", () => {

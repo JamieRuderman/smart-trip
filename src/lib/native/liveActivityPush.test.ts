@@ -13,7 +13,9 @@ vi.mock("@/lib/env", () => ({
   readOptionalEnvString: (v: unknown) => readOptionalEnvString(v),
 }));
 
-const setLiveActivityTokenEndpoint = vi.fn(async (_url: string) => {});
+const setLiveActivityTokenEndpoint = vi.fn(async (url: string) => {
+  void url;
+});
 const startTripActivityWithPush = vi.fn(async () => ({
   started: true,
   activityId: "sys-1",
@@ -26,6 +28,7 @@ vi.mock("@/lib/native/liveActivity", () => ({
 import {
   deregisterPushActivity,
   isLiveActivityPushEnabled,
+  registerPushActivity,
   startAndRegisterPushActivity,
 } from "./liveActivityPush";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
@@ -111,6 +114,21 @@ describe("startAndRegisterPushActivity", () => {
     fetchMock.mockRejectedValue(new Error("network"));
     const result = await startAndRegisterPushActivity(REG, ATTRS, CONTENT);
     expect(result).toEqual({ started: true });
+  });
+});
+
+describe("registerPushActivity", () => {
+  it("POSTs the registration (boot-time heal path)", async () => {
+    await registerPushActivity(REG);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://smart.example/api/liveactivity/register",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(REG) }),
+    );
+  });
+
+  it("never throws on a network failure", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    await expect(registerPushActivity(REG)).resolves.toBeUndefined();
   });
 });
 

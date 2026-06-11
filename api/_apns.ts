@@ -131,11 +131,19 @@ export interface ApnsSendResult {
   reason?: string;
 }
 
+/** Abort a hung APNs connection/stream after this long, so one bad send can't
+ *  hold the serverless function until the platform timeout. */
+const SEND_TIMEOUT_MS = 10_000;
+
 /**
  * Send one Live Activity push to a per-activity update token over HTTP/2.
  * Integration-only (real key + token required); opens a short-lived connection
  * per call — fine for the low-volume cron. Throwing is the caller's signal to
  * drop a dead token (e.g. 410 Gone).
+ *
+ * Both the SESSION and the stream get error handlers: a connection-level
+ * failure (DNS, TLS, reset) emits `error` on the session, and an unlistened
+ * session `error` is an uncaught exception that would crash the function run.
  */
 export async function sendLiveActivityPush(args: {
   config: ApnsConfig;
@@ -147,6 +155,23 @@ export async function sendLiveActivityPush(args: {
   const client = connect(`https://${args.config.host}`);
   try {
     return await new Promise<ApnsSendResult>((resolve, reject) => {
+      let settled = false;
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+      const fail = (error: unknown) =>
+        settle(() =>
+          reject(error instanceof Error ? error : new Error(String(error))),
+        );
+      const timer = setTimeout(() => {
+        fail(new Error(`APNs send timed out after ${SEND_TIMEOUT_MS}ms`));
+        client.destroy();
+      }, SEND_TIMEOUT_MS);
+      client.on("error", fail);
+
       const body = Buffer.from(JSON.stringify(args.payload));
       const req = client.request({
         ":method": "POST",
@@ -172,9 +197,9 @@ export async function sendLiveActivityPush(args: {
         } catch {
           reason = data || undefined;
         }
-        resolve({ status, reason });
+        settle(() => resolve({ status, reason }));
       });
-      req.on("error", reject);
+      req.on("error", fail);
       req.write(body);
       req.end();
     });

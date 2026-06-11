@@ -15,34 +15,38 @@ import {
   type FeedTripUpdate,
 } from "../_liveActivityStatus.js";
 import {
+  clearCachedApnsJwt,
+  getCachedApnsJwt,
   getLastSent,
   getRegistration,
   getToken,
   listActiveIds,
   liveActivityStoreAvailable,
   removeActivity,
+  setCachedApnsJwt,
   setLastSent,
 } from "../_liveActivityStore.js";
 
 /**
- * Cron (Vercel Scheduled Function) that corrects every registered Live
- * Activity's countdown from GTFS-RT while phones are locked. For each active
- * activity it re-derives the live arrival/delay, and pushes an `update` (delay
- * or phase changed) or `end` (arrived) via APNs — otherwise nothing, since the
- * native `Text(timerInterval:)` ticks on its own.
+ * Cron (scheduled HTTP hit) that corrects every registered Live Activity's
+ * countdown from GTFS-RT while phones are locked. For each active activity it
+ * re-derives the live arrival/delay, and pushes an `update` (delay, phase, or
+ * cancellation changed) or `end` (arrived) via APNs — otherwise nothing, since
+ * the native `Text(timerInterval:)` ticks on its own.
  *
- * Inert until configured: no Redis store or no APNs `.p8` credentials → 200
- * no-op. Protect with `CRON_SECRET` (Vercel sets `Authorization: Bearer …`).
+ * Inert until configured: no Redis store, no APNs `.p8` credentials, or no
+ * `CRON_SECRET` → 200 no-op. The secret is part of the "configured" check
+ * (not just an optional guard) so that the push path can never be driven
+ * anonymously once the APNs credentials exist.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.authorization !== `Bearer ${secret}`) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   const apns = readApnsConfig();
-  if (!liveActivityStoreAvailable() || !apns) {
+  if (!liveActivityStoreAvailable() || !apns || !secret) {
     return res.status(200).json({ ok: true, skipped: "not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const ids = await listActiveIds();
@@ -57,7 +61,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const now = Date.now();
-  const jwt = signApnsJwt(apns, Math.floor(now / 1000));
+  // Reuse one provider JWT across runs (Redis-cached, 45 min): APNs throttles
+  // provider-token churn (TooManyProviderTokenUpdates), so a fresh signature
+  // per 1-minute cron run would get pushes rejected.
+  let jwt = await getCachedApnsJwt();
+  if (!jwt) {
+    jwt = signApnsJwt(apns, Math.floor(now / 1000));
+    await setCachedApnsJwt(jwt);
+  }
   let pushed = 0;
   let ended = 0;
 
@@ -110,6 +121,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return;
         }
         if (result.status >= 400) {
+          // A stale cached JWT (key rotated, clock skew) fails every push the
+          // same way — drop it so the next run signs fresh.
+          if (result.reason === "ExpiredProviderToken") {
+            await clearCachedApnsJwt();
+          }
           console.warn(
             `[liveactivity] push ${id} → ${result.status} ${result.reason ?? ""}`,
           );
@@ -126,7 +142,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else {
         await setLastSent(
           id,
-          { delayMinutes: status.delayMinutes, phase, isEnded: false },
+          {
+            delayMinutes: status.delayMinutes,
+            phase,
+            isEnded: false,
+            isCanceled: status.isCanceled,
+          },
           status.arrivalEpochMs,
           now,
         );
@@ -138,12 +159,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ ok: true, processed: ids.length, pushed, ended });
 }
 
-/** Fetch our own normalized trip-updates JSON (reusing its 511 cache). */
+/** Fetch our own normalized trip-updates JSON (reusing its 511 cache), bounded
+ *  so a hung upstream can't hold the cron run open. */
 async function fetchTripUpdates(): Promise<FeedTripUpdate[]> {
   const base =
     process.env.PUBLIC_BASE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  const res = await fetch(`${base}/api/gtfsrt/tripupdates`);
+  const res = await fetch(`${base}/api/gtfsrt/tripupdates`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) throw new Error(`tripupdates ${res.status}`);
   const json = (await res.json()) as { updates?: FeedTripUpdate[] };
   return json.updates ?? [];

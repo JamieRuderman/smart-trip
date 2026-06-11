@@ -43,6 +43,27 @@ describe("isLiveActivityRegistration", () => {
     expect(isLiveActivityRegistration(null)).toBe(false);
     expect(isLiveActivityRegistration("x")).toBe(false);
   });
+
+  it("accepts an optional originStartTime and rejects a non-string one", () => {
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, originStartTime: "07:55" }),
+    ).toBe(true);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, originStartTime: 755 }),
+    ).toBe(false);
+  });
+
+  it("rejects oversized strings (public endpoint, bounded junk)", () => {
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, id: "x".repeat(200) }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, fromStation: "x".repeat(100) }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, scheduledDeparture: "x".repeat(20) }),
+    ).toBe(false);
+  });
 });
 
 describe("isLiveActivityTokenPayload", () => {
@@ -60,5 +81,15 @@ describe("isLiveActivityTokenPayload", () => {
 
   it("rejects a missing id", () => {
     expect(isLiveActivityTokenPayload({ activityId: "sys-1", token: "abc" })).toBe(false);
+  });
+
+  it("rejects an oversized token", () => {
+    expect(
+      isLiveActivityTokenPayload({
+        id: "trip-7",
+        activityId: "sys-1",
+        token: "a".repeat(600),
+      }),
+    ).toBe(false);
   });
 });

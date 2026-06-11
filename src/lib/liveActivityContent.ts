@@ -54,16 +54,42 @@ export interface TripActivityContentState {
 export const MIN_LIVE_ACTIVITY_IOS_MAJOR = 16;
 export const MIN_LIVE_ACTIVITY_IOS_MINOR = 2;
 
+/** Random base36 slug for activity ids. `crypto.getRandomValues` exists in
+ *  every WKWebView/browser/Node we run in; Math.random is a non-security
+ *  fallback only for exotic embeds. */
+function randomSlug(length = 10): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  // Structural type, not `Crypto`: this module is also compiled under the
+  // DOM-less api tsconfig.
+  const globalCrypto = (
+    globalThis as {
+      crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array };
+    }
+  ).crypto;
+  if (globalCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(length);
+    globalCrypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+  }
+  let out = "";
+  for (let i = 0; i < length; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
 /**
- * Stable, deterministic activity id for a focused trip. The plugin's local
- * `startActivity` requires a caller-supplied id and keys update/end on it, so
- * the same trip must always resolve to the same id (across JS reloads) to reach
- * its running activity. Service-date-scoped so the same trip number on a
- * different day is a distinct activity. Also the join key between the client
- * registration and the iOS-posted push token on the server.
+ * Activity id for a focused trip: trip/service-date scoped for debuggability,
+ * plus a random slug so the id is NOT guessable. The id doubles as the join
+ * key between the client registration and the iOS-posted push token on the
+ * server, where the register/deregister endpoints are necessarily public — an
+ * unguessable id is the capability that stops a third party from overwriting
+ * or deregistering someone else's activity. Reaching the running activity
+ * across JS reloads relies on the id being PERSISTED (`FocusedTrip.
+ * liveActivityId`), not recomputed, so the randomness costs nothing.
  */
 export function tripActivityId(tripNumber: number, serviceDate: string): string {
-  return `trip-${tripNumber}-${serviceDate}`;
+  return `trip-${tripNumber}-${serviceDate}-${randomSlug()}`;
 }
 
 /**

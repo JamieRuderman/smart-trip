@@ -25,6 +25,9 @@ export interface FeedStopTimeUpdate {
 }
 export interface FeedTripUpdate {
   scheduleRelationship?: string;
+  /** Trip's scheduled origin departure, "HH:MM:SS" — the cancellation
+   *  fallback's match key (cancelled runs often lose their stop updates). */
+  startTime?: string;
   stopTimeUpdates: FeedStopTimeUpdate[];
 }
 
@@ -79,7 +82,7 @@ export function computeLiveTripStatus(args: {
     if (distance > MATCH_WINDOW_MS) continue;
     if (!best || distance < best.distance) best = { update, from, distance };
   }
-  if (!best) return null;
+  if (!best) return matchCanceledByStartTime(reg, updates, now);
 
   const isCanceled = best.update.scheduleRelationship === "CANCELED";
   const liveDepartureMs = best.from.departureTime! * 1000;
@@ -107,6 +110,35 @@ export function computeLiveTripStatus(args: {
   };
 }
 
+/**
+ * Fallback for cancelled runs whose stop_time_updates the feed omitted (511
+ * does this — the client keeps an equivalent `canceledByStartTime` map):
+ * match a CANCELED update by the trip's scheduled origin start time. Only
+ * offered when the registration carries `originStartTime`, and only ever
+ * yields a cancelled status — with no stop updates there is no delay to
+ * derive, so the scheduled targets stand.
+ */
+function matchCanceledByStartTime(
+  reg: LiveActivityRegistration,
+  updates: FeedTripUpdate[],
+  now: number,
+): LiveTripStatus | null {
+  if (!reg.originStartTime) return null;
+  const match = updates.find(
+    (u) =>
+      u.scheduleRelationship === "CANCELED" &&
+      u.startTime?.slice(0, 5) === reg.originStartTime,
+  );
+  if (!match) return null;
+  return {
+    departureEpochMs: reg.departureEpochMs,
+    arrivalEpochMs: reg.arrivalEpochMs,
+    delayMinutes: 0,
+    isCanceled: true,
+    isEnded: now >= reg.arrivalEpochMs,
+  };
+}
+
 export type PushAction = "none" | "update" | "end";
 
 /**
@@ -118,7 +150,14 @@ export type PushAction = "none" | "update" | "end";
  */
 export function decidePushAction(args: {
   status: LiveTripStatus;
-  lastSent: { delayMinutes: number; phase: "pre-departure" | "en-route"; isEnded: boolean } | null;
+  lastSent: {
+    delayMinutes: number;
+    phase: "pre-departure" | "en-route";
+    isEnded: boolean;
+    /** Older records (pre-cancellation tracking) may lack this; treated as
+     *  "not cancelled" so a cancellation still triggers exactly one update. */
+    isCanceled?: boolean;
+  } | null;
   now: number;
 }): { action: PushAction; phase: "pre-departure" | "en-route" } {
   const phase: "pre-departure" | "en-route" =
@@ -130,7 +169,8 @@ export function decidePushAction(args: {
   if (
     args.lastSent != null &&
     args.lastSent.delayMinutes === args.status.delayMinutes &&
-    args.lastSent.phase === phase
+    args.lastSent.phase === phase &&
+    (args.lastSent.isCanceled ?? false) === args.status.isCanceled
   ) {
     return { action: "none", phase };
   }

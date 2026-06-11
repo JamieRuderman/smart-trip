@@ -92,9 +92,13 @@ afterEach(() => {
 });
 
 describe("tripActivityId", () => {
-  it("is stable + service-date scoped", () => {
-    expect(tripActivityId(7, "2026-06-09")).toBe("trip-7-2026-06-09");
-    expect(tripActivityId(7, "2026-06-10")).not.toBe(tripActivityId(7, "2026-06-09"));
+  it("is trip/service-date scoped with an unguessable random slug", () => {
+    const id = tripActivityId(7, "2026-06-09");
+    // Debuggable prefix + ≥10 chars of base36 entropy. The id is a server-side
+    // capability (public register/deregister endpoints key on it), so it must
+    // not be derivable from the trip + date alone.
+    expect(id).toMatch(/^trip-7-2026-06-09-[a-z0-9]{10,}$/);
+    expect(tripActivityId(7, "2026-06-09")).not.toBe(id);
   });
 });
 

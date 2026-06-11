@@ -63,7 +63,10 @@ describe("buildLiveActivityPayload", () => {
       aps: {
         timestamp: 1000,
         event: "update",
-        "content-state": contentState,
+        // Wrapped under `values`: that's the Codable shape of the plugin's
+        // GenericAttributes.ContentState, which ActivityKit uses to decode the
+        // push. A flat dict here fails decoding and the update is dropped.
+        "content-state": { values: contentState },
         "stale-date": 2000,
       },
     });

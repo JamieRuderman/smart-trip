@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform: () => false } }));
 
 import {
+  anchorLiveTime,
   loadFocusedTrip,
   saveFocusedTrip,
   migrateLegacyReminders,
@@ -102,6 +103,45 @@ describe("focusedArrivalInstant / focusedDepartureInstant", () => {
 
   it("returns null when the trip is no longer in the schedule", () => {
     expect(focusedArrivalInstant(makeFocused({ tripNumber: 999999 }))).toBeNull();
+  });
+});
+
+describe("anchorLiveTime", () => {
+  // Static anchor: 2026-06-09 08:30 local.
+  const STATIC = new Date(2026, 5, 9, 8, 30, 0, 0).getTime();
+
+  it("anchors a same-day live time onto the static instant's day", () => {
+    expect(anchorLiveTime(STATIC, "08:34")).toBe(
+      new Date(2026, 5, 9, 8, 34, 0, 0).getTime(),
+    );
+  });
+
+  it("keeps a live time slightly before the static one on the same day", () => {
+    expect(anchorLiveTime(STATIC, "08:28")).toBe(
+      new Date(2026, 5, 9, 8, 28, 0, 0).getTime(),
+    );
+  });
+
+  it("rolls forward when the static instant is just before midnight", () => {
+    const lateStatic = new Date(2026, 5, 9, 23, 55, 0, 0).getTime();
+    // Live 00:10 belongs to the NEXT calendar day (closest to the anchor).
+    expect(anchorLiveTime(lateStatic, "00:10")).toBe(
+      new Date(2026, 5, 10, 0, 10, 0, 0).getTime(),
+    );
+  });
+
+  it("rolls backward when the static instant is just after midnight", () => {
+    const overnightStatic = new Date(2026, 5, 10, 0, 5, 0, 0).getTime();
+    // Live 23:58 belongs to the PREVIOUS calendar day.
+    expect(anchorLiveTime(overnightStatic, "23:58")).toBe(
+      new Date(2026, 5, 9, 23, 58, 0, 0).getTime(),
+    );
+  });
+
+  it("strips schedule markers from the live time", () => {
+    expect(anchorLiveTime(STATIC, "08:45*")).toBe(
+      new Date(2026, 5, 9, 8, 45, 0, 0).getTime(),
+    );
   });
 });
 

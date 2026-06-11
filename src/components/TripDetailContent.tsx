@@ -532,7 +532,6 @@ export function TripDetailContent({
             liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
             arrivalTime={trip.arrivalTime}
             realtimeArrivalTime={realtimeStatus?.liveArrivalTime ?? null}
-            delayMinutes={realtimeStatus?.delayMinutes ?? null}
             currentTime={currentTime}
             timeFormat={timeFormat}
             scheduleType={scheduleType}

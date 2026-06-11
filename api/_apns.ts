@@ -98,8 +98,13 @@ export type LiveActivityPushEvent = "update" | "end";
 
 /**
  * Build the APNs JSON body for a Live Activity push. Pure; exported for tests.
- * The `content-state` is the SAME `Record<string,string>` the client sends via
- * `encodeContentState`, so the widget decodes one shape regardless of source.
+ *
+ * `contentState` is the SAME `Record<string,string>` the client sends via
+ * `encodeContentState`, but ActivityKit decodes the push's `content-state`
+ * with the WIDGET's `ContentState` Codable — and the capacitor-live-activity
+ * plugin's `GenericAttributes.ContentState` is `{ values: [String: String] }`.
+ * So the flat dict must be wrapped under a `values` key here; sending it flat
+ * would fail decoding and iOS would silently drop every push.
  *
  * `staleEpochMs` → `stale-date` (seconds): iOS dims the activity if no fresher
  * push arrives by then. For an `end` event, `dismissEpochMs` → `dismissal-date`.
@@ -114,7 +119,7 @@ export function buildLiveActivityPayload(args: {
   const aps: Record<string, unknown> = {
     timestamp: args.timestampSeconds,
     event: args.event,
-    "content-state": args.contentState,
+    "content-state": { values: args.contentState },
   };
   if (args.staleEpochMs != null) {
     aps["stale-date"] = Math.floor(args.staleEpochMs / 1000);

@@ -173,6 +173,25 @@ export function focusedArrivalInstant(focused: FocusedTrip): number | null {
 }
 
 /**
+ * Re-anchor a live "HH:MM" clock time onto the calendar day of a static
+ * schedule instant, picking the day offset that lands closest to it
+ * (overnight-safe within ±12h). Lets the Live Activity sync turn the feed's
+ * clock times into absolute instants on the focused trip's own service date,
+ * instead of anchoring to "today" the way the schedule views do.
+ */
+export function anchorLiveTime(staticInstant: number, liveHHMM: string): number {
+  const minutes = hhmmToMinutes(liveHHMM);
+  const d = new Date(staticInstant);
+  d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  let t = d.getTime();
+  const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+  const FULL_DAY_MS = 24 * 60 * 60 * 1000;
+  if (t < staticInstant - HALF_DAY_MS) t += FULL_DAY_MS;
+  else if (t > staticInstant + HALF_DAY_MS) t -= FULL_DAY_MS;
+  return t;
+}
+
+/**
  * Read the focused trip, clearing it once its (static) arrival on the service
  * date has passed, or when the trip can no longer be found in the schedule
  * (timetable changed under a stale focus).

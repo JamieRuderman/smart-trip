@@ -49,6 +49,10 @@ import {
   type TripActivityAttributes,
   type TripActivityContentState,
 } from "@/lib/native/liveActivity";
+import {
+  shouldShowLiveActivity,
+  LIVE_ACTIVITY_WINDOW_MS,
+} from "@/lib/liveActivityContent";
 
 // Fixed "now": Tue 2026-06-09 08:00 local.
 const NOW = new Date(2026, 5, 9, 8, 0, 0, 0).getTime();
@@ -71,7 +75,7 @@ function content(over: Partial<TripActivityContentState> = {}): TripActivityCont
     delayMinutes: 0,
     nextStop: null,
     remainingStops: null,
-    statusText: "On time · departing",
+    statusText: "On time",
     isCanceled: false,
     isEnded: false,
     staleAfterEpochMs: DEP,
@@ -121,6 +125,35 @@ describe("canStartActivity", () => {
   });
 });
 
+describe("shouldShowLiveActivity", () => {
+  const base = {
+    hasReminder: false,
+    departureEpochMs: DEP, // 30 min after NOW → inside the 60-min window
+    arrivalEpochMs: ARR,
+    now: NOW,
+  };
+  const farFromDeparture = DEP - (LIVE_ACTIVITY_WINDOW_MS + 60_000); // 61 min out
+
+  it("shows within the window before departure", () => {
+    expect(shouldShowLiveActivity(base)).toBe(true);
+  });
+  it("hides a far-ahead focus with no reminder", () => {
+    expect(shouldShowLiveActivity({ ...base, now: farFromDeparture })).toBe(false);
+  });
+  it("an armed reminder overrides the window", () => {
+    expect(
+      shouldShowLiveActivity({ ...base, hasReminder: true, now: farFromDeparture }),
+    ).toBe(true);
+  });
+  it("shows once en route, then stops after arrival", () => {
+    expect(shouldShowLiveActivity({ ...base, now: DEP + 1 })).toBe(true);
+    expect(shouldShowLiveActivity({ ...base, now: ARR })).toBe(false);
+    expect(
+      shouldShowLiveActivity({ ...base, hasReminder: true, now: ARR }),
+    ).toBe(false);
+  });
+});
+
 describe("derivePhase", () => {
   it("is pre-departure before departure, en-route after", () => {
     expect(derivePhase({ departureEpochMs: DEP, now: NOW })).toBe("pre-departure");
@@ -131,13 +164,13 @@ describe("derivePhase", () => {
 
 describe("deriveStatusText", () => {
   it("prioritizes cancelled > ended > delayed > on-time", () => {
-    expect(deriveStatusText({ delayMinutes: 5, isCanceled: true, isEnded: false, phase: "en-route" })).toBe("Cancelled");
-    expect(deriveStatusText({ delayMinutes: 5, isCanceled: false, isEnded: true, phase: "en-route" })).toBe("Arrived");
-    expect(deriveStatusText({ delayMinutes: 4, isCanceled: false, isEnded: false, phase: "en-route" })).toBe("+4 min");
+    expect(deriveStatusText({ delayMinutes: 5, isCanceled: true, isEnded: false })).toBe("Cancelled");
+    expect(deriveStatusText({ delayMinutes: 5, isCanceled: false, isEnded: true })).toBe("Arrived");
+    expect(deriveStatusText({ delayMinutes: 4, isCanceled: false, isEnded: false })).toBe("Delayed");
   });
-  it("is phase-aware when on time", () => {
-    expect(deriveStatusText({ delayMinutes: 0, isCanceled: false, isEnded: false, phase: "pre-departure" })).toBe("On time · departing");
-    expect(deriveStatusText({ delayMinutes: null, isCanceled: false, isEnded: false, phase: "en-route" })).toBe("On time · arriving");
+  it("is 'On time' when not late", () => {
+    expect(deriveStatusText({ delayMinutes: 0, isCanceled: false, isEnded: false })).toBe("On time");
+    expect(deriveStatusText({ delayMinutes: null, isCanceled: false, isEnded: false })).toBe("On time");
   });
 });
 
@@ -155,7 +188,7 @@ describe("buildContentState", () => {
     });
     expect(c.phase).toBe("pre-departure");
     expect(c.delayMinutes).toBe(0);
-    expect(c.statusText).toBe("On time · departing");
+    expect(c.statusText).toBe("On time");
     expect(c.staleAfterEpochMs).toBe(DEP); // pre-departure → departure target
   });
   it("uses the arrival target once en-route", () => {
@@ -170,7 +203,7 @@ describe("buildContentState", () => {
       now: DEP + 60_000,
     });
     expect(c.phase).toBe("en-route");
-    expect(c.statusText).toBe("+6 min");
+    expect(c.statusText).toBe("Delayed");
     expect(c.staleAfterEpochMs).toBe(ARR);
   });
 });
@@ -273,7 +306,7 @@ describe("startTripActivity", () => {
 
 describe("updateTripActivity", () => {
   it("updates with encoded content on iOS", async () => {
-    const c = content({ phase: "en-route", delayMinutes: 3, statusText: "+3 min" });
+    const c = content({ phase: "en-route", delayMinutes: 3, statusText: "Delayed" });
     const result = await updateTripActivity("trip-7-2026-06-09", c);
     expect(result).toEqual({ updated: true });
     expect(updateActivity).toHaveBeenCalledWith({

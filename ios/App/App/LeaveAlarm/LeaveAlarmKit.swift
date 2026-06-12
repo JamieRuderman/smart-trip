@@ -101,10 +101,18 @@ enum LeaveAlarmKit {
                     var secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?
                     var secondaryIntent: (any LiveActivityIntent)?
                     if let openButtonTitle, !openButtonTitle.isEmpty {
+                        // AlarmKit renders this alert out-of-process, so
+                        // `systemImageName` resolves built-in SF Symbols only —
+                        // the brand train can't load as a custom symbol here (it
+                        // renders blank). A system train glyph (e.g. tram.fill)
+                        // reads as "almost the brand but wrong", so this button —
+                        // which opens the app to the trip — uses a neutral "open"
+                        // arrow. The real brand train is on the in-app + widget
+                        // surfaces.
                         secondaryButton = AlarmButton(
                             text: LocalizedStringResource(String.LocalizationValue(openButtonTitle)),
                             textColor: .white,
-                            systemImageName: "tram.fill"
+                            systemImageName: "arrow.right"
                         )
                         secondaryBehavior = .custom
                         secondaryIntent = OpenSmartTripIntent()

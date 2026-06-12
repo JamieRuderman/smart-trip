@@ -9,7 +9,7 @@ import { Capacitor } from "@capacitor/core";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
-import { bootFocusedTrip } from "@/lib/focusedTrip";
+import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/hooks/useFocusedTrip";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
@@ -36,6 +36,12 @@ const App = () => {
 
   useAppForegroundRefresh(async () => {
     emitAppRefreshEvent();
+    // Re-read the focused trip so a reminder that fired while we were away
+    // clears immediately — its OS alarm has no JS callback — and reconcile the
+    // Live Activity (end orphans; start it if we've just entered the show
+    // window, or recover one that was dismissed).
+    window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
+    void reconcileTripActivities();
     await queryClient.refetchQueries({ type: "active" });
   });
 

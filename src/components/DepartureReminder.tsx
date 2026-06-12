@@ -21,6 +21,7 @@ import { isSouthbound } from "@/lib/stationUtils";
 import {
   focusedDepartureInstant,
   focusedTripMatchesSchedule,
+  REMINDER_FIRE_BUFFER_MS,
 } from "@/lib/focusedTrip";
 import { APP_STORE_URL } from "@/seo/constants";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
@@ -234,11 +235,20 @@ export function DepartureReminder({
     (reminderDepartureAt - currentTime.getTime()) / 60_000,
   );
 
-  /** Maximum lead time we'll allow. Picking the max fires the alarm
-   *  immediately — fine as a "leave now" nudge since the user chose it. */
+  /** Maximum lead time we'll allow. Held REMINDER_FIRE_BUFFER_MS short of "now"
+   *  so the soonest selectable reminder is still a valid future fire time:
+   *  picking the max fires almost immediately (a fine "leave now" nudge) but
+   *  never at/just-past now, which would fail the alarm and downgrade it to a
+   *  notification. */
   const maxLeadMinutes = Math.max(
     1,
-    Math.min(MAX_LEAD_MINUTES, minutesUntilDeparture)
+    Math.min(
+      MAX_LEAD_MINUTES,
+      Math.floor(
+        (reminderDepartureAt - currentTime.getTime() - REMINDER_FIRE_BUFFER_MS) /
+          60_000,
+      ),
+    )
   );
 
   /** Need at least 2 minutes of lead before we'll offer the reminder picker:

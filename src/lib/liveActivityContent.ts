@@ -57,6 +57,12 @@ export interface TripActivityContentState {
 export const MIN_LIVE_ACTIVITY_IOS_MAJOR = 16;
 export const MIN_LIVE_ACTIVITY_IOS_MINOR = 2;
 
+/** How long before departure the Live Activity becomes eligible to show. A
+ *  focused trip further out than this stays dormant (no hours-long lock-screen
+ *  clutter) until it enters the window — unless a reminder is armed or it's
+ *  already en route. */
+export const LIVE_ACTIVITY_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 /** Random base36 slug for activity ids. `crypto.getRandomValues` exists in
  *  every WKWebView/browser/Node we run in; Math.random is a non-security
  *  fallback only for exotic embeds. */
@@ -115,6 +121,26 @@ export function canStartActivity(args: {
 }
 
 /**
+ * Whether the focused trip's Live Activity should currently be on screen. Pure
+ * + testable. Shows it within `LIVE_ACTIVITY_WINDOW_MS` of departure, whenever a
+ * reminder is armed (a strong "I'm tracking this" signal that overrides the
+ * window), or once it's en route ("riding"). Stops once arrival has passed.
+ * Orthogonal to the iOS/version gate (`canStartActivity`): this is the WHETHER,
+ * that is the CAN.
+ */
+export function shouldShowLiveActivity(args: {
+  hasReminder: boolean;
+  departureEpochMs: number;
+  arrivalEpochMs: number;
+  now: number;
+}): boolean {
+  if (args.now >= args.arrivalEpochMs) return false;
+  if (args.hasReminder) return true;
+  if (args.now >= args.departureEpochMs) return true;
+  return args.departureEpochMs - args.now <= LIVE_ACTIVITY_WINDOW_MS;
+}
+
+/**
  * Which countdown the headline shows: departure until the train has left, then
  * arrival. Pure; the boundary is the departure instant. Used both to build the
  * content state and to pick the active staleness target.
@@ -128,21 +154,18 @@ export function derivePhase(args: {
 
 /**
  * Humanized status pill from the realtime/derived flags. Pure. Precedence:
- * cancelled > ended > delayed > on-time. The on-time copy is phase-aware so the
- * lock screen reads naturally ("Departing"/"Arriving") when not late.
+ * cancelled > ended > delayed > on-time. The widget's colour theme (blue /
+ * orange / red) keys off these same flags, never off parsing this text.
  */
 export function deriveStatusText(args: {
   delayMinutes: number | null;
   isCanceled: boolean;
   isEnded: boolean;
-  phase: TripActivityPhase;
 }): string {
   if (args.isCanceled) return "Cancelled";
   if (args.isEnded) return "Arrived";
-  if (args.delayMinutes != null && args.delayMinutes > 0) {
-    return `+${args.delayMinutes} min`;
-  }
-  return args.phase === "pre-departure" ? "On time · departing" : "On time · arriving";
+  if (args.delayMinutes != null && args.delayMinutes > 0) return "Delayed";
+  return "On time";
 }
 
 /**
@@ -176,7 +199,6 @@ export function buildContentState(args: {
       delayMinutes,
       isCanceled: args.isCanceled,
       isEnded: args.isEnded,
-      phase,
     }),
     isCanceled: args.isCanceled,
     isEnded: args.isEnded,

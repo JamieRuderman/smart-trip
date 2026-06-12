@@ -70,6 +70,15 @@ struct TripActivityModel {
         return phase == .preDeparture ? "Departs in" : "Arrives in"
     }
 
+    /// Countdown label carrying the train number, for the lock-screen banner —
+    /// e.g. "Trip 21 departs in".
+    var tripCountdownLabel: String {
+        if isCanceled { return "Cancelled" }
+        if isEnded { return "Arrived" }
+        let verb = phase == .preDeparture ? "departs" : "arrives"
+        return "Trip \(tripNumber) \(verb) in"
+    }
+
     private static func epochMsDate(_ raw: String?) -> Date? {
         guard let raw, let ms = Double(raw), ms.isFinite, ms > 0 else { return nil }
         return Date(timeIntervalSince1970: ms / 1000)

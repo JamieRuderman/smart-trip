@@ -7,6 +7,7 @@ import {
   loadFocusedTrip,
   reconstructFocusedTrip,
   saveFocusedTrip,
+  REMINDER_FIRE_BUFFER_MS,
   type FocusedTrip,
   type FocusedTripReminder,
 } from "@/lib/focusedTrip";
@@ -25,6 +26,7 @@ import {
   updateTripActivity,
   type TripActivityAttributes,
 } from "@/lib/native/liveActivity";
+import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
 import {
   deregisterPushActivity,
   isLiveActivityPushEnabled,
@@ -156,6 +158,19 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
+  // Only show within the departure window / when a reminder is armed / en route
+  // — a far-ahead focus stays dormant rather than parking a Live Activity on the
+  // lock screen for hours. Re-evaluated by reconcile + the reminder-arm path.
+  if (
+    !shouldShowLiveActivity({
+      hasReminder: saved.reminder != null,
+      departureEpochMs: departureAt,
+      arrivalEpochMs: arrivalAt,
+      now: Date.now(),
+    })
+  ) {
+    return;
+  }
   const id = tripActivityId(saved.tripNumber, saved.serviceDate);
   const attributes: TripActivityAttributes = {
     tripNumber: saved.tripNumber,
@@ -201,6 +216,20 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
+ * Start the focused trip's Live Activity if it isn't already on screen and it
+ * should be (within the departure window, a reminder is armed, or en route).
+ * Deduped against the OS's live list, so it never double-starts; it DOES bring
+ * one back once eligible — covering a far-ahead focus that just entered the
+ * window and recovering an activity the user dismissed. `startActivityForFocus`
+ * self-gates, so this is a no-op while the trip is still dormant.
+ */
+export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
+  const running = await listTripActivities();
+  if (focused.liveActivityId && running.includes(focused.liveActivityId)) return;
+  await startActivityForFocus(focused);
+}
+
+/**
  * Boot/foreground reconciliation, two-way. (1) End any OS-side Live Activity
  * that no longer belongs to the current focus — a stale focus auto-cleared by
  * `loadFocusedTrip` (arrival passed, timetable changed) leaves its activity
@@ -220,7 +249,12 @@ export async function reconcileTripActivities(): Promise<void> {
   await Promise.all(
     ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
   );
-  if (focused && !focused.liveActivityId) {
+  const running = keep != null && ids.includes(keep);
+  if (focused && !running) {
+    // Nothing on screen for this focus (never started, ended, or the user
+    // dismissed it) — (re)start if it should show now. startActivityForFocus
+    // self-gates on the window/reminder/riding rule, so a far-ahead focus with
+    // no reminder stays dormant; a dismissed-but-eligible one comes back.
     await startActivityForFocus(focused);
     return;
   }
@@ -392,15 +426,28 @@ export function useFocusedTrip() {
       if (current.reminder && current.reminder.notificationId !== notificationId) {
         await cancelNotification(current.reminder.notificationId);
       }
-      const reminderAt = departureAt - leadMinutes * 60_000;
+      // Clamp the fire time off "now": the slider already holds it back, but a
+      // first-time permission prompt can eat into the lead, and AlarmKit rejects
+      // an at/just-past fire time (we'd fall back to a weaker notification).
+      const reminderAt = Math.max(
+        departureAt - leadMinutes * 60_000,
+        Date.now() + REMINDER_FIRE_BUFFER_MS,
+      );
       // armAndPersistReminder picks the channel (alarm vs notification) and
       // requests notification permission only if it actually falls back, so an
       // alarm-only user who denied notifications isn't blocked here.
-      return armAndPersistReminder(
+      const result = await armAndPersistReminder(
         current,
         { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
         "Failed to schedule focused-trip reminder",
       );
+      // A set reminder forces the Live Activity on — ensure it's running (covers
+      // a far-ahead focus and recovers a dismissal). Fire-and-forget, like focus.
+      if (result.ok) {
+        const latest = loadFocusedTrip();
+        if (latest) void ensureActivityForFocus(latest);
+      }
+      return result;
     },
     [],
   );
@@ -411,7 +458,10 @@ export function useFocusedTrip() {
     async (departureAt: number, text: ReminderText): Promise<void> => {
       const current = loadFocusedTrip();
       if (!current?.reminder) return;
-      const reminderAt = departureAt - current.reminder.leadMinutes * 60_000;
+      const reminderAt = Math.max(
+        departureAt - current.reminder.leadMinutes * 60_000,
+        Date.now() + REMINDER_FIRE_BUFFER_MS,
+      );
       if (
         reminderAt === current.reminder.reminderAt &&
         text.title === current.reminder.title &&

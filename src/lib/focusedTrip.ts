@@ -41,6 +41,12 @@ export interface FocusedTrip {
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
 export const FOCUSED_TRIP_CHANGED_EVENT = "smart-train-focused-trip-changed";
 
+/** Hold the soonest reminder this far in the future so the alarm schedules
+ *  successfully. AlarmKit rejects a fire time that's at/just-past "now", which
+ *  silently downgrades the reminder to a weaker local notification. Constrains
+ *  the picker slider and clamps the computed fire time on both arm paths. */
+export const REMINDER_FIRE_BUFFER_MS = 60_000;
+
 /**
  * Whether `focused` belongs to the same schedule as a displayed leg/arrival —
  * matched by direction + weekday/weekend schedule type, NOT exact leg. The same

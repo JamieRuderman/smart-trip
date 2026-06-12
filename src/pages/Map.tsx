@@ -427,6 +427,12 @@ function MapContents() {
         className="absolute inset-x-0 top-0"
         style={{
           ...(cssVars as React.CSSProperties),
+          // mapbox-gl.css's `.mapboxgl-map { position: relative }` is injected
+          // after Tailwind (the lazy /map chunk loads it last) and, at equal
+          // specificity, wins on source order — overriding the `absolute` class
+          // above and collapsing this container to 0 height. Pin position inline
+          // so the inset offsets apply and the map fills the screen.
+          position: "absolute",
           bottom: "var(--safe-area-bottom)",
         }}
       />

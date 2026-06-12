@@ -210,7 +210,7 @@
     "warningTitle": "Cerca de la salida",
     "warningBody_one": "Solo {{count}} min antes de que salga el tren: asegúrate de tener tiempo suficiente para llegar.",
     "warningBody_other": "Solo {{count}} min antes de que salga el tren: asegúrate de tener tiempo suficiente para llegar.",
-    "notificationTitle": "Hora de salir hacia {{station}}",
+    "notificationTitle": "Sal hacia {{station}}",
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes).",
     "alarmStop": "Detener",
     "alarmViewTrip": "Ver viaje"

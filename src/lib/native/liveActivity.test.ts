@@ -72,6 +72,7 @@ function content(over: Partial<TripActivityContentState> = {}): TripActivityCont
     nextStop: null,
     remainingStops: null,
     statusText: "On time · departing",
+    isCanceled: false,
     isEnded: false,
     staleAfterEpochMs: DEP,
     ...over,
@@ -192,6 +193,7 @@ describe("encodeAttributes / encodeContentState", () => {
       delayMinutes: "0",
       nextStop: "",
       remainingStops: "",
+      isCanceled: "false",
       isEnded: "false",
       staleAfterEpochMs: String(DEP),
     });

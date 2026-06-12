@@ -16,10 +16,12 @@ vi.mock("@/lib/env", () => ({
 const setLiveActivityTokenEndpoint = vi.fn(async (url: string) => {
   void url;
 });
-const startTripActivityWithPush = vi.fn(async () => ({
-  started: true,
-  activityId: "sys-1",
-}));
+const startTripActivityWithPush = vi.fn(
+  async (): Promise<{ started: boolean; activityId?: string }> => ({
+    started: true,
+    activityId: "sys-1",
+  }),
+);
 vi.mock("@/lib/native/liveActivity", () => ({
   setLiveActivityTokenEndpoint: (url: string) => setLiveActivityTokenEndpoint(url),
   startTripActivityWithPush: () => startTripActivityWithPush(),

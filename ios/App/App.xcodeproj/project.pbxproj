@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		4585AB0B988AD24734CAD3BB /* TripActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -15,13 +16,46 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */; };
+		5EF9B69B4CACA407E3E5E8A8 /* SmartTripWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8845A6772E51344B8D7262F /* SmartTripWidgetBundle.swift */; };
+		658954374CB32357CF5A3CC1 /* SmartTripWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */; };
+		90C66BC2E0C3A22C56EBF4D1 /* GenericAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BECD21E46085A195BE3149 /* GenericAttributes.swift */; };
+		989714CA4D3D58CA0B855398 /* TripActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382FE64EA322CDB67EB332FA /* TripActivityModel.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		AA254B2DEBB0A59F2803DAF2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F06DD956CF393C6C634F4AF /* Foundation.framework */; };
 		BA1DC9F6D7EF3AB2F5E585CB /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09BF3F276A99C4388386BDB /* MainViewController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		EDD5B387E6CD9C4A00603FE4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 56D574B9649B903DE05EC96F;
+			remoteInfo = SmartTripWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8CF4DF610C5E4873E2675D60 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				658954374CB32357CF5A3CC1 /* SmartTripWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		10BECD21E46085A195BE3149 /* GenericAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GenericAttributes.swift; sourceTree = "<group>"; };
+		10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TripActivityWidget.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		382FE64EA322CDB67EB332FA /* TripActivityModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TripActivityModel.swift; sourceTree = "<group>"; };
+		3F06DD956CF393C6C634F4AF /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -31,9 +65,12 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmKit.swift; sourceTree = "<group>"; };
+		92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SmartTripWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmPlugin.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		DA117BF44531AFC1784F1499 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E8845A6772E51344B8D7262F /* SmartTripWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartTripWidgetBundle.swift; sourceTree = "<group>"; };
 		F09BF3F276A99C4388386BDB /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -47,6 +84,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		60E54AE27B8C43E1747A958A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA254B2DEBB0A59F2803DAF2 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -54,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
+				5A7023ADF15325788F56E636 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -65,6 +111,7 @@
 				504EC3051FED79650016851F /* Products */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
+				979CCB7F21E8A8800F4E6E71 /* SmartTripWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -72,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,6 +141,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		5A7023ADF15325788F56E636 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3F06DD956CF393C6C634F4AF /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
 			isa = PBXGroup;
 			children = (
@@ -100,6 +156,19 @@
 				AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */,
 			);
 			name = Pods;
+			sourceTree = "<group>";
+		};
+		979CCB7F21E8A8800F4E6E71 /* SmartTripWidget */ = {
+			isa = PBXGroup;
+			children = (
+				E8845A6772E51344B8D7262F /* SmartTripWidgetBundle.swift */,
+				10BECD21E46085A195BE3149 /* GenericAttributes.swift */,
+				382FE64EA322CDB67EB332FA /* TripActivityModel.swift */,
+				10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */,
+				DA117BF44531AFC1784F1499 /* Info.plist */,
+			);
+			name = SmartTripWidget;
+			path = SmartTripWidget;
 			sourceTree = "<group>";
 		};
 		E4EC4CEBE64FBFD42A61507F /* LeaveAlarm */ = {
@@ -124,15 +193,34 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				9592DBEFFC6D2A0C8D5DEB22 /* [CP] Embed Pods Frameworks */,
+				8CF4DF610C5E4873E2675D60 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0264158F4FD1E2CDE90AE7D2 /* PBXTargetDependency */,
 			);
 			name = App;
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		56D574B9649B903DE05EC96F /* SmartTripWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 217BF6F16AE54A2D3ACA8D1C /* Build configuration list for PBXNativeTarget "SmartTripWidget" */;
+			buildPhases = (
+				EBD4039FF93A6F90AAFF7948 /* Sources */,
+				60E54AE27B8C43E1747A958A /* Frameworks */,
+				9C6E88D0275F32F6FF4E0598 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartTripWidget;
+			productName = SmartTripWidget;
+			productReference = 92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -164,6 +252,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				56D574B9649B903DE05EC96F /* SmartTripWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -179,6 +268,13 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9C6E88D0275F32F6FF4E0598 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,7 +328,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EBD4039FF93A6F90AAFF7948 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5EF9B69B4CACA407E3E5E8A8 /* SmartTripWidgetBundle.swift in Sources */,
+				90C66BC2E0C3A22C56EBF4D1 /* GenericAttributes.swift in Sources */,
+				989714CA4D3D58CA0B855398 /* TripActivityModel.swift in Sources */,
+				4585AB0B988AD24734CAD3BB /* TripActivityWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0264158F4FD1E2CDE90AE7D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SmartTripWidget;
+			target = 56D574B9649B903DE05EC96F /* SmartTripWidget */;
+			targetProxy = EDD5B387E6CD9C4A00603FE4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -414,9 +530,63 @@
 			};
 			name = Release;
 		};
+		CE5A651517212E273CA31018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 6YH3537ZY9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SmartTripWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = smart.trip.SmartTripWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F3EFBEEC6F582B9E3A3AAE57 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 6YH3537ZY9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SmartTripWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = smart.trip.SmartTripWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		217BF6F16AE54A2D3ACA8D1C /* Build configuration list for PBXNativeTarget "SmartTripWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE5A651517212E273CA31018 /* Release */,
+				F3EFBEEC6F582B9E3A3AAE57 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

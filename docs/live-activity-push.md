@@ -53,10 +53,13 @@ clear / arrival → DELETE /api/liveactivity/register?id=…
 
 ## Required to go live
 
-### 1. Native widget (the Mac/Xcode work from Phase 1's plan)
-The widget extension must exist and render a real Live Activity before any token
-is minted. Note its **bundle id** (e.g. `smart.trip.SmartTripWidget`) — the APNs
-topic is `<widget-bundle-id>.push-type.liveactivity`.
+### 1. Native widget — ✅ shipped (`ios/App/SmartTripWidget/`)
+The `SmartTripWidget` extension target renders the lock-screen + Dynamic Island
+UI. Its bundle id is **`smart.trip.SmartTripWidget`** — the APNs topic is
+therefore `smart.trip.SmartTripWidget.push-type.liveactivity`. Remaining
+Xcode-side work: confirm the signing team on the new target, and (for Phase 2)
+enable the *Push Notifications* capability on the **App** target so ActivityKit
+can mint update tokens.
 
 ### 2. APNs auth key
 Create a **token-based** APNs key (`.p8`) in the Apple Developer portal
@@ -69,7 +72,7 @@ You get a `.p8` file + a 10-char **Key ID**; the **Team ID** is `6YH3537ZY9`.
 | `APNS_KEY_ID` | the `.p8` Key ID |
 | `APNS_TEAM_ID` | `6YH3537ZY9` |
 | `APNS_PRIVATE_KEY` | the `.p8` PEM contents (newlines as literal `\n` are accepted) |
-| `APNS_WIDGET_BUNDLE_ID` | the widget bundle id |
+| `APNS_WIDGET_BUNDLE_ID` | `smart.trip.SmartTripWidget` |
 | `APNS_HOST` | optional; defaults to `api.push.apple.com` (use `api.sandbox.push.apple.com` for dev builds) |
 | `CRON_SECRET` | shared secret; the scheduler must send it as `Authorization: Bearer …`. **Required** — the push endpoint treats a missing secret as "not configured" and no-ops, so it can never run unauthenticated |
 | `PUBLIC_BASE_URL` | optional; the cron's base for its internal `/api/gtfsrt/tripupdates` fetch (falls back to `VERCEL_URL`) |

@@ -128,11 +128,11 @@ describe("canStartActivity", () => {
 describe("shouldShowLiveActivity", () => {
   const base = {
     hasReminder: false,
-    departureEpochMs: DEP, // 30 min after NOW → inside the 60-min window
+    departureEpochMs: DEP, // 30 min after NOW → inside the window
     arrivalEpochMs: ARR,
     now: NOW,
   };
-  const farFromDeparture = DEP - (LIVE_ACTIVITY_WINDOW_MS + 60_000); // 61 min out
+  const farFromDeparture = DEP - (LIVE_ACTIVITY_WINDOW_MS + 60_000); // just past the window
 
   it("shows within the window before departure", () => {
     expect(shouldShowLiveActivity(base)).toBe(true);

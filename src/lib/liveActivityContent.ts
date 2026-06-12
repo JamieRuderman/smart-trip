@@ -61,7 +61,7 @@ export const MIN_LIVE_ACTIVITY_IOS_MINOR = 2;
  *  focused trip further out than this stays dormant (no hours-long lock-screen
  *  clutter) until it enters the window — unless a reminder is armed or it's
  *  already en route. */
-export const LIVE_ACTIVITY_WINDOW_MS = 60 * 60 * 1000;
+export const LIVE_ACTIVITY_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /** Random base36 slug for activity ids. `crypto.getRandomValues` exists in
  *  every WKWebView/browser/Node we run in; Math.random is a non-security

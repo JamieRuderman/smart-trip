@@ -5,6 +5,7 @@ import {
   focusedArrivalInstant,
   focusedDepartureInstant,
   loadFocusedTrip,
+  reconstructFocusedTrip,
   saveFocusedTrip,
   type FocusedTrip,
   type FocusedTripReminder,
@@ -24,6 +25,14 @@ import {
   updateTripActivity,
   type TripActivityAttributes,
 } from "@/lib/native/liveActivity";
+import {
+  deregisterPushActivity,
+  isLiveActivityPushEnabled,
+  registerPushActivity,
+  startAndRegisterPushActivity,
+} from "@/lib/native/liveActivityPush";
+import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { reminderIdFor } from "@/lib/notificationId";
 import { logger } from "@/lib/logger";
@@ -76,11 +85,60 @@ function sameFocusIdentity(
 const lastSentActivityContent = new Map<string, string>();
 
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
- *  Island), if one is running. Safe no-op everywhere else. */
+ *  Island), if one is running. Also deregisters it from the push backend when
+ *  push updates are enabled. Safe no-op everywhere else. */
 async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
+  if (isLiveActivityPushEnabled()) {
+    await deregisterPushActivity(focused.liveActivityId);
+  }
+}
+
+/**
+ * Origin-terminal scheduled departure ("HH:MM", markers stripped) — matches
+ * the GTFS-RT feed's `startTime`, which is how the backend recognizes a
+ * cancelled run whose stop updates were omitted. Southbound runs originate at
+ * the northernmost station (times[0]), northbound at the southernmost
+ * (times[last]) — same convention as useTripRealtimeStatusMap. Undefined when
+ * the origin time isn't in the static data (trip starts mid-line).
+ */
+function originStartTimeFor(
+  trip: ProcessedTrip,
+  southbound: boolean,
+): string | undefined {
+  const raw = southbound ? trip.times[0] : trip.times[trip.times.length - 1];
+  const cleaned = raw?.replace(/[*~]/g, "");
+  return cleaned && cleaned !== "--" ? cleaned : undefined;
+}
+
+/** The push-backend registration for a focus under activity id `id`, or null
+ *  when the trip can't be reconstructed. Shared by the start path and the
+ *  boot-time re-registration heal. */
+function buildRegistrationForFocus(
+  saved: FocusedTrip,
+  id: string,
+): LiveActivityRegistration | null {
+  const trip = reconstructFocusedTrip(saved);
+  const departureAt = focusedDepartureInstant(saved);
+  const arrivalAt = focusedArrivalInstant(saved);
+  if (!trip || departureAt == null || arrivalAt == null) return null;
+  const southbound = isSouthbound(saved.fromStation, saved.toStation);
+  const originStartTime = originStartTimeFor(trip, southbound);
+  return {
+    id,
+    tripNumber: saved.tripNumber,
+    serviceDate: saved.serviceDate,
+    fromStation: saved.fromStation,
+    toStation: saved.toStation,
+    direction: southbound ? "southbound" : "northbound",
+    scheduledDeparture: trip.departureTime,
+    scheduledArrival: trip.arrivalTime,
+    departureEpochMs: departureAt,
+    arrivalEpochMs: arrivalAt,
+    ...(originStartTime ? { originStartTime } : {}),
+  };
 }
 
 /**
@@ -117,7 +175,18 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isEnded: false,
     now: Date.now(),
   });
-  const { started } = await startTripActivity(id, attributes, content);
+  // Push-enabled builds register the trip + APNs token with the backend so the
+  // countdown is corrected while the phone is locked; everything else uses the
+  // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
+  let started: boolean;
+  if (isLiveActivityPushEnabled()) {
+    const registration = buildRegistrationForFocus(saved, id);
+    started = registration
+      ? (await startAndRegisterPushActivity(registration, attributes, content)).started
+      : (await startTripActivity(id, attributes, content)).started;
+  } else {
+    started = (await startTripActivity(id, attributes, content)).started;
+  }
   if (!started) return;
   lastSentActivityContent.set(id, JSON.stringify(content));
   const latest = loadFocusedTrip();
@@ -150,7 +219,21 @@ export async function reconcileTripActivities(): Promise<void> {
   await Promise.all(
     ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
   );
-  if (focused && !focused.liveActivityId) await startActivityForFocus(focused);
+  if (focused && !focused.liveActivityId) {
+    await startActivityForFocus(focused);
+    return;
+  }
+  // Push heal: the running activity's registration POST may have failed at
+  // focus time (offline), silently degrading locked-screen corrections.
+  // Re-registering is an idempotent upsert keyed on the activity id (and
+  // refreshes the server-side TTLs), so re-POST on every boot.
+  if (focused?.liveActivityId && isLiveActivityPushEnabled()) {
+    const registration = buildRegistrationForFocus(
+      focused,
+      focused.liveActivityId,
+    );
+    if (registration) await registerPushActivity(registration);
+  }
 }
 
 /**

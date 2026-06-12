@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { Station } from "@/types/smartSchedule";
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
+  focusedArrivalInstant,
+  focusedDepartureInstant,
   loadFocusedTrip,
   saveFocusedTrip,
   type FocusedTrip,
@@ -13,6 +15,16 @@ import {
   scheduleNotification,
 } from "@/lib/notificationScheduler";
 import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
+import {
+  buildContentState,
+  endTripActivity,
+  listTripActivities,
+  startTripActivity,
+  tripActivityId,
+  updateTripActivity,
+  type TripActivityAttributes,
+} from "@/lib/native/liveActivity";
+import { isSouthbound } from "@/lib/stationUtils";
 import { reminderIdFor } from "@/lib/notificationId";
 import { logger } from "@/lib/logger";
 
@@ -57,6 +69,88 @@ function sameFocusIdentity(
     a.toStation === b.toStation &&
     a.scheduleType === b.scheduleType
   );
+}
+
+/** Last content state sent per activity id — skips redundant plugin round-trips
+ *  when the sync effect re-fires with unchanged data (RT poll, clock ticks). */
+const lastSentActivityContent = new Map<string, string>();
+
+/** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
+ *  Island), if one is running. Safe no-op everywhere else. */
+async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
+  if (!focused?.liveActivityId) return;
+  lastSentActivityContent.delete(focused.liveActivityId);
+  await endTripActivity(focused.liveActivityId);
+}
+
+/**
+ * Start the iOS Live Activity (lock screen + Dynamic Island countdown) for a
+ * freshly saved focus and persist its id. Targets come from the static
+ * schedule + serviceDate — the drift sync corrects them from realtime later.
+ * Graceful no-op off-iOS / <16.2 / activities disabled (startTripActivity
+ * gates internally). Mirrors armAndPersistReminder's commit discipline: after
+ * the (async) start, the focus is re-read and the activity is rolled back if
+ * the user switched/cleared trips meanwhile; on commit we persist from the
+ * LATEST record so a concurrently armed reminder isn't clobbered.
+ */
+async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
+  const departureAt = focusedDepartureInstant(saved);
+  const arrivalAt = focusedArrivalInstant(saved);
+  if (departureAt == null || arrivalAt == null) return;
+  const id = tripActivityId(saved.tripNumber, saved.serviceDate);
+  const attributes: TripActivityAttributes = {
+    tripNumber: saved.tripNumber,
+    fromStation: saved.fromStation,
+    toStation: saved.toStation,
+    routeName: "SMART",
+    direction: isSouthbound(saved.fromStation, saved.toStation)
+      ? "southbound"
+      : "northbound",
+  };
+  const content = buildContentState({
+    departureEpochMs: departureAt,
+    arrivalEpochMs: arrivalAt,
+    delayMinutes: null,
+    nextStop: null,
+    remainingStops: null,
+    isCanceled: false,
+    isEnded: false,
+    now: Date.now(),
+  });
+  const { started } = await startTripActivity(id, attributes, content);
+  if (!started) return;
+  lastSentActivityContent.set(id, JSON.stringify(content));
+  const latest = loadFocusedTrip();
+  if (latest == null || !sameFocusIdentity(latest, saved)) {
+    lastSentActivityContent.delete(id);
+    await endTripActivity(id);
+    return;
+  }
+  saveFocusedTrip({ ...latest, liveActivityId: id });
+  notifyChange();
+}
+
+/**
+ * Boot/foreground reconciliation, two-way. (1) End any OS-side Live Activity
+ * that no longer belongs to the current focus — a stale focus auto-cleared by
+ * `loadFocusedTrip` (arrival passed, timetable changed) leaves its activity
+ * orphaned on the lock screen since the storage layer can't reach the plugin.
+ * (2) Self-heal the opposite gap: a focus with NO committed activity (start
+ * failed, app killed between start and commit, or Live Activities were
+ * disabled when the trip was focused and enabled since) gets a fresh start —
+ * `startActivityForFocus` re-gates internally, so attempting every boot is
+ * safe. A user-dismissed activity is NOT respawned: swiping it away leaves
+ * `liveActivityId` committed, which skips the heal. Instant no-op off-iOS.
+ * Call alongside `bootFocusedTrip`.
+ */
+export async function reconcileTripActivities(): Promise<void> {
+  const focused = loadFocusedTrip();
+  const keep = focused?.liveActivityId;
+  const ids = await listTripActivities();
+  await Promise.all(
+    ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
+  );
+  if (focused && !focused.liveActivityId) await startActivityForFocus(focused);
 }
 
 /**
@@ -112,7 +206,7 @@ async function armAndPersistReminder(
 
   // Commit only if the focus is still the same run we scheduled for.
   const latest = loadFocusedTrip();
-  if (!sameFocusIdentity(latest, current)) {
+  if (latest == null || !sameFocusIdentity(latest, current)) {
     if (alarmId) await cancelLeaveAlarm(alarmId);
     else await cancelNotification(reminder.notificationId);
     return { ok: false, reason: "schedule-failed" };
@@ -126,9 +220,10 @@ async function armAndPersistReminder(
   } else if (prev?.alarmId) {
     await cancelLeaveAlarm(prev.alarmId);
   }
-  // Identity matches `current`, so it's safe (and type-clean vs the nullable
-  // `latest`) to persist from `current` with the freshly scheduled reminder.
-  saveFocusedTrip({ ...current, reminder: { ...reminder, alarmId } });
+  // Persist from `latest` (same identity as `current`, just re-read): the
+  // Live Activity start commits `liveActivityId` concurrently with this
+  // await-heavy path, and spreading the stale `current` would clobber it.
+  saveFocusedTrip({ ...latest, reminder: { ...reminder, alarmId } });
   notifyChange();
   return { ok: true };
 }
@@ -163,11 +258,13 @@ export function useFocusedTrip() {
   }, []);
 
   /** Focus a trip (no reminder). Replaces any existing focus and cancels its
-   *  reminder. Caller handles any "switch trains?" confirmation. */
+   *  reminder + Live Activity. Caller handles any "switch trains?"
+   *  confirmation. */
   const focusTrip = useCallback(async (input: FocusTripInput) => {
     const prev = loadFocusedTrip();
     if (prev?.reminder) await cancelReminderChannels(prev.reminder);
-    saveFocusedTrip({
+    await endFocusActivity(prev);
+    const next: FocusedTrip = {
       source: "user",
       tripNumber: input.tripNumber,
       fromStation: input.fromStation,
@@ -175,8 +272,12 @@ export function useFocusedTrip() {
       scheduleType: input.scheduleType,
       serviceDate: input.serviceDate,
       reminder: null,
-    });
+    };
+    saveFocusedTrip(next);
     notifyChange();
+    // After the focus is visible — the activity is an enhancement, so its
+    // (async, gated) start must not delay the card/picker appearing.
+    await startActivityForFocus(next);
   }, []);
 
   /** Arm (number) or disarm (null) the reminder. `departureAt` is the live-
@@ -244,12 +345,58 @@ export function useFocusedTrip() {
     [],
   );
 
+  /**
+   * Push the live departure/arrival/delay into the running Live Activity so
+   * the lock-screen / Dynamic Island countdown tracks realtime drift and the
+   * pre-departure → en-route phase flip. Independent of any armed reminder —
+   * the activity follows the focused train itself. No-op when no activity is
+   * running, and deduped against the last sent content so the RT poll / clock
+   * tick can call this freely.
+   */
+  const updateLiveActivity = useCallback(
+    async (args: {
+      departureAt: number;
+      arrivalAt: number;
+      delayMinutes: number | null;
+      nextStop?: string | null;
+      remainingStops?: number | null;
+      isCanceled?: boolean;
+    }): Promise<void> => {
+      const current = loadFocusedTrip();
+      const id = current?.liveActivityId;
+      if (!id) return;
+      const content = buildContentState({
+        departureEpochMs: args.departureAt,
+        arrivalEpochMs: args.arrivalAt,
+        delayMinutes: args.delayMinutes,
+        nextStop: args.nextStop ?? null,
+        remainingStops: args.remainingStops ?? null,
+        isCanceled: args.isCanceled ?? false,
+        isEnded: false,
+        now: Date.now(),
+      });
+      const json = JSON.stringify(content);
+      if (lastSentActivityContent.get(id) === json) return;
+      const { updated } = await updateTripActivity(id, content);
+      if (updated) lastSentActivityContent.set(id, json);
+    },
+    [],
+  );
+
   const clearFocusedTrip = useCallback(async () => {
     const current = loadFocusedTrip();
     if (current?.reminder) await cancelReminderChannels(current.reminder);
+    await endFocusActivity(current);
     saveFocusedTrip(null);
     notifyChange();
   }, []);
 
-  return { focusedTrip, focusTrip, setReminder, rescheduleReminder, clearFocusedTrip };
+  return {
+    focusedTrip,
+    focusTrip,
+    setReminder,
+    rescheduleReminder,
+    updateLiveActivity,
+    clearFocusedTrip,
+  };
 }

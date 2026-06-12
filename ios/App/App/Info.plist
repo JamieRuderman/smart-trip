@@ -49,6 +49,8 @@
 	<string>SMART trip uses your location to highlight the nearest station and improve trip progress tracking.</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>SMART Trip uses alarms to remind you when it is time to leave for your train.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>

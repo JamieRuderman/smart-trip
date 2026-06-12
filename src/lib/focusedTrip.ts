@@ -29,6 +29,13 @@ export interface FocusedTrip {
    *  departure/arrival are derived from static schedule + this date. */
   serviceDate: string;
   reminder: FocusedTripReminder | null;
+  /** Caller-chosen id of the running iOS Live Activity (lock screen + Dynamic
+   *  Island countdown) for this trip, when one was started. iOS 16.2+ only;
+   *  absent on Android, web, older iOS, or when Live Activities are disabled.
+   *  Persisted so we can update/end the right activity across JS reloads — the
+   *  OS keeps the activity alive independently of the webview. Mirrors how
+   *  `reminder.alarmId` tracks an out-of-process alert. */
+  liveActivityId?: string;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
@@ -72,6 +79,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       typeof (r.reminder as Record<string, unknown>).body === "string" &&
       ((r.reminder as Record<string, unknown>).alarmId === undefined ||
         typeof (r.reminder as Record<string, unknown>).alarmId === "string"));
+  const liveActivityIdOk =
+    r.liveActivityId === undefined || typeof r.liveActivityId === "string";
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -80,7 +89,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     (r.scheduleType === "weekday" || r.scheduleType === "weekend") &&
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
-    reminderOk
+    reminderOk &&
+    liveActivityIdOk
   );
 }
 
@@ -148,6 +158,37 @@ export function focusedDepartureInstant(focused: FocusedTrip): number | null {
   const trip = reconstructFocusedTrip(focused);
   if (!trip) return null;
   return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));
+}
+
+/**
+ * Resolve the focused trip's arrival (at its toStation) to an absolute instant
+ * on its service date, rolling overnight trips to the next day. The single
+ * source for the Live Activity countdown's arrival target. Sibling of
+ * `focusedDepartureInstant`; null if the trip can't be reconstructed.
+ */
+export function focusedArrivalInstant(focused: FocusedTrip): number | null {
+  const trip = reconstructFocusedTrip(focused);
+  if (!trip) return null;
+  return arrivalInstant(focused, trip);
+}
+
+/**
+ * Re-anchor a live "HH:MM" clock time onto the calendar day of a static
+ * schedule instant, picking the day offset that lands closest to it
+ * (overnight-safe within ±12h). Lets the Live Activity sync turn the feed's
+ * clock times into absolute instants on the focused trip's own service date,
+ * instead of anchoring to "today" the way the schedule views do.
+ */
+export function anchorLiveTime(staticInstant: number, liveHHMM: string): number {
+  const minutes = hhmmToMinutes(liveHHMM);
+  const d = new Date(staticInstant);
+  d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  let t = d.getTime();
+  const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+  const FULL_DAY_MS = 24 * 60 * 60 * 1000;
+  if (t < staticInstant - HALF_DAY_MS) t += FULL_DAY_MS;
+  else if (t > staticInstant + HALF_DAY_MS) t -= FULL_DAY_MS;
+  return t;
 }
 
 /**

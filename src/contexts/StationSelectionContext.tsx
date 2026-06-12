@@ -11,6 +11,7 @@ import type { Station } from "@/types/smartSchedule";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { useFocusedTrip } from "@/hooks/useFocusedTrip";
+import { endTripActivity } from "@/lib/native/liveActivity";
 import { FOCUSED_TRIP_CHANGED_EVENT, loadFocusedTrip } from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
@@ -256,6 +257,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     focusTrip,
     setReminder,
     rescheduleReminder,
+    updateLiveActivity,
     clearFocusedTrip,
   } = useFocusedTrip();
 
@@ -270,6 +272,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     if (!focusedTrip) return;
     const tick = window.setInterval(() => {
       if (loadFocusedTrip() === null) {
+        // The storage layer auto-cleared the trip (arrival passed / timetable
+        // changed) but can't reach the plugin — end its Live Activity here so
+        // the lock-screen countdown doesn't linger past arrival.
+        if (focusedTrip.liveActivityId) {
+          void endTripActivity(focusedTrip.liveActivityId);
+        }
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
         return;
       }
@@ -298,6 +306,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusTrip,
       setReminder,
       rescheduleReminder,
+      updateLiveActivity,
       clearFocusedTrip,
     }),
     [
@@ -314,6 +323,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       focusTrip,
       setReminder,
       rescheduleReminder,
+      updateLiveActivity,
       clearFocusedTrip,
     ],
   );

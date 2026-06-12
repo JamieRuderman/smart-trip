@@ -25,6 +25,16 @@ export interface StationSelection {
     text: ReminderText,
   ) => Promise<SetReminderResult>;
   rescheduleReminder: (departureAt: number, text: ReminderText) => Promise<void>;
+  /** Push live departure/arrival/delay into the focused trip's iOS Live
+   *  Activity (no-op when none is running — non-iOS, unsupported, off). */
+  updateLiveActivity: (args: {
+    departureAt: number;
+    arrivalAt: number;
+    delayMinutes: number | null;
+    nextStop?: string | null;
+    remainingStops?: number | null;
+    isCanceled?: boolean;
+  }) => Promise<void>;
   clearFocusedTrip: () => Promise<void>;
 }
 

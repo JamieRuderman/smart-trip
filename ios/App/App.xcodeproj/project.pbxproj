@@ -14,7 +14,10 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */; };
+		82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		BA1DC9F6D7EF3AB2F5E585CB /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09BF3F276A99C4388386BDB /* MainViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,8 +30,11 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmKit.swift; sourceTree = "<group>"; };
+		9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmPlugin.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		F09BF3F276A99C4388386BDB /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -81,6 +87,8 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				F09BF3F276A99C4388386BDB /* MainViewController.swift */,
+				E4EC4CEBE64FBFD42A61507F /* LeaveAlarm */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -92,6 +100,16 @@
 				AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */,
 			);
 			name = Pods;
+			sourceTree = "<group>";
+		};
+		E4EC4CEBE64FBFD42A61507F /* LeaveAlarm */ = {
+			isa = PBXGroup;
+			children = (
+				9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */,
+				88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */,
+			);
+			name = LeaveAlarm;
+			path = LeaveAlarm;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -141,8 +159,6 @@
 				Base,
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
-			packageReferences = (
-			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -210,6 +226,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				BA1DC9F6D7EF3AB2F5E585CB /* MainViewController.swift in Sources */,
+				82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */,
+				51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -7,7 +7,6 @@ import {
   loadFocusedTrip,
   reconstructFocusedTrip,
   saveFocusedTrip,
-  REMINDER_FIRE_BUFFER_MS,
   type FocusedTrip,
   type FocusedTripReminder,
 } from "@/lib/focusedTrip";
@@ -426,13 +425,12 @@ export function useFocusedTrip() {
       if (current.reminder && current.reminder.notificationId !== notificationId) {
         await cancelNotification(current.reminder.notificationId);
       }
-      // Clamp the fire time off "now": the slider already holds it back, but a
-      // first-time permission prompt can eat into the lead, and AlarmKit rejects
-      // an at/just-past fire time (we'd fall back to a weaker notification).
-      const reminderAt = Math.max(
-        departureAt - leadMinutes * 60_000,
-        Date.now() + REMINDER_FIRE_BUFFER_MS,
-      );
+      // Intended fire time, kept UNCLAMPED. The near-now buffer is enforced on
+      // the picker slider (it can't select a sub-buffer lead); clamping here with
+      // Date.now() instead makes the value non-deterministic and spins the
+      // drift-reschedule effect into a re-arm loop (its idempotency check
+      // recomputes this same unclamped expression).
+      const reminderAt = departureAt - leadMinutes * 60_000;
       // armAndPersistReminder picks the channel (alarm vs notification) and
       // requests notification permission only if it actually falls back, so an
       // alarm-only user who denied notifications isn't blocked here.
@@ -458,10 +456,9 @@ export function useFocusedTrip() {
     async (departureAt: number, text: ReminderText): Promise<void> => {
       const current = loadFocusedTrip();
       if (!current?.reminder) return;
-      const reminderAt = Math.max(
-        departureAt - current.reminder.leadMinutes * 60_000,
-        Date.now() + REMINDER_FIRE_BUFFER_MS,
-      );
+      // Unclamped, to match DepartureReminder's drift short-circuit (see the
+      // note in setReminder) — never reintroduce a Date.now() clamp here.
+      const reminderAt = departureAt - current.reminder.leadMinutes * 60_000;
       if (
         reminderAt === current.reminder.reminderAt &&
         text.title === current.reminder.title &&

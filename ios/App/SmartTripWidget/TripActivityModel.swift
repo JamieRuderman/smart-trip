@@ -31,6 +31,7 @@ struct TripActivityModel {
     let statusText: String
     let isCanceled: Bool
     let isEnded: Bool
+    let reminderSet: Bool
 
     init(context: ActivityViewContext<GenericAttributes>) {
         let attrs = context.attributes.staticValues
@@ -50,33 +51,7 @@ struct TripActivityModel {
         statusText = state["statusText"] ?? ""
         isCanceled = state["isCanceled"] == "true"
         isEnded = state["isEnded"] == "true"
-    }
-
-    /// The countdown the headline shows: departure until the train leaves,
-    /// then arrival. Nil when there's nothing left to count down to.
-    var countdownTarget: Date? {
-        guard !isEnded, !isCanceled else { return nil }
-        let target = phase == .preDeparture ? departureDate : arrivalDate
-        // A target at/behind "now" renders as a frozen 0:00 — let the view
-        // fall back to a static label instead.
-        guard let target, target.timeIntervalSinceNow > 0 else { return nil }
-        return target
-    }
-
-    /// Short label above/next to the countdown.
-    var countdownLabel: String {
-        if isCanceled { return "Cancelled" }
-        if isEnded { return "Arrived" }
-        return phase == .preDeparture ? "Departs in" : "Arrives in"
-    }
-
-    /// Countdown label carrying the train number, for the lock-screen banner —
-    /// e.g. "Trip 21 departs in".
-    var tripCountdownLabel: String {
-        if isCanceled { return "Cancelled" }
-        if isEnded { return "Arrived" }
-        let verb = phase == .preDeparture ? "departs" : "arrives"
-        return "Trip \(tripNumber) \(verb) in"
+        reminderSet = state["reminderSet"] == "true"
     }
 
     private static func epochMsDate(_ raw: String?) -> Date? {

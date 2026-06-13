@@ -78,6 +78,7 @@ function content(over: Partial<TripActivityContentState> = {}): TripActivityCont
     statusText: "On time",
     isCanceled: false,
     isEnded: false,
+    reminderSet: false,
     staleAfterEpochMs: DEP,
     ...over,
   };
@@ -228,7 +229,11 @@ describe("encodeAttributes / encodeContentState", () => {
       remainingStops: "",
       isCanceled: "false",
       isEnded: "false",
+      reminderSet: "false",
       staleAfterEpochMs: String(DEP),
+    });
+    expect(encodeContentState(content({ reminderSet: true }))).toMatchObject({
+      reminderSet: "true",
     });
   });
   it("omits staleAfterEpochMs when absent", () => {

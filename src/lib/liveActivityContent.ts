@@ -48,6 +48,8 @@ export interface TripActivityContentState {
    *  pill, no countdown) on this, never on parsing `statusText`. */
   isCanceled: boolean;
   isEnded: boolean;
+  /** Whether a leave reminder is armed for this trip — drives the bell icon. */
+  reminderSet: boolean;
   /** ActivityKit staleDate (epoch ms): when the OS should mark the activity
    *  visually stale because JS may not have corrected it (phone locked). */
   staleAfterEpochMs?: number;
@@ -184,6 +186,7 @@ export function buildContentState(args: {
   remainingStops: number | null;
   isCanceled: boolean;
   isEnded: boolean;
+  reminderSet?: boolean;
   now: number;
 }): TripActivityContentState {
   const phase = derivePhase({ departureEpochMs: args.departureEpochMs, now: args.now });
@@ -202,6 +205,7 @@ export function buildContentState(args: {
     }),
     isCanceled: args.isCanceled,
     isEnded: args.isEnded,
+    reminderSet: args.reminderSet ?? false,
     staleAfterEpochMs:
       phase === "pre-departure" ? args.departureEpochMs : args.arrivalEpochMs,
   };
@@ -242,6 +246,7 @@ export function encodeContentState(
     statusText: c.statusText,
     isCanceled: String(c.isCanceled),
     isEnded: String(c.isEnded),
+    reminderSet: String(c.reminderSet),
     ...(c.staleAfterEpochMs != null
       ? { staleAfterEpochMs: String(c.staleAfterEpochMs) }
       : {}),

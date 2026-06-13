@@ -98,6 +98,9 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const phase =
     departureAt != null ? derivePhase({ departureEpochMs: departureAt, now }) : null;
   const liveActivityId = focusedTrip.liveActivityId ?? null;
+  // Re-push content (which carries reminderSet) when a reminder is armed/cleared
+  // so the bell icon appears/disappears live.
+  const reminderSet = focusedTrip.reminder != null;
 
   // `phase` is a dep so crossing departure pushes exactly one update that
   // flips the headline countdown; the hook dedupes unchanged content, so the
@@ -107,7 +110,7 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     if (!liveActivityId || departureAt == null || arrivalAt == null) return;
     void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase]);
+  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet]);
 
   return null;
 }

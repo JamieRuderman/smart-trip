@@ -210,7 +210,7 @@
     "warningTitle": "Close to departure",
     "warningBody_one": "Only {{count}} min before the train leaves — make sure that's enough time to get there.",
     "warningBody_other": "Only {{count}} min before the train leaves — make sure that's enough time to get there.",
-    "notificationTitle": "Time to leave for {{station}}",
+    "notificationTitle": "Leave for {{station}}",
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before).",
     "alarmStop": "Stop",
     "alarmViewTrip": "View trip"

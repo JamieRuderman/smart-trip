@@ -12,8 +12,8 @@ import WidgetKit
  * SwiftUI's self-updating `.relative` style ("1 hr, 24 min", and "min, sec"
  * under an hour; see `RelativeArrival`). It lives on the *leading* edge so its
  * width changes as it ticks never shove the fixed clock times / route pinned to
- * the trailing edge. The compact island pill is a digital `.timer` ("1:24:32").
- * Both tick natively with no push.
+ * the trailing edge. The compact island shows a narrow departure `.timer` only
+ * before the train leaves; en route it collapses back to the train icon.
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -53,7 +53,7 @@ struct TripActivityWidget: Widget {
                             } else if model.isEnded {
                                 Text("Arrived").font(.headline.weight(.bold)).foregroundStyle(accent)
                             } else {
-                                Text("Arrives in")
+                                Text(countdownLabel(model))
                                     .font(.caption2.weight(.semibold))
                                     .textCase(.uppercase)
                                     .foregroundStyle(.secondary)
@@ -93,13 +93,15 @@ struct TripActivityWidget: Widget {
                     .padding(.top, 8)
                 }
             } compactLeading: {
-                TrainIcon(size: 18)
+                TrainIcon(size: 20)
                     .foregroundStyle(accent)
+                    .padding(.horizontal, 2)
             } compactTrailing: {
                 CompactCountdown(model: model)
             } minimal: {
-                TrainIcon(size: 18)
+                TrainIcon(size: 20)
                     .foregroundStyle(accent)
+                    .padding(.horizontal, 2)
             }
             .keylineTint(accent)
         }
@@ -113,20 +115,24 @@ private enum Brand {
     /// The app's "My Trip" blue — keep in sync with `--my-trip-background`
     /// (211 75% 48%) in src/index.css.
     static let blue = Color(red: 0.12, green: 0.47, blue: 0.84)
-    /// "Running late" orange — mirrors `--delay` (15 86% 55%) in src/index.css.
-    static let orange = Color(red: 0.937, green: 0.357, blue: 0.163)
+    /// "Running late" gold — mirrors `--smart-gold` (36 69% 54%) in src/index.css.
+    static let gold = Color(red: 216.0 / 255.0, green: 146.0 / 255.0, blue: 63.0 / 255.0)
     /// Cancelled red — mirrors `--destructive` (0 84% 60%) in src/index.css.
     static let red = Color(red: 0.937, green: 0.267, blue: 0.267)
 }
 
-/// Status-driven accent: blue when on time, the brand delay orange when late,
+private func countdownLabel(_ model: TripActivityModel) -> String {
+    model.phase == .enRoute ? "To destination" : "Arrives in"
+}
+
+/// Status-driven accent: blue when on time, the brand delay gold when late,
 /// red when cancelled. Drives the lock-screen background tint and every Dynamic
 /// Island accent so the status colour reads the same on both surfaces. Mirrors
 /// the precedence in `deriveStatusText` (cancelled > ended > delayed).
 private func statusColor(_ model: TripActivityModel) -> Color {
     if model.isCanceled { return Brand.red }
     if model.isEnded { return Brand.blue }
-    if model.delayMinutes > 0 { return Brand.orange }
+    if model.delayMinutes > 0 { return Brand.gold }
     return Brand.blue
 }
 
@@ -419,35 +425,53 @@ private struct StatusPill: View {
         if onColoredBackground { return .white.opacity(0.22) }
         if model.isCanceled { return Brand.red.opacity(0.9) }
         if model.isEnded { return .white.opacity(0.22) }
-        if model.delayMinutes > 0 { return Brand.orange.opacity(0.9) }
+        if model.delayMinutes > 0 { return Brand.gold.opacity(0.9) }
         return .white.opacity(0.22)
     }
 }
 
-/// Compact-trailing variant: a digital countdown timer ("1:24:32"), or a
-/// terminal symbol. The `.timer` style reserves its own width and ticks every
-/// second natively — fine here because the compact pill has no neighbour to
-/// shove, and the digital form stays narrow where the relative wording wouldn't.
+/// Compact-trailing variant: a digital departure countdown before boarding, a
+/// terminal symbol for cancelled/arrived states, and nothing once en route.
+/// Keep this aggressively narrow; if compact content asks for too much width,
+/// iOS inflates the island into the wide presentation.
 private struct CompactCountdown: View {
     let model: TripActivityModel
 
+    @ViewBuilder
     var body: some View {
         if model.isCanceled {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
         } else if model.isEnded {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.blue)
-        } else if let arrival = model.arrivalDate {
-            // Compact: the arrival clock time, not a countdown. iOS has no
-            // secondless *ticking* timer, and masking the seconds off a `.timer`
-            // stops it rendering live (it goes blank). So the pill shows when
-            // you'll arrive — compact, no seconds, and always exact since an
-            // absolute time needs no updates. The expanded island and lock
-            // screen still carry the live "arrives in" countdown.
-            Text(arrival, style: .time)
-                .font(.caption2.weight(.semibold))
+        } else if model.phase == .preDeparture, let departure = model.departureDate {
+            DigitalTimer(target: departure)
         } else {
-            Text("—").font(.caption2.weight(.semibold))
+            EmptyView()
         }
+    }
+}
+
+/// Native ActivityKit-friendly countdown with seconds visible. The secondless
+/// variants fought the compact island host too much; this keeps the reliable
+/// self-updating timer and constrains its visual footprint.
+private struct DigitalTimer: View {
+    let target: Date
+
+    var body: some View {
+        let now = Date()
+        Group {
+            if target <= now {
+                Text("NOW")
+            } else {
+                Text(timerInterval: now...target, countsDown: true )
+            }
+        }
+        .font(.system(size: 16, weight: .bold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .frame(width: 50, alignment: .trailing)
+        .accessibilityLabel(Text(target, style: .timer))
     }
 }
 
@@ -492,10 +516,10 @@ private struct ScheduleTimes: View {
     }
 }
 
-/// Bottom-*leading* block: "ARRIVES IN" over the live relative countdown (see
-/// `RelativeArrival`), or the terminal word once cancelled/arrived. Leading-
-/// aligned so the countdown's changing width grows into the centre gap rather
-/// than shoving the clock times pinned on the trailing edge.
+/// Bottom-*leading* block: the countdown label over the live relative countdown
+/// (see `RelativeArrival`), or the terminal word once cancelled/arrived.
+/// Leading-aligned so the countdown's changing width grows into the centre gap
+/// rather than shoving the clock times pinned on the trailing edge.
 private struct ArrivesIn: View {
     let model: TripActivityModel
 
@@ -506,7 +530,7 @@ private struct ArrivesIn: View {
             } else if model.isEnded {
                 Text("Arrived").font(.system(size: 19, weight: .bold))
             } else {
-                Text("Arrives in")
+                Text(countdownLabel(model))
                     .font(.caption2.weight(.semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(.white.opacity(0.6))
@@ -582,4 +606,67 @@ private struct LockScreenView: View {
         // "last known" rather than live truth.
         .opacity(isStale ? 0.6 : 1)
     }
+}
+
+private enum TripActivityPreviewData {
+    static let attributes = GenericAttributes(
+        id: "preview-trip-143",
+        staticValues: [
+            "tripNumber": "143",
+            "fromStation": "Santa Rosa Downtown",
+            "toStation": "Larkspur",
+            "routeName": "SMART",
+            "direction": "southbound",
+        ]
+    )
+
+    static var runningState: GenericAttributes.ContentState {
+        let now = Date()
+        let departure = now.addingTimeInterval(-8 * 60)
+        let arrival = now.addingTimeInterval(77 * 60 + 32)
+        return GenericAttributes.ContentState(values: [
+            "phase": "en-route",
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "nextStop": "Petaluma Downtown",
+            "remainingStops": "7",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "true",
+        ])
+    }
+
+    private static func epochMs(_ date: Date) -> String {
+        String(Int(date.timeIntervalSince1970 * 1000))
+    }
+}
+
+@available(iOSApplicationExtension 17.0, *)
+#Preview("Lock Screen", as: .content, using: TripActivityPreviewData.attributes) {
+    TripActivityWidget()
+} contentStates: {
+    TripActivityPreviewData.runningState
+}
+
+@available(iOSApplicationExtension 17.0, *)
+#Preview("Dynamic Island Compact", as: .dynamicIsland(.compact), using: TripActivityPreviewData.attributes) {
+    TripActivityWidget()
+} contentStates: {
+    TripActivityPreviewData.runningState
+}
+
+@available(iOSApplicationExtension 17.0, *)
+#Preview("Dynamic Island Expanded", as: .dynamicIsland(.expanded), using: TripActivityPreviewData.attributes) {
+    TripActivityWidget()
+} contentStates: {
+    TripActivityPreviewData.runningState
+}
+
+@available(iOSApplicationExtension 17.0, *)
+#Preview("Dynamic Island Minimal", as: .dynamicIsland(.minimal), using: TripActivityPreviewData.attributes) {
+    TripActivityWidget()
+} contentStates: {
+    TripActivityPreviewData.runningState
 }

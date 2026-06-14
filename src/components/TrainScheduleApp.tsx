@@ -26,7 +26,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
-import { FocusedTripCard } from "./FocusedTripCard";
+import { TripModeHeader } from "./TripModeHeader";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { getDevFixture } from "@/lib/devFixtures";
@@ -40,6 +40,9 @@ export function TrainScheduleApp() {
     headerHeights.logo === HEADER_HEIGHTS.logo.large
       ? HEADER_MAX_HEIGHTS.large
       : HEADER_MAX_HEIGHTS.small;
+  // In trip mode the planner header is replaced by the pinned trip card, whose
+  // (expanded) height is measured so the page reserves matching top padding.
+  const [tripHeaderHeight, setTripHeaderHeight] = useState(0);
   const {
     fromStation,
     toStation,
@@ -200,19 +203,27 @@ export function TrainScheduleApp() {
       className="min-h-[100dvh] bg-card md:bg-background relative"
       ref={headerContainerRef}
     >
-      <StickyHeader
-        fromStation={fromStation}
-        toStation={toStation}
-        scheduleType={scheduleType}
-        headerHeights={headerHeights}
-        onFromStationChange={setFromStation}
-        onToStationChange={setToStation}
-        onScheduleTypeChange={setScheduleType}
-        onSwapStations={swapStations}
-        closestStation={closestStation}
-        locationLoading={locationLoading}
-        onRequestLocation={handleRequestLocation}
-      />
+      {focusedTrip ? (
+        <TripModeHeader
+          currentTime={currentTime}
+          timeFormat="12h"
+          onHeightChange={setTripHeaderHeight}
+        />
+      ) : (
+        <StickyHeader
+          fromStation={fromStation}
+          toStation={toStation}
+          scheduleType={scheduleType}
+          headerHeights={headerHeights}
+          onFromStationChange={setFromStation}
+          onToStationChange={setToStation}
+          onScheduleTypeChange={setScheduleType}
+          onSwapStations={swapStations}
+          closestStation={closestStation}
+          locationLoading={locationLoading}
+          onRequestLocation={handleRequestLocation}
+        />
+      )}
 
       <main
         className="flex flex-col min-h-[100vh] container mx-auto px-4 pb-4 md:pb-6 space-y-4"
@@ -220,7 +231,11 @@ export function TrainScheduleApp() {
         aria-label="Train schedule planning interface"
         style={{
           overflowAnchor: "none",
-          paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
+          // Trip mode: reserve the measured pinned-card height (already includes
+          // the safe-area inset). Planner: the constant header height + inset.
+          paddingTop: focusedTrip
+            ? `${tripHeaderHeight || maxHeaderHeight}px`
+            : `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
         {/* Connectivity banner — only renders when offline */}
@@ -228,9 +243,6 @@ export function TrainScheduleApp() {
 
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
-
-        {/* Focused Trip — pinned above the schedule */}
-        <FocusedTripCard currentTime={currentTime} timeFormat="12h" />
 
         {/* Live Train Map */}
         <MapDiagramPreviewCard />

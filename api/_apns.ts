@@ -11,7 +11,7 @@ import { connect } from "node:http2";
  *   APNS_KEY_ID       — the 10-char Key ID of the .p8 auth key
  *   APNS_TEAM_ID      — Apple Developer team id (e.g. 6YH3537ZY9)
  *   APNS_PRIVATE_KEY  — the .p8 contents (PEM), newlines as real "\n" or literal
- *   APNS_WIDGET_BUNDLE_ID — the WIDGET bundle id (e.g. smart.trip.SmartTripWidget)
+ *   APNS_WIDGET_BUNDLE_ID — the WIDGET bundle id (e.g. smart.trip.widget)
  *   APNS_HOST         — optional; defaults to the production gateway
  *
  * The pure helpers (`apnsJwtClaims`, `buildLiveActivityPayload`,

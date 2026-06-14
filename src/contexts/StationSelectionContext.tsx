@@ -252,6 +252,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
+  // Lead-time reminder modal open state. Lives here (not in the picker) so the
+  // in-sheet "Take this train" control can open it as it closes its own sheet,
+  // and the modal (rendered by the home FocusedTripCard) survives that unmount.
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const openReminderDialog = useCallback(() => setReminderDialogOpen(true), []);
+  const closeReminderDialog = useCallback(
+    () => setReminderDialogOpen(false),
+    [],
+  );
+
   const {
     focusedTrip,
     focusTrip,
@@ -302,6 +312,9 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      reminderDialogOpen,
+      openReminderDialog,
+      closeReminderDialog,
       focusedTrip,
       focusTrip,
       setReminder,
@@ -319,6 +332,9 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
+      reminderDialogOpen,
+      openReminderDialog,
+      closeReminderDialog,
       focusedTrip,
       focusTrip,
       setReminder,

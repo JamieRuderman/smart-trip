@@ -17,6 +17,12 @@ export interface StationSelection {
   swapStations: () => void;
   setScheduleType: (type: "weekday" | "weekend") => void;
   setSelectedTrip: (tripNumber: number | null) => void;
+  /** Whether the lead-time reminder modal is open. Lifted to context so the
+   *  in-sheet "Take this train" control can pop it after closing its own sheet,
+   *  and so the modal survives that sheet unmounting. */
+  reminderDialogOpen: boolean;
+  openReminderDialog: () => void;
+  closeReminderDialog: () => void;
   focusedTrip: FocusedTrip | null;
   focusTrip: (input: FocusTripInput) => Promise<void>;
   setReminder: (

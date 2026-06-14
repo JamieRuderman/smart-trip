@@ -12,6 +12,7 @@ import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/hooks/useFocusedTrip";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
+import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
@@ -68,6 +69,10 @@ const App = () => {
                       survives route changes and sheet closes, since the lock
                       screen tracks the focused train regardless of view. */}
                   <LiveActivitySync />
+                  {/* App-level reminder modal host — lives here (like
+                      LiveActivitySync) so "Take this train" can pop it from any
+                      surface and it survives the triggering sheet/route change. */}
+                  <ReminderDialogHost />
                   <Suspense fallback={null}>
                     <Routes>
                       <Route path="/" element={<Index />} />

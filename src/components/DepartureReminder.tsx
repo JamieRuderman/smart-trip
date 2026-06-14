@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, BellRing } from "lucide-react";
+import { BellRing } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
 import {
@@ -411,7 +411,7 @@ export function DepartureReminder({
               aria-label={t("departureReminder.setReminder")}
               className="mt-2 h-9 w-full gap-1.5"
             >
-              <Bell className="h-3.5 w-3.5 text-my-trip" aria-hidden="true" />
+              <BellRing className="h-3.5 w-3.5 text-my-trip" aria-hidden="true" />
               <span>{t("departureReminder.setReminder")}</span>
             </Button>
           )}
@@ -428,7 +428,7 @@ export function DepartureReminder({
                 rel="noopener noreferrer"
                 aria-label={t("departureReminder.appCta")}
               >
-                <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                <BellRing className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{t("departureReminder.appCta")}</span>
               </a>
             </Button>

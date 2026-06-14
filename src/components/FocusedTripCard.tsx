@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, BellRing, Calendar, ChevronRight, Timer } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { BellRing, Calendar, ChevronRight, Timer } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
@@ -25,6 +33,33 @@ interface FocusedTripCardProps {
 }
 
 /**
+ * A scroll-collapsible section of the pinned trip card. Its height is driven by
+ * a `--trip-col-<order>` CSS var that {@link TripModeHeader} sets on its
+ * container as the schedule scrolls (1px per scrolled px, sequential by
+ * `order`). Defaults to natural height when the var is unset (not pinned).
+ */
+function Collapsible({
+  order,
+  className,
+  children,
+}: {
+  order: number;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-collapse
+      data-order={order}
+      className={cn("overflow-hidden", className)}
+      style={{ height: `var(--trip-col-${order}, auto)` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
  * Pinned representation of the user's focused trip ("Go"), shown above the
  * schedule. Always rendered the same way regardless of the home screen's
  * current from/to — reconstructed from static schedule, with live realtime
@@ -40,7 +75,10 @@ interface FocusedTripCardProps {
  * stays mounted for one transition so the sheet animates closed instead of
  * vanishing instantly.
  */
-export function FocusedTripCard({ currentTime, timeFormat }: FocusedTripCardProps) {
+export function FocusedTripCard({
+  currentTime,
+  timeFormat,
+}: FocusedTripCardProps) {
   const { focusedTrip } = useStationSelection();
 
   const [detailOpen, setDetailOpenState] = useState(false);
@@ -237,7 +275,7 @@ function FocusedTripCardInner({
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-0 md:border-0 bg-my-trip-background text-white"
+      className="overflow-hidden border-0 md:border-0 bg-my-trip-background text-white shadow-lg"
     >
       {/* Tappable summary → opens the full trip-detail sheet. */}
       <button
@@ -246,29 +284,33 @@ function FocusedTripCardInner({
         aria-label={t("focusedTrip.viewDetails")}
         className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-inset"
       >
-        <div className="p-4 md:p-6 space-y-4">
-          {/* Eyebrow + "details" affordance */}
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
-              <TripIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("focusedTrip.myTrip")}
-            </span>
-            <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">
-              {t("focusedTrip.details")}
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </div>
+        <div className="px-4 md:px-6 pt-4 md:pt-6">
+          {/* Eyebrow + "details" affordance — collapses on scroll. */}
+          <Collapsible order={2}>
+            <div className="flex items-center justify-between pb-4">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
+                <TripIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("focusedTrip.myTrip")}
+              </span>
+              <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">
+                {t("focusedTrip.details")}
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </div>
+          </Collapsible>
 
-          {/* Route — origin → destination. Each station name is an
-              unbreakable unit so a long name wraps as a whole rather than
-              splitting mid-name. */}
-          <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug text-white">
-            <span className="whitespace-nowrap">{focusedTrip.fromStation}</span>
-            <span className="font-normal text-white/60">→</span>
-            <span className="whitespace-nowrap">{focusedTrip.toStation}</span>
-          </p>
+          {/* Route — collapses on scroll. Each station name is an unbreakable
+              unit so a long name wraps as a whole rather than mid-name. */}
+          <Collapsible order={3}>
+            <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug text-white pb-4">
+              <span className="whitespace-nowrap">{focusedTrip.fromStation}</span>
+              <span className="font-normal text-white/60">→</span>
+              <span className="whitespace-nowrap">{focusedTrip.toStation}</span>
+            </p>
+          </Collapsible>
 
-          {/* Train number + times */}
+          {/* Train number + times — both kept visible: the times sit beside the
+              number, so collapsing them saves no height, and they're useful. */}
           <div className="flex items-end gap-4">
             <div className="flex flex-col leading-none shrink-0">
               <span className="text-[0.65rem] font-medium uppercase tracking-wide text-white/70 mb-1">
@@ -302,69 +344,75 @@ function FocusedTripCardInner({
               </p>
             </div>
           </div>
-
-          {/* Departure countdown ("how long until I need to leave?") for
-              today's run, or the service day for a future run. */}
-          {showCountdown ? (
-            <div className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-2.5">
-              <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
-              <span className="text-lg font-semibold tracking-tight">
-                <CountdownLabel minutesUntil={minutesUntil} />
-              </span>
-            </div>
-          ) : isFutureService && serviceDayLabel ? (
-            <div className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-2.5">
-              <Calendar className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
-              <span className="text-lg font-semibold tracking-tight capitalize">
-                {t("focusedTrip.departsOn", { day: serviceDayLabel })}
-              </span>
-            </div>
-          ) : null}
         </div>
       </button>
 
-      {/* Actions — siblings of the summary button (no nested interactives). */}
-      <div className="flex items-center gap-2 px-4 md:px-6 pb-4">
-        {reminder ? (
-          <button
-            type="button"
-            onClick={openReminderDialog}
-            aria-label={t("departureReminder.editReminder")}
-            className="flex-1 min-w-0 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
-          >
-            <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {reminderTimeLabel}
-              <span className="text-white/70">
-                {" · "}
-                {t("departureReminder.minutesBefore", {
-                  count: reminder.leadMinutes,
-                })}
-              </span>
+      {/* Countdown/message + Cancel — always visible (not collapsible) so you
+          can always see when to leave and stop the trip. Cancel is a sibling of
+          the summary button (no nested interactives). */}
+      <div className="flex items-center gap-2 px-4 md:px-6 pt-4 pb-4">
+        {showCountdown ? (
+          <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
+            <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            <span className="text-lg font-semibold tracking-tight">
+              <CountdownLabel minutesUntil={minutesUntil} />
             </span>
-          </button>
-        ) : showAddReminder ? (
-          <button
-            type="button"
-            onClick={openReminderDialog}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/15 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
-          >
-            <Bell className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {t("departureReminder.setReminder")}
-          </button>
+          </div>
+        ) : isFutureService && serviceDayLabel ? (
+          <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
+            <Calendar className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            <span className="text-lg font-semibold tracking-tight capitalize">
+              {t("focusedTrip.departsOn", { day: serviceDayLabel })}
+            </span>
+          </div>
         ) : (
           <span className="flex-1" />
         )}
-
         <button
           type="button"
           onClick={() => void clearFocusedTrip()}
           aria-label={t("focusedTrip.stop")}
-          className="shrink-0 rounded-lg bg-white/10 px-3.5 h-9 text-sm font-semibold text-white/90 transition-colors hover:bg-white/20"
+          className="shrink-0 inline-flex items-center justify-center rounded-xl bg-white/10 px-4 h-12 text-sm font-semibold text-white/90 transition-colors hover:bg-white/20"
         >
           {t("focusedTrip.stop")}
         </button>
       </div>
+
+      {/* Reminder pill / full-width "Add reminder" — collapses on scroll. */}
+      {(reminder || showAddReminder) && (
+        <Collapsible order={4}>
+          <div className="px-4 md:px-6 pb-4">
+            {reminder ? (
+              <button
+                type="button"
+                onClick={openReminderDialog}
+                aria-label={t("departureReminder.editReminder")}
+                className="w-full min-w-0 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
+              >
+                <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {reminderTimeLabel}
+                  <span className="text-white/70">
+                    {" · "}
+                    {t("departureReminder.minutesBefore", {
+                      count: reminder.leadMinutes,
+                    })}
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openReminderDialog}
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/15 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
+              >
+                <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {t("departureReminder.setReminder")}
+              </button>
+            )}
+          </div>
+        </Collapsible>
+      )}
 
       {sheetMounted && (
         <TripDetailSheet

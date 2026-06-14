@@ -124,7 +124,7 @@ function FocusedTripCardInner({
 
   const { isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
-  const { clearFocusedTrip } = useStationSelection();
+  const { clearFocusedTrip, openReminderDialog } = useStationSelection();
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
@@ -173,19 +173,13 @@ function FocusedTripCardInner({
       })
     : null;
 
-  // ── Detail-sheet open: "details" opens it plain; "add reminder" opens it
-  //    with the lead-time picker already up. ─────────────────────────────────
-  const [openWithPicker, setOpenWithPicker] = useState(false);
+  // Tapping the card opens the full trip-detail sheet; "Add reminder" pops the
+  // lead-time modal directly (no sheet) via context, landing the user right
+  // back on this card once they set it or dismiss.
   const openDetails = useCallback(() => {
-    setOpenWithPicker(false);
-    setDetailOpen(true);
-  }, [setDetailOpen]);
-  const openReminderPicker = useCallback(() => {
-    setOpenWithPicker(true);
     setDetailOpen(true);
   }, [setDetailOpen]);
   const closeDetails = useCallback(() => {
-    setOpenWithPicker(false);
     setDetailOpen(false);
   }, [setDetailOpen]);
 
@@ -229,16 +223,16 @@ function FocusedTripCardInner({
     [],
   );
 
-  // Match DepartureReminder's lead requirement: hide "Add reminder" once
-  // there's under ~2 min of lead (or the train has departed — minutesUntil
-  // goes negative), so the deep-link can't land on a sheet whose picker would
-  // only offer a degenerate, fire-immediately range. Future-service trips keep
-  // the affordance (their countdown is day-relative, not a live lead).
+  // Match reminderLeadRange's tooLate gate: hide "Add reminder" once there's
+  // under ~3 min of lead (or the train has departed — minutesUntil goes
+  // negative), so the button can't open a modal whose slider has collapsed to a
+  // single degenerate point. Future-service trips keep the affordance (their
+  // countdown is day-relative, not a live lead).
   const showAddReminder =
     !isCanceledOrSkipped &&
     !reminder &&
     isReminderSupported() &&
-    (isFutureService || minutesUntil >= 2);
+    (isFutureService || minutesUntil >= 3);
 
   return (
     <SectionCard
@@ -334,7 +328,8 @@ function FocusedTripCardInner({
         {reminder ? (
           <button
             type="button"
-            onClick={openDetails}
+            onClick={openReminderDialog}
+            aria-label={t("departureReminder.editReminder")}
             className="flex-1 min-w-0 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
           >
             <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -351,7 +346,7 @@ function FocusedTripCardInner({
         ) : showAddReminder ? (
           <button
             type="button"
-            onClick={openReminderPicker}
+            onClick={openReminderDialog}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/15 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
           >
             <Bell className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -386,7 +381,6 @@ function FocusedTripCardInner({
           showFerry={false}
           isFocused
           scheduleType={focusedTrip.scheduleType}
-          autoOpenReminderPicker={openWithPicker}
         />
       )}
     </SectionCard>

@@ -58,9 +58,6 @@ export interface TripDetailContentProps {
    *  intermediate rows that match the user's chosen leg. */
   userFromStation?: Station | null;
   userToStation?: Station | null;
-  /** Open the reminder lead-time picker on mount (home "My Trip" card → "Add
-   *  reminder" deep-link). */
-  autoOpenReminderPicker?: boolean;
   /** Schedule (weekday/weekend) the displayed trip belongs to — forwarded to
    *  the reminder/focus control so it never has to infer it from today. */
   scheduleType: "weekday" | "weekend";
@@ -85,7 +82,6 @@ export function TripDetailContent({
   showCloseButton = true,
   userFromStation = null,
   userToStation = null,
-  autoOpenReminderPicker = false,
   scheduleType,
   isFocused = false,
 }: TripDetailContentProps) {
@@ -535,7 +531,6 @@ export function TripDetailContent({
             currentTime={currentTime}
             timeFormat={timeFormat}
             scheduleType={scheduleType}
-            autoOpenPicker={autoOpenReminderPicker}
           />
         </div>
       )}

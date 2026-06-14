@@ -167,7 +167,6 @@
 				10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */,
 				DA117BF44531AFC1784F1499 /* Info.plist */,
 			);
-			name = SmartTripWidget;
 			path = SmartTripWidget;
 			sourceTree = "<group>";
 		};
@@ -177,7 +176,6 @@
 				9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */,
 				88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */,
 			);
-			name = LeaveAlarm;
 			path = LeaveAlarm;
 			sourceTree = "<group>";
 		};
@@ -234,6 +232,9 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Manual;
+					};
+					56D574B9649B903DE05EC96F = {
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -534,7 +535,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 6YH3537ZY9;
@@ -545,6 +547,8 @@
 				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = smart.trip.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SMART trip widget store profile";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -557,7 +561,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 6YH3537ZY9;
@@ -568,6 +573,8 @@
 				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = smart.trip.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SMART trip widget store profile";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;

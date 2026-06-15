@@ -88,18 +88,20 @@ public class LeaveAlarmActivity extends AppCompatActivity {
         handler.postDelayed(this::dismiss, AUTO_DISMISS_MS);
     }
 
+    @SuppressWarnings("deprecation") // pre-API-27 lock-screen flags; 27+ uses setShowWhenLocked
     private void showOverLockScreen() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); // not deprecated
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
             KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
             if (km != null) km.requestDismissKeyguard(this, null);
+        } else {
+            getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         }
-        getWindow().addFlags(
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
     }
 
     private void startRinging() {
@@ -123,6 +125,7 @@ public class LeaveAlarmActivity extends AppCompatActivity {
         startVibration();
     }
 
+    @SuppressWarnings("deprecation") // VIBRATOR_SERVICE + vibrate(long[],int) on pre-API-31/26
     private void startVibration() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

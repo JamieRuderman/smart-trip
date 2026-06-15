@@ -13,9 +13,10 @@ export interface FocusedTripReminder {
   notificationId: number;
   title: string;
   body: string;
-  /** AlarmKit alarm id (iOS 26+) when this reminder was scheduled as a true
-   *  "Leave Alarm" rather than a local notification. Absent on the notification
-   *  path (Android, web, AlarmKit unavailable/denied, or scheduling failure). */
+  /** Out-of-process alarm id when this reminder was scheduled as a true "Leave
+   *  Alarm" (iOS AlarmKit, or Android AlarmManager.setAlarmClock) rather than a
+   *  local notification. Absent on the notification path (web, alarm
+   *  unavailable/denied, or scheduling failure). */
   alarmId?: string;
 }
 

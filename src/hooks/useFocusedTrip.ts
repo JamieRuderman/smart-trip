@@ -276,10 +276,11 @@ export async function reconcileTripActivities(): Promise<void> {
  * onto the focused trip and notify consumers. Shared by the arm + drift-
  * reschedule paths.
  *
- * Prefers a true AlarmKit "Leave Alarm" on iOS (it breaks through Silent
- * Mode/Focus), falling back to a local notification everywhere else (Android,
- * web, AlarmKit unavailable/denied/off-day, or a create failure). The alarm
- * REPLACES the notification — never both, so the user gets a single alert.
+ * Prefers a true "Leave Alarm" on iOS (AlarmKit) and Android (setAlarmClock) —
+ * it breaks through Silent Mode / Focus / DND — falling back to a local
+ * notification otherwise (web, alarm unavailable/denied/off-day, or a create
+ * failure). The alarm REPLACES the notification — never both, so the user gets
+ * a single alert.
  * Notification permission is requested ONLY on the fallback path, so an
  * alarm-only user who denied notifications can still get a Leave Alarm.
  *

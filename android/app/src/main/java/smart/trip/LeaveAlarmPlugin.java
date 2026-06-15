@@ -18,16 +18,16 @@ import java.util.UUID;
 
 /**
  * Android side of the local {@code LeaveAlarm} Capacitor plugin — the
- * counterpart to ios/App/App/LeaveAlarm/. iOS uses AlarmKit; here we schedule
- * an exact {@link android.app.AlarmManager#setAlarmClock} that fires a
- * full-screen, alarm-audio alert ({@link LeaveAlarmActivity}) which rings
+ * counterpart to ios/App/App/LeaveAlarm/. iOS uses AlarmKit; here we schedule a
+ * Doze-piercing {@link android.app.AlarmManager#setAndAllowWhileIdle} that fires
+ * a full-screen, alarm-audio alert ({@link LeaveAlarmActivity}) which rings
  * through silent mode / Do Not Disturb — the promise the notification path
  * can't make.
  *
- * <p>setAlarmClock requires the USE_EXACT_ALARM permission (declared in the
- * manifest, auto-granted at install for alarm apps); without it the call throws
- * SecurityException and we fall back to a notification. POST_NOTIFICATIONS also
- * matters, since the alert is delivered via a full-screen-intent notification.
+ * <p>setAndAllowWhileIdle wakes through Doze with NO exact-alarm permission, so
+ * the app needs no USE_EXACT_ALARM / SCHEDULE_EXACT_ALARM and no alarm-clock Play
+ * declaration; the trade-off is it can fire a few minutes late under Doze.
+ * POST_NOTIFICATIONS matters, since the alert is a full-screen-intent notification.
  *
  * <p>JS binds to this via {@code registerPlugin("LeaveAlarm")} in
  * src/lib/native/leaveAlarm.ts; the method surface mirrors the Swift plugin.

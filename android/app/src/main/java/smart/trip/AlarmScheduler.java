@@ -15,14 +15,13 @@ final class AlarmScheduler {
     static void schedule(Context ctx, String id, long triggerAt, String title, String stop, String open) {
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) throw new IllegalStateException("AlarmManager unavailable");
-        // setAlarmClock: exact, wakes the device, fires through Doze, and shows
-        // the status-bar alarm chip. It requires the USE_EXACT_ALARM (or
-        // SCHEDULE_EXACT_ALARM) permission and THROWS SecurityException without
-        // it — the caller catches that and falls back to a notification.
-        Intent launch = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        PendingIntent show = PendingIntent.getActivity(
-            ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        am.setAlarmClock(new AlarmManager.AlarmClockInfo(triggerAt, show), firePendingIntent(ctx, id));
+        // setAndAllowWhileIdle: wakes the device (RTC_WAKEUP) and fires through
+        // Doze with NO exact-alarm permission — so the app needs no
+        // USE_EXACT_ALARM / SCHEDULE_EXACT_ALARM and no alarm-clock Play
+        // declaration. The trade-off vs setAlarmClock is precision: under Doze the
+        // OS batches allow-while-idle alarms, so it can fire a few minutes late —
+        // acceptable for a lead-time "leave" reminder.
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, firePendingIntent(ctx, id));
         // Persist only once the alarm is actually set, so a failed schedule
         // leaves no orphan entry for boot-restore to resurrect.
         AlarmStore.put(ctx, id, triggerAt, title, stop, open);

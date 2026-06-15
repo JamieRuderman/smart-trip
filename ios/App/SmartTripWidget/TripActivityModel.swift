@@ -25,6 +25,9 @@ struct TripActivityModel {
     let phase: Phase
     let departureDate: Date?
     let arrivalDate: Date?
+    /// Fire instant of the armed leave alarm, when one is set; the pre-alarm
+    /// countdown target.
+    let reminderDate: Date?
     let delayMinutes: Int
     let nextStop: String?
     let remainingStops: Int?
@@ -32,6 +35,9 @@ struct TripActivityModel {
     let isCanceled: Bool
     let isEnded: Bool
     let reminderSet: Bool
+    /// Precomputed by the app (see buildContentState): a reminder is armed and
+    /// hasn't fired yet, so the surfaces lead with the alarm countdown.
+    let alarmPending: Bool
 
     init(context: ActivityViewContext<GenericAttributes>) {
         let attrs = context.attributes.staticValues
@@ -45,6 +51,7 @@ struct TripActivityModel {
         phase = Phase(rawValue: state["phase"] ?? "") ?? .preDeparture
         departureDate = Self.epochMsDate(state["departureEpochMs"])
         arrivalDate = Self.epochMsDate(state["arrivalEpochMs"])
+        reminderDate = Self.epochMsDate(state["reminderEpochMs"])
         delayMinutes = Int(state["delayMinutes"] ?? "") ?? 0
         nextStop = Self.nonEmpty(state["nextStop"])
         remainingStops = Int(state["remainingStops"] ?? "")
@@ -52,6 +59,7 @@ struct TripActivityModel {
         isCanceled = state["isCanceled"] == "true"
         isEnded = state["isEnded"] == "true"
         reminderSet = state["reminderSet"] == "true"
+        alarmPending = state["alarmPending"] == "true"
     }
 
     private static func epochMsDate(_ raw: String?) -> Date? {

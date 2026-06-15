@@ -79,6 +79,7 @@ function content(over: Partial<TripActivityContentState> = {}): TripActivityCont
     isCanceled: false,
     isEnded: false,
     reminderSet: false,
+    alarmPending: false,
     staleAfterEpochMs: DEP,
     ...over,
   };
@@ -207,6 +208,41 @@ describe("buildContentState", () => {
     expect(c.statusText).toBe("Delayed");
     expect(c.staleAfterEpochMs).toBe(ARR);
   });
+  it("leads with the alarm: pending while armed + ahead, with the alarm as the stale target", () => {
+    const reminderAt = NOW + 10 * 60_000; // alarm 10 min out, before departure
+    const c = buildContentState({
+      departureEpochMs: DEP,
+      arrivalEpochMs: ARR,
+      delayMinutes: null,
+      nextStop: null,
+      remainingStops: null,
+      isCanceled: false,
+      isEnded: false,
+      reminderSet: true,
+      reminderEpochMs: reminderAt,
+      now: NOW,
+    });
+    expect(c.alarmPending).toBe(true);
+    expect(c.reminderEpochMs).toBe(reminderAt);
+    expect(c.staleAfterEpochMs).toBe(reminderAt); // alarm stage dims at the alarm
+  });
+  it("drops the alarm stage once the alarm has fired, falling back to departure", () => {
+    const reminderAt = NOW - 60_000; // already fired
+    const c = buildContentState({
+      departureEpochMs: DEP,
+      arrivalEpochMs: ARR,
+      delayMinutes: null,
+      nextStop: null,
+      remainingStops: null,
+      isCanceled: false,
+      isEnded: false,
+      reminderSet: true,
+      reminderEpochMs: reminderAt,
+      now: NOW,
+    });
+    expect(c.alarmPending).toBe(false);
+    expect(c.staleAfterEpochMs).toBe(DEP); // pre-departure target
+  });
 });
 
 describe("encodeAttributes / encodeContentState", () => {
@@ -230,11 +266,22 @@ describe("encodeAttributes / encodeContentState", () => {
       isCanceled: "false",
       isEnded: "false",
       reminderSet: "false",
+      alarmPending: "false",
       staleAfterEpochMs: String(DEP),
     });
     expect(encodeContentState(content({ reminderSet: true }))).toMatchObject({
       reminderSet: "true",
     });
+  });
+  it("serializes the alarm stage and omits reminderEpochMs when absent", () => {
+    const reminderAt = DEP - 10 * 60_000;
+    expect(
+      encodeContentState(content({ alarmPending: true, reminderEpochMs: reminderAt })),
+    ).toMatchObject({
+      alarmPending: "true",
+      reminderEpochMs: String(reminderAt),
+    });
+    expect(encodeContentState(content())).not.toHaveProperty("reminderEpochMs");
   });
   it("omits staleAfterEpochMs when absent", () => {
     const encoded = encodeContentState(content({ staleAfterEpochMs: undefined }));

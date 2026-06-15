@@ -189,6 +189,7 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isCanceled: false,
     isEnded: false,
     reminderSet: saved.reminder != null,
+    reminderEpochMs: saved.reminder?.reminderAt ?? null,
     now: Date.now(),
   });
   // Push-enabled builds register the trip + APNs token with the backend so the
@@ -513,6 +514,7 @@ export function useFocusedTrip() {
         isCanceled: args.isCanceled ?? false,
         isEnded: false,
         reminderSet: current?.reminder != null,
+        reminderEpochMs: current?.reminder?.reminderAt ?? null,
         now: Date.now(),
       });
       const json = JSON.stringify(content);

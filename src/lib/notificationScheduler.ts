@@ -114,7 +114,18 @@ export async function scheduleNotification(
   if (Capacitor.isNativePlatform()) {
     await LocalNotifications.schedule({
       notifications: [
-        { id: n.id, title: n.title, body: n.body, schedule: { at: new Date(n.at) } },
+        {
+          id: n.id,
+          title: n.title,
+          body: n.body,
+          // allowWhileIdle lets the alarm fire through Android Doze and wake the
+          // device. Without it — and without exact-alarm permission, which we
+          // don't request — the plugin falls back to a non-wakeup inexact alarm
+          // (AlarmManager.set + RTC) that Doze defers to the next maintenance
+          // window, so a reminder set for an early hour with the phone idle
+          // silently never fires. No-op on iOS (reminders use AlarmKit there).
+          schedule: { at: new Date(n.at), allowWhileIdle: true },
+        },
       ],
     });
     return;

@@ -27,7 +27,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         AlarmStore.Entry entry = AlarmStore.get(ctx, id);
         if (entry == null) return; // already canceled
         AlarmNotifier.ring(ctx, entry);
-        // setAlarmClock is one-shot; it's no longer pending once delivered.
+        // The alarm is one-shot; it's no longer pending once delivered.
         AlarmStore.remove(ctx, id);
     }
 }

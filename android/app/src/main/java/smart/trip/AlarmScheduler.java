@@ -5,7 +5,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 
-/** Schedules and cancels the exact wake-up alarm behind a Leave Alarm. */
+/** Schedules and cancels the wake-up alarm behind a Leave Alarm. */
 final class AlarmScheduler {
     static final String ACTION_FIRE = "smart.trip.action.LEAVE_ALARM_FIRE";
     static final String EXTRA_ID = "leave_alarm_id";

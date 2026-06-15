@@ -42,7 +42,7 @@ public class LeaveAlarmPlugin extends Plugin {
 
     @PluginMethod
     public void isAvailable(PluginCall call) {
-        // setAlarmClock exists on every API this app supports (minSdk 23).
+        // setAndAllowWhileIdle exists on every API this app supports (minSdk 23).
         JSObject ret = new JSObject();
         ret.put("value", true);
         call.resolve(ret);

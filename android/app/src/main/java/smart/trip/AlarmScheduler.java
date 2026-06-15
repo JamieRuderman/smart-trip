@@ -13,16 +13,19 @@ final class AlarmScheduler {
     private AlarmScheduler() {}
 
     static void schedule(Context ctx, String id, long triggerAt, String title, String stop, String open) {
-        AlarmStore.put(ctx, id, triggerAt, title, stop, open);
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (am == null) return;
-        // setAlarmClock: exact, wakes the device, fires through Doze, and is
-        // exempt from the SCHEDULE_EXACT_ALARM permission. The show intent opens
-        // the app when the user taps the status-bar alarm chip.
+        if (am == null) throw new IllegalStateException("AlarmManager unavailable");
+        // setAlarmClock: exact, wakes the device, fires through Doze, and shows
+        // the status-bar alarm chip. It requires the USE_EXACT_ALARM (or
+        // SCHEDULE_EXACT_ALARM) permission and THROWS SecurityException without
+        // it — the caller catches that and falls back to a notification.
         Intent launch = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent show = PendingIntent.getActivity(
             ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         am.setAlarmClock(new AlarmManager.AlarmClockInfo(triggerAt, show), firePendingIntent(ctx, id));
+        // Persist only once the alarm is actually set, so a failed schedule
+        // leaves no orphan entry for boot-restore to resurrect.
+        AlarmStore.put(ctx, id, triggerAt, title, stop, open);
     }
 
     static void cancel(Context ctx, String id) {

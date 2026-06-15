@@ -61,9 +61,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-    <!-- Leave Alarm (real-alarm parity with iOS AlarmKit). setAlarmClock needs
-         no SCHEDULE_EXACT_ALARM; the alert is a full-screen-intent notification
-         and is re-armed across reboots. -->
+    <!-- Leave Alarm (real-alarm parity with iOS AlarmKit). USE_EXACT_ALARM is
+         auto-granted at install and lets setAlarmClock set an exact wake-up; the
+         alert is a full-screen-intent notification, re-armed across reboots. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

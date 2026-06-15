@@ -24,10 +24,10 @@ import java.util.UUID;
  * through silent mode / Do Not Disturb — the promise the notification path
  * can't make.
  *
- * <p>setAlarmClock is exempt from the SCHEDULE_EXACT_ALARM permission, so there
- * is no exact-alarm grant dance; the one runtime permission that matters is
- * POST_NOTIFICATIONS, because the alert is delivered via a full-screen-intent
- * notification.
+ * <p>setAlarmClock requires the USE_EXACT_ALARM permission (declared in the
+ * manifest, auto-granted at install for alarm apps); without it the call throws
+ * SecurityException and we fall back to a notification. POST_NOTIFICATIONS also
+ * matters, since the alert is delivered via a full-screen-intent notification.
  *
  * <p>JS binds to this via {@code registerPlugin("LeaveAlarm")} in
  * src/lib/native/leaveAlarm.ts; the method surface mirrors the Swift plugin.
@@ -70,9 +70,12 @@ public class LeaveAlarmPlugin extends Plugin {
 
     @PluginMethod
     public void schedule(PluginCall call) {
-        // Epoch ms arrives as a JS number — read as Double (it exceeds Int32).
-        Double fireAtMs = call.getDouble("fireAtMs");
-        if (fireAtMs == null || fireAtMs.isNaN() || fireAtMs.isInfinite()) {
+        // Epoch ms arrives as a JS number; past Int32 it lands as a Long, which
+        // PluginCall.getDouble() (Double/Float/Integer only) drops to null — so
+        // read it via optDouble, which coerces any Number. Double holds epoch ms
+        // exactly (well under 2^53).
+        double fireAtMs = call.getData().optDouble("fireAtMs", Double.NaN);
+        if (Double.isNaN(fireAtMs) || Double.isInfinite(fireAtMs)) {
             call.reject("fireAtMs is required");
             return;
         }
@@ -81,7 +84,7 @@ public class LeaveAlarmPlugin extends Plugin {
             call.reject("title is required");
             return;
         }
-        long triggerAt = (long) (double) fireAtMs;
+        long triggerAt = (long) fireAtMs;
         if (triggerAt <= System.currentTimeMillis()) {
             call.reject("fireAtMs must be in the future");
             return;
@@ -89,7 +92,14 @@ public class LeaveAlarmPlugin extends Plugin {
         String stop = call.getString("stopButtonTitle", "Stop");
         String open = call.getString("openButtonTitle"); // nullable — hides the second button
         String id = UUID.randomUUID().toString();
-        AlarmScheduler.schedule(getContext(), id, triggerAt, title, stop, open);
+        try {
+            AlarmScheduler.schedule(getContext(), id, triggerAt, title, stop, open);
+        } catch (Exception e) {
+            // e.g. SecurityException when exact-alarm permission is missing/revoked
+            // — reject so JS degrades to the notification path instead of crashing.
+            call.reject("Failed to schedule alarm: " + e.getMessage(), e);
+            return;
+        }
         JSObject ret = new JSObject();
         ret.put("id", id);
         call.resolve(ret);

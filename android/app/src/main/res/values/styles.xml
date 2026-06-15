@@ -23,4 +23,12 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- Full-screen "Leave Alarm" surface (Android side of the LeaveAlarm
+         plugin): brand green, no action bar. -->
+    <style name="Theme.LeaveAlarm" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#11AB75</item>
+        <item name="android:statusBarColor">#0E8F61</item>
+        <item name="android:navigationBarColor">#11AB75</item>
+    </style>
 </resources>

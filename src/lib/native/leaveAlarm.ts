@@ -3,9 +3,11 @@ import { logger } from "../logger";
 
 /**
  * Thin, mockable wrapper around the app's LOCAL `LeaveAlarm` Capacitor plugin
- * (ios/App/App/LeaveAlarm/) for the "Leave Alarm" feature. We deliberately
- * scope true alarms to **iOS only** (Apple AlarmKit, iOS 26+); Android and web
- * stay on the existing local-notification path.
+ * for the "Leave Alarm" feature. A true alarm is used on both native platforms:
+ * iOS via Apple AlarmKit (ios/App/App/LeaveAlarm/, iOS 26+) and Android via
+ * AlarmManager.setAlarmClock + a full-screen alarm activity
+ * (android/.../LeaveAlarm*). Web has no alarm and stays on the local-
+ * notification path.
  *
  * The local plugin replaced `@capgo/capacitor-alarm`, whose JS API could only
  * target the NEXT occurrence of an hour/minute — so any reminder more than
@@ -14,10 +16,10 @@ import { logger } from "../logger";
  * alert carries the app's own presentation: brand tint, a stop button, and a
  * "View trip" secondary button that opens the app.
  *
- * AlarmKit makes the leave reminder break through Silent Mode / Focus, instead
- * of a notification that's easy to miss. Keeping the plugin API behind this
- * module means the focused-trip scheduler and its unit tests depend on our
- * stable surface, and any native-side drift is isolated here.
+ * The alarm breaks through Silent Mode / Focus / Do Not Disturb, instead of a
+ * notification that's easy to miss. Keeping the plugin API behind this module
+ * means the focused-trip scheduler and its unit tests depend on our stable
+ * surface, and any native-side drift is isolated here.
  */
 
 export type AlarmAuthStatus = "authorized" | "denied" | "unavailable";
@@ -42,9 +44,17 @@ export interface LeaveAlarmNativePlugin {
 
 const LeaveAlarm = registerPlugin<LeaveAlarmNativePlugin>("LeaveAlarm");
 
-/** Whether a real AlarmKit alarm can be scheduled on this device. iOS-only. */
+/** Platforms with a native LeaveAlarm implementation: iOS (AlarmKit) and
+ *  Android (AlarmManager.setAlarmClock + full-screen alarm). Web has none. */
+function alarmCapablePlatform(): boolean {
+  const platform = Capacitor.getPlatform();
+  return platform === "ios" || platform === "android";
+}
+
+/** Whether a real alarm can be scheduled here (iOS AlarmKit or Android
+ *  setAlarmClock). */
 export async function isAlarmAvailable(): Promise<boolean> {
-  if (Capacitor.getPlatform() !== "ios") return false;
+  if (!alarmCapablePlatform()) return false;
   try {
     const { value } = await LeaveAlarm.isAvailable();
     return value === true;
@@ -64,7 +74,7 @@ function toAuthStatus(status: string): AlarmAuthStatus {
 
 /** Current AlarmKit authorization without prompting. */
 export async function checkAlarmAuth(): Promise<AlarmAuthStatus> {
-  if (Capacitor.getPlatform() !== "ios") return "unavailable";
+  if (!alarmCapablePlatform()) return "unavailable";
   try {
     const { status } = await LeaveAlarm.checkAuthorization();
     return toAuthStatus(status);
@@ -76,7 +86,7 @@ export async function checkAlarmAuth(): Promise<AlarmAuthStatus> {
 
 /** Prompt for AlarmKit authorization (no re-prompt if already decided). */
 export async function requestAlarmAuth(): Promise<AlarmAuthStatus> {
-  if (Capacitor.getPlatform() !== "ios") return "unavailable";
+  if (!alarmCapablePlatform()) return "unavailable";
   try {
     const { status } = await LeaveAlarm.requestAuthorization();
     return toAuthStatus(status);
@@ -89,18 +99,18 @@ export async function requestAlarmAuth(): Promise<AlarmAuthStatus> {
 export type ReminderChannel = "alarm" | "notification";
 
 /**
- * Decide whether a reminder should fire as a true AlarmKit "Leave Alarm" or as
- * the local-notification fallback. We only use an alarm on iOS, when AlarmKit
- * is available and the user has authorized it — every other case (Android, web,
- * unavailable, denied) falls back to a notification. Pure so it can be unit
- * tested without touching Capacitor or the DOM.
+ * Decide whether a reminder should fire as a true "Leave Alarm" or as the
+ * local-notification fallback. We use an alarm on iOS (AlarmKit) and Android
+ * (setAlarmClock) when it's available and the user has authorized it — every
+ * other case (web, unavailable, denied) falls back to a notification. Pure so
+ * it can be unit tested without touching Capacitor or the DOM.
  */
 export function decideReminderChannel(args: {
   platform: string;
   alarmAvailable: boolean;
   alarmStatus: AlarmAuthStatus;
 }): ReminderChannel {
-  if (args.platform !== "ios") return "notification";
+  if (args.platform !== "ios" && args.platform !== "android") return "notification";
   if (!args.alarmAvailable) return "notification";
   if (args.alarmStatus !== "authorized") return "notification";
   return "alarm";
@@ -114,10 +124,10 @@ export interface LeaveAlarmButtonText {
 }
 
 /**
- * Create a one-time AlarmKit alarm at `fireAt` (epoch ms — ANY future date,
- * not just the next occurrence of its clock time), or return
- * `{ scheduled: false }` when an alarm can't/shouldn't be used (non-iOS,
- * unavailable, unauthorized, or the schedule call failed).
+ * Create a one-time alarm at `fireAt` (epoch ms — ANY future date, not just the
+ * next occurrence of its clock time), or return `{ scheduled: false }` when an
+ * alarm can't/shouldn't be used (web, unavailable, unauthorized, or the
+ * schedule call failed).
  *
  * Does NOT cancel any previous alarm — the caller retires the prior channel
  * only after a new one is confirmed scheduled, so a failed (re)schedule never

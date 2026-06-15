@@ -17,7 +17,7 @@ const cancel = vi.fn(async (opts: { id: string }) => {
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: { getPlatform: () => getPlatform() },
-  // The local LeaveAlarm plugin (registered natively from MainViewController).
+  // The local LeaveAlarm plugin (registered natively per platform).
   registerPlugin: () => ({
     isAvailable: () => isAvailable(),
     checkAuthorization: () => checkAuthorization(),
@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe("decideReminderChannel", () => {
-  it("uses an alarm only on iOS when available and authorized", () => {
+  it("uses an alarm on iOS when available and authorized", () => {
     expect(
       decideReminderChannel({
         platform: "ios",
@@ -58,14 +58,14 @@ describe("decideReminderChannel", () => {
     ).toBe("alarm");
   });
 
-  it("falls back to notification on Android even when authorized", () => {
+  it("uses an alarm on Android too (setAlarmClock parity)", () => {
     expect(
       decideReminderChannel({
         platform: "android",
         alarmAvailable: true,
         alarmStatus: "authorized",
       }),
-    ).toBe("notification");
+    ).toBe("alarm");
   });
 
   it("falls back to notification on web", () => {
@@ -108,7 +108,7 @@ describe("checkAlarmAuth", () => {
     await expect(checkAlarmAuth()).resolves.toBe("denied");
   });
 
-  it("is unavailable off-iOS without touching the plugin", async () => {
+  it("is unavailable on web without touching the plugin", async () => {
     getPlatform.mockReturnValue("web");
     await expect(checkAlarmAuth()).resolves.toBe("unavailable");
     expect(checkAuthorization).not.toHaveBeenCalled();
@@ -152,11 +152,18 @@ describe("scheduleLeaveAlarm", () => {
     expect(result.scheduled).toBe(true);
   });
 
-  it("does not schedule on a non-iOS platform", async () => {
-    getPlatform.mockReturnValue("android");
+  it("does not schedule on web (no native alarm)", async () => {
+    getPlatform.mockReturnValue("web");
     const result = await scheduleLeaveAlarm({ label: "Leave", fireAt });
     expect(result).toEqual({ scheduled: false });
     expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it("schedules a real alarm on Android (setAlarmClock parity)", async () => {
+    getPlatform.mockReturnValue("android");
+    const result = await scheduleLeaveAlarm({ label: "Leave", fireAt });
+    expect(result).toEqual({ scheduled: true, alarmId: "alarm-1" });
+    expect(schedule).toHaveBeenCalled();
   });
 
   it("does not schedule when AlarmKit is unavailable", async () => {

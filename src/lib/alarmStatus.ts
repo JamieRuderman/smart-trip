@@ -1,6 +1,7 @@
 export type AlarmPhase =
   | "CANCELED_OR_SKIPPED"
   | "ENDED"
+  | "LEAVE"
   | "PRE_DEPARTURE"
   | "BOARDING_WINDOW"
   | "EN_ROUTE_FRESH"
@@ -12,6 +13,10 @@ export interface AlarmStatusInput {
   minutesUntilDeparture: number;
   minutesUntilArrival: number;
   minutesAfterArrival: number;
+  /** Minutes until the armed leave reminder fires (departure − lead), or null
+   *  when no reminder is armed. While ≥ 0 the status leads with a "leave in"
+   *  countdown — the first of the three stages (leave → departs → arrives). */
+  minutesUntilLeave?: number | null;
   hasStarted: boolean;
   isCanceled: boolean;
   isCanceledOrSkipped: boolean;
@@ -24,10 +29,11 @@ export interface AlarmStatusInput {
 
 export interface AlarmStatusSelection {
   phase: AlarmPhase;
-  kind: "message" | "departure-countdown" | "arrival-countdown";
+  kind: "message" | "leave-countdown" | "departure-countdown" | "arrival-countdown";
   translationKey?: string;
   translationValues?: Record<string, number | string>;
   tone?: "default" | "muted";
+  minutesUntilLeave?: number;
   minutesUntilDeparture?: number;
   minutesUntilArrival?: number;
 }
@@ -100,6 +106,7 @@ export function selectAlarmStatus(
     minutesUntilDeparture,
     minutesUntilArrival,
     minutesAfterArrival,
+    minutesUntilLeave = null,
     hasStarted,
     isCanceled,
     isCanceledOrSkipped,
@@ -137,6 +144,16 @@ export function selectAlarmStatus(
 
   if (isPostDeparture) {
     return buildEnRouteSelection(minutesUntilArrival, hasFreshRealtime, hasReliableGps);
+  }
+
+  // Lead with the "leave in" countdown while the armed reminder is still ahead,
+  // before the departure countdown — matching the home card + Live Activity.
+  if (minutesUntilLeave != null && minutesUntilLeave >= 0) {
+    return {
+      phase: "LEAVE",
+      kind: "leave-countdown",
+      minutesUntilLeave,
+    };
   }
 
   if (minutesUntilDeparture <= 2) {

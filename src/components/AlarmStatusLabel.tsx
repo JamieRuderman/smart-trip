@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { CountdownLabel } from "./CountdownLabel";
+import { LeaveLabel } from "./LeaveLabel";
 import { ArrivalLabel } from "./ArrivalLabel";
 import type { AlarmStatusSelection } from "@/lib/alarmStatus";
 import { stateText } from "@/lib/tripTheme";
@@ -13,6 +14,13 @@ export function AlarmStatusLabel({
   const { t } = useTranslation();
 
   const text = (() => {
+    if (
+      status.kind === "leave-countdown" &&
+      status.minutesUntilLeave != null
+    ) {
+      return <LeaveLabel minutesUntilLeave={status.minutesUntilLeave} />;
+    }
+
     if (
       status.kind === "departure-countdown" &&
       status.minutesUntilDeparture != null

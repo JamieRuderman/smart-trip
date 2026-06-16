@@ -177,7 +177,7 @@ export const TripCard = memo(function TripCard({
       <div
         ref={cardRef}
         className={cn(
-          "flex items-center px-4 py-2 rounded-lg border transition-all",
+          "relative flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
           // Blue == "you're on/taking this train" and overrides the semantic
@@ -205,8 +205,11 @@ export const TripCard = memo(function TripCard({
           isDelayed={isDelayed}
         />
         {isRiding && (
+          // Floats over the start of the schedule text instead of sitting
+          // inline — keeps the times in their natural position (no awkward
+          // shove to the right) while the pill reads as layered on top.
           <span
-            className="ml-1 mr-2 shrink-0 self-center px-1.5 py-0.5 rounded-md bg-my-trip-background text-white text-[10px] font-bold uppercase tracking-wider leading-none"
+            className="pointer-events-none absolute left-[5.25rem] top-1/2 z-20 -translate-y-1/2 shrink-0 rounded-md bg-my-trip-background px-2.5 py-1 text-sm font-bold uppercase leading-none tracking-wider text-white shadow-md ring-2 ring-background"
             aria-label={t("tripCard.ridingAria", "Currently riding this train")}
           >
             {t("stationInfo.riding")}

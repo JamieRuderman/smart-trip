@@ -1,16 +1,20 @@
-import { useEffect, useMemo } from "react";
-import { Capacitor } from "@capacitor/core";
+import { useEffect, useMemo, useRef } from "react";
+import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedDepartureInstant,
+  loadFocusedTrip,
   reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
+import { scheduleFocusActivityDismissal } from "@/hooks/useFocusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { useNow } from "@/hooks/useNow";
-import { derivePhase } from "@/lib/native/liveActivity";
+import { buildContentState, derivePhase } from "@/lib/native/liveActivity";
+import { logger } from "@/lib/logger";
 
 function dateKey(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -111,6 +115,60 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet]);
+
+  // Snapshot of what to hand iOS when the app backgrounds, kept in a ref so the
+  // long-lived `appStateChange` listener always sees the latest live values
+  // without re-subscribing. Null until we have both instants.
+  const dismissSnapshotRef = useRef<{
+    content: ReturnType<typeof buildContentState>;
+    arrivalAt: number;
+  } | null>(null);
+  dismissSnapshotRef.current =
+    liveActivityId && departureAt != null && arrivalAt != null
+      ? {
+          arrivalAt,
+          content: buildContentState({
+            departureEpochMs: departureAt,
+            arrivalEpochMs: arrivalAt,
+            delayMinutes,
+            nextStop: null,
+            remainingStops: null,
+            isCanceled,
+            isEnded: false,
+            reminderSet,
+            now,
+          }),
+        }
+      : null;
+
+  // When the app leaves the foreground, schedule the activity to auto-dismiss at
+  // arrival (local path) so the Dynamic Island / lock screen clears itself even
+  // if the JS never wakes again — the gap that left it lingering past arrival.
+  // Registered once; the snapshot ref carries the live values.
+  useEffect(() => {
+    let handle: PluginListenerHandle | null = null;
+    let cancelled = false;
+    CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) return;
+      const snap = dismissSnapshotRef.current;
+      // Re-read storage rather than trust a stale closure: the focus may have
+      // been cleared/replaced since this listener was registered.
+      const current = loadFocusedTrip();
+      if (!snap || !current) return;
+      void scheduleFocusActivityDismissal(current, snap.content, snap.arrivalAt);
+    })
+      .then((listener) => {
+        if (cancelled) listener.remove();
+        else handle = listener;
+      })
+      .catch((error) => {
+        logger.warn("Unable to register Live Activity background listener", error);
+      });
+    return () => {
+      cancelled = true;
+      handle?.remove();
+    };
+  }, []);
 
   return null;
 }

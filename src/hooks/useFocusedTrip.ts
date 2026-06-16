@@ -20,10 +20,12 @@ import {
   buildContentState,
   endTripActivity,
   listTripActivities,
+  listTripActivityRecords,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
+  type TripActivityContentState,
 } from "@/lib/native/liveActivity";
 import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
 import {
@@ -245,16 +247,30 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
 export async function reconcileTripActivities(): Promise<void> {
   const focused = loadFocusedTrip();
   const keep = focused?.liveActivityId;
-  const ids = await listTripActivities();
+  const records = await listTripActivityRecords();
   await Promise.all(
-    ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
+    records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
-  const running = keep != null && ids.includes(keep);
-  if (focused && !running) {
-    // Nothing on screen for this focus (never started, ended, or the user
-    // dismissed it) — (re)start if it should show now. startActivityForFocus
-    // self-gates on the window/reminder/riding rule, so a far-ahead focus with
-    // no reminder stays dormant; a dismissed-but-eligible one comes back.
+  const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
+  // An `ended` kept activity is one we scheduled to auto-dismiss after arrival
+  // when the app last backgrounded (the local self-clear path): it's still on
+  // screen and self-ticking but can no longer be updated, so once we're back in
+  // the foreground we revive it as a fresh, updatable activity. Revive only when
+  // the focus has NO activity on screen (never started / system-purged) or that
+  // frozen one; `active`/`stale` are already live, and `dismissed` means the
+  // user swiped it away — neither should be respawned.
+  //
+  // Push builds never schedule that local auto-dismiss (the cron ends the
+  // activity server-side at live arrival), so there an `ended` activity is a
+  // deliberate end — leave it be rather than resurrect it.
+  const keptFrozen =
+    kept != null && kept.state === "ended" && !isLiveActivityPushEnabled();
+  if (focused && (kept == null || keptFrozen)) {
+    // (Re)start if it should show now. startActivityForFocus self-gates on the
+    // window/reminder/riding rule, so a far-ahead focus with no reminder stays
+    // dormant; a frozen-but-eligible one comes back. End the frozen activity
+    // first so its pending auto-dismissal can't remove the freshly started one.
+    if (keptFrozen && keep != null) await endTripActivity(keep);
     await startActivityForFocus(focused);
     return;
   }
@@ -269,6 +285,31 @@ export async function reconcileTripActivities(): Promise<void> {
     );
     if (registration) await registerPushActivity(registration);
   }
+}
+
+/**
+ * Hand iOS a guaranteed dismissal at `arrivalEpochMs` for the focused trip's
+ * running Live Activity, so the lock screen / Dynamic Island clears itself after
+ * arrival even if the app stays backgrounded through it. Call when the app
+ * leaves the foreground — that's the last moment JS runs before the OS owns the
+ * activity alone.
+ *
+ * LOCAL path only: push builds already end the activity server-side at the live
+ * arrival (the cron's `decidePushAction` → `end`), and ending it here would
+ * freeze it against those corrections. No-op off-iOS, with no running activity,
+ * or once arrival has passed (the normal foreground end paths handle that).
+ * `content` is rendered as the final state — pass the live, NOT-ended content so
+ * the self-ticking countdown keeps running until the dismissal lands.
+ */
+export async function scheduleFocusActivityDismissal(
+  focused: FocusedTrip,
+  content: TripActivityContentState,
+  arrivalEpochMs: number,
+): Promise<void> {
+  if (isLiveActivityPushEnabled()) return;
+  if (!focused.liveActivityId) return;
+  if (arrivalEpochMs <= Date.now()) return;
+  await endTripActivity(focused.liveActivityId, content, arrivalEpochMs);
 }
 
 /**

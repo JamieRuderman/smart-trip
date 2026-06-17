@@ -42,7 +42,7 @@ import {
   encodeContentState,
   endTripActivity,
   isLiveActivityAvailable,
-  listTripActivities,
+  listTripActivityRecords,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
@@ -91,6 +91,11 @@ beforeEach(() => {
   getPlatform.mockReturnValue("ios");
   getInfo.mockResolvedValue({ osVersion: "17.4" });
   isAvailable.mockResolvedValue({ value: true });
+  // Reset the implementation too: clearAllMocks() only wipes call data, so a
+  // prior test's mockRejectedValue would otherwise leak into the next.
+  listActivities.mockResolvedValue({
+    items: [{ id: "trip-7-2026-06-09", activityId: "sys-1", state: "active" }],
+  });
 });
 
 afterEach(() => {
@@ -396,6 +401,26 @@ describe("endTripActivity", () => {
       dismissalPolicy: "immediate",
     });
   });
+  it("schedules an after-arrival auto-dismiss for a future dismissal time", async () => {
+    // `Date.now()` is pinned to NOW; ARR is in the future, so we hand iOS a
+    // `.after(date)` policy with the arrival as the (seconds) dismissal date.
+    const final = content();
+    await endTripActivity("trip-7-2026-06-09", final, ARR);
+    expect(endActivity).toHaveBeenCalledWith({
+      id: "trip-7-2026-06-09",
+      contentState: encodeContentState(final),
+      dismissalPolicy: "after",
+      dismissalDate: Math.floor(ARR / 1000),
+    });
+  });
+  it("dismisses immediately when the scheduled dismissal time is already past", async () => {
+    await endTripActivity("trip-7-2026-06-09", undefined, NOW - 1000);
+    expect(endActivity).toHaveBeenCalledWith({
+      id: "trip-7-2026-06-09",
+      contentState: {},
+      dismissalPolicy: "immediate",
+    });
+  });
   it("swallows plugin errors", async () => {
     endActivity.mockRejectedValue(new Error("boom"));
     await expect(endTripActivity("x")).resolves.toBeUndefined();
@@ -407,17 +432,19 @@ describe("endTripActivity", () => {
   });
 });
 
-describe("listTripActivities", () => {
-  it("returns the logical ids on iOS", async () => {
-    await expect(listTripActivities()).resolves.toEqual(["trip-7-2026-06-09"]);
+describe("listTripActivityRecords", () => {
+  it("returns the logical id + lifecycle state on iOS", async () => {
+    await expect(listTripActivityRecords()).resolves.toEqual([
+      { id: "trip-7-2026-06-09", state: "active" },
+    ]);
   });
   it("returns [] off-iOS", async () => {
     getPlatform.mockReturnValue("android");
-    await expect(listTripActivities()).resolves.toEqual([]);
+    await expect(listTripActivityRecords()).resolves.toEqual([]);
     expect(listActivities).not.toHaveBeenCalled();
   });
   it("returns [] when the plugin throws", async () => {
     listActivities.mockRejectedValue(new Error("boom"));
-    await expect(listTripActivities()).resolves.toEqual([]);
+    await expect(listTripActivityRecords()).resolves.toEqual([]);
   });
 });

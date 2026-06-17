@@ -432,6 +432,71 @@ private struct BellRingIconShape: Shape {
     }
 }
 
+/// A walking-person glyph for the "time to leave" stage on the compact island —
+/// a head over striding legs + arms. Drawn as a vector (not an SF Symbol) so it
+/// matches the web app's `WalkIcon` exactly; mirror of Tabler Icons' `walk`
+/// (MIT). Stroked like `TrainIcon`; keep in lockstep with the web component.
+private struct WalkIcon: View {
+    var size: CGFloat
+    var strokeRatio: CGFloat = 0.083
+
+    var body: some View {
+        WalkIconShape()
+            .stroke(
+                style: StrokeStyle(
+                    lineWidth: size * strokeRatio,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+            .frame(width: size, height: size)
+    }
+}
+
+/// `walk` outline in Tabler's 24×24 viewBox, scaled to fit the proposed rect
+/// (same fit math as `TrainIconShape`). The figure is a small head circle plus
+/// three open polylines (back leg, front leg + torso, arms), so unlike the
+/// bell it needs no arc reconstruction — just straight segments.
+private struct WalkIconShape: Shape {
+    private static let viewBox: CGFloat = 24
+
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / Self.viewBox
+        let side = Self.viewBox * scale
+        let dx = rect.midX - side / 2
+        let dy = rect.midY - side / 2
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: dx + x * scale, y: dy + y * scale)
+        }
+
+        var path = Path()
+
+        // Head: circle cx 13 cy 4 r 1.
+        let r = 1 * scale
+        let head = pt(13, 4)
+        path.addEllipse(in: CGRect(x: head.x - r, y: head.y - r, width: 2 * r, height: 2 * r))
+
+        // Back leg: M7 21 l3 -4
+        path.move(to: pt(7, 21))
+        path.addLine(to: pt(10, 17))
+
+        // Front leg + torso: M16 21 l-2 -4 l-3 -3 l1 -6
+        path.move(to: pt(16, 21))
+        path.addLine(to: pt(14, 17))
+        path.addLine(to: pt(11, 14))
+        path.addLine(to: pt(12, 8))
+
+        // Arms across the chest: M6 12 l2 -3 l4 -1 l3 3 l3 1
+        path.move(to: pt(6, 12))
+        path.addLine(to: pt(8, 9))
+        path.addLine(to: pt(12, 8))
+        path.addLine(to: pt(15, 11))
+        path.addLine(to: pt(18, 12))
+
+        return path
+    }
+}
+
 /// Status pill. On the black Dynamic Island it carries the status colour
 /// itself; on the lock screen the card already supplies that colour, so the
 /// pill is a neutral frosted chip (`onColoredBackground`).
@@ -458,9 +523,11 @@ private struct StatusPill: View {
     }
 }
 
-/// Compact-leading glyph: the bell-ring while a leave alarm is still pending,
-/// otherwise the brand train. Pairs with `CompactCountdown` so the icon and the
-/// countdown beside it always describe the same target (alarm → departure).
+/// Compact-leading glyph: a walking person while a leave alarm is still
+/// pending, otherwise the brand train. Pairs with `CompactCountdown` so the
+/// icon and the countdown beside it always describe the same target (head out →
+/// departure). The walking figure (not a bell) keeps the leave countdown from
+/// doubling up on the "reminder armed" bell shown elsewhere.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
@@ -468,7 +535,7 @@ private struct CompactLeadingIcon: View {
     @ViewBuilder
     var body: some View {
         if model.alarmPending {
-            BellRingIcon(size: 18)
+            WalkIcon(size: 20)
                 .foregroundStyle(accent)
                 .padding(.horizontal, 2)
         } else {

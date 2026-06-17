@@ -55,7 +55,7 @@ struct TripActivityWidget: Widget {
                         VStack(alignment: .leading, spacing: 1) {
                             if model.isCanceled {
                                 Text("Cancelled").font(.headline.weight(.bold)).foregroundStyle(accent)
-                            } else if model.isEnded {
+                            } else if isArrived(model) {
                                 Text("Arrived").font(.headline.weight(.bold)).foregroundStyle(accent)
                             } else {
                                 Text(countdownLabel(model))
@@ -124,14 +124,28 @@ private enum Brand {
     static let red = Color(red: 0.937, green: 0.267, blue: 0.267)
 }
 
-/// The three stages the headline countdown moves through before arrival. Keyed
-/// off the app-precomputed `alarmPending` + `phase` flags, never the widget's
-/// own clock, so it matches `buildContentState` and flips on the next push.
+/// The three stages the headline countdown moves through before arrival.
 private enum CountdownStage { case alarm, departure, arrival }
 
-private func countdownStage(_ model: TripActivityModel) -> CountdownStage {
-    if model.alarmPending { return .alarm }
-    return model.phase == .enRoute ? .arrival : .departure
+/// The active stage, derived from the widget's OWN clock against the target
+/// instants in the payload — NOT the app-pushed `phase` / `alarmPending` flags.
+///
+/// A local (non-push) activity receives no content update while the app is
+/// backgrounded, so keying the stage purely off the pushed flags froze it: once
+/// departure passed with the app not foreground to push the flip, the compact
+/// timer sat at 0:00 instead of advancing to the destination countdown. The
+/// pushed instants remain the source of truth (realtime delay moves them); the
+/// clock just picks which one is active, so the stage self-advances on the next
+/// system re-render (screen-on, unlock, periodic refresh) with no push needed.
+/// `now` is a parameter so previews/tests can pin it.
+private func countdownStage(_ model: TripActivityModel, now: Date = Date()) -> CountdownStage {
+    if model.reminderSet, let reminder = model.reminderDate, now < reminder {
+        return .alarm
+    }
+    if let departure = model.departureDate, now < departure {
+        return .departure
+    }
+    return .arrival
 }
 
 /// Uppercase label shown above the live countdown on the lock screen + expanded
@@ -153,13 +167,26 @@ private func countdownTarget(_ model: TripActivityModel) -> Date? {
     }
 }
 
+/// Whether the trip has concluded — the app's pushed `isEnded`, OR the widget's
+/// OWN clock has passed arrival. A local (non-push) activity gets no `isEnded`
+/// push while the app is backgrounded, so without the clock fallback the surfaces
+/// sat on the destination countdown frozen at 0:00 after arrival until a
+/// foreground reconcile (or iOS expiry) finally cleared the activity. Deriving it
+/// here renders a clean "Arrived" terminal state in the meantime. `now` is a
+/// parameter so previews/tests can pin it.
+private func isArrived(_ model: TripActivityModel, now: Date = Date()) -> Bool {
+    if model.isEnded { return true }
+    guard let arrival = model.arrivalDate else { return false }
+    return now >= arrival
+}
+
 /// Status-driven accent: blue when on time, the brand delay gold when late,
 /// red when cancelled. Drives the lock-screen background tint and every Dynamic
 /// Island accent so the status colour reads the same on both surfaces. Mirrors
 /// the precedence in `deriveStatusText` (cancelled > ended > delayed).
 private func statusColor(_ model: TripActivityModel) -> Color {
     if model.isCanceled { return Brand.red }
-    if model.isEnded { return Brand.blue }
+    if isArrived(model) { return Brand.blue }
     if model.delayMinutes > 0 { return Brand.gold }
     return Brand.blue
 }
@@ -564,7 +591,9 @@ private struct StatusPill: View {
     var onColoredBackground = false
 
     var body: some View {
-        Text(model.statusText)
+        // "Arrived" overrides the (now stale) pushed status once the widget's own
+        // clock passes arrival, matching the headline's terminal state.
+        Text(!model.isCanceled && isArrived(model) ? "Arrived" : model.statusText)
             .font(.caption2.weight(.semibold))
             .lineLimit(1)
             .padding(.horizontal, 8)
@@ -576,7 +605,7 @@ private struct StatusPill: View {
     private var background: Color {
         if onColoredBackground { return .white.opacity(0.22) }
         if model.isCanceled { return Brand.red.opacity(0.9) }
-        if model.isEnded { return .white.opacity(0.22) }
+        if isArrived(model) { return .white.opacity(0.22) }
         if model.delayMinutes > 0 { return Brand.gold.opacity(0.9) }
         return .white.opacity(0.22)
     }
@@ -616,7 +645,7 @@ private struct CompactCountdown: View {
     var body: some View {
         if model.isCanceled {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
-        } else if model.isEnded {
+        } else if isArrived(model) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.blue)
         } else if let target = countdownTarget(model) {
             DigitalTimer(target: target)
@@ -708,7 +737,7 @@ private struct HeadlineCountdown: View {
         VStack(alignment: .leading, spacing: 2) {
             if model.isCanceled {
                 Text("Cancelled").font(.system(size: 19, weight: .bold))
-            } else if model.isEnded {
+            } else if isArrived(model) {
                 Text("Arrived").font(.system(size: 19, weight: .bold))
             } else {
                 Text(countdownLabel(model))

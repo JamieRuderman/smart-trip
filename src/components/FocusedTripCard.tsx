@@ -287,16 +287,16 @@ function FocusedTripCardInner({
     [],
   );
 
-  // Match reminderLeadRange's tooLate gate: hide "Add reminder" once there's
-  // under ~3 min of lead (or the train has departed — minutesUntil goes
-  // negative), so the button can't open a modal whose slider has collapsed to a
-  // single degenerate point. Future-service trips keep the affordance (their
-  // countdown is day-relative, not a live lead).
+  // Match reminderLeadRange's tooLate gate: hide "Add reminder" once departure
+  // is under ~2 min away (or the train has departed — minutesUntil goes
+  // negative), past which even a 1-min lead reminder would fire inside the
+  // near-now buffer. Future-service trips keep the affordance (their countdown
+  // is day-relative, not a live lead).
   const showAddReminder =
     !isCanceledOrSkipped &&
     !reminder &&
     isReminderSupported() &&
-    (isFutureService || minutesUntil >= 3);
+    (isFutureService || minutesUntil >= 2);
 
   return (
     <SectionCard

@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { BellRing, Calendar, ChevronRight, Timer } from "lucide-react";
+import { BellRing, Calendar, ChevronRight, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -23,6 +23,7 @@ import {
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { SectionCard } from "@/components/ui/section-card";
 import { TripIcon } from "./icons/TripIcon";
+import { WalkIcon } from "./icons/WalkIcon";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
 import { LeaveLabel } from "./LeaveLabel";
@@ -313,8 +314,7 @@ function FocusedTripCardInner({
           {/* Eyebrow + "details" affordance — collapses on scroll. */}
           <Collapsible order={2}>
             <div className="flex items-center justify-between pb-4">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
-                <TripIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/85">
                 {t("focusedTrip.myTrip")}
               </span>
               <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">
@@ -379,9 +379,11 @@ function FocusedTripCardInner({
         {countdownStage ? (
           <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
             {countdownStage === "leave" ? (
-              <BellRing className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <WalkIcon className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            ) : countdownStage === "departs" ? (
+              <TripIcon className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
             ) : (
-              <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <MapPin className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
             )}
             <span className="text-lg font-semibold tracking-tight">
               {countdownStage === "leave" ? (

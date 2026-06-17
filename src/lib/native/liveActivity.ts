@@ -185,17 +185,41 @@ export async function updateTripActivity(
   }
 }
 
-/** End the activity (on clear / arrival / focus replace). Best-effort; dismisses
- *  immediately. Optionally renders a final state first. */
+/**
+ * End the activity (on clear / arrival / focus replace). Best-effort; optionally
+ * renders a final state first.
+ *
+ * By default dismisses IMMEDIATELY. When `dismissAtEpochMs` is a future instant,
+ * the activity is instead scheduled to auto-dismiss THEN (ActivityKit
+ * `.after(date)`): it stays on the lock screen / Dynamic Island — its
+ * `Text(timerInterval:)` countdown keeps ticking — and iOS removes it at that
+ * date even if the app never runs again. This is how the local (non-push)
+ * focused-trip activity self-clears after arrival while the phone is locked,
+ * since the JS that would otherwise call this never wakes in the background.
+ * `dismissalDate` is UNIX *seconds* (the plugin feeds it to
+ * `Date(timeIntervalSince1970:)`). A past/now `dismissAtEpochMs` falls back to
+ * immediate.
+ */
 export async function endTripActivity(
   id: string,
   finalContent?: TripActivityContentState,
+  dismissAtEpochMs?: number,
 ): Promise<void> {
   if (Capacitor.getPlatform() !== "ios") return;
+  const contentState = finalContent ? encodeContentState(finalContent) : {};
   try {
+    if (dismissAtEpochMs != null && dismissAtEpochMs > Date.now()) {
+      await LiveActivity.endActivity({
+        id,
+        contentState,
+        dismissalPolicy: "after",
+        dismissalDate: Math.floor(dismissAtEpochMs / 1000),
+      });
+      return;
+    }
     await LiveActivity.endActivity({
       id,
-      contentState: finalContent ? encodeContentState(finalContent) : {},
+      contentState,
       dismissalPolicy: "immediate",
     });
   } catch (error) {
@@ -203,13 +227,22 @@ export async function endTripActivity(
   }
 }
 
-/** Logical ids of activities the OS still knows about — for boot reconciliation
- *  (end any orphan whose trip no longer matches the focus). `[]` off-iOS/error. */
-export async function listTripActivities(): Promise<string[]> {
+/** A known activity and its ActivityKit lifecycle state ("active" | "stale" |
+ *  "pending" | "ended" | "dismissed"). */
+export interface TripActivityRecord {
+  id: string;
+  state: string;
+}
+
+/** Known activities (with lifecycle state) the OS still tracks — for boot /
+ *  foreground reconciliation: end orphans, and tell an `ended` activity (one we
+ *  scheduled to auto-dismiss after arrival) apart from a live one. `[]`
+ *  off-iOS/error. */
+export async function listTripActivityRecords(): Promise<TripActivityRecord[]> {
   if (Capacitor.getPlatform() !== "ios") return [];
   try {
     const { items } = await LiveActivity.listActivities();
-    return items.map((i) => i.id);
+    return items.map((i) => ({ id: i.id, state: i.state }));
   } catch (error) {
     logger.warn("LiveActivity.listActivities failed", error);
     return [];

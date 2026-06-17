@@ -29,6 +29,8 @@ import { useCountdown } from "@/hooks/useCountdown";
 import { useAlarmStatus } from "@/hooks/useAlarmStatus";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { useNow } from "@/hooks/useNow";
+import { TripIcon } from "./icons/TripIcon";
+import { WalkIcon } from "./icons/WalkIcon";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
@@ -327,6 +329,21 @@ export function TripDetailContent({
         <div className="w-[5rem] shrink-0 flex justify-end pr-3">
           {isOtherDay ? (
             <Calendar
+              className="h-6 w-6 text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : alarmStatus.kind === "leave-countdown" ? (
+            <WalkIcon
+              className="h-6 w-6 text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : alarmStatus.kind === "departure-countdown" ? (
+            <TripIcon
+              className="h-6 w-6 text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : alarmStatus.kind === "arrival-countdown" ? (
+            <MapPin
               className="h-6 w-6 text-muted-foreground"
               aria-hidden="true"
             />

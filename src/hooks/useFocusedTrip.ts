@@ -19,11 +19,13 @@ import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
 import {
   buildContentState,
   endTripActivity,
-  listTripActivities,
+  listTripActivityRecords,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
+  type TripActivityContentState,
+  type TripActivityRecord,
 } from "@/lib/native/liveActivity";
 import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
 import {
@@ -217,6 +219,7 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
+/**
  * Push the focused trip's CURRENT content to its already-running Live Activity,
  * so a just-armed/cleared/rescheduled reminder (the "leave alarm" stage) is
  * reflected on the lock screen + Dynamic Island immediately, instead of waiting
@@ -250,22 +253,57 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
 }
 
 /**
+ * Start the focus's Live Activity, or REVIVE it when the only thing on screen is
+ * the frozen `ended` activity we scheduled to auto-dismiss after arrival (the
+ * local background self-clear path). An `ended` activity still renders but can no
+ * longer be updated, so we end it and start a fresh, updatable one.
+ *
+ * No-op (returns false) when a LIVE activity already exists for the focus
+ * (`active`/`stale`/`pending`), when the user swiped it away (`dismissed`), or
+ * when a push build deliberately ended it server-side at arrival — none of those
+ * should be respawned. Returns true when it (re)started one. `startActivityForFocus`
+ * self-gates on the window/reminder/riding rule, so a dormant focus stays off.
+ */
+async function startOrReviveActivity(
+  focused: FocusedTrip,
+  records: TripActivityRecord[],
+): Promise<boolean> {
+  const keep = focused.liveActivityId;
+  const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
+  // Push builds never schedule the local auto-dismiss (the cron ends the
+  // activity server-side at live arrival), so there an `ended` activity is a
+  // deliberate end — leave it be rather than resurrect it.
+  const keptFrozen =
+    kept != null && kept.state === "ended" && !isLiveActivityPushEnabled();
+  // Already covered (live / user-dismissed / push-ended) — don't touch it.
+  if (kept != null && !keptFrozen) return false;
+  // End the frozen one first so its pending auto-dismissal can't remove the
+  // freshly started activity.
+  if (keptFrozen && keep != null) await endTripActivity(keep);
+  await startActivityForFocus(focused);
+  return true;
+}
+
+/**
  * Start the focused trip's Live Activity if it isn't already on screen and it
  * should be (within the departure window, a reminder is armed, or en route).
- * Deduped against the OS's live list, so it never double-starts; it DOES bring
- * one back once eligible — covering a far-ahead focus that just entered the
- * window and recovering an activity the user dismissed. `startActivityForFocus`
- * self-gates, so this is a no-op while the trip is still dormant. When the
- * activity is ALREADY running it refreshes its content instead of no-op'ing, so
- * a freshly armed reminder's alarm stage lands right away.
+ * Deduped against the OS's live list by lifecycle state (see
+ * {@link startOrReviveActivity}), so it never double-starts; it DOES bring one
+ * back once eligible — covering a far-ahead focus that just entered the window,
+ * and reviving the frozen `ended` activity left by the background auto-dismiss
+ * before the next foreground reconcile runs (e.g. arming a reminder right after
+ * returning to the app). When a live activity already covers the focus, its
+ * content is refreshed so a freshly armed reminder's alarm stage lands right
+ * away. `startActivityForFocus` self-gates, so this is a no-op while dormant.
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
-  const running = await listTripActivities();
-  if (focused.liveActivityId && running.includes(focused.liveActivityId)) {
+  const records = await listTripActivityRecords();
+  // Revive/start when nothing live covers the focus; otherwise push current
+  // content so a just-armed reminder's alarm stage shows immediately.
+  if (!(await startOrReviveActivity(focused, records))) {
     await refreshActivityContent(focused);
-    return;
   }
-  await startActivityForFocus(focused);
+
 }
 
 /**
@@ -282,40 +320,37 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * Call alongside `bootFocusedTrip`.
  */
 export async function reconcileTripActivities(): Promise<void> {
-  const focused = loadFocusedTrip();
-  const ids = await listTripActivities();
-  // The activity to keep for the current focus: its committed id, or — when that
-  // hasn't landed yet — any running activity for the SAME trip+service date.
-  // `startActivityForFocus` commits `liveActivityId` asynchronously, so a
-  // reconcile racing a just-started activity (e.g. a foreground/focus event
-  // fired as the reminder dialog closes) would otherwise read a stale focus and
-  // end the fresh activity as an "orphan", blanking the lock screen / Dynamic
-  // Island. Adopt it instead, and commit the recovered id so later
-  // updates/reconciles target it.
-  let keep: string | undefined;
-  if (focused) {
+  let focused = loadFocusedTrip();
+  const records = await listTripActivityRecords();
+  // Adopt a running activity for the SAME trip+service date when the focus's
+  // committed `liveActivityId` hasn't landed yet — `startActivityForFocus`
+  // commits it asynchronously, so a reconcile racing a just-started activity
+  // (e.g. a foreground/focus event fired as the reminder dialog closes) would
+  // otherwise end the fresh activity as an "orphan", blanking the lock screen /
+  // Dynamic Island. Commit the recovered id so the rest of this pass — and
+  // later updates/reconciles — target it instead of ending/restarting it.
+  if (
+    focused != null &&
+    (focused.liveActivityId == null ||
+      !records.some((r) => r.id === focused!.liveActivityId))
+  ) {
     const prefix = `trip-${focused.tripNumber}-${focused.serviceDate}-`;
-    keep =
-      focused.liveActivityId && ids.includes(focused.liveActivityId)
-        ? focused.liveActivityId
-        : ids.find((id) => id.startsWith(prefix));
-    if (keep && keep !== focused.liveActivityId) {
-      saveFocusedTrip({ ...focused, liveActivityId: keep });
+    const adopted = records.find((r) => r.id.startsWith(prefix));
+    if (adopted) {
+      focused = { ...focused, liveActivityId: adopted.id };
+      saveFocusedTrip(focused);
       notifyChange();
     }
   }
+  const keep = focused?.liveActivityId;
   await Promise.all(
-    ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
+    records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
-  const running = keep != null && ids.includes(keep);
-  if (focused && !running) {
-    // Nothing on screen for this focus (never started, ended, or the user
-    // dismissed it) — (re)start if it should show now. startActivityForFocus
-    // self-gates on the window/reminder/riding rule, so a far-ahead focus with
-    // no reminder stays dormant; a dismissed-but-eligible one comes back.
-    await startActivityForFocus(focused);
-    return;
-  }
+  // (Re)start or revive the focus's activity if nothing live is on screen for
+  // it (never started, frozen by the background auto-dismiss, system-purged).
+  // Returns false when a live / user-dismissed / push-ended activity already
+  // covers it, in which case we fall through to the push self-heal below.
+  if (focused && (await startOrReviveActivity(focused, records))) return;
   // Push heal: the running activity's registration POST may have failed at
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and
@@ -324,6 +359,31 @@ export async function reconcileTripActivities(): Promise<void> {
     const registration = buildRegistrationForFocus(focused, keep);
     if (registration) await registerPushActivity(registration);
   }
+}
+
+/**
+ * Hand iOS a guaranteed dismissal at `arrivalEpochMs` for the focused trip's
+ * running Live Activity, so the lock screen / Dynamic Island clears itself after
+ * arrival even if the app stays backgrounded through it. Call when the app
+ * leaves the foreground — that's the last moment JS runs before the OS owns the
+ * activity alone.
+ *
+ * LOCAL path only: push builds already end the activity server-side at the live
+ * arrival (the cron's `decidePushAction` → `end`), and ending it here would
+ * freeze it against those corrections. No-op off-iOS, with no running activity,
+ * or once arrival has passed (the normal foreground end paths handle that).
+ * `content` is rendered as the final state — pass the live, NOT-ended content so
+ * the self-ticking countdown keeps running until the dismissal lands.
+ */
+export async function scheduleFocusActivityDismissal(
+  focused: FocusedTrip,
+  content: TripActivityContentState,
+  arrivalEpochMs: number,
+): Promise<void> {
+  if (isLiveActivityPushEnabled()) return;
+  if (!focused.liveActivityId) return;
+  if (arrivalEpochMs <= Date.now()) return;
+  await endTripActivity(focused.liveActivityId, content, arrivalEpochMs);
 }
 
 /**

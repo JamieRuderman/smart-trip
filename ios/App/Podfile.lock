@@ -1,17 +1,17 @@
 PODS:
-  - Capacitor (8.3.0):
+  - Capacitor (8.4.0):
     - CapacitorCordova
   - CapacitorApp (8.1.0):
     - Capacitor
-  - CapacitorCordova (8.3.0)
+  - CapacitorCordova (8.4.0)
   - CapacitorDevice (8.0.2):
     - Capacitor
-  - CapacitorGeolocation (8.1.0):
+  - CapacitorGeolocation (8.2.0):
     - Capacitor
-    - IONGeolocationLib (= 2.0.0)
+    - IONGeolocationLib (= 2.1.0)
   - CapacitorHaptics (8.0.2):
     - Capacitor
-  - CapacitorKeyboard (8.0.2):
+  - CapacitorKeyboard (8.0.5):
     - Capacitor
   - CapacitorLiveActivity (8.2.0):
     - Capacitor
@@ -21,7 +21,7 @@ PODS:
     - Capacitor
   - CapacitorStatusBar (8.0.2):
     - Capacitor
-  - IONGeolocationLib (2.0.0)
+  - IONGeolocationLib (2.1.0)
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
@@ -65,18 +65,18 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/status-bar"
 
 SPEC CHECKSUMS:
-  Capacitor: 22e541237135648c9aa736232bb4d2eec35fddcb
+  Capacitor: 75bd117ba037a51bb0f19ded32c67f4b3bc16600
   CapacitorApp: 449ffe26375e96f8aaaee625ac6e01e5c57c8650
-  CapacitorCordova: 2e1e2bb93b2f365309dc4ff18b72b9a69a7814a9
+  CapacitorCordova: 71d81f350e6c30bf2a846593b5c480fbd68e9bac
   CapacitorDevice: 14cba6f88d1c3074cbf825fea977c8c526453ff8
-  CapacitorGeolocation: 7132de914f9d853ec4642dc1d36e4e2018a4e8a8
+  CapacitorGeolocation: b36f6287bfc9f2eefa04dc900496f2c8ae666136
   CapacitorHaptics: 296f771ecd89c7a1bd92a7b6826a7d268e2e70f5
-  CapacitorKeyboard: 8aa4f4ae80b2c92f92c07bf0181c464c2e7f5ff0
+  CapacitorKeyboard: b6b0744890cdb1d9a96e2cafcc9253fdcc55de3b
   CapacitorLiveActivity: 7b84904a7230327780949e50ea98bbb3f0ee31cc
   CapacitorLocalNotifications: 2615aa008f608b95d3921a778ee1988abf1e6148
   CapacitorSplashScreen: 4b46c72298db552b3c57ce021ef028b6dc7f1fa7
   CapacitorStatusBar: 01d5763b4ed720de5ce2edbc938de6a98f4c8f32
-  IONGeolocationLib: a5e40b54edc2ee9902036eda5aaa41ddf07bb68d
+  IONGeolocationLib: 6a7b6f76063fb1b01cfb14fae7d0f526e3c9b271
 
 PODFILE CHECKSUM: 97347445e94e7aca4eebc2fac36029aac37e59bb
 

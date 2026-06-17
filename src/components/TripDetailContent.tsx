@@ -24,6 +24,7 @@ import {
 } from "@/lib/scheduleUtils";
 import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useAlarmStatus } from "@/hooks/useAlarmStatus";
 import { useTripStatus } from "@/hooks/useTripStatus";
@@ -142,6 +143,18 @@ export function TripDetailContent({
     currentTime,
   );
 
+  // When this sheet is the user's focused trip and a leave reminder is armed,
+  // lead with the "leave in" countdown (reminder fires `leadMinutes` before
+  // departure, so it tracks the same clock as the departure countdown). Other
+  // trips' sheets never carry a reminder, so they skip the leave stage.
+  const { focusedTrip } = useStationSelection();
+  const reminderLeadMinutes =
+    isFocused && focusedTrip?.reminder != null
+      ? focusedTrip.reminder.leadMinutes
+      : null;
+  const minutesUntilLeave =
+    reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
+
   const hasLocation = lat != null && lng != null;
 
   // Trip metadata
@@ -212,6 +225,7 @@ export function TripDetailContent({
       (currentTime.getHours() * 60 + currentTime.getMinutes())
     ),
     minutesAfterArrival,
+    minutesUntilLeave,
     hasStarted,
     isCanceled,
     isCanceledOrSkipped,

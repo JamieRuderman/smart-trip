@@ -8,12 +8,17 @@ import WidgetKit
  * bell when a reminder is armed. All content arrives via `GenericAttributes`
  * from the app/server (see TripActivityModel for the key contract).
  *
- * The "arrives in" countdown on the lock screen and expanded island uses
- * SwiftUI's self-updating `.relative` style ("1 hr, 24 min", and "min, sec"
- * under an hour; see `RelativeArrival`). It lives on the *leading* edge so its
- * width changes as it ticks never shove the fixed clock times / route pinned to
- * the trailing edge. The compact island shows a narrow departure `.timer` only
- * before the train leaves; en route it collapses back to the train icon.
+ * The headline countdown advances through three stages (see `CountdownStage`):
+ * while a leave alarm is armed and still ahead it counts down to the *alarm*
+ * under a bell ("Alarm in"); once that fires it flips to the *departure* under
+ * the train ("Departs in"); and once the train leaves it counts down to
+ * *arrival* ("To destination"). On the lock screen and expanded island this
+ * uses SwiftUI's self-updating `.relative` style ("1 hr, 24 min", and
+ * "min, sec" under an hour; see `RelativeCountdown`), pinned to the *leading*
+ * edge so its changing width never shoves the fixed clock times / route on the
+ * trailing edge. The compact island leads with the bell + a narrow alarm
+ * `.timer`, swaps to the train + departure `.timer` once the alarm fires, then
+ * collapses back to the bare train icon en route.
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -57,7 +62,7 @@ struct TripActivityWidget: Widget {
                                     .font(.caption2.weight(.semibold))
                                     .textCase(.uppercase)
                                     .foregroundStyle(.secondary)
-                                RelativeArrival(model: model)
+                                RelativeCountdown(model: model)
                                     .font(.system(size: 22, weight: .bold))
                                     .foregroundStyle(accent)
                                     .lineLimit(1)
@@ -93,9 +98,7 @@ struct TripActivityWidget: Widget {
                     .padding(.top, 8)
                 }
             } compactLeading: {
-                TrainIcon(size: 20)
-                    .foregroundStyle(accent)
-                    .padding(.horizontal, 2)
+                CompactLeadingIcon(model: model, accent: accent)
             } compactTrailing: {
                 CompactCountdown(model: model)
             } minimal: {
@@ -121,8 +124,33 @@ private enum Brand {
     static let red = Color(red: 0.937, green: 0.267, blue: 0.267)
 }
 
+/// The three stages the headline countdown moves through before arrival. Keyed
+/// off the app-precomputed `alarmPending` + `phase` flags, never the widget's
+/// own clock, so it matches `buildContentState` and flips on the next push.
+private enum CountdownStage { case alarm, departure, arrival }
+
+private func countdownStage(_ model: TripActivityModel) -> CountdownStage {
+    if model.alarmPending { return .alarm }
+    return model.phase == .enRoute ? .arrival : .departure
+}
+
+/// Uppercase label shown above the live countdown on the lock screen + expanded
+/// island.
 private func countdownLabel(_ model: TripActivityModel) -> String {
-    model.phase == .enRoute ? "To destination" : "Arrives in"
+    switch countdownStage(model) {
+    case .alarm: return "Alarm in"
+    case .departure: return "Departs in"
+    case .arrival: return "To destination"
+    }
+}
+
+/// The instant the active stage's countdown ticks down to.
+private func countdownTarget(_ model: TripActivityModel) -> Date? {
+    switch countdownStage(model) {
+    case .alarm: return model.reminderDate
+    case .departure: return model.departureDate
+    case .arrival: return model.arrivalDate
+    }
 }
 
 /// Status-driven accent: blue when on time, the brand delay gold when late,
@@ -430,10 +458,31 @@ private struct StatusPill: View {
     }
 }
 
-/// Compact-trailing variant: a digital departure countdown before boarding, a
-/// terminal symbol for cancelled/arrived states, and nothing once en route.
-/// Keep this aggressively narrow; if compact content asks for too much width,
-/// iOS inflates the island into the wide presentation.
+/// Compact-leading glyph: the bell-ring while a leave alarm is still pending,
+/// otherwise the brand train. Pairs with `CompactCountdown` so the icon and the
+/// countdown beside it always describe the same target (alarm → departure).
+private struct CompactLeadingIcon: View {
+    let model: TripActivityModel
+    let accent: Color
+
+    @ViewBuilder
+    var body: some View {
+        if model.alarmPending {
+            BellRingIcon(size: 18)
+                .foregroundStyle(accent)
+                .padding(.horizontal, 2)
+        } else {
+            TrainIcon(size: 20)
+                .foregroundStyle(accent)
+                .padding(.horizontal, 2)
+        }
+    }
+}
+
+/// Compact-trailing variant: a digital countdown to the armed alarm first, then
+/// to departure once it fires, a terminal symbol for cancelled/arrived states,
+/// and nothing once en route. Keep this aggressively narrow; if compact content
+/// asks for too much width, iOS inflates the island into the wide presentation.
 private struct CompactCountdown: View {
     let model: TripActivityModel
 
@@ -443,6 +492,8 @@ private struct CompactCountdown: View {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
         } else if model.isEnded {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.blue)
+        } else if model.alarmPending, let reminder = model.reminderDate {
+            DigitalTimer(target: reminder)
         } else if model.phase == .preDeparture, let departure = model.departureDate {
             DigitalTimer(target: departure)
         } else {
@@ -475,17 +526,18 @@ private struct DigitalTimer: View {
     }
 }
 
-/// Live "arrives in" countdown via SwiftUI's `.relative` date style (e.g.
-/// "3 hr, 35 min") — ticks down natively with no push. Used on the roomy
-/// surfaces (lock screen + expanded island); the compact pill uses a digital
-/// timer instead, where the relative wording is too wide. "—" when the arrival
-/// instant is missing; callers handle the cancelled/arrived states.
-private struct RelativeArrival: View {
+/// Live countdown for the active stage (alarm → departure → arrival) via
+/// SwiftUI's `.relative` date style (e.g. "3 hr, 35 min") — ticks down natively
+/// with no push. Used on the roomy surfaces (lock screen + expanded island);
+/// the compact pill uses a digital timer instead, where the relative wording is
+/// too wide. "—" when the stage's instant is missing; callers handle the
+/// cancelled/arrived states.
+private struct RelativeCountdown: View {
     let model: TripActivityModel
 
     var body: some View {
-        if let arrival = model.arrivalDate {
-            Text(arrival, style: .relative)
+        if let target = countdownTarget(model) {
+            Text(target, style: .relative)
         } else {
             Text("—")
         }
@@ -516,11 +568,12 @@ private struct ScheduleTimes: View {
     }
 }
 
-/// Bottom-*leading* block: the countdown label over the live relative countdown
-/// (see `RelativeArrival`), or the terminal word once cancelled/arrived.
-/// Leading-aligned so the countdown's changing width grows into the centre gap
-/// rather than shoving the clock times pinned on the trailing edge.
-private struct ArrivesIn: View {
+/// Bottom-*leading* block: the stage countdown label over the live relative
+/// countdown (see `RelativeCountdown`), or the terminal word once
+/// cancelled/arrived. Leading-aligned so the countdown's changing width grows
+/// into the centre gap rather than shoving the clock times pinned on the
+/// trailing edge.
+private struct HeadlineCountdown: View {
     let model: TripActivityModel
 
     var body: some View {
@@ -534,7 +587,7 @@ private struct ArrivesIn: View {
                     .font(.caption2.weight(.semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(.white.opacity(0.6))
-                RelativeArrival(model: model)
+                RelativeCountdown(model: model)
                     .font(.system(size: 19, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -584,7 +637,7 @@ private struct LockScreenView: View {
             // *same* size — at 19pt both fit their half without scaling, so
             // neither side shrinks past the other.
             HStack(alignment: .lastTextBaseline, spacing: 10) {
-                ArrivesIn(model: model)
+                HeadlineCountdown(model: model)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("Trip \(model.tripNumber)")
@@ -635,6 +688,28 @@ private enum TripActivityPreviewData {
             "isCanceled": "false",
             "isEnded": "false",
             "reminderSet": "true",
+            "alarmPending": "false",
+        ])
+    }
+
+    /// Pre-departure with a leave alarm still ahead: the bell + "Alarm in"
+    /// countdown stage.
+    static var alarmPendingState: GenericAttributes.ContentState {
+        let now = Date()
+        let reminder = now.addingTimeInterval(12 * 60)
+        let departure = now.addingTimeInterval(27 * 60)
+        let arrival = now.addingTimeInterval(104 * 60)
+        return GenericAttributes.ContentState(values: [
+            "phase": "pre-departure",
+            "reminderEpochMs": epochMs(reminder),
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "true",
+            "alarmPending": "true",
         ])
     }
 
@@ -647,6 +722,7 @@ private enum TripActivityPreviewData {
 #Preview("Lock Screen", as: .content, using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.runningState
 }
 
@@ -654,6 +730,7 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Compact", as: .dynamicIsland(.compact), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.runningState
 }
 
@@ -661,6 +738,7 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Expanded", as: .dynamicIsland(.expanded), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.runningState
 }
 

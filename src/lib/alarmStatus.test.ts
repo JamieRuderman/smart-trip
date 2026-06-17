@@ -19,6 +19,41 @@ describe("selectAlarmStatus", () => {
     expect(status.minutesUntilDeparture).toBe(12);
   });
 
+  it("leads with the leave countdown while the armed reminder is still ahead", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: 20,
+      minutesUntilArrival: 91,
+      minutesAfterArrival: -91,
+      minutesUntilLeave: 5,
+      hasStarted: false,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+    });
+
+    expect(status.phase).toBe("LEAVE");
+    expect(status.kind).toBe("leave-countdown");
+    expect(status.minutesUntilLeave).toBe(5);
+  });
+
+  it("falls back to the departure countdown once the leave time has passed", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: 12,
+      minutesUntilArrival: 83,
+      minutesAfterArrival: -83,
+      minutesUntilLeave: -3,
+      hasStarted: false,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+    });
+
+    expect(status.phase).toBe("PRE_DEPARTURE");
+    expect(status.kind).toBe("departure-countdown");
+  });
+
   it("shows leaving soon inside the boarding window before departure", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: 1,

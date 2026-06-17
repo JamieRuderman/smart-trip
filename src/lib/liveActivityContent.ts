@@ -50,6 +50,15 @@ export interface TripActivityContentState {
   isEnded: boolean;
   /** Whether a leave reminder is armed for this trip — drives the bell icon. */
   reminderSet: boolean;
+  /** Absolute fire instant (epoch ms) of the armed leave alarm, when one is set.
+   *  The target the pre-alarm countdown ticks down to on the compact island,
+   *  expanded island, and lock screen. Absent when no reminder is armed. */
+  reminderEpochMs?: number;
+  /** Precomputed gate: a reminder is armed AND hasn't fired yet, so the surfaces
+   *  lead with a bell + "Alarm in" countdown before flipping to the train +
+   *  "Departs in" countdown. Mirrors `phase`'s precompute discipline — the
+   *  widget keys its icon/label on this flag, never on its own clock. */
+  alarmPending: boolean;
   /** ActivityKit staleDate (epoch ms): when the OS should mark the activity
    *  visually stale because JS may not have corrected it (phone locked). */
   staleAfterEpochMs?: number;
@@ -174,9 +183,10 @@ export function deriveStatusText(args: {
  * Build the dynamic content state from the focused trip's instants + realtime
  * status. Pure — the single source of truth for the activity payload, shared by
  * the start, drift-update, and server push paths. `delayMinutes` null is
- * normalized to 0. The staleness target is the ACTIVE countdown's instant
- * (departure pre-board, else arrival), so iOS dims the activity once the
- * countdown it's showing elapses and JS hasn't refreshed it.
+ * normalized to 0. The staleness target is the ACTIVE countdown's instant (the
+ * armed alarm while it's still pending, else departure pre-board, else arrival),
+ * so iOS dims the activity once the countdown it's showing elapses and JS hasn't
+ * refreshed it.
  */
 export function buildContentState(args: {
   departureEpochMs: number;
@@ -187,10 +197,19 @@ export function buildContentState(args: {
   isCanceled: boolean;
   isEnded: boolean;
   reminderSet?: boolean;
+  /** Absolute fire instant of the armed leave alarm (epoch ms), if any. */
+  reminderEpochMs?: number | null;
   now: number;
 }): TripActivityContentState {
   const phase = derivePhase({ departureEpochMs: args.departureEpochMs, now: args.now });
   const delayMinutes = args.delayMinutes ?? 0;
+  const reminderSet = args.reminderSet ?? false;
+  const reminderEpochMs = args.reminderEpochMs ?? null;
+  // Lead with the alarm countdown only while the alarm is both armed and still
+  // ahead of us — once it fires (or there's no reminder) the surfaces fall
+  // through to the departure / arrival countdown.
+  const alarmPending =
+    reminderSet && reminderEpochMs != null && args.now < reminderEpochMs;
   return {
     phase,
     departureEpochMs: args.departureEpochMs,
@@ -205,9 +224,14 @@ export function buildContentState(args: {
     }),
     isCanceled: args.isCanceled,
     isEnded: args.isEnded,
-    reminderSet: args.reminderSet ?? false,
-    staleAfterEpochMs:
-      phase === "pre-departure" ? args.departureEpochMs : args.arrivalEpochMs,
+    reminderSet,
+    ...(reminderEpochMs != null ? { reminderEpochMs } : {}),
+    alarmPending,
+    staleAfterEpochMs: alarmPending
+      ? reminderEpochMs!
+      : phase === "pre-departure"
+        ? args.departureEpochMs
+        : args.arrivalEpochMs,
   };
 }
 
@@ -247,6 +271,10 @@ export function encodeContentState(
     isCanceled: String(c.isCanceled),
     isEnded: String(c.isEnded),
     reminderSet: String(c.reminderSet),
+    alarmPending: String(c.alarmPending),
+    ...(c.reminderEpochMs != null
+      ? { reminderEpochMs: String(c.reminderEpochMs) }
+      : {}),
     ...(c.staleAfterEpochMs != null
       ? { staleAfterEpochMs: String(c.staleAfterEpochMs) }
       : {}),

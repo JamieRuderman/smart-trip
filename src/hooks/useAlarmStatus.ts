@@ -11,6 +11,8 @@ interface UseAlarmStatusParams {
   minutesUntilDeparture: number;
   minutesUntilArrival: number;
   minutesAfterArrival: number;
+  /** Minutes until the armed leave reminder fires, or null when none is armed. */
+  minutesUntilLeave?: number | null;
   hasStarted: boolean;
   isCanceled: boolean;
   isCanceledOrSkipped: boolean;
@@ -33,6 +35,7 @@ export function useAlarmStatus(
     minutesUntilDeparture,
     minutesUntilArrival,
     minutesAfterArrival,
+    minutesUntilLeave = null,
     hasStarted,
     isCanceled,
     isCanceledOrSkipped,
@@ -69,6 +72,7 @@ export function useAlarmStatus(
         minutesUntilDeparture,
         minutesUntilArrival,
         minutesAfterArrival,
+        minutesUntilLeave,
         hasStarted,
         isCanceled,
         isCanceledOrSkipped,
@@ -82,6 +86,7 @@ export function useAlarmStatus(
       minutesUntilDeparture,
       minutesUntilArrival,
       minutesAfterArrival,
+      minutesUntilLeave,
       hasStarted,
       isCanceled,
       isCanceledOrSkipped,

@@ -101,16 +101,22 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   // Re-push content (which carries reminderSet) when a reminder is armed/cleared
   // so the bell icon appears/disappears live.
   const reminderSet = focusedTrip.reminder != null;
+  // Cross the alarm fire instant the same way we cross departure: a dep flip
+  // that pushes one update so the compact island / lock screen swap the bell +
+  // "Alarm in" countdown for the train + "Departs in" countdown on time.
+  const reminderAt = focusedTrip.reminder?.reminderAt ?? null;
+  const alarmPending = reminderAt != null && now < reminderAt;
 
-  // `phase` is a dep so crossing departure pushes exactly one update that
-  // flips the headline countdown; the hook dedupes unchanged content, so the
-  // re-fires from the 30s tick / RT poll are free. `liveActivityId` is a dep
-  // so the first sync fires as soon as the (async) start commits the id.
+  // `phase` / `alarmPending` are deps so crossing the alarm fire time and then
+  // departure each push exactly one update that flips the leading countdown;
+  // the hook dedupes unchanged content, so the re-fires from the 30s tick / RT
+  // poll are free. `liveActivityId` is a dep so the first sync fires as soon as
+  // the (async) start commits the id.
   useEffect(() => {
     if (!liveActivityId || departureAt == null || arrivalAt == null) return;
     void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet]);
+  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending]);
 
   return null;
 }

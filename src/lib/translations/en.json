@@ -234,8 +234,11 @@
     "switchCancel": "Cancel"
   },
   "tracker": {
-    "departsInHoursMinutes": "Arrives in {{hours}}h {{minutes}}m",
-    "departsInMinutes": "Arrives in {{minutes}} min",
+    "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
+    "departsInMinutes": "Departs in {{minutes}} min",
+    "leaveInHoursMinutes": "Leave in {{hours}}h {{minutes}}m",
+    "leaveInMinutes": "Leave in {{minutes}} min",
+    "leaveNow": "Leave now",
     "nowBoarding": "Departing",
     "departedMinutesAgo": "Departed {{minutes}} min ago",
     "scheduled": "Scheduled",

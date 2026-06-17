@@ -25,6 +25,8 @@ import { SectionCard } from "@/components/ui/section-card";
 import { TripIcon } from "./icons/TripIcon";
 import { TimePair } from "./TimePair";
 import { CountdownLabel } from "./CountdownLabel";
+import { LeaveLabel } from "./LeaveLabel";
+import { ArrivalLabel } from "./ArrivalLabel";
 import { TripDetailSheet } from "./TripDetailSheet";
 
 interface FocusedTripCardProps {
@@ -180,6 +182,11 @@ function FocusedTripCardInner({
     realtimeStatus?.liveDepartureTime ?? undefined,
     currentTime,
   );
+  const minutesUntilArrival = useCountdown(
+    trip.arrivalTime,
+    realtimeStatus?.liveArrivalTime ?? undefined,
+    currentTime,
+  );
 
   // Whether the focused run is on a later calendar day than today (e.g. a
   // weekend train chosen on a weekday). The "leave in X" countdown only makes
@@ -197,11 +204,6 @@ function FocusedTripCardInner({
         });
       })()
     : null;
-  // Once the train has departed the "leave now" countdown is moot — let the
-  // reminder/Stop controls and the full sheet carry the en-route story.
-  const showCountdown =
-    !isCanceledOrSkipped && !isFutureService && minutesUntil >= 0;
-
   const reminder = focusedTrip.reminder;
   const reminderTimeLabel = reminder
     ? new Date(reminder.reminderAt).toLocaleTimeString(i18n.language, {
@@ -210,6 +212,29 @@ function FocusedTripCardInner({
         hour12: timeFormat === "12h",
       })
     : null;
+
+  // Minutes until the user should head out — the armed reminder fires
+  // `leadMinutes` before departure, so it tracks the same clock as the
+  // departure countdown (and goes negative once that lead has passed).
+  const minutesUntilLeave =
+    reminder != null ? minutesUntil - reminder.leadMinutes : null;
+
+  // The single countdown chip walks the same three stages as the Live Activity
+  // so every surface tells one story: head out (while a leave reminder is still
+  // ahead) → departs (until the train leaves) → arrives (en route, until the
+  // destination). Only for today's, non-cancelled runs; a future-service focus
+  // shows its weekday instead (below) since these live countdowns are
+  // today-relative.
+  const countdownStage: "leave" | "departs" | "arrives" | null =
+    isCanceledOrSkipped || isFutureService
+      ? null
+      : minutesUntilLeave != null && minutesUntilLeave >= 0
+        ? "leave"
+        : minutesUntil >= 0
+          ? "departs"
+          : minutesUntilArrival >= 0
+            ? "arrives"
+            : null;
 
   // Tapping the card opens the full trip-detail sheet; "Add reminder" pops the
   // lead-time modal directly (no sheet) via context, landing the user right
@@ -351,11 +376,21 @@ function FocusedTripCardInner({
           can always see when to leave and stop the trip. Cancel is a sibling of
           the summary button (no nested interactives). */}
       <div className="flex items-center gap-2 px-4 md:px-6 pt-4 pb-4">
-        {showCountdown ? (
+        {countdownStage ? (
           <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
-            <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            {countdownStage === "leave" ? (
+              <BellRing className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            ) : (
+              <Timer className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            )}
             <span className="text-lg font-semibold tracking-tight">
-              <CountdownLabel minutesUntil={minutesUntil} />
+              {countdownStage === "leave" ? (
+                <LeaveLabel minutesUntilLeave={minutesUntilLeave!} />
+              ) : countdownStage === "departs" ? (
+                <CountdownLabel minutesUntil={minutesUntil} />
+              ) : (
+                <ArrivalLabel minutesUntilArrival={minutesUntilArrival} />
+              )}
             </span>
           </div>
         ) : isFutureService && serviceDayLabel ? (

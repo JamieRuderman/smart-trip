@@ -628,7 +628,10 @@ private struct CompactCountdown: View {
 
 /// Native ActivityKit-friendly countdown with seconds visible. The secondless
 /// variants fought the compact island host too much; this keeps the reliable
-/// self-updating timer and constrains its visual footprint.
+/// self-updating timer and constrains its visual footprint. Uses `maxWidth`
+/// (not a fixed width) so it shrinks to the compact-trailing slot rather than
+/// overflowing it — a fixed width wider than the slot collapses the trailing to
+/// nothing (the "empty second bubble" on the compact island).
 private struct DigitalTimer: View {
     let target: Date
 
@@ -638,14 +641,15 @@ private struct DigitalTimer: View {
             if target <= now {
                 Text("NOW")
             } else {
-                Text(timerInterval: now...target, countsDown: true )
+                Text(timerInterval: now...target, countsDown: true)
             }
         }
         .font(.system(size: 16, weight: .bold))
+        .monospacedDigit()
         .foregroundStyle(.white)
         .lineLimit(1)
         .minimumScaleFactor(0.5)
-        .frame(width: 50, alignment: .trailing)
+        .frame(maxWidth: 52, alignment: .trailing)
         .accessibilityLabel(Text(target, style: .timer))
     }
 }

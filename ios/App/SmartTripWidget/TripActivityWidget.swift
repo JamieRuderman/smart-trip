@@ -10,15 +10,15 @@ import WidgetKit
  *
  * The headline countdown advances through three stages (see `CountdownStage`):
  * while a leave alarm is armed and still ahead it counts down to the *alarm*
- * under a bell ("Leave in"); once that fires it flips to the *departure* under
- * the train ("Departs in"); and once the train leaves it counts down to
- * *arrival* ("To destination"). On the lock screen and expanded island this
- * uses SwiftUI's self-updating `.relative` style ("1 hr, 24 min", and
- * "min, sec" under an hour; see `RelativeCountdown`), pinned to the *leading*
- * edge so its changing width never shoves the fixed clock times / route on the
- * trailing edge. The compact island leads with the bell + a narrow alarm
- * `.timer`, swaps to the train + departure `.timer` once the alarm fires, then
- * collapses back to the bare train icon en route.
+ * ("Leave in"); once that fires it flips to the *departure* ("Departs in"); and
+ * once the train leaves it counts down to *arrival* ("To destination"). On the
+ * lock screen and expanded island this uses SwiftUI's self-updating `.relative`
+ * style ("1 hr, 24 min", and "min, sec" under an hour; see `RelativeCountdown`),
+ * pinned to the *leading* edge so its changing width never shoves the fixed
+ * clock times / route on the trailing edge. The compact island pairs a narrow
+ * `.timer` with a stage-matched glyph (see `CompactLeadingIcon`): a walking
+ * person to the alarm, the train to departure, then a map pin to the
+ * destination en route.
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -368,7 +368,7 @@ private struct BellRingIconShape: Shape {
 
         // Clapper: M10.268 21 a2 2 0 0 0 3.464 0
         path.move(to: pt(10.268, 21))
-        Self.arc(&path, to: pt(13.732, 21), radius: 2 * scale, largeArc: false, sweep: false)
+        appendSVGArc(&path, to: pt(13.732, 21), radius: 2 * scale, largeArc: false, sweep: false)
 
         // Right ring line: M22 8 c0 -2.3 -.8 -4.3 -2 -6
         path.move(to: pt(22, 8))
@@ -376,11 +376,11 @@ private struct BellRingIconShape: Shape {
 
         // Bell body (base corners + dome)
         path.move(to: pt(3.262, 15.326))
-        Self.arc(&path, to: pt(4, 17), radius: 1 * scale, largeArc: false, sweep: false)
+        appendSVGArc(&path, to: pt(4, 17), radius: 1 * scale, largeArc: false, sweep: false)
         path.addLine(to: pt(20, 17))
-        Self.arc(&path, to: pt(20.74, 15.327), radius: 1 * scale, largeArc: false, sweep: false)
+        appendSVGArc(&path, to: pt(20.74, 15.327), radius: 1 * scale, largeArc: false, sweep: false)
         path.addCurve(to: pt(18, 8), control1: pt(19.41, 13.956), control2: pt(18, 12.499))
-        Self.arc(&path, to: pt(6, 8), radius: 6 * scale, largeArc: false, sweep: false)
+        appendSVGArc(&path, to: pt(6, 8), radius: 6 * scale, largeArc: false, sweep: false)
         path.addCurve(to: pt(3.262, 15.326), control1: pt(6, 12.499), control2: pt(4.589, 13.956))
 
         // Left ring line: M4 2 C2.8 3.7 2 5.7 2 8
@@ -390,45 +390,104 @@ private struct BellRingIconShape: Shape {
         return path
     }
 
-    /// Append a circular arc (lucide uses rx == ry, no rotation) from the path's
-    /// current point to `end`, approximated with ≤90° cubic segments. `largeArc`
-    /// / `sweep` follow SVG arc-flag semantics.
-    private static func arc(_ path: inout Path, to end: CGPoint, radius: CGFloat,
-                            largeArc: Bool, sweep: Bool) {
-        let start = path.currentPoint ?? end
-        let halfDx = (start.x - end.x) / 2
-        let halfDy = (start.y - end.y) / 2
-        let dist = (halfDx * halfDx + halfDy * halfDy).squareRoot()
-        if dist == 0 { return }
-        let r = max(radius, dist)
-        let h = (r * r - dist * dist).squareRoot()
-        let mx = (start.x + end.x) / 2
-        let my = (start.y + end.y) / 2
-        let ux = (end.x - start.x) / (2 * dist)
-        let uy = (end.y - start.y) / (2 * dist)
-        let sign: CGFloat = (largeArc != sweep) ? 1 : -1
-        let cx = mx + sign * h * (-uy)
-        let cy = my + sign * h * ux
-        var a0 = atan2(start.y - cy, start.x - cx)
-        let a1 = atan2(end.y - cy, end.x - cx)
-        var delta = a1 - a0
-        if sweep && delta < 0 { delta += 2 * .pi }
-        if !sweep && delta > 0 { delta -= 2 * .pi }
-        let segCount = max(1, Int((abs(delta) / (.pi / 2)).rounded(.up)))
-        let segAngle = delta / CGFloat(segCount)
-        let k = (4.0 / 3.0) * tan(segAngle / 4) * r
-        var current = start
-        for _ in 0..<segCount {
-            let a2 = a0 + segAngle
-            let p2 = CGPoint(x: cx + r * cos(a2), y: cy + r * sin(a2))
-            let t0 = CGPoint(x: -sin(a0), y: cos(a0))
-            let t2 = CGPoint(x: -sin(a2), y: cos(a2))
-            let c1 = CGPoint(x: current.x + k * t0.x, y: current.y + k * t0.y)
-            let c2 = CGPoint(x: p2.x - k * t2.x, y: p2.y - k * t2.y)
-            path.addCurve(to: p2, control1: c1, control2: c2)
-            current = p2
-            a0 = a2
+}
+
+/// Append a circular arc (lucide uses rx == ry, no rotation) from the path's
+/// current point to `end`, approximated with ≤90° cubic segments. `largeArc` /
+/// `sweep` follow SVG arc-flag semantics. Shared by the lucide-derived icon
+/// shapes (bell-ring, map-pin).
+private func appendSVGArc(_ path: inout Path, to end: CGPoint, radius: CGFloat,
+                          largeArc: Bool, sweep: Bool) {
+    let start = path.currentPoint ?? end
+    let halfDx = (start.x - end.x) / 2
+    let halfDy = (start.y - end.y) / 2
+    let dist = (halfDx * halfDx + halfDy * halfDy).squareRoot()
+    if dist == 0 { return }
+    let r = max(radius, dist)
+    let h = (r * r - dist * dist).squareRoot()
+    let mx = (start.x + end.x) / 2
+    let my = (start.y + end.y) / 2
+    let ux = (end.x - start.x) / (2 * dist)
+    let uy = (end.y - start.y) / (2 * dist)
+    let sign: CGFloat = (largeArc != sweep) ? 1 : -1
+    let cx = mx + sign * h * (-uy)
+    let cy = my + sign * h * ux
+    var a0 = atan2(start.y - cy, start.x - cx)
+    let a1 = atan2(end.y - cy, end.x - cx)
+    var delta = a1 - a0
+    if sweep && delta < 0 { delta += 2 * .pi }
+    if !sweep && delta > 0 { delta -= 2 * .pi }
+    let segCount = max(1, Int((abs(delta) / (.pi / 2)).rounded(.up)))
+    let segAngle = delta / CGFloat(segCount)
+    let k = (4.0 / 3.0) * tan(segAngle / 4) * r
+    var current = start
+    for _ in 0..<segCount {
+        let a2 = a0 + segAngle
+        let p2 = CGPoint(x: cx + r * cos(a2), y: cy + r * sin(a2))
+        let t0 = CGPoint(x: -sin(a0), y: cos(a0))
+        let t2 = CGPoint(x: -sin(a2), y: cos(a2))
+        let c1 = CGPoint(x: current.x + k * t0.x, y: current.y + k * t0.y)
+        let c2 = CGPoint(x: p2.x - k * t2.x, y: p2.y - k * t2.y)
+        path.addCurve(to: p2, control1: c1, control2: c2)
+        current = p2
+        a0 = a2
+    }
+}
+
+/// The SMART/lucide `map-pin` glyph — a teardrop pin with a hole — for the "to
+/// destination" stage on the compact island, matching the home card's MapPin.
+/// Drawn as a vector so it matches the web app exactly; mirror of lucide-react's
+/// `MapPin` (keep in lockstep). Stroked like `TrainIcon`.
+private struct MapPinIcon: View {
+    var size: CGFloat
+    var strokeRatio: CGFloat = 0.083
+
+    var body: some View {
+        MapPinIconShape()
+            .stroke(
+                style: StrokeStyle(
+                    lineWidth: size * strokeRatio,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+            .frame(width: size, height: size)
+    }
+}
+
+/// `map-pin` outline in lucide's 24×24 viewBox, scaled to fit the proposed rect
+/// (same fit math as `TrainIconShape`). The pin body mixes cubic curves with two
+/// circular arcs (the rounded bottom tip and the domed top), reconstructed via
+/// `appendSVGArc`; the inner hole is a plain circle.
+private struct MapPinIconShape: Shape {
+    private static let viewBox: CGFloat = 24
+
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / Self.viewBox
+        let side = Self.viewBox * scale
+        let dx = rect.midX - side / 2
+        let dy = rect.midY - side / 2
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: dx + x * scale, y: dy + y * scale)
         }
+
+        var path = Path()
+
+        // Pin body: M20 10 c0 4.993 -5.539 10.193 -7.399 11.799
+        //           a1 1 0 0 1 -1.202 0
+        //           C9.539 20.193 4 14.993 4 10 a8 8 0 0 1 16 0
+        path.move(to: pt(20, 10))
+        path.addCurve(to: pt(12.601, 21.799), control1: pt(20, 14.993), control2: pt(14.461, 20.193))
+        appendSVGArc(&path, to: pt(11.399, 21.799), radius: 1 * scale, largeArc: false, sweep: true)
+        path.addCurve(to: pt(4, 10), control1: pt(9.539, 20.193), control2: pt(4, 14.993))
+        appendSVGArc(&path, to: pt(20, 10), radius: 8 * scale, largeArc: false, sweep: true)
+
+        // Inner hole: circle cx 12 cy 10 r 3.
+        let r = 3 * scale
+        let center = pt(12, 10)
+        path.addEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r))
+
+        return path
     }
 }
 
@@ -523,33 +582,33 @@ private struct StatusPill: View {
     }
 }
 
-/// Compact-leading glyph: a walking person while a leave alarm is still
-/// pending, otherwise the brand train. Pairs with `CompactCountdown` so the
-/// icon and the countdown beside it always describe the same target (head out →
-/// departure). The walking figure (not a bell) keeps the leave countdown from
-/// doubling up on the "reminder armed" bell shown elsewhere.
+/// Compact-leading glyph: tracks the active countdown stage so the icon always
+/// matches the timer beside it (and the home card) — a walking person to the
+/// leave alarm, the brand train to departure, then a map pin to the destination
+/// once en route. The walking figure (not a bell) keeps the leave countdown
+/// from doubling up on the "reminder armed" bell shown elsewhere.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
 
     @ViewBuilder
     var body: some View {
-        if model.alarmPending {
-            WalkIcon(size: 20)
-                .foregroundStyle(accent)
-                .padding(.horizontal, 2)
-        } else {
-            TrainIcon(size: 20)
-                .foregroundStyle(accent)
-                .padding(.horizontal, 2)
+        Group {
+            switch countdownStage(model) {
+            case .alarm: WalkIcon(size: 20)
+            case .departure: TrainIcon(size: 20)
+            case .arrival: MapPinIcon(size: 20)
+            }
         }
+        .foregroundStyle(accent)
+        .padding(.horizontal, 2)
     }
 }
 
-/// Compact-trailing variant: a digital countdown to the armed alarm first, then
-/// to departure once it fires, a terminal symbol for cancelled/arrived states,
-/// and nothing once en route. Keep this aggressively narrow; if compact content
-/// asks for too much width, iOS inflates the island into the wide presentation.
+/// Compact-trailing variant: a digital countdown to whichever instant the active
+/// stage targets (alarm → departure → arrival), or a terminal symbol once
+/// cancelled/arrived. Keep this aggressively narrow; if compact content asks for
+/// too much width, iOS inflates the island into the wide presentation.
 private struct CompactCountdown: View {
     let model: TripActivityModel
 
@@ -559,10 +618,8 @@ private struct CompactCountdown: View {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
         } else if model.isEnded {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.blue)
-        } else if model.alarmPending, let reminder = model.reminderDate {
-            DigitalTimer(target: reminder)
-        } else if model.phase == .preDeparture, let departure = model.departureDate {
-            DigitalTimer(target: departure)
+        } else if let target = countdownTarget(model) {
+            DigitalTimer(target: target)
         } else {
             EmptyView()
         }

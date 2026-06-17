@@ -37,7 +37,7 @@ export function LiveActivitySync() {
 }
 
 function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
-  const { updateLiveActivity } = useStationSelection();
+  const { updateLiveActivity, clearFocusedTrip } = useStationSelection();
   // 30s tick: cheap re-render that re-evaluates the phase boundary between
   // realtime polls so the departure→arrival flip lands close to on time.
   const nowSeconds = useNow(30_000);
@@ -117,6 +117,20 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending]);
+
+  // Once arrival passes while the app is foreground, end the activity and clear
+  // the focus right away (the 30s tick is what crosses the boundary) — rather
+  // than leaving it in the Dynamic Island showing the clock-derived "Arrived"
+  // state until the next foreground reconcile. This closes the app-open-at-
+  // arrival gap; the backgrounded-through-arrival case can't be ended locally
+  // (ActivityKit can't schedule a future dismissal without ending — and so
+  // removing from the island — immediately), where iOS's expiry is the backstop.
+  // clearFocusedTrip is idempotent, and clearing the focus unmounts this syncer,
+  // so it can't re-fire.
+  useEffect(() => {
+    if (arrivalAt == null || now < arrivalAt) return;
+    void clearFocusedTrip();
+  }, [now, arrivalAt, clearFocusedTrip]);
 
   // NOTE: we deliberately do NOT end the activity when the app goes inactive.
   // An ended Live Activity drops out of the Dynamic Island (it only lingers on

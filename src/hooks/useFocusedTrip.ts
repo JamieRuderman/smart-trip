@@ -24,7 +24,6 @@ import {
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
-  type TripActivityContentState,
   type TripActivityRecord,
 } from "@/lib/native/liveActivity";
 import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
@@ -219,7 +218,6 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
-/**
  * Push the focused trip's CURRENT content to its already-running Live Activity,
  * so a just-armed/cleared/rescheduled reminder (the "leave alarm" stage) is
  * reflected on the lock screen + Dynamic Island immediately, instead of waiting
@@ -303,7 +301,6 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
   if (!(await startOrReviveActivity(focused, records))) {
     await refreshActivityContent(focused);
   }
-
 }
 
 /**
@@ -359,31 +356,6 @@ export async function reconcileTripActivities(): Promise<void> {
     const registration = buildRegistrationForFocus(focused, keep);
     if (registration) await registerPushActivity(registration);
   }
-}
-
-/**
- * Hand iOS a guaranteed dismissal at `arrivalEpochMs` for the focused trip's
- * running Live Activity, so the lock screen / Dynamic Island clears itself after
- * arrival even if the app stays backgrounded through it. Call when the app
- * leaves the foreground — that's the last moment JS runs before the OS owns the
- * activity alone.
- *
- * LOCAL path only: push builds already end the activity server-side at the live
- * arrival (the cron's `decidePushAction` → `end`), and ending it here would
- * freeze it against those corrections. No-op off-iOS, with no running activity,
- * or once arrival has passed (the normal foreground end paths handle that).
- * `content` is rendered as the final state — pass the live, NOT-ended content so
- * the self-ticking countdown keeps running until the dismissal lands.
- */
-export async function scheduleFocusActivityDismissal(
-  focused: FocusedTrip,
-  content: TripActivityContentState,
-  arrivalEpochMs: number,
-): Promise<void> {
-  if (isLiveActivityPushEnabled()) return;
-  if (!focused.liveActivityId) return;
-  if (arrivalEpochMs <= Date.now()) return;
-  await endTripActivity(focused.liveActivityId, content, arrivalEpochMs);
 }
 
 /**

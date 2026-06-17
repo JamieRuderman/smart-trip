@@ -314,8 +314,7 @@ function FocusedTripCardInner({
           {/* Eyebrow + "details" affordance — collapses on scroll. */}
           <Collapsible order={2}>
             <div className="flex items-center justify-between pb-4">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/85">
-                <TripIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/85">
                 {t("focusedTrip.myTrip")}
               </span>
               <span className="flex items-center gap-0.5 text-xs font-medium text-white/70">

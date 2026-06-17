@@ -10,7 +10,7 @@ import WidgetKit
  *
  * The headline countdown advances through three stages (see `CountdownStage`):
  * while a leave alarm is armed and still ahead it counts down to the *alarm*
- * under a bell ("Alarm in"); once that fires it flips to the *departure* under
+ * under a bell ("Leave in"); once that fires it flips to the *departure* under
  * the train ("Departs in"); and once the train leaves it counts down to
  * *arrival* ("To destination"). On the lock screen and expanded island this
  * uses SwiftUI's self-updating `.relative` style ("1 hr, 24 min", and
@@ -138,7 +138,7 @@ private func countdownStage(_ model: TripActivityModel) -> CountdownStage {
 /// island.
 private func countdownLabel(_ model: TripActivityModel) -> String {
     switch countdownStage(model) {
-    case .alarm: return "Alarm in"
+    case .alarm: return "Leave in"
     case .departure: return "Departs in"
     case .arrival: return "To destination"
     }
@@ -759,7 +759,7 @@ private enum TripActivityPreviewData {
         ])
     }
 
-    /// Pre-departure with a leave alarm still ahead: the bell + "Alarm in"
+    /// Pre-departure with a leave alarm still ahead: the bell + "Leave in"
     /// countdown stage.
     static var alarmPendingState: GenericAttributes.ContentState {
         let now = Date()

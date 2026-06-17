@@ -19,13 +19,13 @@ import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
 import {
   buildContentState,
   endTripActivity,
-  listTripActivities,
   listTripActivityRecords,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
   type TripActivityContentState,
+  type TripActivityRecord,
 } from "@/lib/native/liveActivity";
 import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
 import {
@@ -218,17 +218,51 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
+ * Start the focus's Live Activity, or REVIVE it when the only thing on screen is
+ * the frozen `ended` activity we scheduled to auto-dismiss after arrival (the
+ * local background self-clear path). An `ended` activity still renders but can no
+ * longer be updated, so we end it and start a fresh, updatable one.
+ *
+ * No-op (returns false) when a LIVE activity already exists for the focus
+ * (`active`/`stale`/`pending`), when the user swiped it away (`dismissed`), or
+ * when a push build deliberately ended it server-side at arrival — none of those
+ * should be respawned. Returns true when it (re)started one. `startActivityForFocus`
+ * self-gates on the window/reminder/riding rule, so a dormant focus stays off.
+ */
+async function startOrReviveActivity(
+  focused: FocusedTrip,
+  records: TripActivityRecord[],
+): Promise<boolean> {
+  const keep = focused.liveActivityId;
+  const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
+  // Push builds never schedule the local auto-dismiss (the cron ends the
+  // activity server-side at live arrival), so there an `ended` activity is a
+  // deliberate end — leave it be rather than resurrect it.
+  const keptFrozen =
+    kept != null && kept.state === "ended" && !isLiveActivityPushEnabled();
+  // Already covered (live / user-dismissed / push-ended) — don't touch it.
+  if (kept != null && !keptFrozen) return false;
+  // End the frozen one first so its pending auto-dismissal can't remove the
+  // freshly started activity.
+  if (keptFrozen && keep != null) await endTripActivity(keep);
+  await startActivityForFocus(focused);
+  return true;
+}
+
+/**
  * Start the focused trip's Live Activity if it isn't already on screen and it
  * should be (within the departure window, a reminder is armed, or en route).
- * Deduped against the OS's live list, so it never double-starts; it DOES bring
- * one back once eligible — covering a far-ahead focus that just entered the
- * window and recovering an activity the user dismissed. `startActivityForFocus`
- * self-gates, so this is a no-op while the trip is still dormant.
+ * Deduped against the OS's live list by lifecycle state (see
+ * {@link startOrReviveActivity}), so it never double-starts; it DOES bring one
+ * back once eligible — covering a far-ahead focus that just entered the window,
+ * and reviving the frozen `ended` activity left by the background auto-dismiss
+ * before the next foreground reconcile runs (e.g. arming a reminder right after
+ * returning to the app). `startActivityForFocus` self-gates, so this is a no-op
+ * while the trip is still dormant.
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
-  const running = await listTripActivities();
-  if (focused.liveActivityId && running.includes(focused.liveActivityId)) return;
-  await startActivityForFocus(focused);
+  const records = await listTripActivityRecords();
+  await startOrReviveActivity(focused, records);
 }
 
 /**
@@ -251,29 +285,11 @@ export async function reconcileTripActivities(): Promise<void> {
   await Promise.all(
     records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
-  const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
-  // An `ended` kept activity is one we scheduled to auto-dismiss after arrival
-  // when the app last backgrounded (the local self-clear path): it's still on
-  // screen and self-ticking but can no longer be updated, so once we're back in
-  // the foreground we revive it as a fresh, updatable activity. Revive only when
-  // the focus has NO activity on screen (never started / system-purged) or that
-  // frozen one; `active`/`stale` are already live, and `dismissed` means the
-  // user swiped it away — neither should be respawned.
-  //
-  // Push builds never schedule that local auto-dismiss (the cron ends the
-  // activity server-side at live arrival), so there an `ended` activity is a
-  // deliberate end — leave it be rather than resurrect it.
-  const keptFrozen =
-    kept != null && kept.state === "ended" && !isLiveActivityPushEnabled();
-  if (focused && (kept == null || keptFrozen)) {
-    // (Re)start if it should show now. startActivityForFocus self-gates on the
-    // window/reminder/riding rule, so a far-ahead focus with no reminder stays
-    // dormant; a frozen-but-eligible one comes back. End the frozen activity
-    // first so its pending auto-dismissal can't remove the freshly started one.
-    if (keptFrozen && keep != null) await endTripActivity(keep);
-    await startActivityForFocus(focused);
-    return;
-  }
+  // (Re)start or revive the focus's activity if nothing live is on screen for
+  // it (never started, frozen by the background auto-dismiss, system-purged).
+  // Returns false when a live / user-dismissed / push-ended activity already
+  // covers it, in which case we fall through to the push self-heal below.
+  if (focused && (await startOrReviveActivity(focused, records))) return;
   // Push heal: the running activity's registration POST may have failed at
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and

@@ -248,9 +248,3 @@ export async function listTripActivityRecords(): Promise<TripActivityRecord[]> {
     return [];
   }
 }
-
-/** Logical ids of activities the OS still knows about — for boot reconciliation
- *  (end any orphan whose trip no longer matches the focus). `[]` off-iOS/error. */
-export async function listTripActivities(): Promise<string[]> {
-  return (await listTripActivityRecords()).map((r) => r.id);
-}

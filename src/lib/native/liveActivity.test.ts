@@ -42,7 +42,6 @@ import {
   encodeContentState,
   endTripActivity,
   isLiveActivityAvailable,
-  listTripActivities,
   listTripActivityRecords,
   startTripActivity,
   tripActivityId,
@@ -383,21 +382,6 @@ describe("endTripActivity", () => {
     getPlatform.mockReturnValue("web");
     await endTripActivity("x");
     expect(endActivity).not.toHaveBeenCalled();
-  });
-});
-
-describe("listTripActivities", () => {
-  it("returns the logical ids on iOS", async () => {
-    await expect(listTripActivities()).resolves.toEqual(["trip-7-2026-06-09"]);
-  });
-  it("returns [] off-iOS", async () => {
-    getPlatform.mockReturnValue("android");
-    await expect(listTripActivities()).resolves.toEqual([]);
-    expect(listActivities).not.toHaveBeenCalled();
-  });
-  it("returns [] when the plugin throws", async () => {
-    listActivities.mockRejectedValue(new Error("boom"));
-    await expect(listTripActivities()).resolves.toEqual([]);
   });
 });
 

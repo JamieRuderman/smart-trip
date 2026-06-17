@@ -217,16 +217,54 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 }
 
 /**
+ * Push the focused trip's CURRENT content to its already-running Live Activity,
+ * so a just-armed/cleared/rescheduled reminder (the "leave alarm" stage) is
+ * reflected on the lock screen + Dynamic Island immediately, instead of waiting
+ * for the next `LiveActivitySync` drift tick. Mirrors `startActivityForFocus`'s
+ * content build; deduped against the last-sent content. No-op when the activity
+ * isn't running or its targets can't be resolved. Realtime delay isn't known
+ * here (the next sync tick re-pushes it), matching the start path.
+ */
+async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
+  const id = focused.liveActivityId;
+  if (!id) return;
+  const departureAt = focusedDepartureInstant(focused);
+  const arrivalAt = focusedArrivalInstant(focused);
+  if (departureAt == null || arrivalAt == null) return;
+  const content = buildContentState({
+    departureEpochMs: departureAt,
+    arrivalEpochMs: arrivalAt,
+    delayMinutes: null,
+    nextStop: null,
+    remainingStops: null,
+    isCanceled: false,
+    isEnded: false,
+    reminderSet: focused.reminder != null,
+    reminderEpochMs: focused.reminder?.reminderAt ?? null,
+    now: Date.now(),
+  });
+  const json = JSON.stringify(content);
+  if (lastSentActivityContent.get(id) === json) return;
+  const { updated } = await updateTripActivity(id, content);
+  if (updated) lastSentActivityContent.set(id, json);
+}
+
+/**
  * Start the focused trip's Live Activity if it isn't already on screen and it
  * should be (within the departure window, a reminder is armed, or en route).
  * Deduped against the OS's live list, so it never double-starts; it DOES bring
  * one back once eligible — covering a far-ahead focus that just entered the
  * window and recovering an activity the user dismissed. `startActivityForFocus`
- * self-gates, so this is a no-op while the trip is still dormant.
+ * self-gates, so this is a no-op while the trip is still dormant. When the
+ * activity is ALREADY running it refreshes its content instead of no-op'ing, so
+ * a freshly armed reminder's alarm stage lands right away.
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
   const running = await listTripActivities();
-  if (focused.liveActivityId && running.includes(focused.liveActivityId)) return;
+  if (focused.liveActivityId && running.includes(focused.liveActivityId)) {
+    await refreshActivityContent(focused);
+    return;
+  }
   await startActivityForFocus(focused);
 }
 
@@ -245,8 +283,27 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  */
 export async function reconcileTripActivities(): Promise<void> {
   const focused = loadFocusedTrip();
-  const keep = focused?.liveActivityId;
   const ids = await listTripActivities();
+  // The activity to keep for the current focus: its committed id, or — when that
+  // hasn't landed yet — any running activity for the SAME trip+service date.
+  // `startActivityForFocus` commits `liveActivityId` asynchronously, so a
+  // reconcile racing a just-started activity (e.g. a foreground/focus event
+  // fired as the reminder dialog closes) would otherwise read a stale focus and
+  // end the fresh activity as an "orphan", blanking the lock screen / Dynamic
+  // Island. Adopt it instead, and commit the recovered id so later
+  // updates/reconciles target it.
+  let keep: string | undefined;
+  if (focused) {
+    const prefix = `trip-${focused.tripNumber}-${focused.serviceDate}-`;
+    keep =
+      focused.liveActivityId && ids.includes(focused.liveActivityId)
+        ? focused.liveActivityId
+        : ids.find((id) => id.startsWith(prefix));
+    if (keep && keep !== focused.liveActivityId) {
+      saveFocusedTrip({ ...focused, liveActivityId: keep });
+      notifyChange();
+    }
+  }
   await Promise.all(
     ids.filter((id) => id !== keep).map((id) => endTripActivity(id)),
   );
@@ -263,11 +320,8 @@ export async function reconcileTripActivities(): Promise<void> {
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and
   // refreshes the server-side TTLs), so re-POST on every boot.
-  if (focused?.liveActivityId && isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(
-      focused,
-      focused.liveActivityId,
-    );
+  if (focused && keep && isLiveActivityPushEnabled()) {
+    const registration = buildRegistrationForFocus(focused, keep);
     if (registration) await registerPushActivity(registration);
   }
 }

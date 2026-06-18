@@ -8,7 +8,7 @@ export function EmptyState() {
 
   return (
     <SectionCard
-      className="flex flex-col justify-center flex-grow text-center"
+      className="flex flex-col justify-center flex-grow text-center pt-10 pb-16"
       role="status"
       aria-live="polite"
     >

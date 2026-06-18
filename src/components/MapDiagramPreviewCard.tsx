@@ -15,7 +15,7 @@ export function MapDiagramPreviewCard() {
   const activeCount = data?.vehicles?.filter((v) => v.trip != null).length ?? 0;
 
   return (
-    <SectionCard className="overflow-hidden bg-smart-train-green/5 hover:bg-smart-train-green/10 transition-colors md:border-smart-train-green/30">
+    <SectionCard className="overflow-hidden bg-smart-train-green/5 hover:bg-smart-train-green/10 transition-colors">
       <button
         type="button"
         onClick={() =>

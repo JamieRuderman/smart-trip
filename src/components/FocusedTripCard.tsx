@@ -145,11 +145,12 @@ function FocusedTripCardInner({
 }) {
   const { t, i18n } = useTranslation();
   const trips = useMemo(() => [trip], [trip]);
-  const { statusMap, canceledByStartTime, lastUpdated } = useTripRealtimeStatusMap(
-    focusedTrip.fromStation,
-    focusedTrip.toStation,
-    trips,
-  );
+  const { statusMap, canceledByStartTime, lastUpdated } =
+    useTripRealtimeStatusMap(
+      focusedTrip.fromStation,
+      focusedTrip.toStation,
+      trips,
+    );
 
   const realtimeStatus = useMemo(() => {
     const primary = statusMap.get(trip.departureTime);
@@ -230,12 +231,12 @@ function FocusedTripCardInner({
     isCanceledOrSkipped || isFutureService
       ? null
       : minutesUntilLeave != null && minutesUntilLeave >= 0
-        ? "leave"
-        : minutesUntil >= 0
-          ? "departs"
-          : minutesUntilArrival >= 0
-            ? "arrives"
-            : null;
+      ? "leave"
+      : minutesUntil >= 0
+      ? "departs"
+      : minutesUntilArrival >= 0
+      ? "arrives"
+      : null;
 
   // Tapping the card opens the full trip-detail sheet; "Add reminder" pops the
   // lead-time modal directly (no sheet) via context, landing the user right
@@ -260,7 +261,8 @@ function FocusedTripCardInner({
       return;
     }
     if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
-    if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
+    if (closeTimerRef.current != null)
+      window.clearTimeout(closeTimerRef.current);
     if (detailOpen) {
       // Mount closed first, then flip open so the browser paints the initial
       // state and the slide-up transition plays.
@@ -281,8 +283,10 @@ function FocusedTripCardInner({
 
   useEffect(
     () => () => {
-      if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
-      if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
+      if (openTimerRef.current != null)
+        window.clearTimeout(openTimerRef.current);
+      if (closeTimerRef.current != null)
+        window.clearTimeout(closeTimerRef.current);
     },
     [],
   );
@@ -301,7 +305,7 @@ function FocusedTripCardInner({
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-0 md:border-0 bg-my-trip-background text-white shadow-lg"
+      className="overflow-hidden border-0 md:border-0 bg-my-trip-background text-white shadow-[0_0_10px_rgba(0,0,0,0.35)]"
     >
       {/* Tappable summary → opens the full trip-detail sheet. */}
       <button
@@ -328,7 +332,9 @@ function FocusedTripCardInner({
               unit so a long name wraps as a whole rather than mid-name. */}
           <Collapsible order={3}>
             <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug text-white pb-4">
-              <span className="whitespace-nowrap">{focusedTrip.fromStation}</span>
+              <span className="whitespace-nowrap">
+                {focusedTrip.fromStation}
+              </span>
               <span className="font-normal text-white/60">→</span>
               <span className="whitespace-nowrap">{focusedTrip.toStation}</span>
             </p>
@@ -379,11 +385,20 @@ function FocusedTripCardInner({
         {countdownStage ? (
           <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
             {countdownStage === "leave" ? (
-              <WalkIcon className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <WalkIcon
+                className="h-5 w-5 shrink-0 text-white/90"
+                aria-hidden="true"
+              />
             ) : countdownStage === "departs" ? (
-              <TripIcon className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <TripIcon
+                className="h-5 w-5 shrink-0 text-white/90"
+                aria-hidden="true"
+              />
             ) : (
-              <MapPin className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+              <MapPin
+                className="h-5 w-5 shrink-0 text-white/90"
+                aria-hidden="true"
+              />
             )}
             <span className="text-lg font-semibold tracking-tight">
               {countdownStage === "leave" ? (
@@ -397,7 +412,10 @@ function FocusedTripCardInner({
           </div>
         ) : isFutureService && serviceDayLabel ? (
           <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-xl bg-white/15 px-3.5 h-12">
-            <Calendar className="h-5 w-5 shrink-0 text-white/90" aria-hidden="true" />
+            <Calendar
+              className="h-5 w-5 shrink-0 text-white/90"
+              aria-hidden="true"
+            />
             <span className="text-lg font-semibold tracking-tight capitalize">
               {t("focusedTrip.departsOn", { day: serviceDayLabel })}
             </span>

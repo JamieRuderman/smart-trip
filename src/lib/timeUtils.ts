@@ -99,6 +99,20 @@ export function computeMinutesUntil(
   staticTime: string,
   liveTime?: string
 ): number {
-  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-  return parseTimeToMinutes(liveTime ?? staticTime) - nowMinutes;
+  // The target is a whole-minute clock time (schedule + realtime feed are both
+  // HH:MM). Measure the gap from `currentTime` in real seconds and round UP, so
+  // the displayed minute reflects the time actually remaining rather than the
+  // difference of two truncated clock minutes. (For an exact-minute target the
+  // two coincide, but computing from seconds keeps it honest if `currentTime`
+  // carries seconds and makes the ceil intent explicit.)
+  const targetMs = parseTimeToMinutes(liveTime ?? staticTime) * 60_000;
+  const nowMs =
+    (currentTime.getHours() * 3_600 +
+      currentTime.getMinutes() * 60 +
+      currentTime.getSeconds()) *
+      1_000 +
+    currentTime.getMilliseconds();
+  const minutes = Math.ceil((targetMs - nowMs) / 60_000);
+  // Math.ceil yields -0 for a target a few seconds in the past; normalize it.
+  return minutes === 0 ? 0 : minutes;
 }

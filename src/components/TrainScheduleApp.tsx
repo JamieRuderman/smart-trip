@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
-import { createMinuteInterval } from "@/lib/utils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -62,9 +61,36 @@ export function TrainScheduleApp() {
   );
   useEffect(() => {
     if (debugCurrentTime) return;
-    return createMinuteInterval(() => {
-      setCurrentTime(new Date());
-    });
+    let timeoutId = 0;
+    let intervalId = 0;
+    const tick = () => setCurrentTime(new Date());
+    // Align the tick to the wall-clock minute boundary so the displayed minute
+    // flips exactly when the clock rolls over, not up to ~59s late.
+    const startAligned = () => {
+      timeoutId = window.setTimeout(() => {
+        tick();
+        intervalId = window.setInterval(tick, 60_000);
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    startAligned();
+    // JS timers are suspended while the app is backgrounded, so `currentTime`
+    // — and every countdown derived from it — is stale on return. Resync the
+    // instant we become visible/focused again, then realign the interval.
+    const resync = () => {
+      if (document.visibilityState !== "visible") return;
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+      tick();
+      startAligned();
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("focus", resync);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("focus", resync);
+    };
   }, [debugCurrentTime]);
 
   const [showAllTrips, setShowAllTrips] = useState(false);

@@ -43,8 +43,26 @@ function haversineMeters(
   return haversineKm(lat1, lng1, lat2, lng2) * 1000;
 }
 
+/**
+ * Minimal position shape `normalizeCoordinates` actually reads. Both the DOM
+ * `GeolocationPosition` (web) and Capacitor's `Position` (native) satisfy it —
+ * they differ only in members we don't use (e.g. `toJSON`), which is why a
+ * direct cross-cast between them is rejected. Typing to this shape lets both
+ * callers pass through without an unsafe cast.
+ */
+interface GeoReading {
+  coords: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    heading?: number | null;
+    speed?: number | null;
+  };
+  timestamp: number;
+}
+
 function normalizeCoordinates(
-  pos: GeolocationPosition,
+  pos: GeoReading,
   previous: Coordinates | null,
 ): Coordinates {
   const rawSpeed = pos.coords.speed;
@@ -94,7 +112,7 @@ async function fetchNativeLocation(): Promise<Coordinates> {
     timeout: 10000,
     maximumAge: 0,
   });
-  return normalizeCoordinates(pos as GeolocationPosition, null);
+  return normalizeCoordinates(pos, null);
 }
 
 function fetchWebLocation(): Promise<Coordinates> {
@@ -195,7 +213,7 @@ export function useGeolocation({
             }
             if (position?.coords) {
               const normalized = normalizeCoordinates(
-                position as GeolocationPosition,
+                position,
                 lastCoordsRef.current,
               );
               lastCoordsRef.current = normalized;

@@ -1,20 +1,16 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
-import { App as CapacitorApp } from "@capacitor/app";
+import { useEffect, useMemo } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedDepartureInstant,
-  loadFocusedTrip,
   reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
-import { scheduleFocusActivityDismissal } from "@/hooks/useFocusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { useNow } from "@/hooks/useNow";
-import { buildContentState, derivePhase } from "@/lib/native/liveActivity";
-import { logger } from "@/lib/logger";
+import { derivePhase } from "@/lib/native/liveActivity";
 
 function dateKey(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -41,7 +37,7 @@ export function LiveActivitySync() {
 }
 
 function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
-  const { updateLiveActivity } = useStationSelection();
+  const { updateLiveActivity, clearFocusedTrip } = useStationSelection();
   // 30s tick: cheap re-render that re-evaluates the phase boundary between
   // realtime polls so the departure→arrival flip lands close to on time.
   const nowSeconds = useNow(30_000);
@@ -122,59 +118,29 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending]);
 
-  // Snapshot of what to hand iOS when the app backgrounds, kept in a ref so the
-  // long-lived `appStateChange` listener always sees the latest live values
-  // without re-subscribing. Null until we have both instants.
-  const dismissSnapshotRef = useRef<{
-    content: ReturnType<typeof buildContentState>;
-    arrivalAt: number;
-  } | null>(null);
-  dismissSnapshotRef.current =
-    liveActivityId && departureAt != null && arrivalAt != null
-      ? {
-          arrivalAt,
-          content: buildContentState({
-            departureEpochMs: departureAt,
-            arrivalEpochMs: arrivalAt,
-            delayMinutes,
-            nextStop: null,
-            remainingStops: null,
-            isCanceled,
-            isEnded: false,
-            reminderSet,
-            now,
-          }),
-        }
-      : null;
-
-  // When the app leaves the foreground, schedule the activity to auto-dismiss at
-  // arrival (local path) so the Dynamic Island / lock screen clears itself even
-  // if the JS never wakes again — the gap that left it lingering past arrival.
-  // Registered once; the snapshot ref carries the live values.
+  // Once arrival passes while the app is foreground, end the activity and clear
+  // the focus right away (the 30s tick is what crosses the boundary) — rather
+  // than leaving it in the Dynamic Island showing the clock-derived "Arrived"
+  // state until the next foreground reconcile. This closes the app-open-at-
+  // arrival gap; the backgrounded-through-arrival case can't be ended locally
+  // (ActivityKit can't schedule a future dismissal without ending — and so
+  // removing from the island — immediately), where iOS's expiry is the backstop.
+  // clearFocusedTrip is idempotent, and clearing the focus unmounts this syncer,
+  // so it can't re-fire.
   useEffect(() => {
-    let handle: PluginListenerHandle | null = null;
-    let cancelled = false;
-    CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) return;
-      const snap = dismissSnapshotRef.current;
-      // Re-read storage rather than trust a stale closure: the focus may have
-      // been cleared/replaced since this listener was registered.
-      const current = loadFocusedTrip();
-      if (!snap || !current) return;
-      void scheduleFocusActivityDismissal(current, snap.content, snap.arrivalAt);
-    })
-      .then((listener) => {
-        if (cancelled) listener.remove();
-        else handle = listener;
-      })
-      .catch((error) => {
-        logger.warn("Unable to register Live Activity background listener", error);
-      });
-    return () => {
-      cancelled = true;
-      handle?.remove();
-    };
-  }, []);
+    if (arrivalAt == null || now < arrivalAt) return;
+    void clearFocusedTrip();
+  }, [now, arrivalAt, clearFocusedTrip]);
+
+  // NOTE: we deliberately do NOT end the activity when the app goes inactive.
+  // An ended Live Activity drops out of the Dynamic Island (it only lingers on
+  // the lock screen until its dismissal date), and iOS fires `isActive:false`
+  // for transient interruptions too (permission prompts, Control Center, the
+  // app switcher) — so ending here blanked the island the user is waiting on
+  // and churned start/end on every interruption. Post-arrival cleanup is
+  // handled by the foreground reconcile + the focus's 30s arrival tick (and
+  // iOS's own Live Activity expiry as a backstop), all while the activity stays
+  // live and visible in the Dynamic Island.
 
   return null;
 }

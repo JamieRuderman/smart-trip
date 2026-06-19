@@ -98,8 +98,11 @@ Instead point a **free external scheduler** at the endpoint:
   custom header `Authorization: Bearer <CRON_SECRET>`. Free tier allows
   once-per-minute.
 - **[Cloudflare Workers Cron](https://developers.cloudflare.com/workers/configuration/cron-triggers/)**
-  (free, reliable, 1-min): a few-line Worker that `fetch`es the endpoint with the
-  same header on a `* * * * *` trigger.
+  (free, reliable, 1-min) — **provided in this repo** at
+  [`workers/liveactivity-cron/`](../workers/liveactivity-cron/): a tiny Worker
+  that `fetch`es the endpoint with the `Authorization: Bearer <CRON_SECRET>`
+  header on a `*/2 * * * *` trigger. Set `PUSH_ENDPOINT_URL` + the `CRON_SECRET`
+  secret and `wrangler deploy` (see its README).
 
 Frequency is a cost/latency knob, not a correctness one: the native
 `Text(timerInterval:)` keeps ticking between pushes, so **every 2–3 minutes** is
@@ -122,7 +125,8 @@ and keeps you well inside free quotas. SMART delays don't change minute-to-minut
 | `api/_liveActivityStatus.ts` | pure live-status derivation + push decision |
 | `api/liveactivity/register.ts` | register (POST) / deregister (DELETE) |
 | `api/liveactivity/token.ts` | iOS token sink (`setUpdateTokenEndpoint` target) |
-| `api/liveactivity/push.ts` | the cron |
+| `api/liveactivity/push.ts` | the cron endpoint (the work) |
+| `workers/liveactivity-cron/` | Cloudflare Worker that hits the cron endpoint on a schedule (the trigger) |
 
 ## Verified vs pending
 

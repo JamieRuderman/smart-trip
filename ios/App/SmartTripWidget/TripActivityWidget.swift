@@ -12,11 +12,16 @@ import WidgetKit
  * while a leave alarm is armed and still ahead it counts down to the *alarm*
  * ("Leave in"); once that fires it flips to the *departure* ("Departs in"); and
  * once the train leaves it counts down to *arrival* ("To destination"). On the
- * lock screen and expanded island this uses SwiftUI's self-updating `.relative`
- * style ("1 hr, 24 min", and "min, sec" under an hour; see `RelativeCountdown`),
- * pinned to the *leading* edge so its changing width never shoves the fixed
- * clock times / route on the trailing edge. The compact island pairs a narrow
- * `.timer` with a stage-matched glyph (see `CompactLeadingIcon`): a walking
+ * lock screen and expanded island this uses SwiftUI's self-updating
+ * `Text(timerInterval:countsDown:)` (see `RelativeCountdown`), pinned to the
+ * *leading* edge so its changing width never shoves the fixed clock times /
+ * route on the trailing edge. Crucially that timer CLAMPS at 0:00 once the
+ * target passes — it never counts *up*. A local (non-push) activity gets no
+ * re-render at the stage/arrival boundary while the app is backgrounded, and the
+ * earlier `.relative` style kept ticking *upward* past the target there, so the
+ * lock screen / expanded island showed an ever-growing "2 min, 30 sec" of
+ * elapsed time instead of holding at zero. The compact island pairs the same
+ * clamping timer with a stage-matched glyph (see `CompactLeadingIcon`): a walking
  * person to the alarm, the train to departure, then a map pin to the
  * destination en route.
  */
@@ -684,17 +689,29 @@ private struct DigitalTimer: View {
 }
 
 /// Live countdown for the active stage (alarm → departure → arrival) via
-/// SwiftUI's `.relative` date style (e.g. "3 hr, 35 min") — ticks down natively
-/// with no push. Used on the roomy surfaces (lock screen + expanded island);
-/// the compact pill uses a digital timer instead, where the relative wording is
-/// too wide. "—" when the stage's instant is missing; callers handle the
-/// cancelled/arrived states.
+/// SwiftUI's self-updating `Text(timerInterval:countsDown:)` — ticks down
+/// natively with no push and CLAMPS at 0:00 once the target passes, so it never
+/// counts up. (The earlier `.relative` style kept counting *up* past the target
+/// whenever a stage boundary or arrival elapsed while the app was backgrounded
+/// and no re-render fired to advance the stage, so the lock screen / expanded
+/// island showed an ever-growing elapsed time instead of holding at zero.) Used
+/// on the roomy surfaces (lock screen + expanded island); the compact pill uses
+/// the same clamping timer at a narrower width. "—" when the stage's instant is
+/// missing; callers handle the cancelled/arrived states.
 private struct RelativeCountdown: View {
     let model: TripActivityModel
 
     var body: some View {
+        let now = Date()
         if let target = countdownTarget(model) {
-            Text(target, style: .relative)
+            if target > now {
+                Text(timerInterval: now...target, countsDown: true)
+                    .monospacedDigit()
+            } else {
+                // Target already elapsed with no re-render to flip the parent to
+                // its "Arrived" terminal word yet — hold at zero, never count up.
+                Text("0:00").monospacedDigit()
+            }
         } else {
             Text("—")
         }

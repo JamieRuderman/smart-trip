@@ -10,9 +10,11 @@ import {
 } from "./_apns.js";
 
 describe("apnsTopic", () => {
-  it("appends the Live Activity push-type suffix to the widget bundle id", () => {
-    expect(apnsTopic("smart.trip.SmartTripWidget")).toBe(
-      "smart.trip.SmartTripWidget.push-type.liveactivity",
+  it("appends the Live Activity push-type suffix to the app bundle id", () => {
+    // ActivityKit's topic is the APP bundle id, not the widget's
+    // (smart.trip.widget) — see _apns.ts / docs/live-activity-push.md.
+    expect(apnsTopic("smart.trip")).toBe(
+      "smart.trip.push-type.liveactivity",
     );
   });
 });
@@ -30,7 +32,7 @@ describe("readApnsConfig", () => {
   const base = {
     APNS_KEY_ID: "KEY1234567",
     APNS_TEAM_ID: "TEAM123456",
-    APNS_WIDGET_BUNDLE_ID: "smart.trip.SmartTripWidget",
+    APNS_WIDGET_BUNDLE_ID: "smart.trip",
     APNS_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----",
   };
 
@@ -101,7 +103,7 @@ describe("signApnsJwt", () => {
       keyId: "KEY1234567",
       teamId: "TEAM123456",
       signingKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
-      widgetBundleId: "smart.trip.SmartTripWidget",
+      widgetBundleId: "smart.trip",
       host: "api.push.apple.com",
     };
 

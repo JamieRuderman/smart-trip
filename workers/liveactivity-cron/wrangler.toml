@@ -15,7 +15,7 @@ crons = ["*/2 * * * *"]
 [vars]
 # Public URL of the Vercel push endpoint. Override per environment (e.g. a
 # preview deploy) with `wrangler deploy --var PUSH_ENDPOINT_URL:https://…`.
-PUSH_ENDPOINT_URL = "https://REPLACE-WITH-YOUR-APP/api/liveactivity/push"
+PUSH_ENDPOINT_URL = "https://smarttraintrip.com/api/liveactivity/push"
 
 # NOTE: CRON_SECRET is a SECRET, not a [vars] entry — it must match the
 # CRON_SECRET configured on the Vercel project. Set it (never commit it) with:

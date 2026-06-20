@@ -11,7 +11,10 @@ import { connect } from "node:http2";
  *   APNS_KEY_ID       — the 10-char Key ID of the .p8 auth key
  *   APNS_TEAM_ID      — Apple Developer team id (e.g. 6YH3537ZY9)
  *   APNS_PRIVATE_KEY  — the .p8 contents (PEM), newlines as real "\n" or literal
- *   APNS_WIDGET_BUNDLE_ID — the WIDGET bundle id (e.g. smart.trip.SmartTripWidget)
+ *   APNS_WIDGET_BUNDLE_ID — the APP bundle id (e.g. smart.trip). ActivityKit's
+ *                           Live Activity topic is the app's bundle id, NOT the
+ *                           widget extension's; the var name is a misnomer kept
+ *                           for deploy-config compatibility.
  *   APNS_HOST         — optional; defaults to the production gateway
  *
  * The pure helpers (`apnsJwtClaims`, `buildLiveActivityPayload`,
@@ -27,7 +30,9 @@ export interface ApnsConfig {
   teamId: string;
   /** PEM contents of the .p8 auth key. */
   signingKey: string;
-  /** The widget extension bundle id (NOT the app id). */
+  /** The APP bundle id (e.g. smart.trip). ActivityKit's Live Activity topic is
+   *  the app's bundle id, not the widget extension's — the field name is a
+   *  misnomer kept to match the existing APNS_WIDGET_BUNDLE_ID env var. */
   widgetBundleId: string;
   host: string;
 }
@@ -50,10 +55,10 @@ export function readApnsConfig(env: NodeJS.ProcessEnv = process.env): ApnsConfig
   };
 }
 
-/** The APNs topic for Live Activity pushes: the widget bundle id with the
- *  fixed Live Activity suffix. Pure. */
-export function apnsTopic(widgetBundleId: string): string {
-  return `${widgetBundleId}.push-type.liveactivity`;
+/** The APNs topic for Live Activity pushes: the APP bundle id with the fixed
+ *  Live Activity suffix (`<app-bundle-id>.push-type.liveactivity`). Pure. */
+export function apnsTopic(appBundleId: string): string {
+  return `${appBundleId}.push-type.liveactivity`;
 }
 
 /** Build the ES256 JWT claims for an APNs provider token. Pure; exported for

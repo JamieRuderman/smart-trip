@@ -60,7 +60,17 @@ function resolveStation(
 /**
  * Compute the live status for `reg` from the feed `updates`, or null when the
  * trip can't be located (no live data — the cron leaves the countdown as-is).
- * `platformMap` is injectable for tests; defaults to the generated map.
+ *
+ * Two match strategies, tried in order:
+ *  1. **Boarding stop** — find the run by its live departure at `fromStation`,
+ *     closest to the scheduled departure within a window. Most precise (gives
+ *     the live boarding delay), and the right path before/at departure.
+ *  2. **Origin start time** — once the train departs your boarding station, 511
+ *     prunes that stop from the feed, so (1) can no longer find it. The run is
+ *     still in the feed though (its later stops remain), so fall back to
+ *     identifying it by the trip-level `startTime` (== `reg.originStartTime`)
+ *     and derive the live arrival from the destination stop, which is still
+ *     ahead. This is what keeps the EN-ROUTE countdown correctable while locked.
  */
 export function computeLiveTripStatus(args: {
   reg: LiveActivityRegistration;
@@ -82,54 +92,76 @@ export function computeLiveTripStatus(args: {
     if (distance > MATCH_WINDOW_MS) continue;
     if (!best || distance < best.distance) best = { update, from, distance };
   }
-  if (!best) return matchCanceledByStartTime(reg, updates, now);
+  if (best) return statusFromBoarding(reg, best.update, best.from, now);
 
-  const isCanceled = best.update.scheduleRelationship === "CANCELED";
-  const liveDepartureMs = best.from.departureTime! * 1000;
+  return matchByOriginStartTime(reg, updates, now);
+}
+
+/** Status from a matched boarding stop: live departure gives the delay; the
+ *  destination's live arrival is preferred, else scheduled shifted by the
+ *  boarding delay (511 leaves arrivalDelay at 0 too). */
+function statusFromBoarding(
+  reg: LiveActivityRegistration,
+  update: FeedTripUpdate,
+  from: FeedStopTimeUpdate,
+  now: number,
+): LiveTripStatus {
+  const isCanceled = update.scheduleRelationship === "CANCELED";
+  const liveDepartureMs = from.departureTime! * 1000;
   // Only count lateness; an early/on-time live time keeps the scheduled target.
   const delayMs = Math.max(0, liveDepartureMs - reg.departureEpochMs);
-  const delayMinutes = Math.round(delayMs / 60_000);
-  const departureEpochMs = reg.departureEpochMs + delayMs;
-
-  // Prefer the destination's live arrival; otherwise shift scheduled by the
-  // boarding delay (511 leaves arrivalDelay at 0 too).
-  const to = best.update.stopTimeUpdates.find(
-    (s) =>
-      s.arrivalTime != null &&
-      resolveStation(s.stopId, reg.toStation, reg.direction),
-  );
+  const to = findDestination(reg, update);
   const arrivalEpochMs =
     to?.arrivalTime != null ? to.arrivalTime * 1000 : reg.arrivalEpochMs + delayMs;
 
   return {
-    departureEpochMs,
+    departureEpochMs: reg.departureEpochMs + delayMs,
     arrivalEpochMs,
-    delayMinutes,
+    delayMinutes: Math.round(delayMs / 60_000),
     isCanceled,
     isEnded: now >= arrivalEpochMs,
   };
 }
 
 /**
- * Fallback for cancelled runs whose stop_time_updates the feed omitted (511
- * does this — the client keeps an equivalent `canceledByStartTime` map):
- * match a CANCELED update by the trip's scheduled origin start time. Only
- * offered when the registration carries `originStartTime`, and only ever
- * yields a cancelled status — with no stop updates there is no delay to
- * derive, so the scheduled targets stand.
+ * Identify the run by its scheduled origin start time (the trip-level
+ * `startTime` 511 keeps even after a stop is pruned), then derive status:
+ *  - if the destination stop is still in the feed, the live arrival gives both
+ *    the corrected arrival and the delay (arrival lateness ≈ boarding lateness;
+ *    511 always reports `departureDelay: 0`, so we diff times, not deltas);
+ *  - otherwise the only thing worth pushing is a CANCELED signal (scheduled
+ *    targets stand, no delay derivable) — a plain scheduled run with no usable
+ *    stop yields null, so the cron leaves the native countdown ticking.
+ * Requires `reg.originStartTime`; absent it, there is no pruning-proof key.
  */
-function matchCanceledByStartTime(
+function matchByOriginStartTime(
   reg: LiveActivityRegistration,
   updates: FeedTripUpdate[],
   now: number,
 ): LiveTripStatus | null {
   if (!reg.originStartTime) return null;
   const match = updates.find(
-    (u) =>
-      u.scheduleRelationship === "CANCELED" &&
-      u.startTime?.slice(0, 5) === reg.originStartTime,
+    (u) => u.startTime?.slice(0, 5) === reg.originStartTime,
   );
   if (!match) return null;
+  const isCanceled = match.scheduleRelationship === "CANCELED";
+
+  const to = findDestination(reg, match);
+  if (to?.arrivalTime != null) {
+    const liveArrivalMs = to.arrivalTime * 1000;
+    const delayMs = Math.max(0, liveArrivalMs - reg.arrivalEpochMs);
+    return {
+      departureEpochMs: reg.departureEpochMs + delayMs,
+      arrivalEpochMs: liveArrivalMs,
+      delayMinutes: Math.round(delayMs / 60_000),
+      isCanceled,
+      isEnded: now >= liveArrivalMs,
+    };
+  }
+
+  // No destination stop to derive from: only a cancellation is still worth a
+  // push; a scheduled run with no usable stop leaves the countdown as-is.
+  if (!isCanceled) return null;
   return {
     departureEpochMs: reg.departureEpochMs,
     arrivalEpochMs: reg.arrivalEpochMs,
@@ -137,6 +169,19 @@ function matchCanceledByStartTime(
     isCanceled: true,
     isEnded: now >= reg.arrivalEpochMs,
   };
+}
+
+/** The destination stop_time_update for this registration (resolves to
+ *  `toStation` + direction and carries a live arrival), or undefined. */
+function findDestination(
+  reg: LiveActivityRegistration,
+  update: FeedTripUpdate,
+): FeedStopTimeUpdate | undefined {
+  return update.stopTimeUpdates.find(
+    (s) =>
+      s.arrivalTime != null &&
+      resolveStation(s.stopId, reg.toStation, reg.direction),
+  );
 }
 
 export type PushAction = "none" | "update" | "end";

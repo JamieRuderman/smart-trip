@@ -127,6 +127,79 @@ describe("computeLiveTripStatus", () => {
     ).toBeNull();
   });
 
+  describe("en-route after the boarding stop is pruned", () => {
+    // 511 drops a stop from the feed once the train departs it, so an en-route
+    // trip has no boarding stop_time_update — only its remaining (destination)
+    // stops and the trip-level startTime. Identify by originStartTime + derive
+    // from the destination so the locked-screen countdown still corrects.
+    const regWithOrigin = { ...REG, originStartTime: "08:10" };
+    const destinationOnly = (arrUnix: number): FeedTripUpdate[] => [
+      {
+        scheduleRelationship: "SCHEDULED",
+        startTime: "08:10:00",
+        stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: arrUnix }],
+      },
+    ];
+
+    it("corrects from the destination arrival (on time) when boarding is gone", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: destinationOnly(SCHED_ARR_MS / 1000),
+        now: SCHED_DEP_MS + 5 * 60_000, // departed, en route
+      });
+      expect(status).not.toBeNull();
+      expect(status!.delayMinutes).toBe(0);
+      expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS);
+      expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+      expect(status!.isEnded).toBe(false);
+    });
+
+    it("derives the delay from a late destination arrival", () => {
+      const lateArr = SCHED_ARR_MS / 1000 + 6 * 60; // +6 min
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: destinationOnly(lateArr),
+        now: SCHED_DEP_MS + 5 * 60_000,
+      });
+      expect(status!.delayMinutes).toBe(6);
+      expect(status!.arrivalEpochMs).toBe(lateArr * 1000);
+      expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 6 * 60_000);
+    });
+
+    it("marks ended from the destination arrival", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: destinationOnly(SCHED_ARR_MS / 1000),
+        now: SCHED_ARR_MS + 1000,
+      });
+      expect(status!.isEnded).toBe(true);
+    });
+
+    it("still null when neither boarding nor destination stop is present (scheduled)", () => {
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: [
+            { scheduleRelationship: "SCHEDULED", startTime: "08:10:00", stopTimeUpdates: [] },
+          ],
+          now: SCHED_DEP_MS + 5 * 60_000,
+        }),
+      ).toBeNull();
+    });
+
+    it("prefers the precise boarding match when that stop is still present", () => {
+      // +5 min boarding delay present → path 1 wins; arrival follows boarding.
+      const lateDep = SCHED_DEP_MS / 1000 + 5 * 60;
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: feed({ depUnix: lateDep }),
+        now: SCHED_DEP_MS,
+      });
+      expect(status!.delayMinutes).toBe(5);
+      expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 5 * 60_000);
+    });
+  });
+
   describe("cancelled-without-stop-updates fallback", () => {
     const CANCELED_NO_STOPS: FeedTripUpdate[] = [
       { scheduleRelationship: "CANCELED", startTime: "08:10:00", stopTimeUpdates: [] },

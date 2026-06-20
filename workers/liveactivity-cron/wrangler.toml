@@ -1,0 +1,22 @@
+name = "smart-trip-liveactivity-cron"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Cron schedule. The native Text(timerInterval:) keeps the countdown ticking
+# between pushes, so every 2 minutes is plenty — a newly-appearing delay lands
+# on the locked screen within that window (see docs/live-activity-push.md).
+# This is a latency/cost knob, not a correctness one:
+#   "* * * * *"   → ~1-minute locked-screen latency, more invocations
+#   "*/2 * * * *" → the documented sweet spot (default below)
+#   "*/3 * * * *" → fewer invocations, still fine for SMART's delay cadence
+[triggers]
+crons = ["*/2 * * * *"]
+
+[vars]
+# Public URL of the Vercel push endpoint. Override per environment (e.g. a
+# preview deploy) with `wrangler deploy --var PUSH_ENDPOINT_URL:https://…`.
+PUSH_ENDPOINT_URL = "https://smarttraintrip.com/api/liveactivity/push"
+
+# NOTE: CRON_SECRET is a SECRET, not a [vars] entry — it must match the
+# CRON_SECRET configured on the Vercel project. Set it (never commit it) with:
+#   npx wrangler secret put CRON_SECRET

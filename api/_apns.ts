@@ -11,15 +11,14 @@ import { connect } from "node:http2";
  *   APNS_KEY_ID       — the 10-char Key ID of the .p8 auth key
  *   APNS_TEAM_ID      — Apple Developer team id (e.g. 6YH3537ZY9)
  *   APNS_PRIVATE_KEY  — the .p8 contents (PEM), newlines as real "\n" or literal
- *   APNS_WIDGET_BUNDLE_ID — the APP bundle id (e.g. smart.trip). ActivityKit's
- *                           Live Activity topic is the app's bundle id, NOT the
- *                           widget extension's; the var name is a misnomer kept
- *                           for deploy-config compatibility.
+ *   APNS_APP_ID       — the APP bundle id (e.g. smart.trip). ActivityKit's
+ *                       Live Activity topic is the app's bundle id, NOT the
+ *                       widget extension's (smart.trip.widget).
  *   APNS_HOST         — optional; defaults to the production gateway
  *
  * The pure helpers (`apnsJwtClaims`, `buildLiveActivityPayload`,
  * `apnsTopic`) are unit-tested; the network send is integration-only (needs a
- * real key + the widget bundle id, neither of which exists until the native
+ * real key + the app bundle id, neither of which exists until the native
  * widget ships), so it's kept thin and guarded.
  */
 
@@ -31,9 +30,8 @@ export interface ApnsConfig {
   /** PEM contents of the .p8 auth key. */
   signingKey: string;
   /** The APP bundle id (e.g. smart.trip). ActivityKit's Live Activity topic is
-   *  the app's bundle id, not the widget extension's — the field name is a
-   *  misnomer kept to match the existing APNS_WIDGET_BUNDLE_ID env var. */
-  widgetBundleId: string;
+   *  the app's bundle id, not the widget extension's (smart.trip.widget). */
+  appBundleId: string;
   host: string;
 }
 
@@ -42,15 +40,15 @@ export interface ApnsConfig {
 export function readApnsConfig(env: NodeJS.ProcessEnv = process.env): ApnsConfig | null {
   const keyId = env.APNS_KEY_ID;
   const teamId = env.APNS_TEAM_ID;
-  const widgetBundleId = env.APNS_WIDGET_BUNDLE_ID;
+  const appBundleId = env.APNS_APP_ID;
   const rawKey = env.APNS_PRIVATE_KEY;
-  if (!keyId || !teamId || !widgetBundleId || !rawKey) return null;
+  if (!keyId || !teamId || !appBundleId || !rawKey) return null;
   return {
     keyId,
     teamId,
     // Vercel env vars can't hold real newlines; accept "\n"-escaped PEM too.
     signingKey: rawKey.includes("\\n") ? rawKey.replace(/\\n/g, "\n") : rawKey,
-    widgetBundleId,
+    appBundleId,
     host: env.APNS_HOST || PRODUCTION_HOST,
   };
 }
@@ -187,7 +185,7 @@ export async function sendLiveActivityPush(args: {
         ":method": "POST",
         ":path": `/3/device/${args.token}`,
         authorization: `bearer ${args.jwt}`,
-        "apns-topic": apnsTopic(args.config.widgetBundleId),
+        "apns-topic": apnsTopic(args.config.appBundleId),
         "apns-push-type": "liveactivity",
         "apns-priority": String(args.priority ?? 10),
         "content-type": "application/json",

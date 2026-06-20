@@ -32,7 +32,7 @@ describe("readApnsConfig", () => {
   const base = {
     APNS_KEY_ID: "KEY1234567",
     APNS_TEAM_ID: "TEAM123456",
-    APNS_WIDGET_BUNDLE_ID: "smart.trip",
+    APNS_APP_ID: "smart.trip",
     APNS_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----",
   };
 
@@ -103,7 +103,7 @@ describe("signApnsJwt", () => {
       keyId: "KEY1234567",
       teamId: "TEAM123456",
       signingKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
-      widgetBundleId: "smart.trip",
+      appBundleId: "smart.trip",
       host: "api.push.apple.com",
     };
 

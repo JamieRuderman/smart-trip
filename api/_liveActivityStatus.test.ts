@@ -187,16 +187,49 @@ describe("computeLiveTripStatus", () => {
       ).toBeNull();
     });
 
-    it("prefers the precise boarding match when that stop is still present", () => {
-      // +5 min boarding delay present → path 1 wins; arrival follows boarding.
+    it("uses the boarding delay within the identified run when that stop is present", () => {
+      // Boarding still present (pre-/at-departure): the live departure gives the
+      // precise +5 delay, and arrival follows it.
       const lateDep = SCHED_DEP_MS / 1000 + 5 * 60;
       const status = computeLiveTripStatus({
         reg: regWithOrigin,
-        updates: feed({ depUnix: lateDep }),
+        updates: [
+          {
+            scheduleRelationship: "SCHEDULED",
+            startTime: "08:10:00",
+            stopTimeUpdates: [{ stopId: FROM_STOP, departureTime: lateDep }],
+          },
+        ],
         now: SCHED_DEP_MS,
       });
       expect(status!.delayMinutes).toBe(5);
       expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 5 * 60_000);
+    });
+
+    it("identifies by origin time, not a different run sharing the boarding station", () => {
+      // The correct run (08:10) has only its destination left; a LATER run still
+      // lists the boarding station within the 2h window. Identity must win — the
+      // delay comes from the correct run's destination (+2), not the wrong run's
+      // boarding (+60). This is the bug that produced a bogus 65-min delay.
+      const updates: FeedTripUpdate[] = [
+        {
+          scheduleRelationship: "SCHEDULED",
+          startTime: "08:10:00",
+          stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: SCHED_ARR_MS / 1000 + 2 * 60 }],
+        },
+        {
+          scheduleRelationship: "SCHEDULED",
+          startTime: "09:40:00",
+          stopTimeUpdates: [{ stopId: FROM_STOP, departureTime: SCHED_DEP_MS / 1000 + 60 * 60 }],
+        },
+      ];
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates,
+        now: SCHED_DEP_MS + 5 * 60_000,
+      });
+      expect(status!.delayMinutes).toBe(2);
+      expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 2 * 60_000);
     });
   });
 

@@ -107,9 +107,11 @@ struct TripActivityWidget: Widget {
             } compactTrailing: {
                 CompactCountdown(model: model)
             } minimal: {
-                TrainIcon(size: 20)
-                    .foregroundStyle(accent)
-                    .padding(.horizontal, 2)
+                // Stage-aware (walk → train → map pin), same as the compact
+                // leading slot — so a trip pushed to the tiny minimal slot (e.g.
+                // another app holds the primary island) still shows the map pin
+                // once en route instead of a frozen train.
+                CompactLeadingIcon(model: model, accent: accent)
             }
             .keylineTint(accent)
         }

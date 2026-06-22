@@ -47,6 +47,15 @@ export interface LiveTripStatus {
  *  than any realistic delay. */
 const MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
 
+/** How far past the scheduled arrival a run must be — while ALSO absent from the
+ *  feed — before the cron treats it as finished and ends the activity. 511 prunes
+ *  a run from the feed once it completes, and that pruning is exactly when an
+ *  `end` could no longer be matched, so the activity would otherwise sit frozen
+ *  at 0:00. A train that's merely late keeps a live destination arrival in the
+ *  feed and is matched normally, so it never reaches this fallback early; the
+ *  small grace only absorbs a single transient feed gap right at the boundary. */
+const ARRIVED_DROP_GRACE_MS = 2 * 60 * 1000;
+
 function resolveStation(
   stopId: string | undefined,
   station: string,
@@ -73,6 +82,13 @@ function resolveStation(
  *     the locked-screen countdown correctable once the train has left.
  *  2. **Boarding stop** — only when the registration carries no origin time:
  *     match the live departure at `fromStation` closest to scheduled, in window.
+ *
+ * When neither locates the run, it has either not appeared yet or — once its
+ * scheduled arrival is past — finished and been pruned from the feed. In the
+ * latter case a terminal `ended` status is synthesized from the registration so
+ * the cron can dismiss the activity instead of leaving the countdown frozen at
+ * 0:00 (see `ARRIVED_DROP_GRACE_MS`); otherwise null (leave the native countdown
+ * ticking).
  */
 export function computeLiveTripStatus(args: {
   reg: LiveActivityRegistration;
@@ -80,7 +96,31 @@ export function computeLiveTripStatus(args: {
   now: number;
 }): LiveTripStatus | null {
   const { reg, updates, now } = args;
+  const matched = matchLiveTripStatus(reg, updates, now);
+  if (matched) return matched;
+  // Unlocatable AND past the scheduled arrival → the run completed and 511
+  // dropped it (a still-running late train would keep a live destination arrival
+  // and be matched above). End it so the activity doesn't stick at 0:00.
+  if (now >= reg.arrivalEpochMs + ARRIVED_DROP_GRACE_MS) {
+    return {
+      departureEpochMs: reg.departureEpochMs,
+      arrivalEpochMs: reg.arrivalEpochMs,
+      delayMinutes: 0,
+      isCanceled: false,
+      isEnded: true,
+    };
+  }
+  return null;
+}
 
+/** Locate `reg`'s run in the feed and derive its live status, or null when it
+ *  can't be found. The feed-matching core of `computeLiveTripStatus`, split out
+ *  so the public entry can layer the finished-run terminal case on top. */
+function matchLiveTripStatus(
+  reg: LiveActivityRegistration,
+  updates: FeedTripUpdate[],
+  now: number,
+): LiveTripStatus | null {
   // 1. Precise identity by origin start time.
   if (reg.originStartTime) {
     const match = updates.find(

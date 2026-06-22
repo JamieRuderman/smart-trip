@@ -280,6 +280,68 @@ describe("computeLiveTripStatus", () => {
       ).toBeNull();
     });
   });
+
+  describe("finished-run fallback (pruned from the feed after arrival)", () => {
+    // 511 drops a run from the feed once it completes — exactly when an `end`
+    // could no longer be matched — so a past-arrival run that's gone is treated
+    // as finished and ended, instead of leaving the countdown stuck at 0:00.
+    const regWithOrigin = { ...REG, originStartTime: "08:10" };
+    // The run's startTime no longer appears (only an unrelated later run does).
+    const otherRun: FeedTripUpdate[] = [
+      { scheduleRelationship: "SCHEDULED", startTime: "09:40:00", stopTimeUpdates: [] },
+    ];
+
+    it("ends once arrival is comfortably past and the run is gone", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: otherRun,
+        now: SCHED_ARR_MS + 3 * 60_000, // > arrival + 2-min grace
+      });
+      expect(status).not.toBeNull();
+      expect(status!.isEnded).toBe(true);
+      expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS);
+    });
+
+    it("does not end within the grace window (absorbs a transient feed gap)", () => {
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: otherRun,
+          now: SCHED_ARR_MS + 60_000, // < grace
+        }),
+      ).toBeNull();
+    });
+
+    it("ends a no-origin registration too once arrival is past and unmatched", () => {
+      expect(
+        computeLiveTripStatus({
+          reg: REG, // no originStartTime → boarding-stop matching finds nothing
+          updates: [],
+          now: SCHED_ARR_MS + 3 * 60_000,
+        })!.isEnded,
+      ).toBe(true);
+    });
+
+    it("does NOT end a late train still present in the feed past scheduled arrival", () => {
+      // Past the SCHEDULED arrival, but the run still carries a live (later)
+      // destination arrival, so it's matched and stays en route — never ended
+      // early by the fallback.
+      const lateArr = SCHED_ARR_MS / 1000 + 8 * 60;
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: [
+          {
+            scheduleRelationship: "SCHEDULED",
+            startTime: "08:10:00",
+            stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: lateArr }],
+          },
+        ],
+        now: SCHED_ARR_MS + 3 * 60_000, // past scheduled, before live arrival
+      });
+      expect(status!.isEnded).toBe(false);
+      expect(status!.arrivalEpochMs).toBe(lateArr * 1000);
+    });
+  });
 });
 
 describe("decidePushAction", () => {

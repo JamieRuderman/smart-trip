@@ -58,6 +58,7 @@ export default {
       if (!isLiveActivityRegistration(body)) {
         return Response.json({ error: "Invalid registration" }, { status: 400 });
       }
+      console.log(`[la] register ${body.id}`);
       return activityStub(env, body.id).fetch("https://do/register", {
         method: "POST",
         body: JSON.stringify(body),
@@ -66,6 +67,7 @@ export default {
     if (path === "/api/liveactivity/register" && request.method === "DELETE") {
       const id = url.searchParams.get("id");
       if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
+      console.log(`[la] deregister ${id}`);
       return activityStub(env, id).fetch("https://do/deregister", { method: "POST" });
     }
     if (path === "/api/liveactivity/token" && request.method === "POST") {
@@ -73,6 +75,7 @@ export default {
       if (!isLiveActivityTokenPayload(body)) {
         return Response.json({ error: "Invalid token payload" }, { status: 400 });
       }
+      console.log(`[la] token ${body.id}`);
       return activityStub(env, body.id).fetch("https://do/token", {
         method: "POST",
         body: JSON.stringify(body),

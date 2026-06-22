@@ -222,7 +222,10 @@ export class TripActivityDO {
     const reg = await this.state.storage.get<LiveActivityRegistration>("reg");
     if (!reg) return; // deregistered between scheduling and firing
     const config = readApnsConfig(this.env);
-    if (!config) return; // unconfigured → no-op (and no reschedule spin)
+    if (!config) {
+      console.warn(`[la] ${reg.id} alarm fired but APNs is not configured`);
+      return; // unconfigured → no-op (and no reschedule spin)
+    }
 
     try {
       const now = Date.now();
@@ -240,8 +243,13 @@ export class TripActivityDO {
         now,
       });
 
+      console.log(
+        `[la] ${reg.id} tick action=${plan.push?.event ?? "none"} stop=${plan.stop} hasToken=${!!token}`,
+      );
+
       if (plan.push && token) {
         const outcome = await this.push(config, token, plan.push.payload);
+        console.log(`[la] ${reg.id} push ${plan.push.event} -> ${outcome}`);
         if (outcome === "dead-token") return void (await this.stop());
         if (outcome === "ok") {
           if (plan.stop) return void (await this.stop());
@@ -284,6 +292,7 @@ export class TripActivityDO {
     let result: Awaited<ReturnType<typeof sendLiveActivityPush>> | undefined;
     for (const host of [config.host, alternateApnsHost(config.host)]) {
       result = await sendLiveActivityPush({ config: { ...config, host }, token, jwt, payload });
+      console.log(`[la] apns ${host} -> ${result.status} ${result.reason ?? ""}`);
       if (result.status < 400 || result.reason !== "BadDeviceToken") break;
     }
     if (!result) return "retry";

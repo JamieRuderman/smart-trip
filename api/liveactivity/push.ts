@@ -127,9 +127,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return;
         }
         if (result.status >= 400) {
-          // A stale cached JWT (key rotated, clock skew) fails every push the
-          // same way — drop it so the next run signs fresh.
-          if (result.reason === "ExpiredProviderToken") {
+          // A bad cached JWT fails every push the same way — drop it so the next
+          // run signs fresh. `ExpiredProviderToken` (age) is the routine case;
+          // `InvalidProviderToken` (bad key/team/signature) clears it too so the
+          // cron self-heals on the next run once the APNs credentials are fixed
+          // (the JWT cache lives in Redis, surviving the fix's redeploy).
+          if (
+            result.reason === "ExpiredProviderToken" ||
+            result.reason === "InvalidProviderToken"
+          ) {
             await clearCachedApnsJwt();
           }
           console.warn(

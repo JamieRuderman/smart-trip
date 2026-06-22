@@ -47,6 +47,7 @@ const PRE_DEPARTURE_SENT: LastSent = {
   phase: "pre-departure",
   isEnded: false,
   isCanceled: false,
+  arrivalEpochMs: SCHED_ARR_MS,
 };
 
 describe("nextWake", () => {
@@ -84,8 +85,34 @@ describe("planTick", () => {
       phase: "pre-departure",
       isEnded: false,
       isCanceled: false,
+      arrivalEpochMs: SCHED_ARR_MS,
     });
     expect(plan.stop).toBe(false);
+  });
+
+  it("dismisses to the DISPLAYED arrival, not a jittered-earlier live one", () => {
+    // Widget is counting down to SCHED_ARR; the feed now reports arrival 7s
+    // earlier. We're past the live arrival but before the displayed one.
+    const displayedArr = SCHED_ARR_MS;
+    const liveArr = SCHED_ARR_MS - 7_000;
+    const plan = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent: {
+        delayMinutes: 0,
+        phase: "en-route",
+        isEnded: false,
+        isCanceled: false,
+        arrivalEpochMs: displayedArr,
+      },
+      updates: enRouteFeed(liveArr / 1000),
+      now: SCHED_ARR_MS - 5_000,
+    });
+    expect(plan.push?.event).toBe("end");
+    expect(plan.stop).toBe(true);
+    // dismissal-date = the displayed arrival (0:00 on screen), NOT live-7s.
+    const aps = (plan.push!.payload as { aps: Record<string, unknown> }).aps;
+    expect(aps["dismissal-date"]).toBe(Math.floor(displayedArr / 1000));
   });
 
   it("is silent when nothing changed since the last send", () => {

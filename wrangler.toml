@@ -1,0 +1,62 @@
+# Cloudflare Workers config for the SMART trip web app + native Live Activity
+# push backend. Lives at the REPO ROOT so Cloudflare Workers Builds (CI) finds it
+# with the default `wrangler deploy` / `wrangler versions upload` command. The
+# Worker source is under workers/web/; build the SPA first (`npm run build` →
+# ./dist), then deploy from the repo root:  npx wrangler deploy
+name = "smart-trip-web"
+main = "workers/web/src/index.ts"
+compatibility_date = "2025-01-01"
+# nodejs_compat so the gtfs-realtime-bindings (protobufjs) decoder runs on the
+# Workers runtime when reading the 511 feed natively.
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain — a PARALLEL endpoint for the Worker. The apex (smarttraintrip.com)
+# stays on Vercel (production); this serves the Worker on a real domain + TLS for
+# testing/early use. Provisioned on deploy (DNS record + cert) now that the zone
+# is active on Cloudflare.
+routes = [{ pattern = "app.smarttraintrip.com", custom_domain = true }]
+# Adding `routes` otherwise disables these by default. Keep workers.dev alive —
+# the iOS test build points VITE_API_BASE_URL at smart-trip-web.smart-trip.workers.dev
+# — and keep per-PR preview URLs (Workers Builds) on.
+workers_dev = true
+preview_urls = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# Client-routed paths (e.g. /trip/123) that match no file fall back to
+# index.html, mirroring the Vercel SPA rewrite in vercel.json.
+not_found_handling = "single-page-application"
+# Invoke the Worker FIRST for /api/* so the DO routes + proxy run instead of the
+# SPA fallback swallowing them; everything else is served straight from assets.
+run_worker_first = ["/api/*"]
+
+[vars]
+# Where un-migrated /api/* is proxied: the live Vercel backend. The DO also reads
+# the trip-updates feed from here (GET /api/gtfsrt/tripupdates). Drop routes from
+# the proxy as they move to native Workers; remove once fully migrated.
+API_ORIGIN = "https://smarttraintrip.com"
+# APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID + PRIVATE
+# KEY are SECRETS, set out-of-band (never committed):
+#   npx wrangler secret put APNS_KEY_ID
+#   npx wrangler secret put APNS_PRIVATE_KEY
+APNS_APP_ID = "smart.trip"
+APNS_TEAM_ID = "6YH3537ZY9"
+
+# Per-activity Live Activity Durable Object — drives exact-time push transitions
+# via the Alarms API (the native replacement for the Vercel poll-cron).
+[[durable_objects.bindings]]
+name = "TRIP_ACTIVITY"
+class_name = "TripActivityDO"
+
+# SQLite-backed DO (free-plan compatible).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TripActivityDO"]
+
+# GTFS-RT feed cache — the Cloudflare-native replacement for the Vercel Upstash
+# cache, so the migrated backend has no Upstash dependency. Bounds the global
+# 511 poll to ~one fetch per feed per freshness window.
+[[kv_namespaces]]
+binding = "FEED_CACHE"
+id = "4ab7e9064165464fbbdb062657e826da"

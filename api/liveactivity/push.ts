@@ -4,10 +4,12 @@ import {
   encodeContentState,
 } from "../../src/lib/liveActivityContent.js";
 import {
+  alternateApnsHost,
   readApnsConfig,
   signApnsJwt,
   buildLiveActivityPayload,
   sendLiveActivityPush,
+  type ApnsSendResult,
 } from "../_apns.js";
 import {
   computeLiveTripStatus,
@@ -114,37 +116,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         dismissEpochMs: action === "end" ? status.arrivalEpochMs : undefined,
       });
 
+      let result: ApnsSendResult | undefined;
       try {
-        const result = await sendLiveActivityPush({
-          config: apns,
-          token,
-          jwt,
-          payload,
-        });
-        // 410 Gone / BadDeviceToken → the token is dead; stop tracking it.
-        if (result.status === 410 || result.reason === "BadDeviceToken") {
-          await removeActivity(id);
-          return;
-        }
-        if (result.status >= 400) {
-          // A bad cached JWT fails every push the same way — drop it so the next
-          // run signs fresh. `ExpiredProviderToken` (age) is the routine case;
-          // `InvalidProviderToken` (bad key/team/signature) clears it too so the
-          // cron self-heals on the next run once the APNs credentials are fixed
-          // (the JWT cache lives in Redis, surviving the fix's redeploy).
-          if (
-            result.reason === "ExpiredProviderToken" ||
-            result.reason === "InvalidProviderToken"
-          ) {
-            await clearCachedApnsJwt();
-          }
-          console.warn(
-            `[liveactivity] push ${id} → ${result.status} ${result.reason ?? ""}`,
-          );
-          return;
+        // A Live Activity token is bound to ONE gateway — sandbox (dev build) or
+        // production (TestFlight/App Store). We can't tell which from the token,
+        // so send to the configured default and, only on BadDeviceToken, retry
+        // the other gateway (the provider JWT is valid for both). This lets one
+        // backend serve dev and release builds at once.
+        for (const host of [apns.host, alternateApnsHost(apns.host)]) {
+          result = await sendLiveActivityPush({
+            config: { ...apns, host },
+            token,
+            jwt,
+            payload,
+          });
+          if (result.status < 400 || result.reason !== "BadDeviceToken") break;
         }
       } catch (err) {
         console.warn(`[liveactivity] push ${id} threw: ${String(err)}`);
+        return;
+      }
+      if (!result) return;
+
+      // 410 Gone, or BadDeviceToken from BOTH gateways → the token is dead.
+      if (result.status === 410 || result.reason === "BadDeviceToken") {
+        await removeActivity(id);
+        return;
+      }
+      if (result.status >= 400) {
+        // A bad cached JWT fails every push the same way — drop it so the next
+        // run signs fresh. `ExpiredProviderToken` (age) is the routine case;
+        // `InvalidProviderToken` (bad key/team/signature) clears it too so the
+        // cron self-heals on the next run once the APNs credentials are fixed
+        // (the JWT cache lives in Redis, surviving the fix's redeploy).
+        if (
+          result.reason === "ExpiredProviderToken" ||
+          result.reason === "InvalidProviderToken"
+        ) {
+          await clearCachedApnsJwt();
+        }
+        console.warn(
+          `[liveactivity] push ${id} → ${result.status} ${result.reason ?? ""}`,
+        );
         return;
       }
 

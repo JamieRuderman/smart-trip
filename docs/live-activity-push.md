@@ -76,7 +76,7 @@ You get a `.p8` file + a 10-char **Key ID**; the **Team ID** is `6YH3537ZY9`.
 | `APNS_TEAM_ID` | `6YH3537ZY9` |
 | `APNS_PRIVATE_KEY` | the `.p8` PEM contents (newlines as literal `\n` are accepted) |
 | `APNS_APP_ID` | `smart.trip` — the **app** bundle id (ActivityKit's Live Activity topic is the app's id, *not* the widget's `smart.trip.widget`). The endpoint appends `.push-type.liveactivity`, yielding `smart.trip.push-type.liveactivity` |
-| `APNS_HOST` | optional; defaults to `api.push.apple.com` (use `api.sandbox.push.apple.com` for dev builds) |
+| `APNS_HOST` | optional; the gateway tried **first** (defaults to production `api.push.apple.com`). The cron falls back to the other gateway on `BadDeviceToken`, so one backend serves **both** sandbox (dev/Xcode builds) and production (TestFlight/App Store) tokens — no need to flip this per build type |
 | `CRON_SECRET` | shared secret; the scheduler must send it as `Authorization: Bearer …`. **Required** — the push endpoint treats a missing secret as "not configured" and no-ops, so it can never run unauthenticated |
 
 Redis is already wired via the existing `KV_REST_API_URL` / `KV_REST_API_TOKEN`

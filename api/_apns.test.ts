@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import {
+  alternateApnsHost,
   apnsJwtClaims,
   apnsTopic,
   buildLiveActivityPayload,
+  PRODUCTION_HOST,
   readApnsConfig,
+  SANDBOX_HOST,
   signApnsJwt,
   type ApnsConfig,
 } from "./_apns.js";
@@ -16,6 +19,17 @@ describe("apnsTopic", () => {
     expect(apnsTopic("smart.trip")).toBe(
       "smart.trip.push-type.liveactivity",
     );
+  });
+});
+
+describe("alternateApnsHost", () => {
+  it("flips between the sandbox and production gateways", () => {
+    expect(alternateApnsHost(SANDBOX_HOST)).toBe(PRODUCTION_HOST);
+    expect(alternateApnsHost(PRODUCTION_HOST)).toBe(SANDBOX_HOST);
+  });
+
+  it("treats an unknown host as production so the fallback hits sandbox", () => {
+    expect(alternateApnsHost("api.example.com")).toBe(SANDBOX_HOST);
   });
 });
 

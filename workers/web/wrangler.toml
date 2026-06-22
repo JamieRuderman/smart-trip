@@ -22,7 +22,24 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 [vars]
-# Where /api/* is proxied for now: the live Vercel backend. As each route is
-# reimplemented natively on Workers, drop it from the proxy; remove this var
-# once the backend is fully migrated.
+# Where un-migrated /api/* is proxied: the live Vercel backend. The DO also reads
+# the trip-updates feed from here (GET /api/gtfsrt/tripupdates). Drop routes from
+# the proxy as they move to native Workers; remove once fully migrated.
 API_ORIGIN = "https://smarttraintrip.com"
+# APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID + PRIVATE
+# KEY are SECRETS, set out-of-band (never committed):
+#   npx wrangler secret put APNS_KEY_ID
+#   npx wrangler secret put APNS_PRIVATE_KEY
+APNS_APP_ID = "smart.trip"
+APNS_TEAM_ID = "6YH3537ZY9"
+
+# Per-activity Live Activity Durable Object — drives exact-time push transitions
+# via the Alarms API (the native replacement for the Vercel poll-cron).
+[[durable_objects.bindings]]
+name = "TRIP_ACTIVITY"
+class_name = "TripActivityDO"
+
+# SQLite-backed DO (free-plan compatible).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TripActivityDO"]

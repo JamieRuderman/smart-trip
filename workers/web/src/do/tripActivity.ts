@@ -37,11 +37,10 @@ import {
   type ApnsConfig,
   type ApnsEnv,
 } from "../lib/apns.js";
+import { getTripUpdates, type GtfsRtEnv } from "../lib/gtfsrt.js";
 
-/** Env visible to the DO (Worker bindings): APNs creds + where to read the feed. */
-export interface DoEnv extends ApnsEnv {
-  API_ORIGIN: string;
-}
+/** Env visible to the DO (Worker bindings): APNs creds + the native 511/KV feed. */
+export interface DoEnv extends ApnsEnv, GtfsRtEnv {}
 
 export interface LastSent {
   delayMinutes: number;
@@ -279,14 +278,14 @@ export class TripActivityDO {
     }
   }
 
-  /** Normalized trip-updates from the existing backend; null on failure (leave
-   *  the countdown ticking, retry next alarm). Reuses the Vercel feed cache. */
+  /** Normalized trip-updates read IN-PROCESS via the native 511 + KV path (no
+   *  Vercel round-trip); null on failure (leave the countdown ticking, retry
+   *  next alarm). The KV cache means the DO and the /api/gtfsrt/tripupdates route
+   *  share one 511 poll budget. */
   private async fetchUpdates(): Promise<FeedTripUpdate[] | null> {
     try {
-      const res = await fetch(`${this.env.API_ORIGIN}/api/gtfsrt/tripupdates`);
-      if (!res.ok) return null;
-      const body = (await res.json()) as { updates?: FeedTripUpdate[] };
-      return body.updates ?? null;
+      const { updates } = await getTripUpdates(this.env);
+      return updates;
     } catch {
       return null;
     }

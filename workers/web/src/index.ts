@@ -16,8 +16,18 @@ import {
   isLiveActivityRegistration,
   isLiveActivityTokenPayload,
 } from "../../../src/lib/liveActivityPushTypes.js";
+import { getTripUpdates, type FeedCacheKV } from "./lib/gtfsrt.js";
 
 export { TripActivityDO } from "./do/tripActivity.js";
+
+/** Wildcard CORS for the public GTFS-RT data (matches api/_cors.ts): the data is
+ *  identical for every caller, and the iOS app reads it from capacitor://localhost. */
+const CORS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,OPTIONS",
+  "access-control-allow-headers": "Content-Type, X-Requested-With",
+  "access-control-max-age": "86400",
+};
 
 /** Minimal structural DO namespace type (avoids a @cloudflare/workers-types dep). */
 interface DurableObjectStub {
@@ -40,6 +50,9 @@ export interface Env {
   APNS_APP_ID?: string;
   APNS_PRIVATE_KEY?: string;
   APNS_HOST?: string;
+  // GTFS-RT native feed (511 + KV cache) — see workers/web/src/lib/gtfsrt.ts.
+  TRANSIT_511_API_KEY?: string;
+  FEED_CACHE: FeedCacheKV;
 }
 
 /** The DO instance for one activity id. */
@@ -80,6 +93,25 @@ export default {
         method: "POST",
         body: JSON.stringify(body),
       });
+    }
+
+    // --- Native GTFS-RT: trip-updates (vehiclepositions/alerts still proxy) ---
+    if (path === "/api/gtfsrt/tripupdates") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: CORS });
+      }
+      try {
+        const data = await getTripUpdates(env);
+        return Response.json(data, {
+          headers: { ...CORS, "cache-control": "s-maxage=30, stale-while-revalidate=15" },
+        });
+      } catch (err) {
+        console.warn(`[gtfsrt] tripupdates failed: ${String(err)}`);
+        return Response.json(
+          { error: "Upstream feed unavailable" },
+          { status: 502, headers: CORS },
+        );
+      }
     }
 
     // --- Everything else under /api/* still proxies to Vercel ---

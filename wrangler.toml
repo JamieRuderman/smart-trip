@@ -6,6 +6,9 @@
 name = "smart-trip-web"
 main = "workers/web/src/index.ts"
 compatibility_date = "2025-01-01"
+# nodejs_compat so the gtfs-realtime-bindings (protobufjs) decoder runs on the
+# Workers runtime when reading the 511 feed natively.
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./dist"
@@ -39,3 +42,10 @@ class_name = "TripActivityDO"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TripActivityDO"]
+
+# GTFS-RT feed cache — the Cloudflare-native replacement for the Vercel Upstash
+# cache, so the migrated backend has no Upstash dependency. Bounds the global
+# 511 poll to ~one fetch per feed per freshness window.
+[[kv_namespaces]]
+binding = "FEED_CACHE"
+id = "4ab7e9064165464fbbdb062657e826da"

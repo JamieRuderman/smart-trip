@@ -14,7 +14,10 @@ import { connect } from "node:http2";
  *   APNS_APP_ID       — the APP bundle id (e.g. smart.trip). ActivityKit's
  *                       Live Activity topic is the app's bundle id, NOT the
  *                       widget extension's (smart.trip.widget).
- *   APNS_HOST         — optional; defaults to the production gateway
+ *   APNS_HOST         — optional; the gateway tried FIRST. Defaults to
+ *                       production. The cron falls back to the other gateway on
+ *                       BadDeviceToken, so both sandbox (dev builds) and
+ *                       production (TestFlight/App Store) tokens are handled.
  *
  * The pure helpers (`apnsJwtClaims`, `buildLiveActivityPayload`,
  * `apnsTopic`) are unit-tested; the network send is integration-only (needs a
@@ -22,7 +25,17 @@ import { connect } from "node:http2";
  * widget ships), so it's kept thin and guarded.
  */
 
-const PRODUCTION_HOST = "api.push.apple.com";
+export const PRODUCTION_HOST = "api.push.apple.com";
+export const SANDBOX_HOST = "api.sandbox.push.apple.com";
+
+/** The other APNs gateway. A Live Activity push token is bound to ONE
+ *  environment — sandbox for a development (Xcode) build, production for
+ *  TestFlight/App Store — and must be sent to the matching gateway. The provider
+ *  JWT (the `.p8`) is valid for both, so a caller that gets `BadDeviceToken` from
+ *  one gateway retries the other. */
+export function alternateApnsHost(host: string): string {
+  return host === SANDBOX_HOST ? PRODUCTION_HOST : SANDBOX_HOST;
+}
 
 export interface ApnsConfig {
   keyId: string;

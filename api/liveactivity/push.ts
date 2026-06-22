@@ -26,6 +26,12 @@ import {
   setCachedApnsJwt,
   setLastSent,
 } from "../_liveActivityStore.js";
+import { fetchFeedCached } from "../_feedCache.js";
+import { fetchGtfsRtBytes, decodeFeed } from "../_gtfsrt.js";
+import {
+  normalizeTripUpdates,
+  TRIPUPDATES_FRESHNESS_MS,
+} from "../_tripUpdatesFeed.js";
 
 /**
  * Cron (scheduled HTTP hit) that corrects every registered Live Activity's
@@ -121,9 +127,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return;
         }
         if (result.status >= 400) {
-          // A stale cached JWT (key rotated, clock skew) fails every push the
-          // same way — drop it so the next run signs fresh.
-          if (result.reason === "ExpiredProviderToken") {
+          // A bad cached JWT fails every push the same way — drop it so the next
+          // run signs fresh. `ExpiredProviderToken` (age) is the routine case;
+          // `InvalidProviderToken` (bad key/team/signature) clears it too so the
+          // cron self-heals on the next run once the APNs credentials are fixed
+          // (the JWT cache lives in Redis, surviving the fix's redeploy).
+          if (
+            result.reason === "ExpiredProviderToken" ||
+            result.reason === "InvalidProviderToken"
+          ) {
             await clearCachedApnsJwt();
           }
           console.warn(
@@ -159,16 +171,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ ok: true, processed: ids.length, pushed, ended });
 }
 
-/** Fetch our own normalized trip-updates JSON (reusing its 511 cache), bounded
- *  so a hung upstream can't hold the cron run open. */
+/** Read the normalized trip-updates IN-PROCESS, reusing the same Redis-backed
+ *  511 cache the `/api/gtfsrt/tripupdates` endpoint serves. Avoids an HTTP
+ *  round-trip to our own function — that cold-started a second instance and
+ *  intermittently blew the cron's timeout, skipping whole runs. A cache hit is
+ *  immediate; only a stale window pays the bounded upstream 511 fetch (which
+ *  has its own timeout), and the upstream poll budget is unchanged. */
 async function fetchTripUpdates(): Promise<FeedTripUpdate[]> {
-  const base =
-    process.env.PUBLIC_BASE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  const res = await fetch(`${base}/api/gtfsrt/tripupdates`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`tripupdates ${res.status}`);
-  const json = (await res.json()) as { updates?: FeedTripUpdate[] };
-  return json.updates ?? [];
+  const { bytes } = await fetchFeedCached(
+    "tripupdates",
+    TRIPUPDATES_FRESHNESS_MS,
+    () => fetchGtfsRtBytes("tripupdates"),
+  );
+  return normalizeTripUpdates(decodeFeed(bytes)).updates;
 }

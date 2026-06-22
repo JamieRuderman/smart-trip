@@ -10,6 +10,17 @@ compatibility_date = "2025-01-01"
 # Workers runtime when reading the 511 feed natively.
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain — a PARALLEL endpoint for the Worker. The apex (smarttraintrip.com)
+# stays on Vercel (production); this serves the Worker on a real domain + TLS for
+# testing/early use. Provisioned on deploy (DNS record + cert) now that the zone
+# is active on Cloudflare.
+routes = [{ pattern = "app.smarttraintrip.com", custom_domain = true }]
+# Adding `routes` otherwise disables these by default. Keep workers.dev alive —
+# the iOS test build points VITE_API_BASE_URL at smart-trip-web.smart-trip.workers.dev
+# — and keep per-PR preview URLs (Workers Builds) on.
+workers_dev = true
+preview_urls = true
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"

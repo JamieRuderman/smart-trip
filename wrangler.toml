@@ -1,24 +1,20 @@
-# Parallel Cloudflare deployment of the SMART trip web app, running ALONGSIDE the
-# existing Vercel deploy to validate Cloudflare hosting before any backend
-# migration. Serves the built Vite SPA (repo-root ./dist) as static assets with
-# SPA fallback, and the Worker in src/index.ts proxies /api/* to the live Vercel
-# backend so the app is fully functional with NO backend rewrite yet.
-#
-# Build the SPA first (`npm run build` from the repo root), then from this dir:
-#   npx wrangler deploy
+# Cloudflare Workers config for the SMART trip web app + native Live Activity
+# push backend. Lives at the REPO ROOT so Cloudflare Workers Builds (CI) finds it
+# with the default `wrangler deploy` / `wrangler versions upload` command. The
+# Worker source is under workers/web/; build the SPA first (`npm run build` →
+# ./dist), then deploy from the repo root:  npx wrangler deploy
 name = "smart-trip-web"
-main = "src/index.ts"
+main = "workers/web/src/index.ts"
 compatibility_date = "2025-01-01"
 
 [assets]
-# Resolved relative to this config file → repo-root ./dist.
-directory = "../../dist"
+directory = "./dist"
 binding = "ASSETS"
 # Client-routed paths (e.g. /trip/123) that match no file fall back to
 # index.html, mirroring the Vercel SPA rewrite in vercel.json.
 not_found_handling = "single-page-application"
-# Invoke the Worker FIRST for /api/* so the proxy runs instead of the SPA
-# fallback swallowing it; everything else is served straight from assets.
+# Invoke the Worker FIRST for /api/* so the DO routes + proxy run instead of the
+# SPA fallback swallowing them; everything else is served straight from assets.
 run_worker_first = ["/api/*"]
 
 [vars]

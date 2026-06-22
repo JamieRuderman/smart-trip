@@ -23,12 +23,20 @@ Live (parallel): <https://smart-trip-web.smart-trip.workers.dev>
 
 ## Deploy
 
+The wrangler config lives at the **repo root** (`/wrangler.toml`) so Cloudflare
+Workers Builds (CI) finds it by default. Deploy from the repo root:
+
 ```sh
-# 1. Build the SPA (repo root). Set VITE_* for a faithful build — see below.
-npm run build
-# 2. Deploy this Worker (from this dir).
-npx wrangler deploy
+npm run build        # builds ./dist (relative API base → same-Worker calls)
+npx wrangler deploy  # bundles workers/web/src + uploads ./dist
 ```
+
+**Cloudflare Workers Builds (CI / per-PR previews):**
+- Build command: `npm run build` (falls back to `npx vite build` if the SEO
+  prerender step needs a browser the CI lacks)
+- Deploy command: `npx wrangler deploy` (production) / `npx wrangler versions
+  upload` (preview branches)
+- Root directory: repo root (default)
 
 ## Build env (for parity with Vercel)
 

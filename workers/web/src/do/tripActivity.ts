@@ -48,6 +48,10 @@ export interface LastSent {
   phase: "pre-departure" | "en-route";
   isEnded: boolean;
   isCanceled: boolean;
+  /** Arrival instant the widget is currently counting down to (the last value we
+   *  pushed). The `end` dismisses to THIS, not the latest feed arrival, so iOS
+   *  removes the activity exactly when the on-screen countdown reaches 0:00. */
+  arrivalEpochMs: number;
 }
 
 /** Feed re-check cadence BETWEEN the exact boundaries. The native countdown
@@ -126,9 +130,15 @@ export function planTick(input: TickInput): TickPlan {
     return { push: null, lastSent: null, stop: action === "end", nextAlarm };
   }
 
+  // On `end`, dismiss to the arrival the widget is DISPLAYING (last pushed), so
+  // iOS removes the activity exactly when the on-screen countdown hits 0:00 —
+  // not a few seconds early when the live feed arrival has jittered ahead of
+  // what the user last saw. iOS holds the (frozen) activity until this instant.
+  const arrivalForView =
+    action === "end" ? lastSent?.arrivalEpochMs ?? status.arrivalEpochMs : status.arrivalEpochMs;
   const content = buildContentState({
     departureEpochMs: status.departureEpochMs,
-    arrivalEpochMs: status.arrivalEpochMs,
+    arrivalEpochMs: arrivalForView,
     delayMinutes: status.delayMinutes,
     nextStop: null,
     remainingStops: null,
@@ -141,7 +151,7 @@ export function planTick(input: TickInput): TickPlan {
     contentState: encodeContentState(content),
     timestampSeconds: Math.floor(now / 1000),
     staleEpochMs: content.staleAfterEpochMs,
-    dismissEpochMs: action === "end" ? status.arrivalEpochMs : undefined,
+    dismissEpochMs: action === "end" ? arrivalForView : undefined,
   });
 
   if (action === "end") {
@@ -154,6 +164,7 @@ export function planTick(input: TickInput): TickPlan {
       phase,
       isEnded: false,
       isCanceled: status.isCanceled,
+      arrivalEpochMs: status.arrivalEpochMs,
     },
     stop: false,
     nextAlarm,

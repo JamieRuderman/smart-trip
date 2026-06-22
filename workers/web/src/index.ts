@@ -16,7 +16,12 @@ import {
   isLiveActivityRegistration,
   isLiveActivityTokenPayload,
 } from "../../../src/lib/liveActivityPushTypes.js";
-import { getTripUpdates, type FeedCacheKV } from "./lib/gtfsrt.js";
+import {
+  getServiceAlerts,
+  getTripUpdates,
+  getVehiclePositions,
+  type FeedCacheKV,
+} from "./lib/gtfsrt.js";
 
 export { TripActivityDO } from "./do/tripActivity.js";
 
@@ -28,6 +33,22 @@ const CORS: Record<string, string> = {
   "access-control-allow-headers": "Content-Type, X-Requested-With",
   "access-control-max-age": "86400",
 };
+
+/** Serve a native GTFS-RT feed with CORS + Cache-Control; 502 on upstream
+ *  failure (the client falls back to its cached data / static schedule). */
+async function serveGtfsRt(
+  request: Request,
+  getData: () => Promise<unknown>,
+  cacheControl: string,
+): Promise<Response> {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  try {
+    return Response.json(await getData(), { headers: { ...CORS, "cache-control": cacheControl } });
+  } catch (err) {
+    console.warn(`[gtfsrt] ${new URL(request.url).pathname} failed: ${String(err)}`);
+    return Response.json({ error: "Upstream feed unavailable" }, { status: 502, headers: CORS });
+  }
+}
 
 /** Minimal structural DO namespace type (avoids a @cloudflare/workers-types dep). */
 interface DurableObjectStub {
@@ -95,23 +116,15 @@ export default {
       });
     }
 
-    // --- Native GTFS-RT: trip-updates (vehiclepositions/alerts still proxy) ---
+    // --- Native GTFS-RT feeds (511 + protobuf + KV; no Vercel, no Upstash) ---
     if (path === "/api/gtfsrt/tripupdates") {
-      if (request.method === "OPTIONS") {
-        return new Response(null, { status: 204, headers: CORS });
-      }
-      try {
-        const data = await getTripUpdates(env);
-        return Response.json(data, {
-          headers: { ...CORS, "cache-control": "s-maxage=30, stale-while-revalidate=15" },
-        });
-      } catch (err) {
-        console.warn(`[gtfsrt] tripupdates failed: ${String(err)}`);
-        return Response.json(
-          { error: "Upstream feed unavailable" },
-          { status: 502, headers: CORS },
-        );
-      }
+      return serveGtfsRt(request, () => getTripUpdates(env), "s-maxage=30, stale-while-revalidate=15");
+    }
+    if (path === "/api/gtfsrt/vehiclepositions") {
+      return serveGtfsRt(request, () => getVehiclePositions(env), "s-maxage=15");
+    }
+    if (path === "/api/gtfsrt/alerts") {
+      return serveGtfsRt(request, () => getServiceAlerts(env), "s-maxage=60, stale-while-revalidate=30");
     }
 
     // --- Everything else under /api/* still proxies to Vercel ---

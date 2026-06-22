@@ -3,12 +3,16 @@
  * native replacement for the Vercel poll-cron, giving **exact-time** transitions
  * instead of up-to-2-min latency.
  *
- * It wakes via the DO Alarms API precisely at the departure instant (the
- * departing→arriving flip) and the arrival instant (the end/dismissal), and
- * re-checks the feed every `POLL_MS` in between so a newly-appearing delay still
- * lands. All the matching/decision/content logic is the SAME pure code the Vercel
- * backend uses (`computeLiveTripStatus`, `decidePushAction`, `buildContentState`)
- * — only the APNs transport is Workers-native (`../lib/apns`).
+ * It wakes via the DO Alarms API precisely at the (live, delay-adjusted)
+ * departure instant (the departing→arriving flip) and arrival instant (the
+ * end/dismissal), and re-checks the feed every `POLL_MS` in between so a
+ * newly-appearing delay still lands. All the matching/decision/content logic is
+ * the SAME pure code the Vercel backend uses — only the APNs transport is
+ * Workers-native (`../lib/apns`).
+ *
+ * The per-tick decision (`planTick`) is a PURE function (no storage/network), so
+ * it's unit-tested directly; the class is a thin shell that does the storage I/O
+ * and APNs send around it.
  *
  * One DO instance per activity id (`idFromName(reg.id)`), so its storage holds
  * exactly that activity's registration, token, last-sent state, and cached
@@ -39,6 +43,123 @@ export interface DoEnv extends ApnsEnv {
   API_ORIGIN: string;
 }
 
+export interface LastSent {
+  delayMinutes: number;
+  phase: "pre-departure" | "en-route";
+  isEnded: boolean;
+  isCanceled: boolean;
+}
+
+/** Feed re-check cadence BETWEEN the exact boundaries. The native countdown
+ *  ticks on its own, so ~90s is ample for delay drift; the transitions stay
+ *  exact because we also wake right on each (live) boundary. */
+export const POLL_MS = 90_000;
+/** Reuse a signed provider JWT this long — APNs throttles provider-token churn
+ *  (TooManyProviderTokenUpdates) and rejects tokens older than 1h. */
+const JWT_TTL_MS = 40 * 60_000;
+
+/**
+ * Next wake: the nearer of the upcoming boundary (departure, then arrival) and a
+ * poll tick — so a transition fires EXACTLY on its boundary while a delay is
+ * still re-checked every `POLL_MS`. Callers pass the LIVE instants (delay-
+ * adjusted) when known, so a slipped departure still flips on time. Past arrival
+ * it keeps polling (never a hot loop) until the feed confirms the run ended.
+ */
+export function nextWake(
+  departureEpochMs: number,
+  arrivalEpochMs: number,
+  now: number,
+): number {
+  const poll = now + POLL_MS;
+  if (now < departureEpochMs) return Math.min(departureEpochMs, poll);
+  if (now < arrivalEpochMs) return Math.min(arrivalEpochMs, poll);
+  return poll;
+}
+
+export interface TickInput {
+  reg: LiveActivityRegistration;
+  token: string | null;
+  lastSent: LastSent | null;
+  /** Normalized feed, or null when the fetch failed (leave countdown ticking). */
+  updates: FeedTripUpdate[] | null;
+  now: number;
+}
+
+export interface TickPlan {
+  /** A push to send, or null when nothing changed / can't push. */
+  push: { event: "update" | "end"; payload: Record<string, unknown> } | null;
+  /** lastSent to persist AFTER a successful non-end push (null = leave as-is). */
+  lastSent: LastSent | null;
+  /** Tear down after this tick (ended, or arrived with no token to dismiss). */
+  stop: boolean;
+  /** Absolute epoch ms to wake next (ignored when `stop`). */
+  nextAlarm: number;
+}
+
+/**
+ * Decide what to do for one tick — PURE (no I/O). Derives the live status, picks
+ * the push (flip / delay update / end) via the shared `decidePushAction`, and
+ * schedules the next wake against the LIVE instants so transitions stay exact
+ * under delay. The DO shell sends `push` and persists `lastSent`/`stop` based on
+ * the actual APNs outcome.
+ */
+export function planTick(input: TickInput): TickPlan {
+  const { reg, token, lastSent, updates, now } = input;
+  const status = updates ? computeLiveTripStatus({ reg, updates, now }) : null;
+
+  // Schedule against LIVE instants when we have them (so a delayed departure
+  // flips on time), else the registration's scheduled times.
+  const nextAlarm = nextWake(
+    status?.departureEpochMs ?? reg.departureEpochMs,
+    status?.arrivalEpochMs ?? reg.arrivalEpochMs,
+    now,
+  );
+
+  if (!status) return { push: null, lastSent: null, stop: false, nextAlarm };
+
+  const { action, phase } = decidePushAction({ status, lastSent, now });
+  if (action === "none") return { push: null, lastSent: null, stop: false, nextAlarm };
+
+  if (!token) {
+    // Can't push: if it has ended there's nothing to dismiss → stop; else wait
+    // for the token (the /token route reschedules us when it arrives).
+    return { push: null, lastSent: null, stop: action === "end", nextAlarm };
+  }
+
+  const content = buildContentState({
+    departureEpochMs: status.departureEpochMs,
+    arrivalEpochMs: status.arrivalEpochMs,
+    delayMinutes: status.delayMinutes,
+    nextStop: null,
+    remainingStops: null,
+    isCanceled: status.isCanceled,
+    isEnded: action === "end",
+    now,
+  });
+  const payload = buildLiveActivityPayload({
+    event: action,
+    contentState: encodeContentState(content),
+    timestampSeconds: Math.floor(now / 1000),
+    staleEpochMs: content.staleAfterEpochMs,
+    dismissEpochMs: action === "end" ? status.arrivalEpochMs : undefined,
+  });
+
+  if (action === "end") {
+    return { push: { event: "end", payload }, lastSent: null, stop: true, nextAlarm };
+  }
+  return {
+    push: { event: "update", payload },
+    lastSent: {
+      delayMinutes: status.delayMinutes,
+      phase,
+      isEnded: false,
+      isCanceled: status.isCanceled,
+    },
+    stop: false,
+    nextAlarm,
+  };
+}
+
 /** Minimal structural types for the DO runtime APIs we use, so this compiles
  *  without pulling in @cloudflare/workers-types. */
 interface DurableObjectStorage {
@@ -53,21 +174,6 @@ interface DurableObjectStorage {
 interface DurableObjectState {
   storage: DurableObjectStorage;
 }
-
-interface LastSent {
-  delayMinutes: number;
-  phase: "pre-departure" | "en-route";
-  isEnded: boolean;
-  isCanceled: boolean;
-}
-
-/** Feed re-check cadence BETWEEN the exact boundaries. The native countdown
- *  ticks on its own, so ~90s is ample for delay drift; the transitions stay
- *  exact because we also wake right on each boundary. */
-const POLL_MS = 90_000;
-/** Reuse a signed provider JWT this long — APNs throttles provider-token churn
- *  (TooManyProviderTokenUpdates) and rejects tokens older than 1h. */
-const JWT_TTL_MS = 40 * 60_000;
 
 export class TripActivityDO {
   private state: DurableObjectState;
@@ -85,13 +191,14 @@ export class TripActivityDO {
       case "/register": {
         const reg = (await req.json()) as LiveActivityRegistration;
         await this.state.storage.put("reg", reg);
-        await this.ensureScheduled();
+        await this.ensureScheduled(reg);
         return Response.json({ ok: true });
       }
       case "/token": {
         const { token } = (await req.json()) as { token: string };
         await this.state.storage.put("token", token);
-        await this.ensureScheduled();
+        const reg = await this.state.storage.get<LiveActivityRegistration>("reg");
+        if (reg) await this.ensureScheduled(reg);
         return Response.json({ ok: true });
       }
       case "/deregister": {
@@ -103,73 +210,54 @@ export class TripActivityDO {
     }
   }
 
-  /** Ensure an alarm is pending no later than the next wake. */
-  private async ensureScheduled(): Promise<void> {
-    const reg = await this.state.storage.get<LiveActivityRegistration>("reg");
-    if (!reg) return;
-    const next = nextWake(reg, Date.now());
+  /** Ensure an alarm is pending no later than the next scheduled-time wake. */
+  private async ensureScheduled(reg: LiveActivityRegistration): Promise<void> {
+    const next = nextWake(reg.departureEpochMs, reg.arrivalEpochMs, Date.now());
     const current = await this.state.storage.getAlarm();
     if (current == null || current > next) await this.state.storage.setAlarm(next);
   }
 
-  /** The alarm tick: derive live status, push a flip / delay update / end as
-   *  needed, then reschedule. Mirrors the Vercel cron's per-activity body. */
+  /** The alarm tick: plan (pure), send any push, persist, reschedule. */
   async alarm(): Promise<void> {
     const reg = await this.state.storage.get<LiveActivityRegistration>("reg");
     if (!reg) return; // deregistered between scheduling and firing
     const config = readApnsConfig(this.env);
     if (!config) return; // unconfigured → no-op (and no reschedule spin)
 
-    const now = Date.now();
-    const updates = await this.fetchUpdates();
-    // computeLiveTripStatus returns a terminal `ended` status once a run is gone
-    // from the feed AND past arrival (api/_liveActivityStatus.ts), so the DO ends
-    // the activity even after 511 prunes the finished run.
-    const status = updates ? computeLiveTripStatus({ reg, updates, now }) : null;
+    try {
+      const now = Date.now();
+      const [token, lastSent, updates] = await Promise.all([
+        this.state.storage.get<string>("token"),
+        this.state.storage.get<LastSent>("lastSent"),
+        this.fetchUpdates(),
+      ]);
 
-    if (status) {
-      const lastSent = (await this.state.storage.get<LastSent>("lastSent")) ?? null;
-      const { action, phase } = decidePushAction({ status, lastSent, now });
-      if (action !== "none") {
-        const token = await this.state.storage.get<string>("token");
-        if (!token) {
-          // Arrived without ever receiving a token → nothing to dismiss; stop.
-          if (action === "end") return void (await this.stop());
-        } else {
-          const content = buildContentState({
-            departureEpochMs: status.departureEpochMs,
-            arrivalEpochMs: status.arrivalEpochMs,
-            delayMinutes: status.delayMinutes,
-            nextStop: null,
-            remainingStops: null,
-            isCanceled: status.isCanceled,
-            isEnded: action === "end",
-            now,
-          });
-          const payload = buildLiveActivityPayload({
-            event: action,
-            contentState: encodeContentState(content),
-            timestampSeconds: Math.floor(now / 1000),
-            staleEpochMs: content.staleAfterEpochMs,
-            dismissEpochMs: action === "end" ? status.arrivalEpochMs : undefined,
-          });
-          const outcome = await this.push(config, token, payload);
-          if (outcome === "dead-token") return void (await this.stop());
-          if (outcome === "ok") {
-            if (action === "end") return void (await this.stop());
-            await this.state.storage.put<LastSent>("lastSent", {
-              delayMinutes: status.delayMinutes,
-              phase,
-              isEnded: false,
-              isCanceled: status.isCanceled,
-            });
-          }
-          // "retry": leave lastSent as-is; the next alarm tries again.
+      const plan = planTick({
+        reg,
+        token: token ?? null,
+        lastSent: lastSent ?? null,
+        updates,
+        now,
+      });
+
+      if (plan.push && token) {
+        const outcome = await this.push(config, token, plan.push.payload);
+        if (outcome === "dead-token") return void (await this.stop());
+        if (outcome === "ok") {
+          if (plan.stop) return void (await this.stop());
+          if (plan.lastSent) await this.state.storage.put("lastSent", plan.lastSent);
         }
+        // "retry" → fall through to reschedule; lastSent unchanged.
+      } else if (plan.stop) {
+        return void (await this.stop());
       }
-    }
 
-    await this.state.storage.setAlarm(nextWake(reg, Date.now()));
+      await this.state.storage.setAlarm(plan.nextAlarm);
+    } catch {
+      // Never let a transient feed/APNs error permanently stall the loop. (DO
+      // alarms auto-retry on throw, but reschedule a poll so the cadence holds.)
+      await this.state.storage.setAlarm(Date.now() + POLL_MS);
+    }
   }
 
   /** Normalized trip-updates from the existing backend; null on failure (leave
@@ -225,15 +313,4 @@ export class TripActivityDO {
     await this.state.storage.deleteAlarm();
     await this.state.storage.deleteAll();
   }
-}
-
-/** Next wake: the nearer of the upcoming boundary (departure, then arrival) and
- *  a poll tick — so transitions fire EXACTLY on the boundary while a delay is
- *  still re-checked every POLL_MS. Past arrival it keeps polling (not a hot
- *  loop) until the feed confirms the run ended, at which point `alarm()` stops. */
-function nextWake(reg: LiveActivityRegistration, now: number): number {
-  const poll = now + POLL_MS;
-  if (now < reg.departureEpochMs) return Math.min(reg.departureEpochMs, poll);
-  if (now < reg.arrivalEpochMs) return Math.min(reg.arrivalEpochMs, poll);
-  return poll;
 }

@@ -10,11 +10,17 @@ compatibility_date = "2025-01-01"
 # Workers runtime when reading the 511 feed natively.
 compatibility_flags = ["nodejs_compat"]
 
-# Custom domain — a PARALLEL endpoint for the Worker. The apex (smarttraintrip.com)
-# stays on Vercel (production); this serves the Worker on a real domain + TLS for
-# testing/early use. Provisioned on deploy (DNS record + cert) now that the zone
-# is active on Cloudflare.
-routes = [{ pattern = "app.smarttraintrip.com", custom_domain = true }]
+# Worker routes/domains.
+#  - app.smarttraintrip.com: a custom domain (its own DNS record + cert), kept as
+#    a parallel/test endpoint.
+#  - smarttraintrip.com/*: the APEX cutover. A zone route, so it activates only
+#    when the apex DNS record is Proxied (orange) and is inert while DNS-only
+#    (grey) — this can ship ahead of the flip, and toggling grey↔orange is an
+#    instant cutover / rollback.
+routes = [
+  { pattern = "app.smarttraintrip.com", custom_domain = true },
+  { pattern = "smarttraintrip.com/*", zone_name = "smarttraintrip.com" },
+]
 # Adding `routes` otherwise disables these by default. Keep workers.dev alive —
 # the iOS test build points VITE_API_BASE_URL at smart-trip-web.smart-trip.workers.dev
 # — and keep per-PR preview URLs (Workers Builds) on.
@@ -32,10 +38,12 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 [vars]
-# Where un-migrated /api/* is proxied: the live Vercel backend. The DO also reads
-# the trip-updates feed from here (GET /api/gtfsrt/tripupdates). Drop routes from
-# the proxy as they move to native Workers; remove once fully migrated.
-API_ORIGIN = "https://smarttraintrip.com"
+# Fallback proxy target for any /api/* the Worker doesn't handle natively — during
+# the transition that's the Vercel cron's /api/liveactivity/push, plus a safety
+# net. Points at the Vercel DEPLOYMENT URL, not smarttraintrip.com, so once the
+# apex is served by this Worker the proxy can't loop back into itself. Remove the
+# proxy (and this var) when Vercel is retired.
+API_ORIGIN = "https://smart-trip.vercel.app"
 # APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID + PRIVATE
 # KEY are SECRETS, set out-of-band (never committed):
 #   npx wrangler secret put APNS_KEY_ID

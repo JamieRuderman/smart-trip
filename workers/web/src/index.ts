@@ -20,7 +20,6 @@ import {
   getServiceAlerts,
   getTripUpdates,
   getVehiclePositions,
-  type FeedCacheKV,
 } from "./lib/gtfsrt.js";
 
 export { TripActivityDO } from "./do/tripActivity.js";
@@ -71,9 +70,8 @@ export interface Env {
   APNS_APP_ID?: string;
   APNS_PRIVATE_KEY?: string;
   APNS_HOST?: string;
-  // GTFS-RT native feed (511 + KV cache) — see workers/web/src/lib/gtfsrt.ts.
+  // GTFS-RT native feed (511 + edge Cache API) — see workers/web/src/lib/gtfsrt.ts.
   TRANSIT_511_API_KEY?: string;
-  FEED_CACHE: FeedCacheKV;
 }
 
 /** The DO instance for one activity id. */
@@ -116,15 +114,15 @@ export default {
       });
     }
 
-    // --- Native GTFS-RT feeds (511 + protobuf + KV; no Vercel, no Upstash) ---
+    // --- Native GTFS-RT feeds (511 + protobuf + edge Cache API; no Vercel, no Upstash) ---
     if (path === "/api/gtfsrt/tripupdates") {
-      return serveGtfsRt(request, () => getTripUpdates(env), "s-maxage=30, stale-while-revalidate=15");
+      return serveGtfsRt(request, () => getTripUpdates(env, url.origin), "s-maxage=30, stale-while-revalidate=15");
     }
     if (path === "/api/gtfsrt/vehiclepositions") {
-      return serveGtfsRt(request, () => getVehiclePositions(env), "s-maxage=15");
+      return serveGtfsRt(request, () => getVehiclePositions(env, url.origin), "s-maxage=15");
     }
     if (path === "/api/gtfsrt/alerts") {
-      return serveGtfsRt(request, () => getServiceAlerts(env), "s-maxage=60, stale-while-revalidate=30");
+      return serveGtfsRt(request, () => getServiceAlerts(env, url.origin), "s-maxage=60, stale-while-revalidate=30");
     }
 
     // --- Everything else under /api/* still proxies to Vercel ---

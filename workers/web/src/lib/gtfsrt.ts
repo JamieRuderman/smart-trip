@@ -58,6 +58,14 @@ const CACHE_BACKSTOP_SECONDS = 300;
 /** Header recording when an entry was fetched, so each feed's own freshness
  *  window applies on top of the backstop TTL. */
 const FETCHED_AT_HEADER = "x-feed-fetched-at";
+/** Header recording the earliest time to re-attempt 511 after a failed refresh.
+ *  Kept separate from the fetch timestamp so serving stale doesn't rewrite the
+ *  feed's real age. */
+const RETRY_AFTER_HEADER = "x-feed-retry-after";
+/** After a failed 511 refresh, keep serving the last-known-good feed (without
+ *  re-hitting 511) for this long, so a 511 outage doesn't make every poll
+ *  re-fetch and wait the upstream timeout. */
+const STALE_RETRY_BACKOFF_MS = 30_000;
 /** Cache-key host for callers without an inbound request (the DO). Must be
  *  within the Worker's zone for `Cache.put` to persist. */
 const DEFAULT_CACHE_ORIGIN = "https://smarttraintrip.com";
@@ -77,10 +85,32 @@ function feedCacheKey(feed: GtfsFeed, origin: string): Request {
   return new Request(`${origin}/__feed-cache/${feed}`);
 }
 
+/** Build a cacheable feed Response carrying its fetch time, plus an optional
+ *  re-attempt-after marker set when a 511 refresh just failed. */
+function feedResponse(bytes: Uint8Array, fetchedAt: number, retryAfter = 0): Response {
+  const headers: Record<string, string> = {
+    [FETCHED_AT_HEADER]: String(fetchedAt),
+    "cache-control": `max-age=${CACHE_BACKSTOP_SECONDS}`,
+  };
+  if (retryAfter > 0) headers[RETRY_AFTER_HEADER] = String(retryAfter);
+  return new Response(bytes, { headers });
+}
+
+/** Best-effort cache write — must NEVER break the response. A fatal cache write
+ *  is what turned the KV write-limit into a full outage. */
+async function cachePut(cache: EdgeCache, key: Request, response: Response): Promise<void> {
+  try {
+    await cache.put(key, response);
+  } catch {
+    /* ignore — degrade to direct 511 fetches */
+  }
+}
+
 /** Raw GTFS-RT protobuf bytes for a feed, cached in the edge Cache API to ~one
  *  511 fetch per freshness window. Best-effort + resilient: a cache-write
  *  failure degrades to a direct 511 fetch, and a 511 hiccup serves the
- *  last-known-good feed instead of throwing. */
+ *  last-known-good feed instead of throwing — then backs off so a sustained
+ *  outage doesn't re-hit 511 on every poll. */
 export async function getFeedBytes(
   env: GtfsRtEnv,
   feed: GtfsFeed,
@@ -94,9 +124,11 @@ export async function getFeedBytes(
   const cached = await cache.match(key).catch(() => undefined);
   const cachedBytes = cached ? new Uint8Array(await cached.arrayBuffer()) : null;
   const fetchedAt = cached ? Number(cached.headers.get(FETCHED_AT_HEADER)) || 0 : 0;
+  const retryAfter = cached ? Number(cached.headers.get(RETRY_AFTER_HEADER)) || 0 : 0;
 
-  // Fresh hit → serve without touching 511.
-  if (cachedBytes && Date.now() - fetchedAt < freshnessMs) {
+  // Serve cached without touching 511 when it's still fresh, OR when we're
+  // inside a post-failure backoff (don't re-hammer 511 during an outage).
+  if (cachedBytes && (Date.now() - fetchedAt < freshnessMs || Date.now() < retryAfter)) {
     return cachedBytes;
   }
 
@@ -109,26 +141,18 @@ export async function getFeedBytes(
   try {
     bytes = await fetch511(env.TRANSIT_511_API_KEY, feed);
   } catch (err) {
-    // 511 hiccup → serve the last-known-good feed rather than failing.
-    if (cachedBytes) return cachedBytes;
+    // 511 hiccup → serve last-known-good, and back off so the next
+    // ~STALE_RETRY_BACKOFF_MS of polls serve stale instead of each re-attempting
+    // 511 and waiting the upstream timeout. fetchedAt is preserved so the feed's
+    // real age stays truthful.
+    if (cachedBytes) {
+      await cachePut(cache, key, feedResponse(cachedBytes, fetchedAt, Date.now() + STALE_RETRY_BACKOFF_MS));
+      return cachedBytes;
+    }
     throw err;
   }
 
-  // Cache write is best-effort: a cache failure must NEVER break the response —
-  // that fatal coupling is what turned the KV write-limit into an outage.
-  try {
-    await cache.put(
-      key,
-      new Response(bytes, {
-        headers: {
-          [FETCHED_AT_HEADER]: String(Date.now()),
-          "cache-control": `max-age=${CACHE_BACKSTOP_SECONDS}`,
-        },
-      }),
-    );
-  } catch {
-    /* ignore — degrade to direct 511 fetches */
-  }
+  await cachePut(cache, key, feedResponse(bytes, Date.now()));
   return bytes;
 }
 

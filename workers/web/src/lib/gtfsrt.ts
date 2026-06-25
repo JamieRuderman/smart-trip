@@ -1,19 +1,17 @@
 /**
  * Native GTFS-RT feed access for the Worker — fetch 511, decode the protobuf,
- * normalize, cached in **Cloudflare KV**. This is the Workers-native replacement
- * for the Vercel `_feedCache.ts` (Upstash) path, so the migrated backend has NO
- * Upstash dependency: Live Activity state lives in the Durable Object, and the
- * feed cache lives in KV.
+ * normalize, cached in **Cloudflare's edge Cache API** (`caches.default`). The
+ * decode (`decodeFeed`) and normalize (`normalizeTripUpdates`) are reused
+ * verbatim from the Vercel code (`api/`); only the fetch + cache are
+ * re-implemented for the Workers runtime.
  *
- * The decode (`decodeFeed`) and normalize (`normalizeTripUpdates`) are reused
- * verbatim from the Vercel code (`api/`) — only the fetch + cache are
- * re-implemented for the Workers runtime (KV instead of Upstash; env binding
- * instead of `process.env`).
- *
- * KV is global, so a cached entry fans out to every colo within seconds —
- * bounding the 511 poll to ~one fetch per feed per freshness window. No refresh
- * lock (unlike the Vercel path): the worst case is a couple of concurrent
- * refreshes at a window boundary, well within 511's budget for this app.
+ * Cache choice: the Cache API is free with **no per-day write limit**. It
+ * replaced Workers KV, whose free-tier 1,000-writes/day cap was far too low for
+ * a write-on-every-refresh cache and took the live feeds down. Unlike KV it
+ * caches per-colo rather than globally, but traffic here sits on ~one Bay Area
+ * colo, so 511 stays at ~one fetch per feed per freshness window — within
+ * budget. The cache is best-effort: a write failure degrades to a direct 511
+ * fetch, and a 511 hiccup serves the last-known-good feed (never a hard error).
  */
 import {
   decodeFeed,
@@ -33,33 +31,36 @@ type IFeedEntity = GtfsRealtime.IFeedEntity;
 
 export type GtfsFeed = "tripupdates" | "vehiclepositions" | "servicealerts";
 
-interface FeedMeta {
-  fetchedAt?: number;
+/** Minimal Cache API surface — `caches.default` is Cloudflare's global edge
+ *  cache: free, with NO per-day write limit (unlike Workers KV's 1k/day free
+ *  cap). Typed locally + resolved via globalThis to avoid a
+ *  `@cloudflare/workers-types` dependency. */
+interface EdgeCache {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
 }
-
-/** Minimal KV surface we use (avoids a `@cloudflare/workers-types` dependency). */
-export interface FeedCacheKV {
-  getWithMetadata(
-    key: string,
-    options: { type: "arrayBuffer" },
-  ): Promise<{ value: ArrayBuffer | null; metadata: FeedMeta | null }>;
-  put(
-    key: string,
-    value: ArrayBuffer | ArrayBufferView,
-    options?: { metadata?: FeedMeta; expirationTtl?: number },
-  ): Promise<void>;
+function edgeCache(): EdgeCache {
+  return (globalThis as unknown as { caches: { default: EdgeCache } }).caches
+    .default;
 }
 
 export interface GtfsRtEnv {
   TRANSIT_511_API_KEY?: string;
-  FEED_CACHE: FeedCacheKV;
 }
 
 const BASE = "http://api.511.org/transit";
 /** Abort a stalled 511 fetch (it can hang ~60s before a 504). */
 const UPSTREAM_TIMEOUT_MS = 10_000;
-/** Hard KV expiry backstop (seconds); the freshness check drives normal refresh. */
-const KV_TTL_SECONDS = 300;
+/** How long a cached feed stays *available* for the stale-on-error fallback,
+ *  independent of each feed's much shorter freshness window — a hard backstop so
+ *  the cache can't serve indefinitely-stale data if 511 stays down. */
+const CACHE_BACKSTOP_SECONDS = 300;
+/** Header recording when an entry was fetched, so each feed's own freshness
+ *  window applies on top of the backstop TTL. */
+const FETCHED_AT_HEADER = "x-feed-fetched-at";
+/** Cache-key host for callers without an inbound request (the DO). Must be
+ *  within the Worker's zone for `Cache.put` to persist. */
+const DEFAULT_CACHE_ORIGIN = "https://smarttraintrip.com";
 
 async function fetch511(apiKey: string, feed: GtfsFeed): Promise<Uint8Array> {
   const res = await fetch(`${BASE}/${feed}?api_key=${apiKey}&agency=SA`, {
@@ -69,35 +70,74 @@ async function fetch511(apiKey: string, feed: GtfsFeed): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Raw GTFS-RT protobuf bytes for a feed, KV-cached to ~one 511 fetch / window. */
+/** Cache key for a feed. The host must be within the Worker's zone for
+ *  `Cache.put` to persist, so we key off the inbound request's origin when we
+ *  have one and fall back to the production apex otherwise. */
+function feedCacheKey(feed: GtfsFeed, origin: string): Request {
+  return new Request(`${origin}/__feed-cache/${feed}`);
+}
+
+/** Raw GTFS-RT protobuf bytes for a feed, cached in the edge Cache API to ~one
+ *  511 fetch per freshness window. Best-effort + resilient: a cache-write
+ *  failure degrades to a direct 511 fetch, and a 511 hiccup serves the
+ *  last-known-good feed instead of throwing. */
 export async function getFeedBytes(
   env: GtfsRtEnv,
   feed: GtfsFeed,
   freshnessMs: number,
+  cacheOrigin: string = DEFAULT_CACHE_ORIGIN,
 ): Promise<Uint8Array> {
-  const key = `feed:${feed}`;
-  const cached = await env.FEED_CACHE.getWithMetadata(key, { type: "arrayBuffer" });
-  if (
-    cached.value &&
-    cached.metadata?.fetchedAt &&
-    Date.now() - cached.metadata.fetchedAt < freshnessMs
-  ) {
-    return new Uint8Array(cached.value);
+  const cache = edgeCache();
+  const key = feedCacheKey(feed, cacheOrigin);
+
+  // Whatever we have cached (fresh, or merely stale-within-backstop).
+  const cached = await cache.match(key).catch(() => undefined);
+  const cachedBytes = cached ? new Uint8Array(await cached.arrayBuffer()) : null;
+  const fetchedAt = cached ? Number(cached.headers.get(FETCHED_AT_HEADER)) || 0 : 0;
+
+  // Fresh hit → serve without touching 511.
+  if (cachedBytes && Date.now() - fetchedAt < freshnessMs) {
+    return cachedBytes;
   }
-  if (!env.TRANSIT_511_API_KEY) throw new Error("Missing TRANSIT_511_API_KEY");
-  const bytes = await fetch511(env.TRANSIT_511_API_KEY, feed);
-  await env.FEED_CACHE.put(key, bytes, {
-    metadata: { fetchedAt: Date.now() },
-    expirationTtl: KV_TTL_SECONDS,
-  });
+
+  // Stale or missing → refresh from 511.
+  if (!env.TRANSIT_511_API_KEY) {
+    if (cachedBytes) return cachedBytes;
+    throw new Error("Missing TRANSIT_511_API_KEY");
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = await fetch511(env.TRANSIT_511_API_KEY, feed);
+  } catch (err) {
+    // 511 hiccup → serve the last-known-good feed rather than failing.
+    if (cachedBytes) return cachedBytes;
+    throw err;
+  }
+
+  // Cache write is best-effort: a cache failure must NEVER break the response —
+  // that fatal coupling is what turned the KV write-limit into an outage.
+  try {
+    await cache.put(
+      key,
+      new Response(bytes, {
+        headers: {
+          [FETCHED_AT_HEADER]: String(Date.now()),
+          "cache-control": `max-age=${CACHE_BACKSTOP_SECONDS}`,
+        },
+      }),
+    );
+  } catch {
+    /* ignore — degrade to direct 511 fetches */
+  }
   return bytes;
 }
 
 /** Normalized trip-updates — the exact shape the client and the DO consume. */
 export async function getTripUpdates(
   env: GtfsRtEnv,
+  cacheOrigin?: string,
 ): Promise<{ timestamp: number; updates: NormalizedTripUpdate[] }> {
-  const bytes = await getFeedBytes(env, "tripupdates", TRIPUPDATES_FRESHNESS_MS);
+  const bytes = await getFeedBytes(env, "tripupdates", TRIPUPDATES_FRESHNESS_MS, cacheOrigin);
   return normalizeTripUpdates(decodeFeed(bytes));
 }
 
@@ -150,8 +190,8 @@ function normalizeVehiclePositions(feed: IFeedMessage): {
   return { timestamp: feedTimestamp, vehicles };
 }
 
-export async function getVehiclePositions(env: GtfsRtEnv) {
-  const bytes = await getFeedBytes(env, "vehiclepositions", VEHICLEPOSITIONS_FRESHNESS_MS);
+export async function getVehiclePositions(env: GtfsRtEnv, cacheOrigin?: string) {
+  const bytes = await getFeedBytes(env, "vehiclepositions", VEHICLEPOSITIONS_FRESHNESS_MS, cacheOrigin);
   return normalizeVehiclePositions(decodeFeed(bytes));
 }
 
@@ -195,7 +235,7 @@ function normalizeServiceAlerts(feed: IFeedMessage): {
   return { timestamp, alerts };
 }
 
-export async function getServiceAlerts(env: GtfsRtEnv) {
-  const bytes = await getFeedBytes(env, "servicealerts", SERVICEALERTS_FRESHNESS_MS);
+export async function getServiceAlerts(env: GtfsRtEnv, cacheOrigin?: string) {
+  const bytes = await getFeedBytes(env, "servicealerts", SERVICEALERTS_FRESHNESS_MS, cacheOrigin);
   return normalizeServiceAlerts(decodeFeed(bytes));
 }

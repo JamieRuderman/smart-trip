@@ -62,9 +62,8 @@ class_name = "TripActivityDO"
 tag = "v1"
 new_sqlite_classes = ["TripActivityDO"]
 
-# GTFS-RT feed cache — the Cloudflare-native replacement for the Vercel Upstash
-# cache, so the migrated backend has no Upstash dependency. Bounds the global
-# 511 poll to ~one fetch per feed per freshness window.
-[[kv_namespaces]]
-binding = "FEED_CACHE"
-id = "4ab7e9064165464fbbdb062657e826da"
+# GTFS-RT feeds are cached in the edge Cache API (caches.default) — free, with
+# no per-day write limit — so the Worker needs no KV binding for the cache. (KV's
+# free-tier 1,000-writes/day cap was too low for a per-refresh cache and took the
+# feeds down.) See workers/web/src/lib/gtfsrt.ts. The old FEED_CACHE KV namespace
+# (4ab7e9064165464fbbdb062657e826da) is now unused and can be deleted from the dash.

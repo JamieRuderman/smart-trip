@@ -101,7 +101,7 @@ export function transformRawToGenerated(): void {
 
   // Anchor every "today" decision to the feed's fetch time so the build is
   // reproducible: the same committed raw feeds always produce the same
-  // generated TypeScript, regardless of when Vercel runs the build. Without
+  // generated TypeScript, regardless of when CI runs the build. Without
   // this, calendar edge cases (holiday Mondays, Friday-before-new-bundle,
   // etc.) keep surfacing as one-off production failures.
   const feedReferenceDate = new Date(smartFeed.fetchedAt);

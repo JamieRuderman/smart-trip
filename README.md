@@ -25,7 +25,7 @@ This project is not affiliated with Sonoma-Marin Area Rail Transit.
 - TanStack Query
 - React Router
 - Capacitor for iOS and Android
-- Vercel serverless functions for GTFS-Realtime proxying
+- Cloudflare Workers — GTFS-Realtime API, SPA hosting, and the Live Activity push backend (Durable Objects)
 
 ## Quick Start
 
@@ -77,13 +77,12 @@ Default local URL:
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `TRANSIT_511_API_KEY` | `.env.local` or Vercel env | 511.org API key for static and realtime feeds |
+| `TRANSIT_511_API_KEY` | `.env.local` (dev) / Cloudflare Worker secret (prod) | 511.org API key for static and realtime feeds |
 | `USE_SAMPLE_DATA` | `.env.local` | Serve fixtures from `sample/` instead of the live API |
 | `DEV_API_PROXY_TARGET` | `.env.local` | Dev-only `/api` proxy target for `npm run dev`; defaults to `http://localhost:3000` |
-| `VITE_API_BASE_URL` | `.env.native` or `.env.native.local` | Absolute API base URL for native builds |
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Vercel env (auto-injected) | Upstash Redis credentials for the shared GTFS-RT cache. Created by the Vercel ↔ Upstash integration; if absent, the cache falls back to direct 511 fetches |
+| `VITE_API_BASE_URL` | `.env.native` or `.env.native.local` | Absolute API base URL for native builds (production: `https://smarttraintrip.com`) |
 
-For production on Vercel, keep `TRANSIT_511_API_KEY` server-side only.
+In production the GTFS-RT cache uses a Cloudflare KV binding (`FEED_CACHE`) — no env vars — and `TRANSIT_511_API_KEY` is a Cloudflare Worker secret, server-side only. (The legacy Vercel `KV_REST_API_*` Upstash credentials are being retired — see #91.)
 
 ## Scripts
 
@@ -107,13 +106,14 @@ For production on Vercel, keep `TRANSIT_511_API_KEY` server-side only.
 
 Static schedule data is generated into `src/data/generated/` and published to `public/data/schedules.json` during `prebuild`.
 
-Realtime data flows through Vercel serverless routes, fronted by a shared
-Redis cache so 511 is polled once per window globally (see below):
+Realtime data flows through the Cloudflare Worker, fronted by a shared
+Cloudflare KV cache so 511 is polled once per freshness window globally
+(see below):
 
 ```text
 511.org GTFS-Realtime
-  -> Upstash Redis cache (poll-on-read + lock, api/_feedCache.ts)
-  -> /api/gtfsrt/{alerts,tripupdates,vehiclepositions}
+  -> Cloudflare KV cache (poll-on-read, workers/web/src/lib/gtfsrt.ts)
+  -> /api/gtfsrt/{alerts,tripupdates,vehiclepositions} (Cloudflare Worker)
   -> React Query hooks
   -> trip cards, trip detail sheets, map, and service alerts UI
 ```
@@ -124,20 +124,13 @@ Trip updates are currently matched against static schedule entries by scheduled 
 
 511's Open Data API allows ~370 requests/hour for our token, and explicitly
 expects a single central backend to fetch once and fan out to all clients —
-the upstream rate must not scale with users. `api/_feedCache.ts` implements
-that: each feed is fetched from 511 at most once per freshness window
-(vehicles 15s, trip updates 40s, alerts 5min ≈ 342 calls/hr total), cached in
-Upstash Redis, and served to every region/user from that one snapshot. A short
-lock prevents concurrent refreshes, and the last-known-good snapshot is served
-if 511 is down.
-
-> **Realtime cache region (TODO: consider moving west).** The Redis primary
-> region and the Vercel serverless functions both run in `iad1` (Washington,
-> D.C.) — co-located so cache reads/writes stay in-region. Riders and the 511
-> upstream are in the SF Bay Area, so relocating **both** the functions
-> (`regions: ["sfo1"]`) **and** the Redis primary region to SF would cut
-> latency. Move them together — splitting across coasts adds a cross-country
-> hop to every cache op. Deferred for now; revisit if realtime latency matters.
+the upstream rate must not scale with users. `workers/web/src/lib/gtfsrt.ts`
+implements that: each feed is fetched from 511 at most once per freshness
+window (vehicles 15s, trip updates 40s, alerts 5min ≈ 342 calls/hr total),
+cached in Cloudflare KV, and served to every edge location/user from that one
+snapshot. KV is global, so a fresh entry fans out to every colo within
+seconds; the worst case at a window boundary is a couple of concurrent
+refreshes, well within 511's budget.
 
 ## Mobile Development
 
@@ -165,7 +158,7 @@ npm run sync-live
 
 ## Releases
 
-Releases are tagged `vX.Y.Z` and shipped to the App Store and Google Play. The web app deploys continuously from `main` via Vercel and is not gated by this process.
+Releases are tagged `vX.Y.Z` and shipped to the App Store and Google Play. The web app deploys continuously from `main` via Cloudflare Workers Builds and is not gated by this process.
 
 ### When to bump which number
 
@@ -254,12 +247,13 @@ Group `feat(*)` first, then user-visible `fix(*)`. Trim anything users won't not
 - The app can request location permission for closest-station selection and GPS-assisted trip detail messaging.
 - Location stays on-device and is not sent as part of schedule or realtime API requests.
 - The app stores a small amount of local state such as theme, language, fare preference, and dismissed/read alert state.
-- The web app includes Vercel Analytics; native builds do not mount that analytics client.
+- The web app uses Cloudflare Web Analytics (cookieless); native builds do not include that analytics client.
 
 ## Project Structure
 
 ```text
-api/                  Vercel serverless realtime proxy routes
+workers/web/          Cloudflare Worker — GTFS-RT API, SPA host, Live Activity push (Durable Object)
+api/                  Legacy Vercel serverless routes (being retired — see #91)
 public/               Static assets and hosted support/privacy pages
 sample/               Local GTFS-Realtime fixtures
 scripts/              Feed update and build helper scripts

@@ -3,10 +3,9 @@
 // and the SEO page templates (src/seo/*LandingPage.tsx).
 //
 // Anything that depends on the production domain lives here so it's a single
-// place to update once smarttraintrip.com is registered and pointed at Vercel.
+// place to update.
 
-// Production site URL. Configured in Vercel with apex + www and a 308
-// redirect from smart-trip-community.vercel.app to preserve crawl equity.
+// Production site URL — the apex smarttraintrip.com, served by Cloudflare.
 export const SITE_URL = "https://smarttraintrip.com" as const;
 
 export const SITE_NAME = "SMART trip" as const;

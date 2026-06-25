@@ -1,14 +1,15 @@
 /**
- * Shared (client + server) types for the Phase 2 Live Activity push backend.
- * Pure — no Capacitor/DOM import — so the Vercel serverless functions in
- * `api/liveactivity/*` can import it via a relative path while the client
- * imports it through the `@/` alias.
+ * Shared (client + server) types for the Live Activity push backend.
+ * Pure — no Capacitor/DOM import — so the server-side push backend (the
+ * Cloudflare Worker / Durable Object under `workers/web/`) can import it via a
+ * relative path while the client imports it through the `@/` alias.
  */
 
 /** Hard caps on string fields. The register/token endpoints are necessarily
  *  public (the app has no user accounts), so every inbound string is bounded
- *  to keep junk payloads from bloating Redis. Generous vs. real values:
- *  activity ids are ~30 chars, station names ~25, APNs tokens ~160 hex. */
+ *  to keep junk payloads from bloating the activity store. Generous vs. real
+ *  values: activity ids are ~30 chars, station names ~25, APNs tokens ~160
+ *  hex. */
 export const MAX_ID_LENGTH = 128;
 export const MAX_STATION_LENGTH = 64;
 export const MAX_TIME_LENGTH = 8;

@@ -10,8 +10,9 @@ export const isDev = import.meta.env.DEV;
 
 /**
  * Base URL for API calls. Defaults to "" (relative) for web deployments.
- * Set VITE_API_BASE_URL to the production Vercel URL for native Capacitor builds
- * so that /api/gtfsrt/* calls resolve correctly from file:// origins.
+ * Set VITE_API_BASE_URL to the production API base (https://smarttraintrip.com)
+ * for native Capacitor builds so /api/gtfsrt/* calls resolve correctly from
+ * file:// origins.
  */
 export const apiBaseUrl =
   readOptionalEnvString(import.meta.env.VITE_API_BASE_URL) ?? "";

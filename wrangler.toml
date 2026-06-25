@@ -10,20 +10,15 @@ compatibility_date = "2025-01-01"
 # Workers runtime when reading the 511 feed natively.
 compatibility_flags = ["nodejs_compat"]
 
-# Worker routes/domains.
-#  - app.smarttraintrip.com: a custom domain (its own DNS record + cert), kept as
-#    a parallel/test endpoint.
-#  - smarttraintrip.com/*: the APEX cutover. A zone route, so it activates only
-#    when the apex DNS record is Proxied (orange) and is inert while DNS-only
-#    (grey) — this can ship ahead of the flip, and toggling grey↔orange is an
-#    instant cutover / rollback.
+# Production Worker routes/domains.
+#  - smarttraintrip.com/*: the apex production site. A zone route, so it activates
+#    only when the apex DNS record is Proxied (orange) and is inert while
+#    DNS-only (grey).
 routes = [
-  { pattern = "app.smarttraintrip.com", custom_domain = true },
   { pattern = "smarttraintrip.com/*", zone_name = "smarttraintrip.com" },
 ]
-# Adding `routes` otherwise disables these by default. Keep workers.dev alive —
-# the iOS test build points VITE_API_BASE_URL at smart-trip-web.smart-trip.workers.dev
-# — and keep per-PR preview URLs (Workers Builds) on.
+# Adding `routes` otherwise disables these by default. Keep workers.dev alive for
+# direct Worker smoke tests.
 workers_dev = true
 preview_urls = true
 
@@ -67,3 +62,26 @@ new_sqlite_classes = ["TripActivityDO"]
 # free-tier 1,000-writes/day cap was too low for a per-refresh cache and took the
 # feeds down.) See workers/web/src/lib/gtfsrt.ts. The old FEED_CACHE KV namespace
 # (4ab7e9064165464fbbdb062657e826da) is now unused and can be deleted from the dash.
+
+# Preview builds use a separate Worker with no Durable Object binding/export.
+# Cloudflare does not generate Preview URLs for Workers that implement Durable
+# Objects, so this environment serves the built SPA and proxies /api/* to the
+# production backend instead of running Live Activity routes locally.
+#
+# In Cloudflare Workers Builds, set the non-production branch deploy command to:
+#   npx wrangler versions upload --env preview
+[env.preview]
+name = "smart-trip-web-preview"
+main = "workers/web/src/preview.ts"
+routes = []
+workers_dev = true
+preview_urls = true
+
+[env.preview.assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[env.preview.vars]
+API_ORIGIN = "https://smarttraintrip.com"

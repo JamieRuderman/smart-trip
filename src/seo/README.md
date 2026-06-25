@@ -65,8 +65,8 @@ add `PLAY_STORE_URL` + a third `data-cta="android"` block in `src/seo/cta.ts`
 ## Auto-update cadence
 
 `update-transit.yml` runs daily, regenerates GTFS-derived data, commits,
-pushes. Vercel auto-deploys → `npm run build` runs → all 50 pages regenerate
-from fresh data. No additional cron needed.
+pushes. Cloudflare Workers Builds auto-deploys → `npm run build` runs → all 50
+pages regenerate from fresh data. No additional cron needed.
 
 ## Verification
 

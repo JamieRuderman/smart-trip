@@ -161,7 +161,7 @@ const SERVICE_LOOKAHEAD_DAYS = 14;
 
 function formatGtfsDate(date: Date): string {
   // Use UTC components so the build is timezone-independent. Local-time
-  // getters would shift the reference date when Vercel (UTC) builds vs a
+  // getters would shift the reference date when the CI build (UTC) runs vs a
   // local-tz dev box, reintroducing the non-determinism we're trying to kill.
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -176,7 +176,7 @@ function formatGtfsDate(date: Date): string {
  * This is the build-time transform — the output is the *static* schedule
  * shipped with the app, and must be reproducible across builds. Call sites
  * pass `new Date(feed.fetchedAt)` so the same committed feed produces the
- * same output whether Vercel runs the build today, on Memorial Day, or six
+ * same output whether CI runs the build today, on Memorial Day, or six
  * months from now. Wall-clock dependence here has caused a string of
  * production failures (issues #43, holiday Mondays, etc.).
  *

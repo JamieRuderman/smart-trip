@@ -1,10 +1,10 @@
 /**
  * Platform-free Live Activity content model + builders, shared by the iOS
- * native bridge (`native/liveActivity.ts`) and the Phase 2 push backend
- * (`api/liveactivity/*`), which builds the SAME content state server-side to
- * push via APNs while the phone is locked.
+ * native bridge (`native/liveActivity.ts`) and the push backend (the Cloudflare
+ * Worker / Durable Object under `workers/web/`), which builds the SAME content
+ * state server-side to push via APNs while the phone is locked.
  *
- * Kept free of any Capacitor/DOM import so Vercel serverless functions can
+ * Kept free of any Capacitor/DOM import so the server-side push backend can
  * import it. The native bridge re-exports everything here, so existing client
  * imports from `native/liveActivity` keep working unchanged.
  *

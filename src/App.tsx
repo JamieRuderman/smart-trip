@@ -4,8 +4,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Analytics } from "@vercel/analytics/react";
-import { Capacitor } from "@capacitor/core";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
@@ -33,8 +31,6 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  const isNative = Capacitor.isNativePlatform();
-
   useAppForegroundRefresh(async () => {
     emitAppRefreshEvent();
     // Re-read the focused trip so a reminder that fired while we were away
@@ -83,7 +79,6 @@ const App = () => {
                     </Routes>
                   </Suspense>
                 </StationSelectionProvider>
-                {!isNative && <Analytics />}
               </ErrorBoundary>
             </BrowserRouter>
           </TooltipProvider>

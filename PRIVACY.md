@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-01-24
+**Effective date:** 2026-06-24
 
 ## Summary
 
@@ -8,7 +8,7 @@
 - We do not sell personal information.
 - The app can request location permission for closest-station and trip-detail features.
 - Location is processed on-device and is not sent with transit data requests.
-- The web app uses Vercel Analytics for aggregated usage measurement.
+- The web app uses Cloudflare Web Analytics (privacy-first, cookieless) for aggregated usage measurement.
 - The app stores limited local preferences on your device.
 
 ## Information We Collect
@@ -39,10 +39,11 @@ This information is stored locally to preserve your app settings and UI state.
 
 ### Analytics
 
-The web app includes Vercel Analytics, which may collect aggregated usage and
-performance information. We use this to understand general usage trends and
-improve the app. Native iOS and Android builds do not mount this web analytics
-client.
+The web app uses Cloudflare Web Analytics, a privacy-first, cookieless service
+that collects aggregated page-view and performance metrics without cookies,
+fingerprinting, or tracking individuals across sites. We use this to understand
+general usage trends and improve the app. The native iOS and Android apps load
+their assets locally and do not include this web analytics.
 
 ## How We Use Information
 

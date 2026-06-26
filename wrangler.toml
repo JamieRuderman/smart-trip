@@ -11,14 +11,12 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Production Worker routes/domains.
-#  - app.smarttraintrip.com: a custom domain (its own DNS record + cert), kept as
-#    a parallel/test endpoint. Retire deliberately in #91, not as part of an
-#    unrelated change.
 #  - smarttraintrip.com/*: the apex production site. A zone route, so it activates
 #    only when the apex DNS record is Proxied (orange) and is inert while
 #    DNS-only (grey).
+# (The app.smarttraintrip.com test-scaffolding custom domain was retired — it was
+#  unused: only a local .env pointer referenced it, now repointed to the apex.)
 routes = [
-  { pattern = "app.smarttraintrip.com", custom_domain = true },
   { pattern = "smarttraintrip.com/*", zone_name = "smarttraintrip.com" },
 ]
 # Adding `routes` otherwise disables these by default. Keep workers.dev alive for

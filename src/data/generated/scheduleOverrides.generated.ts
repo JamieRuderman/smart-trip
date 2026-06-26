@@ -11,7 +11,6 @@ export type ScheduleType = "weekday" | "weekend";
  * classification.
  */
 export const scheduleOverrides: Record<string, ScheduleType> = {
-  "2026-05-25": "weekend",
   "2026-07-03": "weekend",
   "2026-09-07": "weekend",
   "2026-11-26": "weekend",

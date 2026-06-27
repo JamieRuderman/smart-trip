@@ -79,7 +79,7 @@
     "scheduleUpdatedDaysAgo_one": "Horario actualizado hace {{count}} día",
     "scheduleUpdatedDaysAgo_other": "Horario actualizado hace {{count}} días",
     "scheduleUpdatedUnknown": "Fecha del horario no disponible",
-    "scheduleStaleSuffix": "El servicio puede haber cambiado — desliza para actualizar.",
+    "scheduleStaleSuffix": "El servicio puede haber cambiado.",
     "scheduleBundledHint": "Mostrando la versión que vino con la app — conéctate a internet para obtener la más reciente."
   },
   "freshness": {
@@ -127,7 +127,9 @@
     "departed": "salió",
     "minTransfer": "min de transferencia",
     "inbound": "Entrada",
-    "outbound": "Salida"
+    "outbound": "Salida",
+    "larkspur": "Lark",
+    "sanFrancisco": "SF"
   },
   "tripCard": {
     "nextTrain": "Próximo tren",

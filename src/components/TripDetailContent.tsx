@@ -612,6 +612,7 @@ export function TripDetailContent({
               ferry={trip.outboundFerry}
               trainArrivalTime={arrivalTime}
               timeFormat={timeFormat}
+              fullLeg
             />
           </div>
         )}
@@ -623,6 +624,7 @@ export function TripDetailContent({
                 trainDepartureTime={departureTime}
                 timeFormat={timeFormat}
                 inbound
+                fullLeg
               />
             </div>
           )}

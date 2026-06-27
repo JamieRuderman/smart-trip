@@ -79,7 +79,7 @@
     "scheduleUpdatedDaysAgo_one": "Schedule updated {{count}} day ago",
     "scheduleUpdatedDaysAgo_other": "Schedule updated {{count}} days ago",
     "scheduleUpdatedUnknown": "Schedule timestamp unavailable",
-    "scheduleStaleSuffix": "Service may have changed — pull to refresh.",
+    "scheduleStaleSuffix": "Service may have changed.",
     "scheduleBundledHint": "Showing the version that shipped with the app — connect to a network for the latest."
   },
   "freshness": {

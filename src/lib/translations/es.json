@@ -127,7 +127,9 @@
     "departed": "salió",
     "minTransfer": "min de transferencia",
     "inbound": "Entrada",
-    "outbound": "Salida"
+    "outbound": "Salida",
+    "larkspur": "Lark",
+    "sanFrancisco": "SF"
   },
   "tripCard": {
     "nextTrain": "Próximo tren",

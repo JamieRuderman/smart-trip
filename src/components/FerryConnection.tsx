@@ -15,6 +15,10 @@ interface FerryConnectionProps {
   timeFormat?: "12h" | "24h";
   inbound?: boolean; // when true, show ferry arrival then train departure
   currentTime?: Date;
+  /** Show both ends of the ferry leg (Larkspur → SF). Used in the trip detail
+   *  card where there's room. The compact schedule listing leaves this off and
+   *  shows only the Larkspur-side connection time. */
+  fullLeg?: boolean;
 }
 
 export function FerryConnection({
@@ -25,6 +29,7 @@ export function FerryConnection({
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
   currentTime,
+  fullLeg = false,
 }: FerryConnectionProps) {
   const { t } = useTranslation();
 
@@ -54,24 +59,66 @@ export function FerryConnection({
   const isShortConnection =
     transferTime < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
 
-  const displayTime = inbound ? ferry.arrive : ferry.depart;
-  const ferryHasDeparted = currentTime != null && isTimeInPast(currentTime, displayTime);
-  const displayLabel = inbound
-    ? (ferryHasDeparted ? t("ferry.arrived") : t("ferry.arrives"))
-    : (ferryHasDeparted ? t("ferry.departed") : t("ferry.departs"));
+  // ferry.depart / ferry.arrive are always in travel order; only the terminal
+  // names flip by direction. Outbound runs Larkspur → SF, inbound SF → Larkspur.
+  const originName = inbound ? t("ferry.sanFrancisco") : t("ferry.larkspur");
+  const destName = inbound ? t("ferry.larkspur") : t("ferry.sanFrancisco");
+  // Full leg mutes the boarding (departure) end once the ferry has left.
+  const boardingHasPassed =
+    currentTime != null && isTimeInPast(currentTime, ferry.depart);
+
+  // Compact (listing) view: the single Larkspur-side connection time — catch it
+  // (outbound) or step off it (inbound) — with a tense-aware label.
+  const compactTime = inbound ? ferry.arrive : ferry.depart;
+  const compactTimePassed =
+    currentTime != null && isTimeInPast(currentTime, compactTime);
+  const compactLabel = inbound
+    ? compactTimePassed
+      ? t("ferry.arrived")
+      : t("ferry.arrives")
+    : compactTimePassed
+      ? t("ferry.departed")
+      : t("ferry.departs");
 
   return (
     <div
       className={cn(
-        "flex-grow flex items-center justify-end gap-3 text-muted-foreground",
-        isMobile && "flex-row-reverse items-start pt-2"
+        "flex-grow flex items-center justify-end text-muted-foreground",
+        isMobile ? "flex-row-reverse items-start gap-2 pt-2" : "gap-3"
       )}
     >
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-1 text-sm flex-end">
-          <span className="text-muted-foreground text-sm">{displayLabel}</span>
-          <TimeDisplay time={displayTime} format={timeFormat} />
-        </div>
+      <div className={cn("flex flex-col gap-1", isMobile ? "items-start" : "items-end")}>
+        {fullLeg ? (
+          <div
+            className={cn(
+              "flex items-baseline gap-2 whitespace-nowrap",
+              isMobile ? "text-sm" : "text-base"
+            )}
+          >
+            <span className="flex items-baseline gap-1">
+              <span className="text-[10px] uppercase text-muted-foreground">
+                {originName}
+              </span>
+              <TimeDisplay
+                time={ferry.depart}
+                format={timeFormat}
+                className={cn(boardingHasPassed && "text-muted-foreground/70")}
+              />
+            </span>
+            <span aria-hidden="true">→</span>
+            <span className="flex items-baseline gap-1">
+              <TimeDisplay time={ferry.arrive} format={timeFormat} />
+              <span className="text-[10px] uppercase text-muted-foreground">
+                {destName}
+              </span>
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-1 text-sm">
+            <span className="text-muted-foreground">{compactLabel}</span>
+            <TimeDisplay time={compactTime} format={timeFormat} />
+          </div>
+        )}
         <div
           className={cn(
             "flex items-center gap-2 text-xs leading-none",
@@ -89,13 +136,18 @@ export function FerryConnection({
       <div
         className={cn(
           "flex flex-col justify-center items-center gap-1",
-          isMobile ? "border-r pr-4 mr-1" : "border-l pl-4 ml-1"
+          isMobile ? "border-r pr-3 mr-1" : "border-l pl-4 ml-1"
         )}
       >
         <Ship className="h-5 w-5" />
-        <span className="text-[10px] uppercase">
-          {inbound ? t("ferry.inbound") : t("ferry.outbound")}
-        </span>
+        {/* In the full-leg mobile view the Lark → SF ordering already conveys
+            direction, so the word would only be redundant width; show it
+            everywhere else (compact listing, and any desktop view). */}
+        {(!fullLeg || !isMobile) && (
+          <span className="text-[10px] uppercase">
+            {inbound ? t("ferry.inbound") : t("ferry.outbound")}
+          </span>
+        )}
       </div>
     </div>
   );

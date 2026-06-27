@@ -28,7 +28,7 @@ export { TripActivityDO } from "./do/tripActivity.js";
  *  identical for every caller, and the iOS app reads it from capacitor://localhost. */
 const CORS: Record<string, string> = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,OPTIONS",
+  "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
   "access-control-allow-headers": "Content-Type, X-Requested-With",
   "access-control-max-age": "86400",
 };
@@ -47,6 +47,17 @@ async function serveGtfsRt(
     console.warn(`[gtfsrt] ${new URL(request.url).pathname} failed: ${String(err)}`);
     return Response.json({ error: "Upstream feed unavailable" }, { status: 502, headers: CORS });
   }
+}
+
+/** Copy a Response with the wildcard CORS headers added. The DO's
+ *  register/token/deregister responses are read by the iOS app from
+ *  capacitor://localhost, so they need CORS just like the GTFS-RT feeds —
+ *  without it the WebView's preflight blocks the (application/json) register
+ *  POST and the activity never reaches the Durable Object. */
+function withCors(res: Response): Response {
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 /** Minimal structural DO namespace type (avoids a @cloudflare/workers-types dep). */
@@ -85,33 +96,46 @@ export default {
     const path = url.pathname;
 
     // --- Native Live Activity routes → Durable Object ---
-    if (path === "/api/liveactivity/register" && request.method === "POST") {
-      const body = await request.json().catch(() => null);
-      if (!isLiveActivityRegistration(body)) {
-        return Response.json({ error: "Invalid registration" }, { status: 400 });
+    // These are read by the iOS app from capacitor://localhost, so every
+    // response needs CORS and the preflight must be answered here (NOT proxied to
+    // Vercel, which returns no CORS — that silently blocked the register POST).
+    if (path.startsWith("/api/liveactivity/")) {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: CORS });
       }
-      console.log(`[la] register ${body.id}`);
-      return activityStub(env, body.id).fetch("https://do/register", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-    }
-    if (path === "/api/liveactivity/register" && request.method === "DELETE") {
-      const id = url.searchParams.get("id");
-      if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
-      console.log(`[la] deregister ${id}`);
-      return activityStub(env, id).fetch("https://do/deregister", { method: "POST" });
-    }
-    if (path === "/api/liveactivity/token" && request.method === "POST") {
-      const body = await request.json().catch(() => null);
-      if (!isLiveActivityTokenPayload(body)) {
-        return Response.json({ error: "Invalid token payload" }, { status: 400 });
+      if (path === "/api/liveactivity/register" && request.method === "POST") {
+        const body = await request.json().catch(() => null);
+        if (!isLiveActivityRegistration(body)) {
+          return withCors(Response.json({ error: "Invalid registration" }, { status: 400 }));
+        }
+        console.log(`[la] register ${body.id}`);
+        return withCors(
+          await activityStub(env, body.id).fetch("https://do/register", {
+            method: "POST",
+            body: JSON.stringify(body),
+          }),
+        );
       }
-      console.log(`[la] token ${body.id}`);
-      return activityStub(env, body.id).fetch("https://do/token", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      if (path === "/api/liveactivity/register" && request.method === "DELETE") {
+        const id = url.searchParams.get("id");
+        if (!id) return withCors(Response.json({ error: "Missing id" }, { status: 400 }));
+        console.log(`[la] deregister ${id}`);
+        return withCors(await activityStub(env, id).fetch("https://do/deregister", { method: "POST" }));
+      }
+      if (path === "/api/liveactivity/token" && request.method === "POST") {
+        const body = await request.json().catch(() => null);
+        if (!isLiveActivityTokenPayload(body)) {
+          return withCors(Response.json({ error: "Invalid token payload" }, { status: 400 }));
+        }
+        console.log(`[la] token ${body.id}`);
+        return withCors(
+          await activityStub(env, body.id).fetch("https://do/token", {
+            method: "POST",
+            body: JSON.stringify(body),
+          }),
+        );
+      }
+      return withCors(Response.json({ error: "Not found" }, { status: 404 }));
     }
 
     // --- Native GTFS-RT feeds (511 + protobuf + edge Cache API; no Vercel, no Upstash) ---

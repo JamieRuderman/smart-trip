@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { nextWake, planTick, POLL_MS, type LastSent } from "./tripActivity.js";
+import {
+  ENDGAME_POLL_MS,
+  nextWake,
+  planTick,
+  POLL_MS,
+  type LastSent,
+} from "./tripActivity.js";
 import type { FeedTripUpdate } from "../../../../api/_liveActivityStatus.js";
 import type { LiveActivityRegistration } from "../../../../src/lib/liveActivityPushTypes.js";
 
@@ -59,8 +65,16 @@ describe("nextWake", () => {
   it("polls when the next boundary is further than a poll away", () => {
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, now)).toBe(now + POLL_MS);
   });
-  it("targets the arrival boundary once departed", () => {
-    const t = SCHED_ARR_MS - 30_000;
+  it("polls at the normal cadence en route, outside the end-game window", () => {
+    const t = SCHED_ARR_MS - 10 * 60_000; // departed, >3min from arrival
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(t + POLL_MS);
+  });
+  it("tightens to the end-game cadence in the final approach", () => {
+    const t = SCHED_ARR_MS - 2 * 60_000; // within the 3-min end-game window
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(t + ENDGAME_POLL_MS);
+  });
+  it("targets the arrival boundary within an end-game poll of it", () => {
+    const t = SCHED_ARR_MS - 20_000; // < ENDGAME_POLL_MS from arrival
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(SCHED_ARR_MS);
   });
   it("keeps polling past arrival (no hot loop)", () => {
@@ -126,7 +140,7 @@ describe("planTick", () => {
         arrivalEpochMs: displayedArr,
       },
       updates: null,
-      now: displayedArr - 30_000,
+      now: displayedArr - 20_000, // within an end-game poll → targets the boundary
     });
     expect(plan.push).toBeNull();
     expect(plan.stop).toBe(false);

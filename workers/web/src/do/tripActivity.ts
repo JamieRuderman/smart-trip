@@ -59,6 +59,14 @@ export interface LastSent {
  *  alarm slot, so each scheduled alarm wakes for whichever independent concern
  *  is next: the boundary timer or this feed-refresh timer. */
 export const POLL_MS = 90_000;
+/** In the final approach to arrival, poll faster so a late-surfacing delay flips
+ *  the countdown to "delayed" BEFORE it bottoms out at 0:00. SMART's real platform
+ *  arrival can run ~1 min past the scheduled time, and 511 only reflects that in
+ *  the last minute or two — at the 90s cadence the correction lands right as the
+ *  countdown hits 0:00. Reads are edge-cache-backed (shared with the public feed),
+ *  so the extra ticks add ~no upstream load. */
+export const ENDGAME_WINDOW_MS = 3 * 60_000;
+export const ENDGAME_POLL_MS = 25_000;
 /** Reuse a signed provider JWT this long — APNs throttles provider-token churn
  *  (TooManyProviderTokenUpdates) and rejects tokens older than 1h. */
 const JWT_TTL_MS = 40 * 60_000;
@@ -68,17 +76,21 @@ const JWT_TTL_MS = 40 * 60_000;
  * a poll tick. These are conceptually separate timers, but the DO Alarms API
  * only stores one timestamp, so the persisted alarm is the one that happens
  * first. Callers pass the LIVE/displayed instants when known, so a slipped
- * departure or arrival still transitions on time.
+ * departure or arrival still transitions on time. The poll cadence tightens to
+ * `ENDGAME_POLL_MS` within `ENDGAME_WINDOW_MS` of arrival (final-approach delays).
  */
 export function nextWake(
   departureEpochMs: number,
   arrivalEpochMs: number,
   now: number,
 ): number {
-  const poll = now + POLL_MS;
-  if (now < departureEpochMs) return Math.min(departureEpochMs, poll);
-  if (now < arrivalEpochMs) return Math.min(arrivalEpochMs, poll);
-  return poll;
+  if (now < departureEpochMs) return Math.min(departureEpochMs, now + POLL_MS);
+  if (now < arrivalEpochMs) {
+    const poll =
+      arrivalEpochMs - now <= ENDGAME_WINDOW_MS ? ENDGAME_POLL_MS : POLL_MS;
+    return Math.min(arrivalEpochMs, now + poll);
+  }
+  return now + POLL_MS;
 }
 
 export interface TickInput {

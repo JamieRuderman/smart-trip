@@ -51,23 +51,14 @@ TRANSIT_511_API_KEY=your_key_here
 
 ### Run locally
 
-For the full app, including local serverless API routes:
-
-```bash
-npm run dev-vercel
-```
-
-For frontend-only development:
-
 ```bash
 npm run dev
 ```
 
-If you use `npm run dev`, real-time endpoints only work when either:
+`npm run dev` proxies `/api/*` to the production Worker (`https://smarttraintrip.com`) by default, so live data works out of the box. To change that:
 
-- `USE_SAMPLE_DATA=true` is set in `.env.local`, or
-- a local API target is running at `http://localhost:3000`, or
-- `DEV_API_PROXY_TARGET` in `.env.local` points `/api` at another backend such as a feature-branch deployment
+- set `USE_SAMPLE_DATA=true` in `.env.local` to serve local fixtures instead, or
+- set `DEV_API_PROXY_TARGET` in `.env.local` to point `/api` at another backend (e.g. a local `wrangler dev` or a feature-branch deployment).
 
 Default local URL:
 
@@ -79,15 +70,14 @@ Default local URL:
 | --- | --- | --- |
 | `TRANSIT_511_API_KEY` | `.env.local` (dev) / Cloudflare Worker secret (prod) | 511.org API key for static and realtime feeds |
 | `USE_SAMPLE_DATA` | `.env.local` | Serve fixtures from `sample/` instead of the live API |
-| `DEV_API_PROXY_TARGET` | `.env.local` | Dev-only `/api` proxy target for `npm run dev`; defaults to `http://localhost:3000` |
+| `DEV_API_PROXY_TARGET` | `.env.local` | Dev-only `/api` proxy target for `npm run dev`; defaults to `https://smarttraintrip.com` (production) |
 | `VITE_API_BASE_URL` | `.env.native` or `.env.native.local` | Absolute API base URL for native builds (production: `https://smarttraintrip.com`) |
 
-In production the GTFS-RT cache uses a Cloudflare KV binding (`FEED_CACHE`) — no env vars — and `TRANSIT_511_API_KEY` is a Cloudflare Worker secret, server-side only. (The legacy Vercel `KV_REST_API_*` Upstash credentials are being retired — see #91.)
+In production the GTFS-RT cache uses Cloudflare's edge Cache API (`caches.default`) — no binding, no env vars — and `TRANSIT_511_API_KEY` is a Cloudflare Worker secret, server-side only.
 
 ## Scripts
 
-- `npm run dev` - Start the Vite dev server
-- `npm run dev-vercel` - Start Vercel dev on port 3210
+- `npm run dev` - Start the Vite dev server (proxies `/api` to production by default)
 - `npm run build` - Type-check and build the web app
 - `npm run build-native` - Type-check and build the native web bundle
 - `npm run preview` - Preview the production build
@@ -106,13 +96,12 @@ In production the GTFS-RT cache uses a Cloudflare KV binding (`FEED_CACHE`) — 
 
 Static schedule data is generated into `src/data/generated/` and published to `public/data/schedules.json` during `prebuild`.
 
-Realtime data flows through the Cloudflare Worker, fronted by a shared
-Cloudflare KV cache so 511 is polled once per freshness window globally
-(see below):
+Realtime data flows through the Cloudflare Worker, fronted by the edge Cache
+API so 511 is polled at most once per freshness window per colo (see below):
 
 ```text
 511.org GTFS-Realtime
-  -> Cloudflare KV cache (poll-on-read, workers/web/src/lib/gtfsrt.ts)
+  -> edge Cache API (poll-on-read, workers/web/src/lib/gtfsrt.ts)
   -> /api/gtfsrt/{alerts,tripupdates,vehiclepositions} (Cloudflare Worker)
   -> React Query hooks
   -> trip cards, trip detail sheets, map, and service alerts UI
@@ -126,11 +115,12 @@ Trip updates are currently matched against static schedule entries by scheduled 
 expects a single central backend to fetch once and fan out to all clients —
 the upstream rate must not scale with users. `workers/web/src/lib/gtfsrt.ts`
 implements that: each feed is fetched from 511 at most once per freshness
-window (vehicles 15s, trip updates 40s, alerts 5min ≈ 342 calls/hr total),
-cached in Cloudflare KV, and served to every edge location/user from that one
-snapshot. KV is global, so a fresh entry fans out to every colo within
-seconds; the worst case at a window boundary is a couple of concurrent
-refreshes, well within 511's budget.
+window (vehicles 15s, trip updates 40s, alerts 5min ≈ 342 calls/hr total) and
+cached in the edge Cache API, then served to every user from that one snapshot.
+The Cache API is per-colo rather than global, but our traffic sits on ~one Bay
+Area colo, so 511 still sees ~one fetch per feed per window — well within budget
+— and there's no per-day write limit (the free Workers KV cap that previously
+took the feeds down).
 
 ## Mobile Development
 
@@ -150,7 +140,7 @@ npm run open-android
 For live reload on device or simulator:
 
 ```bash
-npm run dev-vercel
+npm run dev
 npm run sync-live
 ```
 
@@ -253,7 +243,7 @@ Group `feat(*)` first, then user-visible `fix(*)`. Trim anything users won't not
 
 ```text
 workers/web/          Cloudflare Worker — GTFS-RT API, SPA host, Live Activity push (Durable Object)
-api/                  Legacy Vercel serverless routes (being retired — see #91)
+api/                  Shared transit + Live Activity logic imported by the Worker
 public/               Static assets and hosted support/privacy pages
 sample/               Local GTFS-Realtime fixtures
 scripts/              Feed update and build helper scripts

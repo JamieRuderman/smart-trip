@@ -23,6 +23,7 @@ import {
   computeLiveTripStatus,
   decidePushAction,
   type FeedTripUpdate,
+  type LiveTripStatus,
 } from "../../../../api/_liveActivityStatus.js";
 import {
   buildContentState,
@@ -99,6 +100,9 @@ export interface TickPlan {
   stop: boolean;
   /** Absolute epoch ms to wake next (ignored when `stop`). */
   nextAlarm: number;
+  /** The live status derived this tick — alarm-log diagnostics only (not control
+   *  flow); null when the run is unlocatable and still pre-arrival. */
+  status: LiveTripStatus | null;
 }
 
 /**
@@ -133,10 +137,10 @@ export function planTick(input: TickInput): TickPlan {
     now,
   );
 
-  if (!status) return { push: null, lastSent: null, stop: false, nextAlarm };
+  if (!status) return { push: null, lastSent: null, stop: false, nextAlarm, status };
 
   const { action, phase } = decidePushAction({ status, lastSent, now });
-  if (action === "none") return { push: null, lastSent: null, stop: false, nextAlarm };
+  if (action === "none") return { push: null, lastSent: null, stop: false, nextAlarm, status };
 
   // If the feed says the train arrived a few seconds before the arrival time we
   // last pushed to the widget, wait until the visible countdown reaches 0:00.
@@ -145,13 +149,13 @@ export function planTick(input: TickInput): TickPlan {
   const arrivalForView =
     action === "end" ? displayedArrivalEpochMs : status.arrivalEpochMs;
   if (action === "end" && now < arrivalForView) {
-    return { push: null, lastSent: null, stop: false, nextAlarm: arrivalForView };
+    return { push: null, lastSent: null, stop: false, nextAlarm: arrivalForView, status };
   }
 
   if (!token) {
     // Can't push: if it has ended there's nothing to dismiss → stop; else wait
     // for the token (the /token route reschedules us when it arrives).
-    return { push: null, lastSent: null, stop: action === "end", nextAlarm };
+    return { push: null, lastSent: null, stop: action === "end", nextAlarm, status };
   }
 
   // On `end`, dismiss to the arrival the widget is DISPLAYING (last pushed), so
@@ -177,7 +181,7 @@ export function planTick(input: TickInput): TickPlan {
   });
 
   if (action === "end") {
-    return { push: { event: "end", payload }, lastSent: null, stop: true, nextAlarm };
+    return { push: { event: "end", payload }, lastSent: null, stop: true, nextAlarm, status };
   }
   return {
     push: { event: "update", payload },
@@ -190,6 +194,7 @@ export function planTick(input: TickInput): TickPlan {
     },
     stop: false,
     nextAlarm,
+    status,
   };
 }
 
@@ -276,8 +281,12 @@ export class TripActivityDO {
         now,
       });
 
+      const s = plan.status;
+      const diag = s
+        ? ` delay=${s.delayMinutes}m arrIn=${Math.round((s.arrivalEpochMs - now) / 1000)}s ended=${s.isEnded}`
+        : " status=none";
       console.log(
-        `[la] ${reg.id} tick action=${plan.push?.event ?? "none"} stop=${plan.stop} hasToken=${!!token}`,
+        `[la] ${reg.id} tick action=${plan.push?.event ?? "none"} stop=${plan.stop} hasToken=${!!token}${diag}`,
       );
 
       if (plan.push && token) {

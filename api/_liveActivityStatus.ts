@@ -47,14 +47,11 @@ export interface LiveTripStatus {
  *  than any realistic delay. */
 const MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
 
-/** How far past the scheduled arrival a run must be — while ALSO absent from the
- *  feed — before the cron treats it as finished and ends the activity. 511 prunes
- *  a run from the feed once it completes, and that pruning is exactly when an
- *  `end` could no longer be matched, so the activity would otherwise sit frozen
- *  at 0:00. A train that's merely late keeps a live destination arrival in the
- *  feed and is matched normally, so it never reaches this fallback early; the
- *  small grace only absorbs a single transient feed gap right at the boundary. */
-const ARRIVED_DROP_GRACE_MS = 2 * 60 * 1000;
+/** How far past the best-known arrival a run must be before a missing feed match
+ *  is treated as finished. Product choice: clear at the displayed arrival
+ *  immediately. Late trains should keep a live destination arrival in the feed;
+ *  when they do, the pushed arrival target moves before this fallback applies. */
+export const ARRIVED_DROP_GRACE_MS = 0;
 
 function resolveStation(
   stopId: string | undefined,

@@ -19,6 +19,7 @@
  * provider JWT — no shared Redis needed.
  */
 import {
+  ARRIVED_DROP_GRACE_MS,
   computeLiveTripStatus,
   decidePushAction,
   type FeedTripUpdate,
@@ -53,20 +54,20 @@ export interface LastSent {
   arrivalEpochMs: number;
 }
 
-/** Feed re-check cadence BETWEEN the exact boundaries. The native countdown
- *  ticks on its own, so ~90s is ample for delay drift; the transitions stay
- *  exact because we also wake right on each (live) boundary. */
+/** Feed re-check cadence BETWEEN the exact boundaries. A Durable Object has one
+ *  alarm slot, so each scheduled alarm wakes for whichever independent concern
+ *  is next: the boundary timer or this feed-refresh timer. */
 export const POLL_MS = 90_000;
 /** Reuse a signed provider JWT this long — APNs throttles provider-token churn
  *  (TooManyProviderTokenUpdates) and rejects tokens older than 1h. */
 const JWT_TTL_MS = 40 * 60_000;
 
 /**
- * Next wake: the nearer of the upcoming boundary (departure, then arrival) and a
- * poll tick — so a transition fires EXACTLY on its boundary while a delay is
- * still re-checked every `POLL_MS`. Callers pass the LIVE instants (delay-
- * adjusted) when known, so a slipped departure still flips on time. Past arrival
- * it keeps polling (never a hot loop) until the feed confirms the run ended.
+ * Next wake: the nearer of the upcoming boundary (departure, then arrival) and
+ * a poll tick. These are conceptually separate timers, but the DO Alarms API
+ * only stores one timestamp, so the persisted alarm is the one that happens
+ * first. Callers pass the LIVE/displayed instants when known, so a slipped
+ * departure or arrival still transitions on time.
  */
 export function nextWake(
   departureEpochMs: number,
@@ -83,7 +84,8 @@ export interface TickInput {
   reg: LiveActivityRegistration;
   token: string | null;
   lastSent: LastSent | null;
-  /** Normalized feed, or null when the fetch failed (leave countdown ticking). */
+  /** Normalized feed, or null when the fetch failed. Past the displayed arrival
+   *  grace, null is treated as terminal so the activity can't stick at 0:00. */
   updates: FeedTripUpdate[] | null;
   now: number;
 }
@@ -108,13 +110,26 @@ export interface TickPlan {
  */
 export function planTick(input: TickInput): TickPlan {
   const { reg, token, lastSent, updates, now } = input;
-  const status = updates ? computeLiveTripStatus({ reg, updates, now }) : null;
+  const fallbackDelayMs = Math.max(0, lastSent?.delayMinutes ?? 0) * 60_000;
+  const fallbackDepartureEpochMs = reg.departureEpochMs + fallbackDelayMs;
+  const displayedArrivalEpochMs = lastSent?.arrivalEpochMs ?? reg.arrivalEpochMs;
+  const status = updates
+    ? computeLiveTripStatus({ reg, updates, now })
+    : now >= displayedArrivalEpochMs + ARRIVED_DROP_GRACE_MS
+      ? {
+          departureEpochMs: fallbackDepartureEpochMs,
+          arrivalEpochMs: displayedArrivalEpochMs,
+          delayMinutes: Math.max(0, lastSent?.delayMinutes ?? 0),
+          isCanceled: lastSent?.isCanceled ?? false,
+          isEnded: true,
+        }
+      : null;
 
-  // Schedule against LIVE instants when we have them (so a delayed departure
-  // flips on time), else the registration's scheduled times.
+  // Schedule against live instants when the feed is available, else the last
+  // displayed targets we pushed (falling back to the registration's schedule).
   const nextAlarm = nextWake(
-    status?.departureEpochMs ?? reg.departureEpochMs,
-    status?.arrivalEpochMs ?? reg.arrivalEpochMs,
+    status?.departureEpochMs ?? fallbackDepartureEpochMs,
+    status?.arrivalEpochMs ?? displayedArrivalEpochMs,
     now,
   );
 
@@ -122,6 +137,16 @@ export function planTick(input: TickInput): TickPlan {
 
   const { action, phase } = decidePushAction({ status, lastSent, now });
   if (action === "none") return { push: null, lastSent: null, stop: false, nextAlarm };
+
+  // If the feed says the train arrived a few seconds before the arrival time we
+  // last pushed to the widget, wait until the visible countdown reaches 0:00.
+  // Sending an ActivityKit `end` with a future dismissal-date can leave iOS in a
+  // frozen terminal render; ending at the displayed boundary removes it cleanly.
+  const arrivalForView =
+    action === "end" ? displayedArrivalEpochMs : status.arrivalEpochMs;
+  if (action === "end" && now < arrivalForView) {
+    return { push: null, lastSent: null, stop: false, nextAlarm: arrivalForView };
+  }
 
   if (!token) {
     // Can't push: if it has ended there's nothing to dismiss → stop; else wait
@@ -133,8 +158,6 @@ export function planTick(input: TickInput): TickPlan {
   // iOS removes the activity exactly when the on-screen countdown hits 0:00 —
   // not a few seconds early when the live feed arrival has jittered ahead of
   // what the user last saw. iOS holds the (frozen) activity until this instant.
-  const arrivalForView =
-    action === "end" ? lastSent?.arrivalEpochMs ?? status.arrivalEpochMs : status.arrivalEpochMs;
   const content = buildContentState({
     departureEpochMs: status.departureEpochMs,
     arrivalEpochMs: arrivalForView,
@@ -278,10 +301,10 @@ export class TripActivityDO {
     }
   }
 
-  /** Normalized trip-updates read IN-PROCESS via the native 511 + KV path (no
-   *  Vercel round-trip); null on failure (leave the countdown ticking, retry
-   *  next alarm). The KV cache means the DO and the /api/gtfsrt/tripupdates route
-   *  share one 511 poll budget. */
+  /** Normalized trip-updates read IN-PROCESS via the native 511 + edge cache
+   *  path (no Vercel round-trip); null on failure (retry next alarm, with a
+   *  terminal fallback in `planTick`). The edge Cache API means the DO and the
+   *  /api/gtfsrt/tripupdates route share one 511 poll budget. */
   private async fetchUpdates(): Promise<FeedTripUpdate[] | null> {
     try {
       const { updates } = await getTripUpdates(this.env);

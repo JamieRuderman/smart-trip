@@ -291,23 +291,23 @@ describe("computeLiveTripStatus", () => {
       { scheduleRelationship: "SCHEDULED", startTime: "09:40:00", stopTimeUpdates: [] },
     ];
 
-    it("ends once arrival is comfortably past and the run is gone", () => {
+    it("ends as soon as arrival is reached and the run is gone", () => {
       const status = computeLiveTripStatus({
         reg: regWithOrigin,
         updates: otherRun,
-        now: SCHED_ARR_MS + 3 * 60_000, // > arrival + 2-min grace
+        now: SCHED_ARR_MS,
       });
       expect(status).not.toBeNull();
       expect(status!.isEnded).toBe(true);
       expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS);
     });
 
-    it("does not end within the grace window (absorbs a transient feed gap)", () => {
+    it("does not end before arrival when the run is gone", () => {
       expect(
         computeLiveTripStatus({
           reg: regWithOrigin,
           updates: otherRun,
-          now: SCHED_ARR_MS + 60_000, // < grace
+          now: SCHED_ARR_MS - 1,
         }),
       ).toBeNull();
     });
@@ -317,7 +317,7 @@ describe("computeLiveTripStatus", () => {
         computeLiveTripStatus({
           reg: REG, // no originStartTime → boarding-stop matching finds nothing
           updates: [],
-          now: SCHED_ARR_MS + 3 * 60_000,
+          now: SCHED_ARR_MS,
         })!.isEnded,
       ).toBe(true);
     });

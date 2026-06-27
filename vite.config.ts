@@ -10,16 +10,25 @@ export default defineConfig(({ mode }) => {
   // Load all env vars (not just VITE_* prefixed) so we can read USE_SAMPLE_DATA
   const env = loadEnv(mode, process.cwd(), "");
   const useSampleData = env.USE_SAMPLE_DATA === "true";
-  const devApiProxyTarget = env.DEV_API_PROXY_TARGET?.trim() || "http://localhost:3000";
+  const devApiProxyTarget =
+    env.DEV_API_PROXY_TARGET?.trim() || "https://smarttraintrip.com";
 
   return {
     server: {
       host: "::",
       port: 3210,
-      // When not using sample data, proxy /api to a local vercel dev instance
+      // When not using sample data, proxy /api to the production Worker by
+      // default (override DEV_API_PROXY_TARGET to point at a local `wrangler
+      // dev`). changeOrigin so the Host header matches the custom-domain route.
       proxy:
         mode === "development" && !useSampleData
-          ? { "/api": devApiProxyTarget }
+          ? {
+              "/api": {
+                target: devApiProxyTarget,
+                changeOrigin: true,
+                secure: true,
+              },
+            }
           : undefined,
     },
     plugins: [

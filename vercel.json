@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/((?!api/|@|src/|node_modules/|assets/)[^.]*)",
-      "destination": "/index.html"
-    }
-  ]
-}

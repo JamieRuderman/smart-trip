@@ -1,16 +1,13 @@
 /**
  * APNs client for the **Cloudflare Workers** runtime — Live Activity pushes.
  *
- * The Vercel version (`api/_apns.ts`) uses `node:http2` + `node:crypto`, neither
- * of which exists on Workers, so this re-implements the two non-portable pieces
- * with web standards:
+ * `node:http2` + `node:crypto` don't exist on Workers, so the two non-portable
+ * pieces are implemented with web standards:
  *   - ES256 provider-JWT signing via **WebCrypto** (`crypto.subtle`, ECDSA P-256)
  *   - the HTTP/2 POST via **`fetch()`** (Workers speaks HTTP/2 to APNs in prod)
  *
- * The payload/topic shapes are intentionally identical to `api/_apns.ts` so the
- * widget decodes one contract regardless of which backend pushed. The pure
- * status/content logic is shared (imported from `src/lib` / `api/`), so this
- * APNs layer is the *only* rewrite the migration needs.
+ * The pure status/content logic is shared (imported from `src/lib` / `api/`);
+ * this APNs transport layer is the only Workers-specific implementation.
  */
 
 export const PRODUCTION_HOST = "api.push.apple.com";
@@ -117,9 +114,9 @@ export async function signApnsJwt(config: ApnsConfig, nowSeconds: number): Promi
 export type LiveActivityPushEvent = "update" | "end";
 
 /**
- * Build the APNs JSON body for a Live Activity push. Pure; identical shape to
- * `api/_apns.ts`. The flat content-state dict is wrapped under `values` to match
- * the plugin's `GenericAttributes.ContentState` Codable, or iOS drops the push.
+ * Build the APNs JSON body for a Live Activity push. Pure. The flat
+ * content-state dict is wrapped under `values` to match the plugin's
+ * `GenericAttributes.ContentState` Codable, or iOS drops the push.
  */
 export function buildLiveActivityPayload(args: {
   event: LiveActivityPushEvent;

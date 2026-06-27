@@ -35,12 +35,6 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 [vars]
-# Fallback proxy target for any /api/* the Worker doesn't handle natively — during
-# the transition that's the Vercel cron's /api/liveactivity/push, plus a safety
-# net. Points at the Vercel DEPLOYMENT URL, not smarttraintrip.com, so once the
-# apex is served by this Worker the proxy can't loop back into itself. Remove the
-# proxy (and this var) when Vercel is retired.
-API_ORIGIN = "https://smart-trip.vercel.app"
 # APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID + PRIVATE
 # KEY are SECRETS, set out-of-band (never committed):
 #   npx wrangler secret put APNS_KEY_ID

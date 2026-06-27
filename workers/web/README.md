@@ -14,14 +14,14 @@ Also reachable at <https://smart-trip-web.smart-trip.workers.dev>.
   (`not_found_handling = "single-page-application"`).
 - **GTFS-Realtime API (native)** — `/api/gtfsrt/{tripupdates,vehiclepositions,alerts}`
   are served directly by the Worker (511 fetch + protobuf decode + normalize,
-  cached in Cloudflare KV). See `src/lib/gtfsrt.ts`.
+  cached in the edge Cache API). See `src/lib/gtfsrt.ts`.
 - **Live Activity push (native)** — `/api/liveactivity/{register,token,deregister}`
   drive a per-activity Durable Object (`src/do/tripActivity.ts`) that fires
   exact-time APNs pushes via the Alarms API.
-- **Fallback proxy → Vercel** — `run_worker_first = ["/api/*"]` runs the Worker
-  before the SPA fallback; any `/api/*` not handled natively proxies to
-  `API_ORIGIN` (the legacy Vercel deployment). This is the last remaining Vercel
-  seam and goes away when the cutover bakes — see #91.
+- **No Vercel** — `run_worker_first = ["/api/*"]` runs the Worker before the SPA
+  fallback so it owns every `/api/*`; all routes are native and any unknown
+  `/api/*` returns 404. (The legacy Vercel fallback proxy was removed once the
+  migration completed.)
 
 ## Deploy
 
@@ -54,6 +54,6 @@ Worker (no `VITE_API_BASE_URL` needed here).
 | Layer | Where it runs |
 | --- | --- |
 | Frontend (SPA) | ✅ native on Cloudflare |
-| GTFS-Realtime API | ✅ native on Cloudflare (KV-cached) |
+| GTFS-Realtime API | ✅ native on Cloudflare (edge Cache API) |
 | Live Activity push | ✅ native on Cloudflare (Durable Object + APNs) |
-| Fallback `/api/*` proxy | ⏳ → Vercel until the cutover bakes (#91) |
+| Unknown `/api/*` | 404 — no Vercel proxy (fully migrated) |

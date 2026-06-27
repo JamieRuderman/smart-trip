@@ -3,11 +3,13 @@
  *
  * - Static SPA: served from ./dist via the ASSETS binding (SPA fallback in
  *   wrangler.toml).
+ * - Native GTFS-RT feeds: /api/gtfsrt/{tripupdates,vehiclepositions,alerts}
+ *   (511 fetch + protobuf decode + edge Cache API) — see ./lib/gtfsrt.ts.
  * - Native Live Activity backend: /api/liveactivity/{register,token,deregister}
  *   are handled here → routed to a per-activity Durable Object
  *   (`TripActivityDO`) that drives EXACT-TIME push transitions via DO alarms.
- * - Everything else under /api/* still proxies to the Vercel backend
- *   (`API_ORIGIN`) — the migration seam, shrinking as routes move over.
+ * - Any other /api/* returns 404: every route is now native, so the legacy
+ *   Vercel fallback proxy was removed once the migration completed.
  *
  * `run_worker_first = ["/api/*"]` guarantees this Worker sees /api/* before the
  * SPA fallback would return index.html for them.
@@ -24,8 +26,9 @@ import {
 
 export { TripActivityDO } from "./do/tripActivity.js";
 
-/** Wildcard CORS for the public GTFS-RT data (matches api/_cors.ts): the data is
- *  identical for every caller, and the iOS app reads it from capacitor://localhost. */
+/** Wildcard CORS for the public GTFS-RT data + native Live Activity routes: the
+ *  responses are identical for every caller, and the iOS app reads them from
+ *  capacitor://localhost. */
 const CORS: Record<string, string> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
@@ -71,8 +74,6 @@ interface DurableObjectNamespace {
 
 export interface Env {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
-  /** Origin that un-migrated /api/* is proxied to (the Vercel backend). */
-  API_ORIGIN: string;
   /** Per-activity Live Activity Durable Objects. */
   TRIP_ACTIVITY: DurableObjectNamespace;
   // APNs creds (forwarded to the DO via env) — see workers/web/src/lib/apns.ts.
@@ -96,9 +97,9 @@ export default {
     const path = url.pathname;
 
     // --- Native Live Activity routes → Durable Object ---
-    // These are read by the iOS app from capacitor://localhost, so every
-    // response needs CORS and the preflight must be answered here (NOT proxied to
-    // Vercel, which returns no CORS — that silently blocked the register POST).
+    // These are read by the iOS app from capacitor://localhost, so every response
+    // needs CORS and the preflight must be answered here: a WebView CORS preflight
+    // with no CORS response silently blocks the (application/json) register POST.
     if (path.startsWith("/api/liveactivity/")) {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: CORS });
@@ -149,12 +150,10 @@ export default {
       return serveGtfsRt(request, () => getServiceAlerts(env, url.origin), "s-maxage=60, stale-while-revalidate=30");
     }
 
-    // --- Everything else under /api/* still proxies to Vercel ---
+    // --- Any other /api/* is unknown: all routes are native now (the legacy
+    //     Vercel fallback proxy was removed once the migration completed). ---
     if (path.startsWith("/api/")) {
-      const upstream = new URL(env.API_ORIGIN);
-      upstream.pathname = path;
-      upstream.search = url.search;
-      return fetch(new Request(upstream.toString(), request));
+      return Response.json({ error: "Not found" }, { status: 404, headers: CORS });
     }
 
     // --- Static asset / SPA fallback ---

@@ -10,12 +10,6 @@
       ],
       "port": 5180,
       "autoPort": true
-    },
-    {
-      "name": "dev-vercel",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev-vercel"],
-      "port": 3210
     }
   ]
 }

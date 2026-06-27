@@ -69,7 +69,8 @@ function Collapsible({
  * status overlaid. Returns null when nothing is focused or the trip can no
  * longer be found in the schedule.
  *
- * Rendered as one solid-blue "My Trip" card (blue == the train you're taking):
+ * Rendered as one solid "My Trip" card — blue == the train you're taking, or the
+ * "running late" gold when delayed (mirrors the lock-screen Live Activity):
  * train identity + live times + departure countdown up top, a frosted actions
  * row (reminder status / add-reminder + Stop) below. Tapping the summary opens
  * the full trip-detail sheet, where the lead-time picker and timeline live.
@@ -305,7 +306,10 @@ function FocusedTripCardInner({
   return (
     <SectionCard
       aria-label={t("focusedTrip.pinnedLabel")}
-      className="overflow-hidden border-0 md:border-0 bg-my-trip-background text-white shadow-[0_0_10px_rgba(0,0,0,0.35)]"
+      className={cn(
+        "overflow-hidden border-0 md:border-0 text-white shadow-[0_0_10px_rgba(0,0,0,0.35)] transition-colors",
+        isDelayed ? "bg-smart-gold" : "bg-my-trip-background",
+      )}
     >
       {/* Tappable summary → opens the full trip-detail sheet. */}
       <button

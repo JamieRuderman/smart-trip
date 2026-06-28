@@ -53,6 +53,21 @@ describe("isLiveActivityRegistration", () => {
     ).toBe(false);
   });
 
+  it("accepts an optional reminderLeadMinutes and rejects bad ones", () => {
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, reminderLeadMinutes: 15 }),
+    ).toBe(true);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, reminderLeadMinutes: 0 }),
+    ).toBe(true);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, reminderLeadMinutes: -5 }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, reminderLeadMinutes: "15" }),
+    ).toBe(false);
+  });
+
   it("rejects oversized strings (public endpoint, bounded junk)", () => {
     expect(
       isLiveActivityRegistration({ ...VALID_REG, id: "x".repeat(200) }),

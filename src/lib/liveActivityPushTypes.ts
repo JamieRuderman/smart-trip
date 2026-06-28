@@ -52,6 +52,13 @@ export interface LiveActivityRegistration {
    *  stop_time_updates were omitted (511 does that). Optional: absent when
    *  the origin time isn't present in the static timetable. */
   originStartTime?: string;
+  /** Lead minutes of the armed "leave alarm" reminder, when one is set. The
+   *  server derives the leave-alarm countdown instant as `liveDeparture - lead`
+   *  and feeds it into every pushed content state, so a locked-screen delay
+   *  correction keeps the "Leave in" stage instead of dropping the leave-alarm
+   *  countdown and reverting to "Departs in". Absent when no reminder is armed;
+   *  the client re-registers whenever the reminder is armed or cleared. */
+  reminderLeadMinutes?: number;
 }
 
 /** The per-activity APNs token payload iOS POSTs to the token endpoint (the
@@ -88,7 +95,11 @@ export function isLiveActivityRegistration(
     typeof r.arrivalEpochMs === "number" &&
     Number.isFinite(r.arrivalEpochMs) &&
     (r.originStartTime === undefined ||
-      isBoundedString(r.originStartTime, MAX_TIME_LENGTH))
+      isBoundedString(r.originStartTime, MAX_TIME_LENGTH)) &&
+    (r.reminderLeadMinutes === undefined ||
+      (typeof r.reminderLeadMinutes === "number" &&
+        Number.isFinite(r.reminderLeadMinutes) &&
+        r.reminderLeadMinutes >= 0))
   );
 }
 

@@ -56,6 +56,19 @@ const PRE_DEPARTURE_SENT: LastSent = {
   arrivalEpochMs: SCHED_ARR_MS,
 };
 
+/** Same run with a 15-min leave alarm armed (departure − 15 min == 08:15). */
+const REMINDER_LEAD_MIN = 15;
+const REG_WITH_REMINDER: LiveActivityRegistration = {
+  ...REG,
+  reminderLeadMinutes: REMINDER_LEAD_MIN,
+};
+const LEAVE_MS = SCHED_DEP_MS - REMINDER_LEAD_MIN * 60_000;
+
+/** The encoded content-state dict carried by a push payload. */
+const contentValues = (plan: ReturnType<typeof planTick>): Record<string, string> =>
+  (plan.push!.payload as { aps: { "content-state": { values: Record<string, string> } } })
+    .aps["content-state"].values;
+
 describe("nextWake", () => {
   const now = SCHED_DEP_MS - 5 * 60_000;
 
@@ -72,6 +85,14 @@ describe("nextWake", () => {
   it("tightens to the end-game cadence in the final approach", () => {
     const t = SCHED_ARR_MS - 2 * 60_000; // within the 3-min end-game window
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(t + ENDGAME_POLL_MS);
+  });
+  it("wakes at the leave-alarm instant when it falls within the next poll", () => {
+    const t = LEAVE_MS - 30_000; // 30s before the leave instant, departure far off
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS)).toBe(LEAVE_MS);
+  });
+  it("ignores a leave-alarm instant that has already fired", () => {
+    const t = LEAVE_MS + 60_000; // past the leave instant, still pre-departure
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS)).toBe(t + POLL_MS);
   });
   it("targets the arrival boundary within an end-game poll of it", () => {
     const t = SCHED_ARR_MS - 20_000; // < ENDGAME_POLL_MS from arrival
@@ -100,6 +121,7 @@ describe("planTick", () => {
       isEnded: false,
       isCanceled: false,
       arrivalEpochMs: SCHED_ARR_MS,
+      alarmPending: false,
     });
     expect(plan.stop).toBe(false);
   });
@@ -257,5 +279,67 @@ describe("planTick", () => {
     expect(plan.push).toBeNull();
     expect(plan.stop).toBe(false);
     expect(plan.nextAlarm).toBe(now + POLL_MS); // min(SCHED_DEP, now+POLL)
+  });
+
+  it("bakes the armed leave-alarm countdown into the pushed content", () => {
+    const now = SCHED_DEP_MS - 20 * 60_000; // 08:10, before the 08:15 leave instant
+    const plan = planTick({
+      reg: REG_WITH_REMINDER,
+      token: "tok",
+      lastSent: null,
+      updates: boardingFeed(SCHED_DEP_MS / 1000),
+      now,
+    });
+    expect(plan.push?.event).toBe("update");
+    const values = contentValues(plan);
+    expect(values.reminderSet).toBe("true");
+    expect(values.reminderEpochMs).toBe(String(LEAVE_MS));
+    expect(values.alarmPending).toBe("true");
+    expect(plan.lastSent?.alarmPending).toBe(true);
+  });
+
+  it("derives the leave-alarm instant from the LIVE (delayed) departure", () => {
+    const liveDep = SCHED_DEP_MS + 10 * 60_000; // +10 min delay
+    const now = SCHED_DEP_MS - 20 * 60_000;
+    const plan = planTick({
+      reg: REG_WITH_REMINDER,
+      token: "tok",
+      lastSent: null,
+      updates: boardingFeed(liveDep / 1000),
+      now,
+    });
+    // Leave alarm tracks the live departure − lead, matching the in-app "Leave in".
+    expect(contentValues(plan).reminderEpochMs).toBe(
+      String(liveDep - REMINDER_LEAD_MIN * 60_000),
+    );
+  });
+
+  it("forces a Leave→Departs update when the alarm fires, delay unchanged", () => {
+    const now = LEAVE_MS + 30_000; // just past the leave instant, still pre-departure
+    const plan = planTick({
+      reg: REG_WITH_REMINDER,
+      token: "tok",
+      // Last push was on-time pre-departure with the alarm still pending.
+      lastSent: { ...PRE_DEPARTURE_SENT, alarmPending: true },
+      updates: boardingFeed(SCHED_DEP_MS / 1000),
+      now,
+    });
+    // decidePushAction alone sees no delay/phase change — the alarm transition is
+    // what earns the push, flipping the surface off its spent "Leave in" stage.
+    expect(plan.push?.event).toBe("update");
+    expect(contentValues(plan).alarmPending).toBe("false");
+    expect(plan.lastSent?.alarmPending).toBe(false);
+  });
+
+  it("stays silent once the alarm has already fired and nothing else changed", () => {
+    const now = LEAVE_MS + 30_000;
+    const plan = planTick({
+      reg: REG_WITH_REMINDER,
+      token: "tok",
+      lastSent: { ...PRE_DEPARTURE_SENT, alarmPending: false },
+      updates: boardingFeed(SCHED_DEP_MS / 1000),
+      now,
+    });
+    expect(plan.push).toBeNull();
   });
 });

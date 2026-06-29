@@ -141,7 +141,28 @@ function buildRegistrationForFocus(
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
     ...(originStartTime ? { originStartTime } : {}),
+    // Carry the armed reminder's lead so the server can keep the leave-alarm
+    // countdown alive across its locked-screen delay pushes (otherwise every
+    // push would drop the "Leave in" stage back to "Departs in").
+    ...(saved.reminder ? { reminderLeadMinutes: saved.reminder.leadMinutes } : {}),
   };
+}
+
+/**
+ * Re-POST the focus's push registration so the backend learns the CURRENT
+ * reminder state (armed lead, or none). The registration is otherwise written
+ * only at activity start — but a reminder is armed/cleared/changed AFTER focus,
+ * and the server bakes the leave-alarm countdown into every push from the
+ * registered lead, so it must be refreshed whenever that lead changes. Idempotent
+ * upsert keyed on the activity id; no-op off push builds or before an activity
+ * has committed its id (the start path registers with the reminder included).
+ */
+async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void> {
+  if (!isLiveActivityPushEnabled()) return;
+  const id = focused.liveActivityId;
+  if (!id) return;
+  const registration = buildRegistrationForFocus(focused, id);
+  if (registration) await registerPushActivity(registration);
 }
 
 /**
@@ -435,8 +456,12 @@ async function armAndPersistReminder(
   // Persist from `latest` (same identity as `current`, just re-read): the
   // Live Activity start commits `liveActivityId` concurrently with this
   // await-heavy path, and spreading the stale `current` would clobber it.
-  saveFocusedTrip({ ...latest, reminder: { ...reminder, alarmId } });
+  const saved: FocusedTrip = { ...latest, reminder: { ...reminder, alarmId } };
+  saveFocusedTrip(saved);
   notifyChange();
+  // Tell the push backend about the (re)armed lead so its locked-screen pushes
+  // keep showing the leave-alarm countdown. Best-effort; never blocks the arm.
+  await reRegisterPushForFocus(saved);
   return { ok: true };
 }
 
@@ -505,8 +530,12 @@ export function useFocusedTrip() {
 
       if (leadMinutes === null) {
         if (current.reminder) await cancelReminderChannels(current.reminder);
-        saveFocusedTrip({ ...current, reminder: null });
+        const cleared: FocusedTrip = { ...current, reminder: null };
+        saveFocusedTrip(cleared);
         notifyChange();
+        // Refresh the push registration so the backend stops baking the (now
+        // cancelled) leave-alarm countdown into its locked-screen pushes.
+        await reRegisterPushForFocus(cleared);
         return { ok: true };
       }
 

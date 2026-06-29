@@ -53,6 +53,12 @@ export interface LastSent {
    *  pushed). The `end` dismisses to THIS, not the latest feed arrival, so iOS
    *  removes the activity exactly when the on-screen countdown reaches 0:00. */
   arrivalEpochMs: number;
+  /** Whether the leave alarm was still pending (ahead of `now`) at the last
+   *  push. Tracked so the pending→fired transition forces one update — flipping
+   *  the surface "Leave in" → "Departs in" and refreshing staleness — even when
+   *  delay/phase are otherwise unchanged. Optional: older persisted records lack
+   *  it (treated as not pending, same as a run with no reminder). */
+  alarmPending?: boolean;
 }
 
 /** Feed re-check cadence BETWEEN the exact boundaries. A Durable Object has one
@@ -83,8 +89,18 @@ export function nextWake(
   departureEpochMs: number,
   arrivalEpochMs: number,
   now: number,
+  /** Leave-alarm instant (epoch ms), when a reminder is armed. Before departure
+   *  we wake exactly at it so the surface flips "Leave in" → "Departs in" (and
+   *  refreshes its staleness target) on time while the phone is locked, rather
+   *  than dimming until the next poll. */
+  reminderEpochMs: number | null = null,
 ): number {
-  if (now < departureEpochMs) return Math.min(departureEpochMs, now + POLL_MS);
+  if (now < departureEpochMs) {
+    const next = Math.min(departureEpochMs, now + POLL_MS);
+    return reminderEpochMs != null && reminderEpochMs > now
+      ? Math.min(next, reminderEpochMs)
+      : next;
+  }
   if (now < arrivalEpochMs) {
     const poll =
       arrivalEpochMs - now <= ENDGAME_WINDOW_MS ? ENDGAME_POLL_MS : POLL_MS;
@@ -129,6 +145,8 @@ export function planTick(input: TickInput): TickPlan {
   const fallbackDelayMs = Math.max(0, lastSent?.delayMinutes ?? 0) * 60_000;
   const fallbackDepartureEpochMs = reg.departureEpochMs + fallbackDelayMs;
   const displayedArrivalEpochMs = lastSent?.arrivalEpochMs ?? reg.arrivalEpochMs;
+  const reminderLeadMs =
+    reg.reminderLeadMinutes != null ? reg.reminderLeadMinutes * 60_000 : null;
   const status = updates
     ? computeLiveTripStatus({ reg, updates, now })
     : now >= displayedArrivalEpochMs + ARRIVED_DROP_GRACE_MS
@@ -141,17 +159,31 @@ export function planTick(input: TickInput): TickPlan {
         }
       : null;
 
+  // The leave-alarm instant tracks the LIVE departure (delay-adjusted), so it
+  // matches the in-app "Leave in" countdown; null when no reminder is armed.
+  const scheduleDepartureEpochMs = status?.departureEpochMs ?? fallbackDepartureEpochMs;
+  const reminderEpochMs =
+    reminderLeadMs != null ? scheduleDepartureEpochMs - reminderLeadMs : null;
+
   // Schedule against live instants when the feed is available, else the last
   // displayed targets we pushed (falling back to the registration's schedule).
   const nextAlarm = nextWake(
-    status?.departureEpochMs ?? fallbackDepartureEpochMs,
+    scheduleDepartureEpochMs,
     status?.arrivalEpochMs ?? displayedArrivalEpochMs,
     now,
+    reminderEpochMs,
   );
 
   if (!status) return { push: null, lastSent: null, stop: false, nextAlarm, status };
 
-  const { action, phase } = decidePushAction({ status, lastSent, now });
+  const alarmPending = reminderEpochMs != null && now < reminderEpochMs;
+  const { action: baseAction, phase } = decidePushAction({ status, lastSent, now });
+  // The pending→fired alarm transition is its own reason to push even when the
+  // shared decision sees no delay/phase change — without it the surface would
+  // stay marked stale on its spent "Leave in" countdown until the next change.
+  const alarmChanged = (lastSent?.alarmPending ?? false) !== alarmPending;
+  const action =
+    baseAction === "none" && alarmChanged && !status.isEnded ? "update" : baseAction;
   if (action === "none") return { push: null, lastSent: null, stop: false, nextAlarm, status };
 
   // If the feed says the train arrived a few seconds before the arrival time we
@@ -182,6 +214,8 @@ export function planTick(input: TickInput): TickPlan {
     remainingStops: null,
     isCanceled: status.isCanceled,
     isEnded: action === "end",
+    reminderSet: reminderEpochMs != null,
+    reminderEpochMs,
     now,
   });
   const payload = buildLiveActivityPayload({
@@ -203,6 +237,7 @@ export function planTick(input: TickInput): TickPlan {
       isEnded: false,
       isCanceled: status.isCanceled,
       arrivalEpochMs: status.arrivalEpochMs,
+      alarmPending,
     },
     stop: false,
     nextAlarm,
@@ -262,7 +297,16 @@ export class TripActivityDO {
 
   /** Ensure an alarm is pending no later than the next scheduled-time wake. */
   private async ensureScheduled(reg: LiveActivityRegistration): Promise<void> {
-    const next = nextWake(reg.departureEpochMs, reg.arrivalEpochMs, Date.now());
+    const reminderEpochMs =
+      reg.reminderLeadMinutes != null
+        ? reg.departureEpochMs - reg.reminderLeadMinutes * 60_000
+        : null;
+    const next = nextWake(
+      reg.departureEpochMs,
+      reg.arrivalEpochMs,
+      Date.now(),
+      reminderEpochMs,
+    );
     const current = await this.state.storage.getAlarm();
     if (current == null || current > next) await this.state.storage.setAlarm(next);
   }

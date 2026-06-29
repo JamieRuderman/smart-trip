@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "smart": {
-    "fetchedAt": "2026-06-28T14:41:42.268Z",
+    "fetchedAt": "2026-06-29T16:31:51.915Z",
     "sourceUrl": "https://api.511.org/transit/datafeeds?operator_id=SA",
-    "bytes": 53394
+    "bytes": 52764
   },
   "ferry": {
-    "fetchedAt": "2026-06-28T14:41:42.268Z",
+    "fetchedAt": "2026-06-29T16:31:51.915Z",
     "sourceUrl": "https://api.511.org/transit/datafeeds?operator_id=GF",
     "bytes": 22718
   }

@@ -13,8 +13,9 @@ interface ScheduleHeaderProps {
   showAllTrips: boolean;
   onToggleShowAllTrips: () => void;
   lastUpdated: Date | null;
-  /** True when the 511 live feed is failing — shows "Live data unavailable". */
-  isUpstreamDown?: boolean;
+  /** True when the live feed is failing (any reason) — with no cached timestamp
+   *  this shows "Live data unavailable" instead of a perpetual "loading". */
+  isFeedUnavailable?: boolean;
 }
 
 export function ScheduleHeader({
@@ -24,14 +25,14 @@ export function ScheduleHeader({
   showAllTrips,
   onToggleShowAllTrips,
   lastUpdated,
-  isUpstreamDown = false,
+  isFeedUnavailable = false,
 }: ScheduleHeaderProps) {
   const { t } = useTranslation();
   const { text: updatedLabel, isStale } = computeRealtimeAgeLabel(
     t,
     lastUpdated,
     currentTime,
-    isUpstreamDown,
+    isFeedUnavailable,
   );
 
   return (

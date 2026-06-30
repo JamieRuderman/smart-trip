@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { fetchGtfsRtJson, isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
+import {
+  fetchGtfsRtJson,
+  isFeedUnavailable,
+  isUpstreamFeedDown,
+} from "@/lib/gtfsRtFetch";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
   stationIndexMap,
@@ -326,6 +330,10 @@ export interface TripRealtimeStatusMaps {
   lastUpdated: Date | null;
   /** True when the 511 upstream feed is failing (so the UI can say so). */
   isUpstreamDown: boolean;
+  /** True when the most recent fetch failed for ANY reason (502 / 500 / network).
+   *  Used to surface "live data unavailable" on a cold start even when the
+   *  failure is not specifically a 511 outage. */
+  isFeedUnavailable: boolean;
 }
 
 /**
@@ -357,11 +365,12 @@ export function useTripRealtimeStatusMap(
 ): TripRealtimeStatusMaps {
   const { data, error } = useTripUpdates();
   const isUpstreamDown = isUpstreamFeedDown(error);
+  const feedUnavailable = isFeedUnavailable(error);
 
   return useMemo(() => {
     const lastUpdated =
       data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isUpstreamDown };
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
@@ -417,6 +426,6 @@ export function useTripRealtimeStatusMap(
         canceledByStartTime.set(result.scheduledDeparture, result.status);
       }
     }
-    return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown };
-  }, [data, fromStation, toStation, trips, isUpstreamDown]);
+    return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
+  }, [data, fromStation, toStation, trips, isUpstreamDown, feedUnavailable]);
 }

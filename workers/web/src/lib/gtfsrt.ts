@@ -140,11 +140,17 @@ export async function getFeedBytes(
   let bytes: Uint8Array;
   try {
     bytes = await fetch511(env.TRANSIT_511_API_KEY, feed);
+    // Validate the protobuf BEFORE caching. 511 can answer HTTP 200 with a
+    // truncated/corrupt body or an HTML error page; caching those as
+    // last-known-good would make every downstream decode throw for the whole
+    // freshness window (realtime + Live Activities go dark even though 511 is
+    // recoverable). An undecodable body is treated exactly like a 511 failure.
+    decodeFeed(bytes);
   } catch (err) {
-    // 511 hiccup → serve last-known-good, and back off so the next
-    // ~STALE_RETRY_BACKOFF_MS of polls serve stale instead of each re-attempting
-    // 511 and waiting the upstream timeout. fetchedAt is preserved so the feed's
-    // real age stays truthful.
+    // 511 hiccup (or an undecodable 200) → serve last-known-good, and back off
+    // so the next ~STALE_RETRY_BACKOFF_MS of polls serve stale instead of each
+    // re-attempting 511 and waiting the upstream timeout. fetchedAt is preserved
+    // so the feed's real age stays truthful.
     if (cachedBytes) {
       await cachePut(cache, key, feedResponse(cachedBytes, fetchedAt, Date.now() + STALE_RETRY_BACKOFF_MS));
       return cachedBytes;

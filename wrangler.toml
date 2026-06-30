@@ -53,6 +53,17 @@ class_name = "TripActivityDO"
 tag = "v1"
 new_sqlite_classes = ["TripActivityDO"]
 
+# Per-IP rate limit for the PUBLIC /api/liveactivity/* mutation routes
+# (register/token/deregister). These are accountless by design, so without a
+# limiter anyone can spin up unbounded Durable Objects (each with a self-
+# scheduling 511 poll alarm). The Worker enforces this binding when present and
+# is a no-op when it's absent (local dev / preview), so it's safe to enable once
+# you've confirmed Workers Rate Limiting is available on the account. Uncomment:
+# [[ratelimit]]
+# name = "LIVEACTIVITY_RATE_LIMIT"
+# namespace_id = "1001"          # any unique id within the account
+# simple = { limit = 60, period = 60 }   # 60 requests / 60s per client IP
+
 # GTFS-RT feeds are cached in the edge Cache API (caches.default) — free, with
 # no per-day write limit — so the Worker needs no KV binding for the cache. (KV's
 # free-tier 1,000-writes/day cap was too low for a per-refresh cache and took the

@@ -27,7 +27,7 @@ why it matters, and a concrete fix direction.
   ring in place; only build elements for new keys. Drop `selectedTrainKey`/`handleTrainClick`
   from the deps that force teardown (toggle a CSS class; read train via a ref).
 
-- [ ] **H2 — Unauthenticated Live Activity registration: no rate limit + unbounded epochs**
+- [x] **H2 — Unauthenticated Live Activity registration: no rate limit + unbounded epochs**
   `workers/web/src/index.ts:103-139`, `workers/web/src/do/tripActivity.ts:299-312`,
   `src/lib/liveActivityPushTypes.ts:93-96`
   Capability slug protects *existing* activities, but anyone can POST unlimited well-formed
@@ -37,8 +37,14 @@ why it matters, and a concrete fix direction.
   *Fix:* add a Cloudflare rate-limit rule (or `RateLimit` binding) on `/api/liveactivity/*`;
   bound epochs to ±48h of `now` and require `arrivalEpochMs > departureEpochMs` in
   `isLiveActivityRegistration`.
+  *Done:* added `arrivalEpochMs > departureEpochMs` to the guard and a testable
+  `isRegistrationWithinHorizon(reg, now)` (±past-grace / +8d future / max 6h duration),
+  enforced in the worker register handler (400 out-of-range). Rate limit wired against an
+  optional `LIVEACTIVITY_RATE_LIMIT` binding (per-IP, no-op when unprovisioned) with a
+  ready-to-uncomment `[[ratelimit]]` block in wrangler.toml — enable once confirmed the
+  account supports Workers Rate Limiting.
 
-- [ ] **H3 — Corrupt-but-HTTP-200 feed bytes cached before decode → realtime dark for the window**
+- [x] **H3 — Corrupt-but-HTTP-200 feed bytes cached before decode → realtime dark for the window**
   `workers/web/src/lib/gtfsrt.ts:155` (cache write) vs `:165` (`decodeFeed`)
   Raw upstream bytes are cached as last-known-good before decode. A 200 with corrupt
   protobuf (CDN hiccup, HTML error page) poisons the cache; `decodeFeed` throws on every
@@ -70,7 +76,7 @@ why it matters, and a concrete fix direction.
 
 ## MEDIUM
 
-- [ ] **M1 — Trip-updates staleness invisible on non-502 failures**
+- [x] **M1 — Trip-updates staleness invisible on non-502 failures**
   `src/hooks/useTripUpdates.ts:353-364`
   Hook surfaces `isUpstreamDown` only for a 502, ignoring `query.isError`. On network loss
   or a 500, react-query keeps last successful `data` → minutes-old data renders as "live"

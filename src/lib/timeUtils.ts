@@ -142,6 +142,67 @@ export function formatClockTime(
   });
 }
 
+/** SMART operates in this zone; the GTFS static timetable is in its wall time. */
+export const AGENCY_TIME_ZONE = "America/Los_Angeles";
+
+const AGENCY_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: AGENCY_TIME_ZONE,
+  hour12: false,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+function agencyParts(epochMs: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of AGENCY_PARTS.formatToParts(epochMs)) {
+    if (p.type !== "literal") out[p.type] = Number(p.value);
+  }
+  // Intl renders midnight as hour 24; normalize to 0 so arithmetic is sane.
+  if (out.hour === 24) out.hour = 0;
+  return out;
+}
+
+/** Agency-zone (America/Los_Angeles) offset in minutes at a given instant. */
+function agencyOffsetMinutes(epochMs: number): number {
+  const p = agencyParts(epochMs);
+  const asUTC = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return (asUTC - epochMs) / 60_000;
+}
+
+/**
+ * Format an epoch (seconds) as the agency-zone "HH:MM", independent of the
+ * device timezone. Used for live GTFS-RT departure times, which must read in
+ * SMART's wall time even on an off-Pacific device.
+ */
+export function agencyClockHHMM(epochSeconds: number): string {
+  const p = agencyParts(epochSeconds * 1000);
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}
+
+/**
+ * Convert a scheduled agency-zone wall time ("YYYYMMDD" + "HH:MM") to an epoch
+ * (seconds), independent of the device timezone. The previous device-local
+ * conversion produced wrong delays on a phone set to a non-Pacific zone, since
+ * the static timetable is Pacific wall time. (One offset correction; exact
+ * except inside the twice-yearly DST transition hour, which has no service.)
+ */
+export function agencyWallTimeToEpochSeconds(
+  yyyymmdd: string,
+  hhmm: string
+): number {
+  const year = Number(yyyymmdd.slice(0, 4));
+  const month = Number(yyyymmdd.slice(4, 6));
+  const day = Number(yyyymmdd.slice(6, 8));
+  const [h, m] = hhmm.split(":").map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, h, m);
+  const offsetMin = agencyOffsetMinutes(utcGuess);
+  return Math.floor((utcGuess - offsetMin * 60_000) / 1000);
+}
+
 /**
  * Minutes remaining until a scheduled (or live) time relative to the given Date.
  * Positive = still in the future; negative = already past.

@@ -7,11 +7,24 @@ import { isDev } from "@/lib/env";
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** When any value here changes while the fallback is showing, the boundary
+   *  clears the error and re-renders its children. Pass e.g. `[location.pathname]`
+   *  so navigating away from a crashed route recovers automatically instead of
+   *  "Try Again" re-rendering the identical (still-throwing) tree. */
+  resetKeys?: ReadonlyArray<unknown>;
 }
 
 interface State {
   hasError: boolean;
   error?: Error;
+}
+
+/** Whether two reset-key arrays differ (length or any element by `Object.is`). */
+export function resetKeysChanged(
+  a: ReadonlyArray<unknown> = [],
+  b: ReadonlyArray<unknown> = [],
+): boolean {
+  return a.length !== b.length || a.some((v, i) => !Object.is(v, b[i]));
 }
 
 /**
@@ -34,6 +47,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // You can log the error to an error reporting service here
     // Example: logErrorToService(error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    // Auto-recover when the reset keys change (e.g. the route changed), so an
+    // error tied to one view doesn't strand the whole subtree on the fallback.
+    if (
+      this.state.hasError &&
+      resetKeysChanged(prevProps.resetKeys, this.props.resetKeys)
+    ) {
+      this.setState({ hasError: false, error: undefined });
+    }
   }
 
   private handleRetry = () => {

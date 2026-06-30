@@ -20,6 +20,7 @@ import type {
 import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { MIN_REPORTED_DELAY_SECONDS } from "@/lib/realtimeConstants";
+import { agencyClockHHMM, agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
 
@@ -27,28 +28,26 @@ function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   return fetchGtfsRtJson<GtfsRtTripUpdatesResponse>("/api/gtfsrt/tripupdates");
 }
 
-/** Convert a Unix timestamp (seconds) to "HH:MM" string in local time */
+/**
+ * Convert a Unix timestamp (seconds) to "HH:MM" in the agency timezone — NOT the
+ * device's. The static timetable is Pacific wall time, so live times and the
+ * delay diff below must read in Pacific to stay correct on an off-region device.
+ */
 function unixToTimeString(unix: number): string {
-  const date = new Date(unix * 1000);
-  const h = date.getHours();
-  const m = date.getMinutes();
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  return agencyClockHHMM(unix);
 }
 
 /**
- * Convert a static scheduled time ("HH:MM") on a given date ("YYYYMMDD") to Unix seconds.
- * Uses local time to match unixToTimeString().
+ * Convert a static scheduled time ("HH:MM") on a given date ("YYYYMMDD") to Unix
+ * seconds, interpreting the wall time in the agency timezone to match
+ * unixToTimeString().
  *
  * NOTE: 511.org always sends departureDelay: 0 even for delayed trains — they only
  * update departure.time. To detect real delays we must diff the live departure.time
  * against the scheduled time from the static timetable.
  */
 function scheduledHHMMtoUnix(yyyymmdd: string, hhmm: string): number {
-  const year = parseInt(yyyymmdd.slice(0, 4), 10);
-  const month = parseInt(yyyymmdd.slice(4, 6), 10) - 1; // 0-indexed
-  const day = parseInt(yyyymmdd.slice(6, 8), 10);
-  const [h, m] = hhmm.split(":").map(Number);
-  return Math.floor(new Date(year, month, day, h, m, 0).getTime() / 1000);
+  return agencyWallTimeToEpochSeconds(yyyymmdd, hhmm);
 }
 
 /**

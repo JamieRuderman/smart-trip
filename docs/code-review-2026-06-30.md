@@ -106,7 +106,7 @@ why it matters, and a concrete fix direction.
   *Fix:* extract `liveActivityController.ts`; leave the hook a thin wrapper. (Same shape in
   `TripDetailContent.tsx`, 634 lines — extract pure selectors + the 90-line debug panel.)
 
-- [ ] **M4 — ErrorBoundary never resets; "Try Again" can loop**
+- [x] **M4 — ErrorBoundary never resets; "Try Again" can loop**
   `src/components/ErrorBoundary.tsx:39-45` (wraps `Routes` in `App.tsx:62`)
   `handleRetry` only flips `hasError=false`; re-rendering the identical tree re-throws. An
   error driven by persisted state (e.g. corrupt station pair) is unrecoverable in-app.
@@ -138,7 +138,7 @@ why it matters, and a concrete fix direction.
   *Fix:* drop the interval and derive from the `currentTime` prop, or read `Date.now()`
   inside a stable interval.
 
-- [ ] **M7 — `unixToTimeString` / `scheduledHHMMtoUnix` use device-local TZ, not Pacific**
+- [x] **M7 — `unixToTimeString` / `scheduledHHMMtoUnix` use device-local TZ, not Pacific**
   `src/hooks/useTripUpdates.ts:27-48`
   Convert via device-local `getHours()`/`new Date(y,m,d,h,m)`. In-region offsets cancel; an
   off-Pacific phone shifts live times and delays by the offset. Latent but real.

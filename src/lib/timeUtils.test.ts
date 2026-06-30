@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  agencyClockHHMM,
+  agencyWallTimeToEpochSeconds,
   computeMinutesUntil,
   formatClockTime,
   isTimeInPast,
@@ -116,6 +118,37 @@ describe("isTimeInPast", () => {
     // that must reason across midnight.
     const lateEvening = new Date(2026, 5, 18, 23, 50);
     expect(isTimeInPast(lateEvening, "00:10")).toBe(true);
+  });
+});
+
+describe("agency timezone conversions (Pacific, device-TZ independent)", () => {
+  // Anchored to explicit UTC instants so these assert the agency-zone logic
+  // regardless of the machine's timezone.
+  it("formats a summer (PDT, UTC-7) epoch in Pacific", () => {
+    const utc = Date.UTC(2026, 6, 1, 19, 0) / 1000; // 19:00Z = 12:00 PDT
+    expect(agencyClockHHMM(utc)).toBe("12:00");
+  });
+
+  it("formats a winter (PST, UTC-8) epoch in Pacific", () => {
+    const utc = Date.UTC(2026, 0, 15, 16, 30) / 1000; // 16:30Z = 08:30 PST
+    expect(agencyClockHHMM(utc)).toBe("08:30");
+  });
+
+  it("converts a Pacific wall time to the correct epoch (summer)", () => {
+    expect(agencyWallTimeToEpochSeconds("20260701", "12:00")).toBe(
+      Date.UTC(2026, 6, 1, 19, 0) / 1000,
+    );
+  });
+
+  it("converts a Pacific wall time to the correct epoch (winter)", () => {
+    expect(agencyWallTimeToEpochSeconds("20260115", "08:30")).toBe(
+      Date.UTC(2026, 0, 15, 16, 30) / 1000,
+    );
+  });
+
+  it("round-trips wall time → epoch → wall time", () => {
+    const epoch = agencyWallTimeToEpochSeconds("20260620", "17:45");
+    expect(agencyClockHHMM(epoch)).toBe("17:45");
   });
 });
 

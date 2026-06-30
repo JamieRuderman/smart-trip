@@ -82,6 +82,48 @@ describe("computeLiveTripStatus", () => {
     expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 3 * 60_000);
   });
 
+  it("treats a sub-minute live slip as on-time (matches the client threshold)", () => {
+    // 40 s late: the client floors anything under a minute to on-time, so the
+    // push backend must too — otherwise Math.round(40s) => 1 and the Live
+    // Activity shows "Delayed" while the in-app card reads "On time".
+    const slip = SCHED_DEP_MS / 1000 + 40;
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: slip, arrUnix: SCHED_ARR_MS / 1000 + 40 }),
+      now: SCHED_DEP_MS - 30 * 60_000,
+    });
+    expect(status!.delayMinutes).toBe(0);
+    // Countdown target stays on the scheduled departure, not the +40 s jitter.
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+  });
+
+  it("reports a delay once the slip reaches the one-minute threshold", () => {
+    const lateDep = SCHED_DEP_MS / 1000 + 65; // 1:05 late
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({ depUnix: lateDep }),
+      now: SCHED_DEP_MS - 5 * 60_000,
+    });
+    expect(status!.delayMinutes).toBe(1);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 65_000);
+  });
+
+  it("treats a sub-minute en-route arrival slip as on-time after boarding is pruned", () => {
+    // Boarding stop gone (en route); destination arrival is 45 s past schedule.
+    const status = computeLiveTripStatus({
+      reg: { ...REG, originStartTime: "08:10" },
+      updates: [
+        {
+          scheduleRelationship: "SCHEDULED",
+          startTime: "08:10:00",
+          stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: SCHED_ARR_MS / 1000 + 45 }],
+        },
+      ],
+      now: SCHED_DEP_MS + 60_000,
+    });
+    expect(status!.delayMinutes).toBe(0);
+  });
+
   it("does not count an early live departure as negative delay", () => {
     const earlyDep = SCHED_DEP_MS / 1000 - 2 * 60;
     const status = computeLiveTripStatus({

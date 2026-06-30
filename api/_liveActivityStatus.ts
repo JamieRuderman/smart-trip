@@ -1,5 +1,6 @@
 import { GTFS_STOP_ID_TO_PLATFORM } from "../src/data/generated/stationPlatforms.generated.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
+import { delayMinutesFromSeconds } from "../src/lib/tripDelay.js";
 
 /**
  * Pure derivation of a registered trip's LIVE departure/arrival/delay from the
@@ -46,6 +47,23 @@ export interface LiveTripStatus {
  *  considered the same run. Half a typical headway buffer; comfortably larger
  *  than any realistic delay. */
 const MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** Whole-minute lateness of `liveMs` past `scheduledMs`, or 0 when on-time —
+ *  computed by the SAME `delayMinutesFromSeconds` the client uses, so the pushed
+ *  "Delayed" pill can never disagree with the in-app status (a <1 min feed slip
+ *  reads on-time on both surfaces). */
+function delayMinutesBetween(liveMs: number, scheduledMs: number): number {
+  const delaySeconds = Math.max(0, liveMs - scheduledMs) / 1000;
+  return delayMinutesFromSeconds(delaySeconds) ?? 0;
+}
+
+/** Positive lateness in ms of `liveMs` past `scheduledMs`, floored to 0 unless
+ *  it counts as a delay (see `delayMinutesBetween`) so a sub-minute slip never
+ *  shifts the countdown target off the scheduled instant. */
+function effectiveDelayMs(liveMs: number, scheduledMs: number): number {
+  const rawMs = Math.max(0, liveMs - scheduledMs);
+  return delayMinutesBetween(liveMs, scheduledMs) > 0 ? rawMs : 0;
+}
 
 /** How far past the best-known arrival a run must be before a missing feed match
  *  is treated as finished. Product choice: clear at the displayed arrival
@@ -171,11 +189,11 @@ function statusFromTrip(
     const liveArrivalMs = to.arrivalTime * 1000;
     // Arrival lateness ≈ boarding lateness; 511 always reports
     // `departureDelay: 0`, so we diff times, not deltas.
-    const delayMs = Math.max(0, liveArrivalMs - reg.arrivalEpochMs);
+    const delayMs = effectiveDelayMs(liveArrivalMs, reg.arrivalEpochMs);
     return {
       departureEpochMs: reg.departureEpochMs + delayMs,
       arrivalEpochMs: liveArrivalMs,
-      delayMinutes: Math.round(delayMs / 60_000),
+      delayMinutes: delayMinutesBetween(liveArrivalMs, reg.arrivalEpochMs),
       isCanceled,
       isEnded: now >= liveArrivalMs,
     };
@@ -203,8 +221,9 @@ function statusFromBoarding(
 ): LiveTripStatus {
   const isCanceled = update.scheduleRelationship === "CANCELED";
   const liveDepartureMs = from.departureTime! * 1000;
-  // Only count lateness; an early/on-time live time keeps the scheduled target.
-  const delayMs = Math.max(0, liveDepartureMs - reg.departureEpochMs);
+  // Only count lateness past the on-time threshold; an early/on-time/sub-minute
+  // live time keeps the scheduled target so the widget agrees with the app.
+  const delayMs = effectiveDelayMs(liveDepartureMs, reg.departureEpochMs);
   const to = findDestination(reg, update);
   const arrivalEpochMs =
     to?.arrivalTime != null ? to.arrivalTime * 1000 : reg.arrivalEpochMs + delayMs;
@@ -212,7 +231,7 @@ function statusFromBoarding(
   return {
     departureEpochMs: reg.departureEpochMs + delayMs,
     arrivalEpochMs,
-    delayMinutes: Math.round(delayMs / 60_000),
+    delayMinutes: delayMinutesBetween(liveDepartureMs, reg.departureEpochMs),
     isCanceled,
     isEnded: now >= arrivalEpochMs,
   };

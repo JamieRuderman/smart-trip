@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { fetchGtfsRtJson, isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
+import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
   stationIndexMap,
@@ -17,7 +18,6 @@ import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
-const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
 
 function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   return fetchGtfsRtJson<GtfsRtTripUpdatesResponse>("/api/gtfsrt/tripupdates");
@@ -89,7 +89,7 @@ function computeDelayMinutes(
   startDate: string
 ): number | undefined {
   const delaySeconds = liveUnix - scheduledHHMMtoUnix(startDate, scheduledHHMM);
-  return delaySeconds >= MIN_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
+  return delayMinutesFromSeconds(delaySeconds) ?? undefined;
 }
 
 /**
@@ -217,8 +217,8 @@ function deriveScheduledStatus(
     scheduledDepartureParam && update.startDate
       ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
       : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
-        ? Math.round(fromUpdate.departureDelay / 60)
+        fromUpdate.departureDelay != null
+        ? (delayMinutesFromSeconds(fromUpdate.departureDelay) ?? undefined)
         : undefined;
 
   // The map key is the static scheduled departure — so ScheduleResults can

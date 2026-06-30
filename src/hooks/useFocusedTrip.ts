@@ -37,6 +37,7 @@ import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { reminderIdFor } from "@/lib/notificationId";
+import { cleanTimeString } from "@/lib/timeUtils";
 import { logger } from "@/lib/logger";
 import i18n from "@/lib/i18n";
 
@@ -112,7 +113,7 @@ function originStartTimeFor(
   southbound: boolean,
 ): string | undefined {
   const raw = southbound ? trip.times[0] : trip.times[trip.times.length - 1];
-  const cleaned = raw?.replace(/[*~]/g, "");
+  const cleaned = raw ? cleanTimeString(raw) : undefined;
   return cleaned && cleaned !== "--" ? cleaned : undefined;
 }
 

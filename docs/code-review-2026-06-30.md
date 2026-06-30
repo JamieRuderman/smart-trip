@@ -47,7 +47,7 @@ why it matters, and a concrete fix direction.
   *Fix:* decode before writing to cache (only cache decodable bytes); on decode failure
   treat as a 511 failure — serve prior good bytes / evict the key so the next poll refetches.
 
-- [ ] **H4 — Three different definitions of "delayed" across surfaces**
+- [x] **H4 — Three different definitions of "delayed" across surfaces**
   `src/hooks/useTripUpdates.ts:20` (`MIN_DELAY_SECONDS = 60`),
   `src/hooks/useMapTrains.ts:99` (hardcoded `>= 180`),
   `src/lib/realtimeConstants.ts:7` (`DELAY_MINUTES_THRESHOLD = 3`)
@@ -101,7 +101,7 @@ why it matters, and a concrete fix direction.
   *Fix:* reset on `location.pathname` change (key the boundary or `resetKeys`); send errors
   to a real sink.
 
-- [ ] **M5 — Pervasive small-helper duplication (DRY)**
+- [x] **M5 — Pervasive small-helper duplication (DRY)**
   - `formatClockTime` (epoch→locale time) verbatim in `ReminderDialog.tsx:38` &
     `DepartureReminder.tsx:82`, inlined in `FocusedTripCard.tsx:212` & `ServiceAlert.tsx:67`.
   - Local `YYYY-MM-DD` key in `scheduleUtils.ts:318`, `focusedTrip.ts:254`,
@@ -113,8 +113,12 @@ why it matters, and a concrete fix direction.
   - `serviceDate→weekday` in `TripDetailContent.tsx:101` & `FocusedTripCard.tsx:201`.
   *Fix:* one helper each in `timeUtils.ts` (`formatClockTime`, `toLocalDateKey`,
   `parseServiceDate`, `serviceDateWeekdayLabel`); reuse everywhere.
+  *Done:* added the four `timeUtils` helpers (+ tests) and `isTrainDelayed`; wired all
+  consumers. Two deliberate leave-as-is: `ServiceAlert.tsx:67` (no `timeFormat` in scope —
+  it intentionally uses the locale default, not the 12/24h preference) and
+  `RoutePairLandingPage.tsx:45` (SEO prerender path, kept isolated from the client lib).
 
-- [ ] **M6 — `useCountdown` interval recreated every tick, never usefully fires**
+- [x] **M6 — `useCountdown` interval recreated every tick, never usefully fires**
   `src/hooks/useCountdown.ts:17-24`
   `currentTime` is both a dep and captured in the `setInterval` closure, so each parent tick
   rebuilds the 10s interval before it fires; the value only advances via the effect body.

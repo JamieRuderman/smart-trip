@@ -7,7 +7,7 @@ import {
 import bundledScheduleOverrides from "@/data/scheduleOverrides";
 import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
-import { parseTimeToMinutes, isTimeInPast } from "./timeUtils";
+import { parseTimeToMinutes, isTimeInPast, toLocalDateKey } from "./timeUtils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
 import type {
   Station,
@@ -315,12 +315,7 @@ export function getNextFerryDeparture(now: Date): FerryConnection | null {
  */
 let activeScheduleOverrides: ScheduleOverrides = { ...bundledScheduleOverrides };
 
-function localDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+const localDateKey = toLocalDateKey;
 
 /**
  * The schedule type that should be used for `now`. Defers to GTFS-derived

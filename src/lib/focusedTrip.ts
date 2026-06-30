@@ -4,6 +4,7 @@ import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
+import { parseTimeToMinutes, toLocalDateKey } from "@/lib/timeUtils";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
@@ -102,8 +103,9 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
 }
 
 function hhmmToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.replace(/[*~]/g, "").split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
+  // Tolerate a malformed HH:MM (→ 0) the way the old inline parse did.
+  const minutes = parseTimeToMinutes(hhmm);
+  return Number.isFinite(minutes) ? minutes : 0;
 }
 
 /**
@@ -252,11 +254,7 @@ export function saveFocusedTrip(trip: FocusedTrip | null): void {
 }
 
 function toServiceDate(epochMs: number): string {
-  const d = new Date(epochMs);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return toLocalDateKey(new Date(epochMs));
 }
 
 const LEGACY_REMINDER_KEY = "smart-train-departure-reminders";

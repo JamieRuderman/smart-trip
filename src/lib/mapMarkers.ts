@@ -1,7 +1,7 @@
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { FONT_FAMILY } from "@/components/SmartLineDiagram/tokens";
 import { TRIP_ICON_PATH } from "@/components/icons/TripIcon";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import { isTrainDelayed } from "@/lib/realtimeConstants";
 
 /** Hex colors mirroring the smart-train-green / smart-gold Tailwind tokens.
  *  Needed because Mapbox marker elements are built with raw inline styles. */
@@ -57,10 +57,7 @@ export function createStationElement(): HTMLElement {
 }
 
 export function createTrainElement(train: MapTrain, selected: boolean): HTMLElement {
-  const isDelayed =
-    !train.isCanceled &&
-    train.delayMinutes !== null &&
-    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const isDelayed = isTrainDelayed(train);
   const bgColor = train.isCanceled
     ? MARKER_COLOR.canceled
     : isDelayed

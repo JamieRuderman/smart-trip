@@ -15,9 +15,9 @@ import type {
 } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { MIN_REPORTED_DELAY_SECONDS } from "@/lib/realtimeConstants";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
-const MIN_DELAY_SECONDS = 60; // <1 min counts as on-time
 
 function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   return fetchGtfsRtJson<GtfsRtTripUpdatesResponse>("/api/gtfsrt/tripupdates");
@@ -89,7 +89,7 @@ function computeDelayMinutes(
   startDate: string
 ): number | undefined {
   const delaySeconds = liveUnix - scheduledHHMMtoUnix(startDate, scheduledHHMM);
-  return delaySeconds >= MIN_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
+  return delaySeconds >= MIN_REPORTED_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
 }
 
 /**
@@ -217,7 +217,7 @@ function deriveScheduledStatus(
     scheduledDepartureParam && update.startDate
       ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
       : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_DELAY_SECONDS
+        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_REPORTED_DELAY_SECONDS
         ? Math.round(fromUpdate.departureDelay / 60)
         : undefined;
 

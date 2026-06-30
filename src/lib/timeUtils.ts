@@ -91,6 +91,58 @@ export function formatDateYYYYMMDD(date: Date): string {
 }
 
 /**
+ * Local-time "YYYY-MM-DD" service-date key for a Date. Uses the device's local
+ * calendar day (the app treats "today" as the local day), so it is NOT the same
+ * as `date.toISOString().slice(0,10)`, which is UTC. Single source of truth for
+ * the key that was previously re-derived inline in several components/hooks.
+ */
+export function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Parse a "YYYY-MM-DD" service date into a local-midnight Date. Inverse of
+ * {@link toLocalDateKey}. Returns the date at 00:00 local time on that day.
+ */
+export function parseServiceDate(serviceDate: string): Date {
+  const [y, mo, d] = serviceDate.split("-").map(Number);
+  return new Date(y, mo - 1, d);
+}
+
+/**
+ * Weekday name (e.g. "Monday") for a "YYYY-MM-DD" service date, localized to
+ * `locale`. Used when showing a future service day instead of bare clock times.
+ */
+export function serviceDateWeekdayLabel(
+  serviceDate: string,
+  locale: string
+): string {
+  return parseServiceDate(serviceDate).toLocaleDateString(locale, {
+    weekday: "long",
+  });
+}
+
+/**
+ * Format an absolute epoch (ms) as a locale clock time ("3:42 PM" / "15:42"),
+ * honoring the user's 12h/24h preference. Single source of truth for the
+ * previously copy-pasted `formatClockTime` helpers.
+ */
+export function formatClockTime(
+  epoch: number,
+  timeFormat: "12h" | "24h",
+  locale: string
+): string {
+  return new Date(epoch).toLocaleTimeString(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: timeFormat === "12h",
+  });
+}
+
+/**
  * Minutes remaining until a scheduled (or live) time relative to the given Date.
  * Positive = still in the future; negative = already past.
  */

@@ -3,7 +3,7 @@ import { positionOnPath } from "@/lib/pathSnap";
 import { trainStationProgress } from "@/lib/trainProgress";
 import { gpsStationProgress } from "@/lib/trainGpsProgress";
 import { scheduledProgress } from "@/lib/trainMotion";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import { isTrainDelayed } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
 
 interface TrainMarkerProps {
@@ -52,10 +52,7 @@ export function TrainMarker({
     resolved.direction,
   );
 
-  const isDelayed =
-    !train.isCanceled &&
-    train.delayMinutes !== null &&
-    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const isDelayed = isTrainDelayed(train);
 
   // Riding swaps the on-time accent for blue; delayed/canceled win so the
   // status signal isn't lost.

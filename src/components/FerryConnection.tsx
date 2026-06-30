@@ -5,6 +5,7 @@ import { Ship, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { stateText } from "@/lib/tripTheme";
 import { isTimeInPast } from "@/lib/scheduleUtils";
+import { calculateTimeDifference } from "@/lib/timeUtils";
 import { useTranslation } from "react-i18next";
 
 interface FerryConnectionProps {
@@ -33,26 +34,15 @@ export function FerryConnection({
 }: FerryConnectionProps) {
   const { t } = useTranslation();
 
-  // Calculate transfer time in minutes
-  const calculateDelta = (a: string, b: string): number => {
-    const clean = (t: string) => t.replace(/[*~]/g, "");
-    const parseTime = (timeStr: string): number => {
-      const [hours, minutes] = timeStr.split(":").map(Number);
-      return hours * 60 + minutes;
-    };
-    const delta = parseTime(clean(b)) - parseTime(clean(a));
-    return delta;
-  };
-
   let transferTime = 0;
 
   if (inbound) {
     if (trainDepartureTime) {
-      transferTime = calculateDelta(ferry.arrive, trainDepartureTime);
+      transferTime = calculateTimeDifference(ferry.arrive, trainDepartureTime);
     }
   } else {
     if (trainArrivalTime) {
-      transferTime = calculateDelta(trainArrivalTime, ferry.depart);
+      transferTime = calculateTimeDifference(trainArrivalTime, ferry.depart);
     }
   }
 

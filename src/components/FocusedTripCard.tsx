@@ -21,6 +21,11 @@ import {
   SHEET_TRANSITION_MS,
 } from "@/lib/animationConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import {
+  formatClockTime,
+  serviceDateWeekdayLabel,
+  toLocalDateKey,
+} from "@/lib/timeUtils";
 import { SectionCard } from "@/components/ui/section-card";
 import { TripIcon } from "./icons/TripIcon";
 import { WalkIcon } from "./icons/WalkIcon";
@@ -195,25 +200,14 @@ function FocusedTripCardInner({
   // weekend train chosen on a weekday). The "leave in X" countdown only makes
   // sense for today's run; for a future day we show its weekday instead so the
   // bare clock times aren't read as "today".
-  const todayKey = `${currentTime.getFullYear()}-${String(
-    currentTime.getMonth() + 1,
-  ).padStart(2, "0")}-${String(currentTime.getDate()).padStart(2, "0")}`;
-  const isFutureService = focusedTrip.serviceDate !== todayKey;
+  const isFutureService =
+    focusedTrip.serviceDate !== toLocalDateKey(currentTime);
   const serviceDayLabel = isFutureService
-    ? (() => {
-        const [y, mo, d] = focusedTrip.serviceDate.split("-").map(Number);
-        return new Date(y, mo - 1, d).toLocaleDateString(i18n.language, {
-          weekday: "long",
-        });
-      })()
+    ? serviceDateWeekdayLabel(focusedTrip.serviceDate, i18n.language)
     : null;
   const reminder = focusedTrip.reminder;
   const reminderTimeLabel = reminder
-    ? new Date(reminder.reminderAt).toLocaleTimeString(i18n.language, {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: timeFormat === "12h",
-      })
+    ? formatClockTime(reminder.reminderAt, timeFormat, i18n.language)
     : null;
 
   // Minutes until the user should head out — the armed reminder fires

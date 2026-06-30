@@ -83,13 +83,20 @@ why it matters, and a concrete fix direction.
   with no staleness indicator. (`useVehiclePositions` guards on feed age; this doesn't.)
   *Fix:* surface `isError`/age-vs-freshness so the UI can mark trip-update data stale.
 
-- [ ] **M2 — No timezone pinning in tests; riskiest time/geometry math untested**
+- [x] **M2 — No timezone pinning in tests; riskiest time/geometry math untested**
   No `vitest.config`/`setupFiles`/`process.env.TZ`. Local-time tests pass only because CI's
   TZ aligns. Untested: `trainMotion.scheduledProgress`, `railProjection.ts`, the `userRiding/`
   state machine (except cold-start fallback), `isTimeInPast`, `getNextTripIndex`/
   `getFirstInProgressTripIndex`.
   *Fix:* pin `TZ=America/Los_Angeles` in a setup file; add overnight + boundary tests for
   `trainMotion`, `railProjection`, and `userRiding` (`boarding`/`release`/`corridor`/correlation).
+  *Done:* pinned `TZ=America/Los_Angeles` via `src/test/setup.ts` (wired through vite.config
+  `test.setupFiles`). Extracted the pure `interpolateStationProgress` from `trainMotion` and
+  tested it (clamp/interp/delay/null-gap/zero-span/NB order); added `isTimeInPast` (incl. the
+  documented overnight limit), `getNextTripIndex`/`getFirstInProgressTripIndex`, and
+  `railProjection` (snap/clamp/fractional/haversine-fallback) tests. Suite 282→308.
+  *Follow-up:* the `userRiding` state machine (boarding/release/corridor/correlation) is still
+  largely untested — left for a dedicated pass (large stateful machine).
 
 - [ ] **M3 — `useFocusedTrip.ts` (659 lines) fuses three modules**
   `src/hooks/useFocusedTrip.ts`

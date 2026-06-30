@@ -72,6 +72,45 @@ function schedMinutesFor(trip: ProcessedTrip): Array<number | null> {
 }
 
 /**
+ * Pure station-index interpolation: given each station's scheduled minute-of-day
+ * (`baseMinutes`, indexed by station; null = no stop there), the travel `order`
+ * (station indices in the direction of travel), the current `nowMinutes`, and a
+ * `delay` offset, return the fractional station index the train is at.
+ *
+ *  - before the first timed stop → clamp to that stop's index
+ *  - between two stops → linear fraction by clock time across the segment
+ *  - a zero/negative-span segment → clamp to the upcoming stop (no divide-by-0)
+ *  - after the last timed stop → clamp to the terminus
+ *  - no timed stops at all → null
+ *
+ * Extracted from {@link scheduledProgress} so the (otherwise schedule-cache and
+ * generated-data coupled) interpolation can be unit-tested directly.
+ */
+export function interpolateStationProgress(
+  baseMinutes: ReadonlyArray<number | null>,
+  order: readonly number[],
+  nowMinutes: number,
+  delay: number,
+): number | null {
+  let prevIdx: number | null = null;
+  for (const idx of order) {
+    const baseT = baseMinutes[idx];
+    if (baseT == null) continue;
+    const t = baseT + delay;
+    if (nowMinutes < t) {
+      if (prevIdx == null) return idx;
+      const prevT = baseMinutes[prevIdx]! + delay;
+      const span = t - prevT;
+      if (span <= 0) return idx;
+      const frac = (nowMinutes - prevT) / span;
+      return prevIdx + (idx - prevIdx) * frac;
+    }
+    prevIdx = idx;
+  }
+  return prevIdx;
+}
+
+/**
  * Compute a train's progress along its schedule at wall time `now`.
  * Returns null when the train can't be matched to a static trip.
  */
@@ -96,20 +135,6 @@ export function scheduledProgress(
   const nowMinutes = minutesOfDay(now);
   const order = direction === "S" ? ORDER_SB : ORDER_NB;
 
-  let prevIdx: number | null = null;
-  for (const idx of order) {
-    const baseT = base[idx];
-    if (baseT == null) continue;
-    const t = baseT + delay;
-    if (nowMinutes < t) {
-      if (prevIdx == null) return { progress: idx, direction };
-      const prevT = base[prevIdx]! + delay;
-      const span = t - prevT;
-      if (span <= 0) return { progress: idx, direction };
-      const frac = (nowMinutes - prevT) / span;
-      return { progress: prevIdx + (idx - prevIdx) * frac, direction };
-    }
-    prevIdx = idx;
-  }
-  return prevIdx != null ? { progress: prevIdx, direction } : null;
+  const progress = interpolateStationProgress(base, order, nowMinutes, delay);
+  return progress != null ? { progress, direction } : null;
 }

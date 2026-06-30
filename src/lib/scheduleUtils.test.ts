@@ -1,11 +1,72 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getTodayScheduleType, setScheduleData } from "@/lib/scheduleUtils";
+import {
+  getFirstInProgressTripIndex,
+  getNextTripIndex,
+  getTodayScheduleType,
+  setScheduleData,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import {
   bundledSchedulePayload,
   isSchedulePayload,
   type SchedulePayload,
 } from "@/data/scheduleData";
+
+/** Minimal ProcessedTrip — these helpers only read departure/arrival times. */
+function trip(departureTime: string, arrivalTime: string): ProcessedTrip {
+  return { departureTime, arrivalTime } as ProcessedTrip;
+}
+
+describe("getNextTripIndex", () => {
+  // 2026-06-18 09:00 local (TZ pinned to Pacific in setup).
+  const now = new Date(2026, 5, 18, 9, 0);
+  const trips = [
+    trip("08:00", "08:45"),
+    trip("08:30", "09:15"),
+    trip("09:30", "10:15"),
+    trip("10:00", "10:45"),
+  ];
+
+  it("returns the first trip that has not yet departed", () => {
+    expect(getNextTripIndex(trips, now)).toBe(2); // 09:30 is the next departure
+  });
+
+  it("returns -1 when every trip has already departed", () => {
+    const allPast = new Date(2026, 5, 18, 23, 0);
+    expect(getNextTripIndex(trips, allPast)).toBe(-1);
+  });
+
+  it("returns 0 before the first departure", () => {
+    const early = new Date(2026, 5, 18, 6, 0);
+    expect(getNextTripIndex(trips, early)).toBe(0);
+  });
+});
+
+describe("getFirstInProgressTripIndex", () => {
+  const trips = [
+    trip("08:00", "08:45"),
+    trip("08:30", "09:15"),
+    trip("09:30", "10:15"),
+  ];
+
+  it("finds a trip whose departure is past but arrival is not", () => {
+    // 09:00: trip 1 (08:30→09:15) has departed but not arrived.
+    const now = new Date(2026, 5, 18, 9, 0);
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(1);
+  });
+
+  it("returns -1 in a gap between trips", () => {
+    // 09:20: trip 1 arrived (09:15), trip 2 not departed (09:30).
+    const now = new Date(2026, 5, 18, 9, 20);
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(-1);
+  });
+
+  it("returns -1 before any trip starts", () => {
+    const now = new Date(2026, 5, 18, 7, 0);
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(-1);
+  });
+});
 
 describe("getTodayScheduleType", () => {
   afterEach(() => {

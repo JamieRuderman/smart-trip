@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeMinutesUntil,
   formatClockTime,
+  isTimeInPast,
   parseServiceDate,
   parseTimeToMinutes,
   serviceDateWeekdayLabel,
@@ -85,6 +86,36 @@ describe("serviceDateWeekdayLabel", () => {
   it("returns the localized weekday name for a service date", () => {
     // 2026-06-18 is a Thursday.
     expect(serviceDateWeekdayLabel("2026-06-18", "en-US")).toBe("Thursday");
+  });
+});
+
+describe("isTimeInPast", () => {
+  // 2026-06-18 14:30 local (TZ pinned to America/Los_Angeles in setup).
+  const now = new Date(2026, 5, 18, 14, 30);
+
+  it("is true for an earlier time today and false for a later one", () => {
+    expect(isTimeInPast(now, "14:29")).toBe(true);
+    expect(isTimeInPast(now, "14:31")).toBe(false);
+  });
+
+  it("treats the exact current minute boundary as not-yet-past", () => {
+    // tripTime is set to HH:MM:00; now carries 0 seconds here, so 14:30 == now
+    // and the strict `<` comparison reports it as not past.
+    expect(isTimeInPast(now, "14:30")).toBe(false);
+  });
+
+  it("strips the * / ~ schedule markers before comparing", () => {
+    expect(isTimeInPast(now, "14:29*")).toBe(true);
+    expect(isTimeInPast(now, "~14:31")).toBe(false);
+  });
+
+  it("compares within the same calendar day only (documents overnight limit)", () => {
+    // KNOWN LIMITATION: isTimeInPast anchors HH:MM to *today*, with no rollover.
+    // A 00:10 trip evaluated at 23:50 is reported as already past. This is inert
+    // for SMART (no post-midnight service) but is a real edge for any caller
+    // that must reason across midnight.
+    const lateEvening = new Date(2026, 5, 18, 23, 50);
+    expect(isTimeInPast(lateEvening, "00:10")).toBe(true);
   });
 });
 

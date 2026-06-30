@@ -87,12 +87,34 @@ function sameFocusIdentity(
  *  when the sync effect re-fires with unchanged data (RT poll, clock ticks). */
 const lastSentActivityContent = new Map<string, string>();
 
+/** Last registration POSTed per activity id — only refreshed on a confirmed-OK
+ *  POST, so a failed attempt isn't cached and re-registration retries on the
+ *  next trigger. Keeps the self-healing re-register (below) from spamming the
+ *  backend with identical payloads on every drift/delay sync tick. */
+const lastSentRegistration = new Map<string, string>();
+
+/** (Re-)POST a registration only when it differs from the last one the backend
+ *  accepted for this activity. The backend bakes the armed reminder's lead into
+ *  every locked-screen push, so it MUST hold the current lead or a delay push
+ *  drops the "Leave in" stage — this is the safety net that re-asserts the lead
+ *  if the arm-time POST was lost (offline) or raced the activity-id commit. */
+async function postRegistrationDeduped(
+  registration: LiveActivityRegistration,
+): Promise<void> {
+  const json = JSON.stringify(registration);
+  if (lastSentRegistration.get(registration.id) === json) return;
+  if (await registerPushActivity(registration)) {
+    lastSentRegistration.set(registration.id, json);
+  }
+}
+
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
  *  Island), if one is running. Also deregisters it from the push backend when
  *  push updates are enabled. Safe no-op everywhere else. */
 async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
+  lastSentRegistration.delete(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
   if (isLiveActivityPushEnabled()) {
     await deregisterPushActivity(focused.liveActivityId);
@@ -162,7 +184,7 @@ async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void> {
   const id = focused.liveActivityId;
   if (!id) return;
   const registration = buildRegistrationForFocus(focused, id);
-  if (registration) await registerPushActivity(registration);
+  if (registration) await postRegistrationDeduped(registration);
 }
 
 /**
@@ -375,7 +397,7 @@ export async function reconcileTripActivities(): Promise<void> {
   // refreshes the server-side TTLs), so re-POST on every boot.
   if (focused && keep && isLiveActivityPushEnabled()) {
     const registration = buildRegistrationForFocus(focused, keep);
-    if (registration) await registerPushActivity(registration);
+    if (registration) await postRegistrationDeduped(registration);
   }
 }
 
@@ -620,6 +642,16 @@ export function useFocusedTrip() {
       const current = loadFocusedTrip();
       const id = current?.liveActivityId;
       if (!id) return;
+      // Self-heal the push registration alongside the content sync: this effect
+      // fires exactly when a leave-in is at risk (delay/phase/reminder change,
+      // and the first time the activity id commits), so re-asserting the armed
+      // reminder's lead here closes the gap where the arm-time POST was lost or
+      // raced the id — without it a later delay push would drop "Leave in".
+      // Deduped, so unchanged registrations don't re-hit the backend.
+      if (current && isLiveActivityPushEnabled()) {
+        const registration = buildRegistrationForFocus(current, id);
+        if (registration) void postRegistrationDeduped(registration);
+      }
       const content = buildContentState({
         departureEpochMs: args.departureAt,
         arrivalEpochMs: args.arrivalAt,

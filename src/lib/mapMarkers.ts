@@ -216,6 +216,26 @@ export function createTrainElement(train: MapTrain, selected: boolean): HTMLElem
   return wrapper;
 }
 
+/**
+ * Signature of everything {@link createTrainElement} renders EXCEPT position.
+ * Lets the map reuse a marker's DOM across polls and rebuild its inner content
+ * only when appearance actually changes (color, heading, number, selection) —
+ * a position-only move just calls `marker.setLngLat`, no DOM churn.
+ */
+export function trainMarkerSignature(
+  train: MapTrain,
+  selected: boolean,
+): string {
+  return [
+    train.isCanceled,
+    isTrainDelayed(train),
+    train.bearing ?? "",
+    train.directionId ?? "",
+    train.tripNumber ?? "",
+    selected,
+  ].join("|");
+}
+
 export function createUserLocationElement(): HTMLElement {
   const el = document.createElement("div");
   el.style.cssText = [

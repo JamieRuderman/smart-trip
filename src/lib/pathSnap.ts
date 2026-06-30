@@ -63,10 +63,14 @@ export function positionOnPath(
   pathEl: SVGPathElement,
   stationArcs: number[],
   direction: "S" | "N" = "S",
+  /** Total path length. Pass the value cached at mount to avoid a forced
+   *  layout (`getTotalLength`) on every call — the path is static after mount.
+   *  Falls back to reading it when omitted. */
+  pathLength?: number,
 ): PathPosition {
   if (stationArcs.length < 2) return { x: 0, y: 0, bearing: 0 };
 
-  const L = pathEl.getTotalLength();
+  const L = pathLength ?? pathEl.getTotalLength();
   const last = stationArcs.length - 1;
   const p = Math.max(0, Math.min(last, progress));
   const i = Math.floor(p);

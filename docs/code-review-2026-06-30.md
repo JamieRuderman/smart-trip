@@ -17,7 +17,7 @@ why it matters, and a concrete fix direction.
 
 ## HIGH
 
-- [ ] **H1 — Mapbox train markers destroyed and rebuilt every 15s poll**
+- [x] **H1 — Mapbox train markers destroyed and rebuilt every 15s poll**
   `src/pages/Map.tsx:347-366`
   Effect unconditionally `marker.remove()` + `new mapboxgl.Marker()` + full
   `createTrainElement()` for every train even when only position changed (`trains` is a
@@ -63,7 +63,7 @@ why it matters, and a concrete fix direction.
   *Fix:* one `isTrainDelayed(train)` helper keyed on a single `DELAY_MINUTES_THRESHOLD`;
   decide the threshold intentionally.
 
-- [ ] **H5 — SmartLineDiagram recomputes SVG path geometry per-train, per-second**
+- [x] **H5 — SmartLineDiagram recomputes SVG path geometry per-train, per-second**
   `src/components/SmartLineDiagram/index.tsx:151,257-280`, `TrainMarker.tsx:44-53`,
   `src/lib/pathSnap.ts`
   `useClockTick(1000)` re-renders every (non-memoized) `TrainMarker` each second, each
@@ -141,10 +141,10 @@ why it matters, and a concrete fix direction.
 
 ## LOW
 
-- [ ] **L1 — `ThemeProvider` context value not memoized** — `src/components/ThemeProvider.tsx:59-65`:
+- [x] **L1 — `ThemeProvider` context value not memoized** — `src/components/ThemeProvider.tsx:59-65`:
   `{theme,setTheme}` is a fresh object each render; latent wide re-render of `useTheme()`
   consumers. Wrap in `useMemo`/`useCallback`.
-- [ ] **L2 — Clock timers don't pause when tab hidden** — `useNow.ts`,
+- [x] **L2 — Clock timers don't pause when tab hidden** — `useNow.ts`,
   `SmartLineDiagram/useClockTick.ts`, `useCountdown.ts` keep firing in background. Copy the
   visibility guard already in `TrainScheduleApp.tsx:79`.
 - [ ] **L3 — `useUserPreferences` spreads parsed JSON without shape validation** —

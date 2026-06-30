@@ -269,6 +269,7 @@ export function SmartLineDiagram({
                   train={train}
                   pathEl={pathRef.current!}
                   stationArcs={snap.arcs}
+                  pathLength={snap.totalLength}
                   selected={train.key === selectedTrainKey}
                   userRiding={isUserRiding}
                   overrideLat={isUserRiding ? userLat : null}

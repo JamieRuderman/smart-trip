@@ -73,11 +73,20 @@ export async function registerPushActivity(
   registration: LiveActivityRegistration,
 ): Promise<boolean> {
   try {
-    await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
+    const response = await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registration),
     });
+    // `fetch` only rejects on a network error — a 4xx/5xx still resolves, so the
+    // backend may NOT hold the registration. Report those as failures too, or a
+    // deduping caller would cache a rejected payload and never retry it.
+    if (!response.ok) {
+      logger.warn(
+        `Live Activity push registration rejected (HTTP ${response.status})`,
+      );
+      return false;
+    }
     return true;
   } catch (error) {
     // The activity stays live with a working local countdown; only the locked-

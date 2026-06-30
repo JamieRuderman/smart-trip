@@ -136,6 +136,11 @@ describe("registerPushActivity", () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     await expect(registerPushActivity(REG)).resolves.toBe(false);
   });
+
+  it("reports failure on a non-2xx response (fetch resolves but the backend rejected)", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response);
+    await expect(registerPushActivity(REG)).resolves.toBe(false);
+  });
 });
 
 describe("deregisterPushActivity", () => {

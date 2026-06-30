@@ -65,21 +65,25 @@ export async function startAndRegisterPushActivity(
  * (Re-)POST a registration to the backend. Idempotent upsert keyed on the
  * activity id, so it doubles as the boot-time heal for a start whose original
  * registration POST failed (offline at focus time) — and refreshes the
- * server-side TTLs as a bonus. Best-effort; never throws.
+ * server-side TTLs as a bonus. Best-effort; never throws. Returns whether the
+ * POST reached the server, so callers that dedupe re-registrations can avoid
+ * caching a failed attempt (and so retry it on the next trigger).
  */
 export async function registerPushActivity(
   registration: LiveActivityRegistration,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registration),
     });
+    return true;
   } catch (error) {
     // The activity stays live with a working local countdown; only the locked-
     // screen delay correction is degraded until the next registration attempt.
     logger.warn("Live Activity push registration failed", error);
+    return false;
   }
 }
 

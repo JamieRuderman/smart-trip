@@ -128,9 +128,13 @@ describe("registerPushActivity", () => {
     );
   });
 
-  it("never throws on a network failure", async () => {
+  it("reports success when the POST reaches the server", async () => {
+    await expect(registerPushActivity(REG)).resolves.toBe(true);
+  });
+
+  it("never throws on a network failure (reports failure)", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
-    await expect(registerPushActivity(REG)).resolves.toBeUndefined();
+    await expect(registerPushActivity(REG)).resolves.toBe(false);
   });
 });
 

@@ -314,6 +314,30 @@ describe("planTick", () => {
     );
   });
 
+  it("keeps and shifts the leave-in countdown when a delay update is pushed", () => {
+    // A delay surfaces while the leave alarm is still pending: the push must say
+    // "Delayed" AND keep the "Leave in" stage, with the leave instant shifted by
+    // the delay — never drop back to "Departs in" (the reported regression).
+    const liveDep = SCHED_DEP_MS + 5 * 60_000; // +5 min delay
+    const now = SCHED_DEP_MS - 20 * 60_000; // 08:10, before the (shifted) leave instant
+    const plan = planTick({
+      reg: REG_WITH_REMINDER,
+      token: "tok",
+      // Last push was on-time with the alarm still pending — so the delay is the
+      // change that earns this push.
+      lastSent: { ...PRE_DEPARTURE_SENT, alarmPending: true },
+      updates: boardingFeed(liveDep / 1000),
+      now,
+    });
+    expect(plan.push?.event).toBe("update");
+    const values = contentValues(plan);
+    expect(values.statusText).toBe("Delayed");
+    expect(values.reminderSet).toBe("true");
+    expect(values.alarmPending).toBe("true");
+    // Leave instant rides the live departure − lead, so "Leave in" stays accurate.
+    expect(values.reminderEpochMs).toBe(String(liveDep - REMINDER_LEAD_MIN * 60_000));
+  });
+
   it("forces a Leave→Departs update when the alarm fires, delay unchanged", () => {
     const now = LEAVE_MS + 30_000; // just past the leave instant, still pre-departure
     const plan = planTick({

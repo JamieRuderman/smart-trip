@@ -174,8 +174,7 @@ export async function getTripUpdates(
 const VEHICLEPOSITIONS_FRESHNESS_MS = 15_000;
 const SERVICEALERTS_FRESHNESS_MS = 300_000;
 
-/** Normalized vehicle positions (shape mirrors api/gtfsrt/vehiclepositions.ts —
- *  minus the dev-only validation `warnings`, which were diagnostic). */
+/** Normalized vehicle positions — the exact shape the client consumes. */
 function normalizeVehiclePositions(feed: IFeedMessage): {
   timestamp: number;
   vehicles: unknown[];
@@ -231,7 +230,7 @@ const mapEffect = (e?: number | null): string =>
 const mapCause = (c?: number | null): string =>
   c == null ? "UNKNOWN_CAUSE" : Alert.Cause[c] ?? "UNKNOWN_CAUSE";
 
-/** Normalized service alerts (shape mirrors api/gtfsrt/alerts.ts). */
+/** Normalized service alerts — the exact shape the client consumes. */
 function normalizeServiceAlerts(feed: IFeedMessage): {
   timestamp: number;
   alerts: unknown[];

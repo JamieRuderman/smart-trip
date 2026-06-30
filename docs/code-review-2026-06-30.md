@@ -105,6 +105,10 @@ why it matters, and a concrete fix direction.
   `buildRegistrationForFocus` live in a React file.
   *Fix:* extract `liveActivityController.ts`; leave the hook a thin wrapper. (Same shape in
   `TripDetailContent.tsx`, 634 lines — extract pure selectors + the 90-line debug panel.)
+  *Status: DEFERRED.* Maintainability-only refactor over ~340 lines of intricate, untested
+  native Live-Activity orchestration that ships in an App Store build. No behavior change
+  intended, but the iOS path can't be verified in this environment, so it's left for a
+  device-backed session rather than moved blind. Awaiting go-ahead.
 
 - [x] **M4 — ErrorBoundary never resets; "Try Again" can loop**
   `src/components/ErrorBoundary.tsx:39-45` (wraps `Routes` in `App.tsx:62`)
@@ -157,7 +161,7 @@ why it matters, and a concrete fix direction.
 - [ ] **L3 — `useUserPreferences` spreads parsed JSON without shape validation** —
   `src/hooks/useUserPreferences.ts:26-34`: a tampered `selectedFareType` flows into
   `calculateFare` → `undefined` deref. Validate fields like `useDismissedAlerts.ts:27`.
-- [ ] **L4 — APNs device token not hex-validated, interpolated raw into URL path** —
+- [x] **L4 — APNs device token not hex-validated, interpolated raw into URL path** —
   `workers/web/src/lib/apns.ts:154`, validated only as a bounded string at
   `liveActivityPushTypes.ts:112`. Can't escape the host, but `?`/`#`/`../` alter the path.
   Validate `/^[0-9a-fA-F]{64,200}$/` or `encodeURIComponent`.
@@ -173,7 +177,7 @@ why it matters, and a concrete fix direction.
 - [ ] **L8 — Wildcard CORS on mutation routes** — `workers/web/src/index.ts:32-37`: by-design,
   not exploitable given the capability model; optionally scope `/api/liveactivity/*` to known
   origins.
-- [ ] **L9 — Stale comments / dead code** — `workers/web/src/lib/gtfsrt.ts:171,228` reference
+- [x] **L9 — Stale comments / dead code** — `workers/web/src/lib/gtfsrt.ts:171,228` reference
   deleted `api/gtfsrt/*`; `src/types/gtfsRt.ts:98` `warnings` is unpopulated;
   `calculateTimeDifference` (`timeUtils.ts:37`) is an unused export.
 - [ ] **L10 — Web reminders lost on tab close** — `src/lib/notificationScheduler.ts:55-95`:

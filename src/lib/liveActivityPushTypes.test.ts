@@ -179,4 +179,16 @@ describe("isLiveActivityTokenPayload", () => {
       }),
     ).toBe(false);
   });
+
+  it("rejects a non-hex token (URL-metacharacter injection guard)", () => {
+    for (const token of ["abc/../x", "dead?beef", "ghijkl", "ab cd"]) {
+      expect(
+        isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token }),
+      ).toBe(false);
+    }
+    // A normal hex token still passes.
+    expect(
+      isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token: "00ffAB12" }),
+    ).toBe(true);
+  });
 });

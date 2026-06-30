@@ -136,6 +136,11 @@ export function isRegistrationWithinHorizon(
   );
 }
 
+/** APNs device tokens are hex. Enforcing the charset stops a token containing
+ *  URL metacharacters (`?`, `#`, `../`) from being interpolated into the APNs
+ *  request path (`/3/device/<token>`) and altering the request. */
+const APNS_TOKEN_PATTERN = /^[0-9a-fA-F]+$/;
+
 /** Validate an unknown body as a `LiveActivityTokenPayload`. Pure. */
 export function isLiveActivityTokenPayload(
   v: unknown,
@@ -146,6 +151,7 @@ export function isLiveActivityTokenPayload(
     isBoundedString(r.id, MAX_ID_LENGTH) &&
     typeof r.activityId === "string" &&
     r.activityId.length <= MAX_ID_LENGTH &&
-    isBoundedString(r.token, MAX_APNS_TOKEN_LENGTH)
+    isBoundedString(r.token, MAX_APNS_TOKEN_LENGTH) &&
+    APNS_TOKEN_PATTERN.test(r.token)
   );
 }

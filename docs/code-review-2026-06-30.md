@@ -62,6 +62,10 @@ why it matters, and a concrete fix direction.
   `TrainMarker.tsx:55`, `StationInfoSheet.tsx:434`.
   *Fix:* one `isTrainDelayed(train)` helper keyed on a single `DELAY_MINUTES_THRESHOLD`;
   decide the threshold intentionally.
+  *Done:* unified to a SINGLE 1-minute threshold across every surface (per owner decision).
+  `DELAY_MINUTES_THRESHOLD = 1` + `isTrainDelayed` in realtimeConstants; the seconds-level
+  "report a delay" conversion now uses main's shared `delayMinutesFromSeconds` (tripDelay.ts,
+  client+server), so my earlier `MIN_REPORTED_DELAY_SECONDS` was dropped as a duplicate.
 
 - [x] **H5 — SmartLineDiagram recomputes SVG path geometry per-train, per-second**
   `src/components/SmartLineDiagram/index.tsx:151,257-280`, `TrainMarker.tsx:44-53`,

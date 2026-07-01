@@ -5,6 +5,7 @@ import {
   isFeedUnavailable,
   isUpstreamFeedDown,
 } from "@/lib/gtfsRtFetch";
+import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
   stationIndexMap,
@@ -19,7 +20,6 @@ import type {
 } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { MIN_REPORTED_DELAY_SECONDS } from "@/lib/realtimeConstants";
 import { agencyClockHHMM, agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
@@ -92,7 +92,7 @@ function computeDelayMinutes(
   startDate: string
 ): number | undefined {
   const delaySeconds = liveUnix - scheduledHHMMtoUnix(startDate, scheduledHHMM);
-  return delaySeconds >= MIN_REPORTED_DELAY_SECONDS ? Math.round(delaySeconds / 60) : undefined;
+  return delayMinutesFromSeconds(delaySeconds) ?? undefined;
 }
 
 /**
@@ -220,8 +220,8 @@ function deriveScheduledStatus(
     scheduledDepartureParam && update.startDate
       ? computeDelayMinutes(fromUpdate.departureTime, scheduledDepartureParam, update.startDate)
       : // Fallback for ADDED/DUPLICATED trips or when no static match was found.
-        fromUpdate.departureDelay != null && fromUpdate.departureDelay >= MIN_REPORTED_DELAY_SECONDS
-        ? Math.round(fromUpdate.departureDelay / 60)
+        fromUpdate.departureDelay != null
+        ? (delayMinutesFromSeconds(fromUpdate.departureDelay) ?? undefined)
         : undefined;
 
   // The map key is the static scheduled departure — so ScheduleResults can

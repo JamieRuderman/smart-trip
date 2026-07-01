@@ -22,8 +22,8 @@ describe("trainMarkerSignature", () => {
   });
 
   it("changes when the delayed state crosses the threshold", () => {
-    const onTime = trainMarkerSignature({ ...base, delayMinutes: 1 } as MapTrain, false);
-    const delayed = trainMarkerSignature({ ...base, delayMinutes: 5 } as MapTrain, false);
+    const onTime = trainMarkerSignature({ ...base, delayMinutes: 0 } as MapTrain, false);
+    const delayed = trainMarkerSignature({ ...base, delayMinutes: 1 } as MapTrain, false);
     expect(onTime).not.toBe(delayed);
   });
 

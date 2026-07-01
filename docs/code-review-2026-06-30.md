@@ -102,17 +102,21 @@ why it matters, and a concrete fix direction.
   *Follow-up:* the `userRiding` state machine (boarding/release/corridor/correlation) is still
   largely untested — left for a dedicated pass (large stateful machine).
 
-- [ ] **M3 — `useFocusedTrip.ts` (659 lines) fuses three modules**
+- [x] **M3 — `useFocusedTrip.ts` (659 lines) fuses three modules**
   `src/hooks/useFocusedTrip.ts`
   ~400 lines aren't hook code: Live Activity lifecycle (88–325), push registration (102–166),
   standalone `reconcileTripActivities` boot reconciler (327–380). Pure mappers like
   `buildRegistrationForFocus` live in a React file.
   *Fix:* extract `liveActivityController.ts`; leave the hook a thin wrapper. (Same shape in
   `TripDetailContent.tsx`, 634 lines — extract pure selectors + the 90-line debug panel.)
-  *Status: DEFERRED.* Maintainability-only refactor over ~340 lines of intricate, untested
-  native Live-Activity orchestration that ships in an App Store build. No behavior change
-  intended, but the iOS path can't be verified in this environment, so it's left for a
-  device-backed session rather than moved blind. Awaiting go-ahead.
+  *Done:* extracted `src/lib/liveActivityController.ts` — the Live Activity lifecycle
+  (start/revive/end), push registration, the boot/foreground reconcile, and reminder
+  scheduling, plus the private dedup maps. `useFocusedTrip` is now a thin state wrapper
+  (692 → 193 lines) that delegates to the controller; `updateLiveActivity`'s body became the
+  controller's `syncFocusedActivityContent`. App.tsx imports `reconcileTripActivities` from
+  the controller. Pure code move (no behavior change) — verified by tsc + eslint + the full
+  suite (327). The iOS runtime path is unchanged but still can't be exercised here, so a
+  device smoke-test before release is advisable. (TripDetailContent split not done — separate.)
 
 - [x] **M4 — ErrorBoundary never resets; "Try Again" can loop**
   `src/components/ErrorBoundary.tsx:39-45` (wraps `Routes` in `App.tsx:62`)

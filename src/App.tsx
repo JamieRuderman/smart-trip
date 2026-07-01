@@ -8,7 +8,7 @@ import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
-import { reconcileTripActivities } from "@/hooks/useFocusedTrip";
+import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";

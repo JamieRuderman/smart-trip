@@ -1,9 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { getAlertFingerprint } from "@/lib/alertFingerprint";
+import {
+  getAlertDismissalKey,
+  getAlertFingerprint,
+} from "@/lib/alertFingerprint";
 import type { ServiceAlertData } from "@/types/smartSchedule";
 
 const DISMISSED_ALERTS_KEY = "smart-train-service-alerts-dismissed-v1";
-const FALLBACK_TTL_MS = 2 * 60 * 60 * 1000;
+export const ALERT_DISMISSAL_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface DismissedAlertRecord {
   dismissedAtMs: number;
@@ -50,12 +53,16 @@ function saveDismissedMap(map: DismissedAlertMap): void {
   }
 }
 
-function getExpiryMs(alert: ServiceAlertData, dismissedAtMs: number): number {
+export function getAlertDismissalExpiryMs(
+  alert: ServiceAlertData,
+  dismissedAtMs: number
+): number {
+  const minimumExpiryMs = dismissedAtMs + ALERT_DISMISSAL_TTL_MS;
   if (alert.endsAt) {
     const parsed = Date.parse(alert.endsAt);
-    if (Number.isFinite(parsed)) return parsed;
+    if (Number.isFinite(parsed)) return Math.max(parsed, minimumExpiryMs);
   }
-  return dismissedAtMs + FALLBACK_TTL_MS;
+  return minimumExpiryMs;
 }
 
 export function useDismissedAlerts() {
@@ -74,8 +81,11 @@ export function useDismissedAlerts() {
 
   const isDismissed = useCallback(
     (alert: ServiceAlertData): boolean => {
-      const fingerprint = getAlertFingerprint(alert);
-      const record = dismissedMap[fingerprint];
+      const dismissalKey = getAlertDismissalKey(alert);
+      // Check the old content fingerprint too, so dismissals made before the
+      // stable-ID change continue to work until their original expiry.
+      const record =
+        dismissedMap[dismissalKey] ?? dismissedMap[getAlertFingerprint(alert)];
       return !!record && record.expiresAtMs > Date.now();
     },
     [dismissedMap]
@@ -83,22 +93,24 @@ export function useDismissedAlerts() {
 
   const dismissAlert = useCallback((alert: ServiceAlertData) => {
     const dismissedAtMs = Date.now();
-    const fingerprint = getAlertFingerprint(alert);
-    const expiresAtMs = getExpiryMs(alert, dismissedAtMs);
+    const dismissalKey = getAlertDismissalKey(alert);
+    const expiresAtMs = getAlertDismissalExpiryMs(alert, dismissedAtMs);
     const record: DismissedAlertRecord = { dismissedAtMs, expiresAtMs };
     setDismissedMap((prev) => {
-      const next = { ...prev, [fingerprint]: record };
+      const next = { ...prev, [dismissalKey]: record };
       saveDismissedMap(next);
       return next;
     });
   }, []);
 
   const restoreAlert = useCallback((alert: ServiceAlertData) => {
-    const fingerprint = getAlertFingerprint(alert);
+    const dismissalKey = getAlertDismissalKey(alert);
+    const legacyFingerprint = getAlertFingerprint(alert);
     setDismissedMap((prev) => {
-      if (!(fingerprint in prev)) return prev;
+      if (!(dismissalKey in prev) && !(legacyFingerprint in prev)) return prev;
       const next = { ...prev };
-      delete next[fingerprint];
+      delete next[dismissalKey];
+      delete next[legacyFingerprint];
       saveDismissedMap(next);
       return next;
     });

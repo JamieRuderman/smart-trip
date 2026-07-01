@@ -23,12 +23,6 @@ interface ScheduleResultsProps {
   scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
-  /** Trip number of the train the user is currently riding (if any) — the
-   *  matching row gets a blue ring + "Riding" pill. */
-  ridingTripNumber?: number | null;
-  /** Direction of the riding train — disambiguates trip numbers that are
-   *  reused across directions. */
-  ridingIsSouthbound?: boolean | null;
   /** The user's focused ("Go") trip number when it belongs to the displayed
    *  leg — that row is highlighted blue (it also appears pinned above; we
    *  intentionally keep it in the list rather than hiding it). */
@@ -46,19 +40,9 @@ export function ScheduleResults({
   scheduleType,
   selectedTripNumber,
   onSelectTrip,
-  ridingTripNumber = null,
-  ridingIsSouthbound = null,
   focusedTripNumber = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
-  // Direction of the displayed schedule — used to confirm a riding trip
-  // number actually belongs to the schedule the user is looking at (the
-  // same trip number is reused across the opposite-direction schedule).
-  const scheduleIsSouthbound = direction?.direction === "southbound";
-  const ridingMatchesSchedule =
-    ridingTripNumber != null &&
-    ridingIsSouthbound != null &&
-    ridingIsSouthbound === scheduleIsSouthbound;
   const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated, isFeedUnavailable } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   const nextTripIndex =
@@ -141,8 +125,6 @@ export function ScheduleResults({
             const showFerry =
               !!trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 
-            const isRiding =
-              ridingMatchesSchedule && trip.trip === ridingTripNumber;
             // The focused trip stays in the list (also pinned above) and is
             // highlighted blue. focusedTripNumber is only set when the focus
             // is on this displayed leg, so a number match is sufficient.
@@ -154,7 +136,6 @@ export function ScheduleResults({
                 trip={trip}
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
-                isRiding={isRiding}
                 isFocused={isFocused}
                 showFerry={showFerry}
                 timeFormat={timeFormat}

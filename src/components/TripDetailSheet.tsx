@@ -50,8 +50,8 @@ export function TripDetailSheet({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
-  // Single hook for all trip progress logic: geolocation, vehicle matching,
-  // GPS inference, stop inference, distance calculations, and derived state.
+  // Single hook for all trip progress logic: vehicle matching, stop inference,
+  // distance calculations, and derived state.
   const progress = useTripProgress({
     trip: rest.trip,
     fromStation: rest.fromStation,
@@ -59,7 +59,6 @@ export function TripDetailSheet({
     currentTime: rest.currentTime,
     realtimeStatus: rest.realtimeStatus,
     isNextTrip: rest.isNextTrip,
-    isOpen,
     isFocused,
     vehiclePositionOverride: rest.vehiclePositionOverride,
   });

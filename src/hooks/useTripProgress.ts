@@ -1,13 +1,8 @@
-import { useGeolocation } from "@/hooks/useGeolocation";
 import { useStopInference } from "@/hooks/useStopInference";
 import type { StopInferenceResult, ProgressHint } from "@/hooks/useStopInference";
 import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
-import {
-  getDistanceToStationKm,
-  haversineKm,
-  isSouthbound,
-} from "@/lib/stationUtils";
-import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
+import { getDistanceToStationKm, isSouthbound } from "@/lib/stationUtils";
+import { selectNextStopTarget } from "@/lib/tripProgress";
 import {
   computeMinutesUntil,
   formatDateYYYYMMDD,
@@ -20,18 +15,10 @@ import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 
 export interface TripProgressResult {
-  // Geolocation
-  lat: number | null;
-  lng: number | null;
-  locationLoading: boolean;
-  requestLocation: () => void;
-  hasReliableGps: boolean;
-  isOnTrain: boolean;
-
   // Vehicle position
   vehiclePosition: VehiclePositionMatch | null;
   progressHint: ProgressHint | null;
-  activeProgressSource: "vehicle" | "gps" | "schedule";
+  activeProgressSource: "vehicle" | "schedule";
 
   // Stop inference (single source of truth)
   stopInference: StopInferenceResult;
@@ -44,8 +31,6 @@ export interface TripProgressResult {
   // Distance
   nextStop: Station | null;
   distanceToNextStopMi: number | null;
-  phoneDistanceToNextStopMi: number | null;
-  distanceToTrainMi: number | null;
 
   // Remaining trip stats
   remainingStops: number | null;
@@ -59,7 +44,6 @@ export function useTripProgress({
   currentTime,
   realtimeStatus,
   isNextTrip,
-  isOpen,
   isFocused = false,
   vehiclePositionOverride,
 }: {
@@ -69,8 +53,6 @@ export function useTripProgress({
   currentTime: Date;
   realtimeStatus?: TripRealtimeStatus | null;
   isNextTrip: boolean;
-  /** Whether the sheet is open — gates geolocation watching. */
-  isOpen: boolean;
   /** When true, this is the user's focused ("Go") / riding trip. The header
    *  band turns blue to match the blue card style, overriding the semantic
    *  state colour (green/gold/red) — blue == "the train I'm taking". */
@@ -78,20 +60,6 @@ export function useTripProgress({
   /** Dev-only: override the live vehicle position hook result. */
   vehiclePositionOverride?: VehiclePositionMatch | null;
 }): TripProgressResult {
-  // ── Geolocation ───────────────────────────────────────────────────────────
-  const {
-    lat,
-    lng,
-    accuracy,
-    speedMps,
-    timestampMs,
-    loading: locationLoading,
-    requestLocation,
-  } = useGeolocation({
-    watch: isOpen,
-    autoRequestOnNative: false,
-  });
-
   // ── Trip ended detection ──────────────────────────────────────────────────
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
   const minutesAfterArrival = -(computeMinutesUntil(currentTime, arrivalTime));
@@ -136,50 +104,13 @@ export function useTripProgress({
 
   const { currentAccent, hasStarted, displayStops, currentIndex } = stopInference;
 
-  // ── GPS reliability & on-train inference ──────────────────────────────────
-  const gpsAgeMs = timestampMs == null ? Infinity : Date.now() - timestampMs;
-  const hasReliableGps =
-    lat != null &&
-    lng != null &&
-    accuracy != null &&
-    accuracy <= 65 &&
-    gpsAgeMs <= 20_000;
-
-  const nearestOnRoute =
-    hasReliableGps && displayStops.length > 0
-      ? displayStops.reduce(
-          (best, station, index) => {
-            const km = getDistanceToStationKm(lat!, lng!, station);
-            return km < best.km ? { station, index, km } : best;
-          },
-          { station: displayStops[0], index: 0, km: Number.POSITIVE_INFINITY },
-        )
-      : null;
-
-  const routeDistanceKm = nearestOnRoute?.km ?? Number.POSITIVE_INFINITY;
-  const isNearRoute = isNearSelectedRoute(routeDistanceKm);
-
-  const isOnTrain =
-    vehiclePosition == null &&
-    hasReliableGps &&
-    isNearRoute &&
-    speedMps != null &&
-    speedMps >= 5.5 &&
-    speedMps <= 45;
-
-  const useGpsForProgress =
-    vehiclePosition == null &&
-    hasReliableGps &&
-    (isOnTrain || routeDistanceKm <= 0.35);
-
   // ── Active progress source ────────────────────────────────────────────────
-  const activeProgressSource: "vehicle" | "gps" | "schedule" =
+  // Live train position (GTFS-RT vehicle feed) when available, else schedule.
+  const activeProgressSource: "vehicle" | "schedule" =
     vehiclePosition?.currentStation != null &&
     displayStops.includes(vehiclePosition.currentStation)
       ? "vehicle"
-      : useGpsForProgress
-        ? "gps"
-        : "schedule";
+      : "schedule";
 
   // ── Header background ─────────────────────────────────────────────────────
   // Blue == "the train I'm taking" and overrides the semantic state colour
@@ -190,42 +121,21 @@ export function useTripProgress({
       ? "bg-my-trip-background"
       : stateBg[currentAccent === "future" && isNextTrip ? "ontime" : currentAccent];
 
-  // ── Next stop target & distances ──────────────────────────────────────────
-  const nextStop =
-    lat == null || lng == null
-      ? null
-      : selectNextStopTarget({
-          displayStops,
-          currentIndex,
-          nearestOnRouteIndex: nearestOnRoute?.index ?? null,
-          useGpsForProgress,
-        });
+  // ── Next stop target & distance ───────────────────────────────────────────
+  const nextStop = selectNextStopTarget({
+    displayStops,
+    currentIndex,
+    nearestOnRouteIndex: null,
+    useGpsForProgress: false,
+  });
 
-  // Prefer train GPS position for distance-to-next-stop; fall back to phone GPS.
+  // Distance-to-next-stop from the live train position (GTFS-RT vehicle feed).
   const distanceToNextStopMi =
     nextStop != null && vehiclePosition != null
       ? getDistanceToStationKm(
           vehiclePosition.position.latitude,
           vehiclePosition.position.longitude,
           nextStop,
-        ) * 0.621371
-      : nextStop != null && lat != null && lng != null
-        ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
-        : null;
-
-  // Phone GPS distance to next stop (always uses phone coordinates).
-  const phoneDistanceToNextStopMi =
-    nextStop != null && lat != null && lng != null
-      ? getDistanceToStationKm(lat, lng, nextStop) * 0.621371
-      : null;
-
-  const distanceToTrainMi =
-    lat != null && lng != null && vehiclePosition != null
-      ? haversineKm(
-          lat,
-          lng,
-          vehiclePosition.position.latitude,
-          vehiclePosition.position.longitude,
         ) * 0.621371
       : null;
 
@@ -247,12 +157,6 @@ export function useTripProgress({
     : null;
 
   return {
-    lat,
-    lng,
-    locationLoading,
-    requestLocation,
-    hasReliableGps,
-    isOnTrain,
     vehiclePosition,
     progressHint,
     activeProgressSource,
@@ -262,8 +166,6 @@ export function useTripProgress({
     headerBg,
     nextStop,
     distanceToNextStopMi,
-    phoneDistanceToNextStopMi,
-    distanceToTrainMi,
     remainingStops,
     minutesUntilArrival,
   };

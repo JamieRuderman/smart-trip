@@ -8,10 +8,8 @@ import {
   Clock,
   MapPin,
   LocateFixed,
-  Loader2,
   ChevronDown,
   ChevronUp,
-  Smartphone,
   Train,
 } from "lucide-react";
 import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
@@ -116,16 +114,8 @@ export function TripDetailContent({
     minutesAfterArrival,
     nextStop,
     distanceToNextStopMi,
-    phoneDistanceToNextStopMi,
-    lat,
-    lng,
-    locationLoading,
-    requestLocation,
-    hasReliableGps,
-    isOnTrain,
     vehiclePosition,
     activeProgressSource,
-    distanceToTrainMi,
     stopInference,
     remainingStops,
     minutesUntilArrival,
@@ -156,8 +146,6 @@ export function TripDetailContent({
       : null;
   const minutesUntilLeave =
     reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
-
-  const hasLocation = lat != null && lng != null;
 
   // Trip metadata
   const tripDurationMinutes =
@@ -234,8 +222,6 @@ export function TripDetailContent({
     isEnded,
     hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
     hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
-    hasReliableGps,
-    isOnTrain,
     lastUpdated,
     currentTime,
   });
@@ -427,30 +413,6 @@ export function TripDetailContent({
           </GutterRow>
         )}
 
-        {!isOtherDay && !hasLocation && (
-          <GutterRow>
-            <button
-              onClick={requestLocation}
-              disabled={locationLoading}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              aria-label={t("header.useMyLocation")}
-            >
-              {locationLoading ? (
-                <Loader2
-                  className="h-3.5 w-3.5 animate-spin shrink-0"
-                  aria-hidden="true"
-                />
-              ) : (
-                <LocateFixed
-                  className="h-3.5 w-3.5 shrink-0"
-                  aria-hidden="true"
-                />
-              )}
-              <span>{t("header.useMyLocation")}</span>
-            </button>
-          </GutterRow>
-        )}
-
         {/* Data Sources panel (toggled by the chevron in the metadata row) */}
         {showDebugPanel && (
           <GutterRow className="pt-1">
@@ -502,43 +464,11 @@ export function TripDetailContent({
                           · {mpsToMph(vehiclePosition.position.speed)} mph
                         </>
                       )}
-                      {distanceToTrainMi != null && (
-                        <> · {distanceToTrainMi.toFixed(1)} mi from phone</>
-                      )}
                       {" · "}age{" "}
                       {nowSec - Math.floor(vehiclePosition.timestamp)}s
                     </p>
                   ) : (
                     <p className="text-muted-foreground">No match</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Phone GPS row */}
-              <div className="flex items-start gap-2 px-3 py-2">
-                <span
-                  className={cn(
-                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
-                    activeProgressSource === "gps"
-                      ? "bg-green-500"
-                      : "bg-muted-foreground/30",
-                  )}
-                />
-                <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground/80">Phone GPS</p>
-                  {hasReliableGps ? (
-                    <p className="text-muted-foreground">
-                      {nextStop ? `Nearest: ${nextStop}` : "—"}
-                      {phoneDistanceToNextStopMi != null && (
-                        <> · {phoneDistanceToNextStopMi.toFixed(1)} mi</>
-                      )}
-                      {isOnTrain && <> · on train</>}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      {lat != null ? "Low accuracy / stale" : "No location"}
-                    </p>
                   )}
                 </div>
               </div>

@@ -1,7 +1,29 @@
 /**
- * Shared realtime-display thresholds, kept in one place so the Mapbox map,
- * line diagram, and station sheet all agree on what counts as "delayed".
+ * Shared realtime-display threshold, kept in one place so the schedule list,
+ * Mapbox map, line diagram, and station sheet all agree on what counts as
+ * "delayed".
+ *
+ * There is a SINGLE threshold: a train is "delayed" as soon as it is at least
+ * this many whole minutes late. The whole-minute lateness itself is produced by
+ * `delayMinutesFromSeconds` (see `tripDelay.ts`), which already treats a
+ * sub-minute feed slip as on-time — so a reported delay is always >= 1 min and
+ * every surface flips to the delayed treatment at the same point.
  */
 
-/** Minimum minutes late to flip a train from on-time → delayed. */
-export const DELAY_MINUTES_THRESHOLD = 3;
+/** Minimum whole minutes late before a train is treated as delayed, everywhere. */
+export const DELAY_MINUTES_THRESHOLD = 1;
+
+/** Whether a train should render in the "delayed" state on any surface (schedule
+ *  list, map, line diagram, station sheet). Canceled trains are never "delayed"
+ *  (they have their own state); a null delay means no realtime, also not
+ *  delayed. Single source of truth for the previously copy-pasted check. */
+export function isTrainDelayed(train: {
+  isCanceled: boolean;
+  delayMinutes: number | null;
+}): boolean {
+  return (
+    !train.isCanceled &&
+    train.delayMinutes != null &&
+    train.delayMinutes >= DELAY_MINUTES_THRESHOLD
+  );
+}

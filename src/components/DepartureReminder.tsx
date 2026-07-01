@@ -22,8 +22,12 @@ import {
   focusedTripMatchesSchedule,
 } from "@/lib/focusedTrip";
 import { reminderLeadRange } from "@/lib/reminderLead";
+import {
+  formatClockTime,
+  parseTimeToMinutes,
+  toLocalDateKey,
+} from "@/lib/timeUtils";
 import { APP_STORE_URL } from "@/seo/constants";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
@@ -73,23 +77,6 @@ function buildDepartureTimestamp(currentTime: Date, hhmm: string): number {
   return d.getTime();
 }
 
-function dateKey(d: Date): string {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-function formatClockTime(
-  epoch: number,
-  timeFormat: "12h" | "24h",
-  locale: string
-): string {
-  return new Date(epoch).toLocaleTimeString(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: timeFormat === "12h",
-  });
-}
 
 export function DepartureReminder({
   tripNumber,
@@ -152,7 +139,7 @@ export function DepartureReminder({
     // (e.g. a weekend train chosen on a weekday), anchor to the next date that
     // actually runs that service so the trip is correctly "this coming weekend".
     if (scheduleType === getTodayScheduleType(currentTime)) {
-      return dateKey(new Date(departureAt));
+      return toLocalDateKey(new Date(departureAt));
     }
     return nextServiceDate(currentTime, scheduleType);
   }, [departureAt, scheduleType, currentTime]);

@@ -13,7 +13,10 @@ import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
 import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { cn } from "@/lib/utils";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import {
+  DELAY_MINUTES_THRESHOLD,
+  isTrainDelayed,
+} from "@/lib/realtimeConstants";
 import { AppSheet } from "@/components/ui/app-sheet";
 import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
@@ -431,10 +434,7 @@ function ArrivalRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
-  const isDelayed =
-    !arrival.isCanceled &&
-    arrival.delayMinutes != null &&
-    arrival.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const isDelayed = isTrainDelayed(arrival);
 
   // Card state mirrors TripCard's semantics so the row reads in the same
   // visual language as the main schedule. No "next train" highlight here —

@@ -31,6 +31,7 @@ import {
   createStationElement,
   createTrainElement,
   createUserLocationElement,
+  trainMarkerSignature,
 } from "@/lib/mapMarkers";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -208,9 +209,16 @@ function MapContents() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const stationMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const trainMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
+  const trainMarkersRef = useRef<
+    globalThis.Map<string, { marker: mapboxgl.Marker; signature: string }>
+  >(new globalThis.Map());
+  // Read by each marker's (once-attached) click listener so it always acts on
+  // the LATEST train data + handler, even though the marker DOM is reused across
+  // polls. Avoids tearing markers down just to refresh the closure.
+  const trainsByKeyRef = useRef<globalThis.Map<string, MapTrain>>(
     new globalThis.Map()
   );
+  const handleTrainClickRef = useRef<(train: MapTrain) => void>(() => {});
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // ── helper: add route source/layer ─────────────────────────────────────────
@@ -292,7 +300,7 @@ function MapContents() {
       // clean up markers
       stationMarkersRef.current.forEach((m) => m.remove());
       stationMarkersRef.current = [];
-      trainMarkers.forEach((m) => m.remove());
+      trainMarkers.forEach((m) => m.marker.remove());
       trainMarkers.clear();
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
@@ -327,43 +335,65 @@ function MapContents() {
     map.setStyle(newStyle);
   }, [theme, addRouteLayer, addStationMarkers]);
 
+  // Keep the marker click listeners (attached once, below) pointed at the
+  // latest train data + handler without re-attaching them every poll.
+  trainsByKeyRef.current = new globalThis.Map(trains.map((t) => [t.key, t]));
+  handleTrainClickRef.current = handleTrainClick;
+
   // ── update train markers when trains data changes ───────────────────────────
+  // Reuse markers across the 15s vehicle-positions poll: a position-only move is
+  // just `setLngLat` (no DOM work); the inner element is rebuilt only when the
+  // visual signature (color/heading/number/selection) actually changes. Avoids
+  // tearing down + recreating every marker (flicker, GC churn, listener re-bind)
+  // on each poll and on every selection change.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const existingKeys = new Set(trainMarkersRef.current.keys());
+    const markers = trainMarkersRef.current;
     const newKeys = new Set(trains.map((t) => t.key));
 
-    // Remove stale markers
-    for (const key of existingKeys) {
+    // Remove markers for trains no longer present.
+    for (const key of markers.keys()) {
       if (!newKeys.has(key)) {
-        trainMarkersRef.current.get(key)?.remove();
-        trainMarkersRef.current.delete(key);
+        markers.get(key)!.marker.remove();
+        markers.delete(key);
       }
     }
 
-    // Add or update
     for (const train of trains) {
-      if (trainMarkersRef.current.has(train.key)) {
-        // Mapbox Marker doesn't support setElement – remove and recreate
-        trainMarkersRef.current.get(train.key)!.remove();
-        trainMarkersRef.current.delete(train.key);
+      const selected = train.key === selectedTrainKey;
+      const signature = trainMarkerSignature(train, selected);
+      const existing = markers.get(train.key);
+
+      if (existing) {
+        // Position is the common per-poll change — cheap, no DOM rebuild.
+        existing.marker.setLngLat([train.longitude, train.latitude]);
+        // Appearance changed (delay/cancel color, heading, number, selection):
+        // rebuild only the inner DOM, keeping the marker + its click listener.
+        if (existing.signature !== signature) {
+          const fresh = createTrainElement(train, selected);
+          existing.marker.getElement().replaceChildren(...fresh.childNodes);
+          existing.signature = signature;
+        }
+        continue;
       }
 
-      const el = createTrainElement(train, train.key === selectedTrainKey);
+      const el = createTrainElement(train, selected);
+      const key = train.key;
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        handleTrainClick(train);
+        const latest = trainsByKeyRef.current.get(key);
+        if (latest) handleTrainClickRef.current(latest);
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([train.longitude, train.latitude])
         .addTo(map);
 
-      trainMarkersRef.current.set(train.key, marker);
+      markers.set(key, { marker, signature });
     }
-  }, [trains, mapLoaded, selectedTrainKey, handleTrainClick]);
+  }, [trains, mapLoaded, selectedTrainKey]);
 
   // ── user location dot ───────────────────────────────────────────────────────
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import {
   ThemeProviderContext,
@@ -56,13 +56,20 @@ export function ThemeProvider({
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, [theme]);
 
-  const value = {
-    theme,
-    setTheme: (theme: Theme) => {
-      localStorage?.setItem(storageKey, theme);
-      setTheme(theme);
+  // Memoize so the context value is stable across re-renders — otherwise every
+  // `useTheme()` consumer re-renders whenever this provider does, even when the
+  // theme is unchanged.
+  const updateTheme = useCallback(
+    (next: Theme) => {
+      localStorage?.setItem(storageKey, next);
+      setTheme(next);
     },
-  };
+    [storageKey],
+  );
+  const value = useMemo(
+    () => ({ theme, setTheme: updateTheme }),
+    [theme, updateTheme],
+  );
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

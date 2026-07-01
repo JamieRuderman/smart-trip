@@ -8,6 +8,11 @@ import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { VehicleStopStatus } from "@/types/gtfsRt";
+import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+
+/** Per-stop delay floor (seconds) that counts toward a train's map delay —
+ *  the at-a-glance color threshold expressed in seconds. */
+const MAP_DELAY_FLOOR_SECONDS = DELAY_MINUTES_THRESHOLD * 60;
 
 export interface MapTrain {
   key: string;
@@ -96,7 +101,10 @@ export function useMapTrains(): {
         let maxDelay: number | null = null;
         if (!isCanceled) {
           for (const stu of update.stopTimeUpdates) {
-            if (stu.departureDelay != null && stu.departureDelay >= 180) {
+            if (
+              stu.departureDelay != null &&
+              stu.departureDelay >= MAP_DELAY_FLOOR_SECONDS
+            ) {
               const mins = Math.round(stu.departureDelay / 60);
               if (maxDelay === null || mins > maxDelay) maxDelay = mins;
             }

@@ -17,6 +17,7 @@
 import {
   isLiveActivityRegistration,
   isLiveActivityTokenPayload,
+  isRegistrationWithinHorizon,
 } from "../../../src/lib/liveActivityPushTypes.js";
 import {
   getServiceAlerts,
@@ -72,6 +73,12 @@ interface DurableObjectNamespace {
   get(id: unknown): DurableObjectStub;
 }
 
+/** Cloudflare Workers Rate Limiting binding (structural). Optional: when the
+ *  binding is not provisioned the limiter simply isn't enforced. */
+interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
   /** Per-activity Live Activity Durable Objects. */
@@ -84,11 +91,30 @@ export interface Env {
   APNS_HOST?: string;
   // GTFS-RT native feed (511 + edge Cache API) — see workers/web/src/lib/gtfsrt.ts.
   TRANSIT_511_API_KEY?: string;
+  /** Optional per-IP rate limiter for the public /api/liveactivity/* mutation
+   *  routes (provisioned via the `[[ratelimit]]` binding in wrangler.toml). When
+   *  absent (local dev / preview / un-provisioned), the routes are unthrottled. */
+  LIVEACTIVITY_RATE_LIMIT?: RateLimiter;
 }
 
 /** The DO instance for one activity id. */
 function activityStub(env: Env, id: string): DurableObjectStub {
   return env.TRIP_ACTIVITY.get(env.TRIP_ACTIVITY.idFromName(id));
+}
+
+/** Enforce the optional per-IP rate limit on the Live Activity mutation routes.
+ *  Returns a 429 Response when over the limit, or null to proceed. No-op when
+ *  the binding isn't provisioned, so it never breaks local/preview. */
+async function rateLimited(request: Request, env: Env): Promise<Response | null> {
+  const limiter = env.LIVEACTIVITY_RATE_LIMIT;
+  if (!limiter) return null;
+  // Key on the client IP; fall back to a constant so a missing header still
+  // shares one bucket rather than bypassing the limit entirely.
+  const key = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const { success } = await limiter.limit({ key }).catch(() => ({ success: true }));
+  return success
+    ? null
+    : withCors(Response.json({ error: "Too many requests" }, { status: 429 }));
 }
 
 export default {
@@ -104,10 +130,18 @@ export default {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: CORS });
       }
+      const limited = await rateLimited(request, env);
+      if (limited) return limited;
       if (path === "/api/liveactivity/register" && request.method === "POST") {
         const body = await request.json().catch(() => null);
         if (!isLiveActivityRegistration(body)) {
           return withCors(Response.json({ error: "Invalid registration" }, { status: 400 }));
+        }
+        // Reject implausible instants up front: the endpoint is public and
+        // accountless, so an out-of-horizon registration could otherwise keep a
+        // Durable Object + its 511 poll alarm alive far longer than any real trip.
+        if (!isRegistrationWithinHorizon(body, Date.now())) {
+          return withCors(Response.json({ error: "Registration out of range" }, { status: 400 }));
         }
         console.log(`[la] register ${body.id}`);
         return withCors(

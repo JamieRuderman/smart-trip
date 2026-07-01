@@ -58,3 +58,15 @@ export async function fetchGtfsRtJson<T>(path: string): Promise<T> {
 export function isUpstreamFeedDown(error: unknown): boolean {
   return error instanceof GtfsRtError && error.isUpstreamDown;
 }
+
+/**
+ * True when the most recent realtime fetch failed for ANY reason — a 511
+ * outage (502), a bug in our own API (500), or a client/network failure (fetch
+ * reject). Unlike {@link isUpstreamFeedDown} this does not single out the 511
+ * upstream: it answers "is live data currently unavailable?", which is what the
+ * UI needs when there is no cached timestamp to age. With cached data present
+ * the freshness label ages it normally regardless of this flag.
+ */
+export function isFeedUnavailable(error: unknown): boolean {
+  return error instanceof Error;
+}

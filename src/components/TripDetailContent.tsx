@@ -15,7 +15,11 @@ import {
   Train,
 } from "lucide-react";
 import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
-import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
+import {
+  calculateTransferTime,
+  isQuickConnection,
+  serviceDateWeekdayLabel,
+} from "@/lib/timeUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import {
   calculateFare,
@@ -100,14 +104,10 @@ export function TripDetailContent({
   // tracking instead. (A future calendar-date picker would supersede this.)
   const isOtherDay = scheduleType !== getTodayScheduleType(currentTime);
   const serviceDayLabel = isOtherDay
-    ? (() => {
-        const [y, mo, d] = nextServiceDate(currentTime, scheduleType)
-          .split("-")
-          .map(Number);
-        return new Date(y, mo - 1, d).toLocaleDateString(i18n.language, {
-          weekday: "long",
-        });
-      })()
+    ? serviceDateWeekdayLabel(
+        nextServiceDate(currentTime, scheduleType),
+        i18n.language,
+      )
     : null;
 
   const {

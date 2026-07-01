@@ -9,12 +9,7 @@ import {
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { useNow } from "@/hooks/useNow";
 import { ReminderDialog } from "./ReminderDialog";
-
-function dateKey(d: Date): string {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
+import { toLocalDateKey } from "@/lib/timeUtils";
 
 /**
  * App-level host for the departure-reminder modal. Lives at the root — NOT in a
@@ -76,7 +71,7 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
   // The RT feed describes today's runs only — a future-service focus must not
   // inherit live data from a same-numbered trip running today.
   const live =
-    focusedTrip.serviceDate === dateKey(new Date(now)) ? realtimeStatus : null;
+    focusedTrip.serviceDate === toLocalDateKey(new Date(now)) ? realtimeStatus : null;
 
   // Live-anchored boarding departure on the focused trip's own service date.
   const staticDepartureAt = useMemo(

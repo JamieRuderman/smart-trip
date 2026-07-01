@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { fetchGtfsRtJson, isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
+import {
+  fetchGtfsRtJson,
+  isFeedUnavailable,
+  isUpstreamFeedDown,
+} from "@/lib/gtfsRtFetch";
 import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import {
   GTFS_STOP_ID_TO_PLATFORM,
@@ -16,6 +20,7 @@ import type {
 } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { agencyClockHHMM, agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
 
@@ -23,28 +28,26 @@ function fetchTripUpdates(): Promise<GtfsRtTripUpdatesResponse> {
   return fetchGtfsRtJson<GtfsRtTripUpdatesResponse>("/api/gtfsrt/tripupdates");
 }
 
-/** Convert a Unix timestamp (seconds) to "HH:MM" string in local time */
+/**
+ * Convert a Unix timestamp (seconds) to "HH:MM" in the agency timezone — NOT the
+ * device's. The static timetable is Pacific wall time, so live times and the
+ * delay diff below must read in Pacific to stay correct on an off-region device.
+ */
 function unixToTimeString(unix: number): string {
-  const date = new Date(unix * 1000);
-  const h = date.getHours();
-  const m = date.getMinutes();
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  return agencyClockHHMM(unix);
 }
 
 /**
- * Convert a static scheduled time ("HH:MM") on a given date ("YYYYMMDD") to Unix seconds.
- * Uses local time to match unixToTimeString().
+ * Convert a static scheduled time ("HH:MM") on a given date ("YYYYMMDD") to Unix
+ * seconds, interpreting the wall time in the agency timezone to match
+ * unixToTimeString().
  *
  * NOTE: 511.org always sends departureDelay: 0 even for delayed trains — they only
  * update departure.time. To detect real delays we must diff the live departure.time
  * against the scheduled time from the static timetable.
  */
 function scheduledHHMMtoUnix(yyyymmdd: string, hhmm: string): number {
-  const year = parseInt(yyyymmdd.slice(0, 4), 10);
-  const month = parseInt(yyyymmdd.slice(4, 6), 10) - 1; // 0-indexed
-  const day = parseInt(yyyymmdd.slice(6, 8), 10);
-  const [h, m] = hhmm.split(":").map(Number);
-  return Math.floor(new Date(year, month, day, h, m, 0).getTime() / 1000);
+  return agencyWallTimeToEpochSeconds(yyyymmdd, hhmm);
 }
 
 /**
@@ -326,6 +329,10 @@ export interface TripRealtimeStatusMaps {
   lastUpdated: Date | null;
   /** True when the 511 upstream feed is failing (so the UI can say so). */
   isUpstreamDown: boolean;
+  /** True when the most recent fetch failed for ANY reason (502 / 500 / network).
+   *  Used to surface "live data unavailable" on a cold start even when the
+   *  failure is not specifically a 511 outage. */
+  isFeedUnavailable: boolean;
 }
 
 /**
@@ -357,11 +364,12 @@ export function useTripRealtimeStatusMap(
 ): TripRealtimeStatusMaps {
   const { data, error } = useTripUpdates();
   const isUpstreamDown = isUpstreamFeedDown(error);
+  const feedUnavailable = isFeedUnavailable(error);
 
   return useMemo(() => {
     const lastUpdated =
       data?.timestamp != null ? new Date(data.timestamp * 1000) : null;
-    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isUpstreamDown };
+    const empty: TripRealtimeStatusMaps = { statusMap: new Map(), canceledByStartTime: new Map(), lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
@@ -417,6 +425,6 @@ export function useTripRealtimeStatusMap(
         canceledByStartTime.set(result.scheduledDeparture, result.status);
       }
     }
-    return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown };
-  }, [data, fromStation, toStation, trips, isUpstreamDown]);
+    return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
+  }, [data, fromStation, toStation, trips, isUpstreamDown, feedUnavailable]);
 }

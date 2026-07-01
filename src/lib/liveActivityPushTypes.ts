@@ -94,6 +94,10 @@ export function isLiveActivityRegistration(
     Number.isFinite(r.departureEpochMs) &&
     typeof r.arrivalEpochMs === "number" &&
     Number.isFinite(r.arrivalEpochMs) &&
+    // Arrival must be strictly after departure — the server schedules the
+    // departure→arrival transition and the post-arrival teardown against these,
+    // so an inverted/equal pair would mis-drive (or never end) the activity.
+    r.arrivalEpochMs > r.departureEpochMs &&
     (r.originStartTime === undefined ||
       isBoundedString(r.originStartTime, MAX_TIME_LENGTH)) &&
     (r.reminderLeadMinutes === undefined ||
@@ -102,6 +106,40 @@ export function isLiveActivityRegistration(
         r.reminderLeadMinutes >= 0))
   );
 }
+
+/** How far in the FUTURE a registration's departure may be. Generous vs real
+ *  use (a rider can pin a weekend trip a few days out) while bounding how long
+ *  an abusive registration can keep its Durable Object + alarm alive. */
+export const MAX_REGISTRATION_FUTURE_MS = 8 * 24 * 60 * 60 * 1000;
+/** How far in the PAST a registration's departure may be — a trip that just
+ *  started (or just ended) is still legitimately registerable. */
+export const MAX_REGISTRATION_PAST_MS = 6 * 60 * 60 * 1000;
+/** Max span from departure to arrival. SMART end-to-end is ~90 min; 6h is a
+ *  generous ceiling that still caps the DO's self-scheduling lifetime. */
+export const MAX_REGISTRATION_DURATION_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Whether a (shape-valid) registration's instants are within a plausible
+ * scheduling horizon of `now`. The register endpoint is public and accountless,
+ * so without this a single request could schedule a Durable Object alarm
+ * arbitrarily far out (or with an absurd duration) and keep it — and its 511
+ * poll loop — alive indefinitely. Pure + time-injected so it's unit-testable.
+ */
+export function isRegistrationWithinHorizon(
+  reg: LiveActivityRegistration,
+  now: number,
+): boolean {
+  return (
+    reg.departureEpochMs >= now - MAX_REGISTRATION_PAST_MS &&
+    reg.departureEpochMs <= now + MAX_REGISTRATION_FUTURE_MS &&
+    reg.arrivalEpochMs <= reg.departureEpochMs + MAX_REGISTRATION_DURATION_MS
+  );
+}
+
+/** APNs device tokens are hex. Enforcing the charset stops a token containing
+ *  URL metacharacters (`?`, `#`, `../`) from being interpolated into the APNs
+ *  request path (`/3/device/<token>`) and altering the request. */
+const APNS_TOKEN_PATTERN = /^[0-9a-fA-F]+$/;
 
 /** Validate an unknown body as a `LiveActivityTokenPayload`. Pure. */
 export function isLiveActivityTokenPayload(
@@ -113,6 +151,7 @@ export function isLiveActivityTokenPayload(
     isBoundedString(r.id, MAX_ID_LENGTH) &&
     typeof r.activityId === "string" &&
     r.activityId.length <= MAX_ID_LENGTH &&
-    isBoundedString(r.token, MAX_APNS_TOKEN_LENGTH)
+    isBoundedString(r.token, MAX_APNS_TOKEN_LENGTH) &&
+    APNS_TOKEN_PATTERN.test(r.token)
   );
 }

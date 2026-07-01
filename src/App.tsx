@@ -1,14 +1,14 @@
 import { lazy, Suspense, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
-import { reconcileTripActivities } from "@/hooks/useFocusedTrip";
+import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
@@ -29,6 +29,37 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/** The routed subtree, wrapped in an ErrorBoundary that resets on navigation —
+ *  so a render error tied to one route (e.g. a corrupt persisted selection)
+ *  clears when the user navigates away, instead of stranding the whole app on
+ *  the fallback. Lives inside BrowserRouter so it can read `useLocation`. */
+const RoutedApp = () => {
+  const location = useLocation();
+  return (
+    <ErrorBoundary resetKeys={[location.pathname]}>
+      <StationSelectionProvider>
+        {/* App-level iOS Live Activity sync — must live where it survives
+            route changes and sheet closes, since the lock screen tracks the
+            focused train regardless of view. */}
+        <LiveActivitySync />
+        {/* App-level reminder modal host — lives here (like LiveActivitySync)
+            so "Take this train" can pop it from any surface and it survives
+            the triggering sheet/route change. */}
+        <ReminderDialogHost />
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/map" element={<Map />} />
+            <Route path="/map-diagram" element={<MapDiagram />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </StationSelectionProvider>
+    </ErrorBoundary>
+  );
+};
 
 const App = () => {
   useAppForegroundRefresh(async () => {
@@ -59,27 +90,7 @@ const App = () => {
           <NativeUiManager />
           <TooltipProvider>
             <BrowserRouter>
-              <ErrorBoundary>
-                <StationSelectionProvider>
-                  {/* App-level iOS Live Activity sync — must live where it
-                      survives route changes and sheet closes, since the lock
-                      screen tracks the focused train regardless of view. */}
-                  <LiveActivitySync />
-                  {/* App-level reminder modal host — lives here (like
-                      LiveActivitySync) so "Take this train" can pop it from any
-                      surface and it survives the triggering sheet/route change. */}
-                  <ReminderDialogHost />
-                  <Suspense fallback={null}>
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/map" element={<Map />} />
-                      <Route path="/map-diagram" element={<MapDiagram />} />
-                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </StationSelectionProvider>
-              </ErrorBoundary>
+              <RoutedApp />
             </BrowserRouter>
           </TooltipProvider>
         </ThemeProvider>

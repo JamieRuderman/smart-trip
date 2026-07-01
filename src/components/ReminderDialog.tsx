@@ -12,6 +12,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { DEFAULT_LEAD_MINUTES, reminderLeadRange } from "@/lib/reminderLead";
+import { formatClockTime } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
 import type { Station } from "@/types/smartSchedule";
 
@@ -33,18 +34,6 @@ interface ReminderDialogProps {
    *  value (clamped) and the footer offers "Cancel reminder". Null when arming
    *  a new one (opens at the default suggestion). */
   currentLeadMinutes?: number | null;
-}
-
-function formatClockTime(
-  epoch: number,
-  timeFormat: "12h" | "24h",
-  locale: string,
-): string {
-  return new Date(epoch).toLocaleTimeString(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: timeFormat === "12h",
-  });
 }
 
 type ReminderError = null | "permission" | "schedule-failed";

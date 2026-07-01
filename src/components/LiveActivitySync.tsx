@@ -11,12 +11,7 @@ import {
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { useNow } from "@/hooks/useNow";
 import { derivePhase } from "@/lib/native/liveActivity";
-
-function dateKey(d: Date): string {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
+import { toLocalDateKey } from "@/lib/timeUtils";
 
 /**
  * Invisible app-level syncer that keeps the focused trip's iOS Live Activity
@@ -70,7 +65,7 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   // weekend trip picked on a weekday) must not inherit live data from a
   // same-numbered trip running today.
   const live =
-    focusedTrip.serviceDate === dateKey(new Date(now)) ? realtimeStatus : null;
+    focusedTrip.serviceDate === toLocalDateKey(new Date(now)) ? realtimeStatus : null;
 
   // Anchor onto the focused trip's own service date (overnight-safe) rather
   // than "today", so these are correct on any route/view and any clock day.

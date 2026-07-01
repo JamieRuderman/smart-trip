@@ -8,8 +8,11 @@ import {
   isSouthbound,
 } from "@/lib/stationUtils";
 import { isNearSelectedRoute, selectNextStopTarget } from "@/lib/tripProgress";
-import { computeMinutesUntil } from "@/lib/timeUtils";
-import { formatDateYYYYMMDD } from "@/lib/timeUtils";
+import {
+  computeMinutesUntil,
+  formatDateYYYYMMDD,
+  parseTimeToMinutes,
+} from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -240,14 +243,7 @@ export function useTripProgress({
     realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
   const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
   const minutesUntilArrival = hasStarted && !isEnded
-    ? Math.max(
-        0,
-        (() => {
-          const cleaned = arrivalMinutes.replace(/[*~]/g, "");
-          const [h, m] = cleaned.split(":").map(Number);
-          return h * 60 + m - nowMinutes;
-        })(),
-      )
+    ? Math.max(0, parseTimeToMinutes(arrivalMinutes) - nowMinutes)
     : null;
 
   return {

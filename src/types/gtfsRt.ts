@@ -95,8 +95,6 @@ export interface GtfsRtVehiclePositionsResponse {
   /** Feed header timestamp in Unix seconds */
   timestamp: number;
   vehicles: GtfsRtVehiclePosition[];
-  /** Validation warnings from the server-side parsing pipeline */
-  warnings?: string[];
 }
 
 /**

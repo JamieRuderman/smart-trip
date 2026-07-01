@@ -1,15 +1,19 @@
+import { memo } from "react";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { positionOnPath } from "@/lib/pathSnap";
 import { trainStationProgress } from "@/lib/trainProgress";
 import { gpsStationProgress } from "@/lib/trainGpsProgress";
 import { scheduledProgress } from "@/lib/trainMotion";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
+import { isTrainDelayed } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
 
 interface TrainMarkerProps {
   train: MapTrain;
   pathEl: SVGPathElement;
   stationArcs: number[];
+  /** Cached total path length, so the per-tick position math skips a forced
+   *  `getTotalLength` layout read. */
+  pathLength: number;
   selected: boolean;
   /** True when this is the train the user is currently riding. */
   userRiding?: boolean;
@@ -22,10 +26,11 @@ interface TrainMarkerProps {
   onClick?: (train: MapTrain) => void;
 }
 
-export function TrainMarker({
+function TrainMarkerImpl({
   train,
   pathEl,
   stationArcs,
+  pathLength,
   selected,
   userRiding = false,
   overrideLat = null,
@@ -50,12 +55,10 @@ export function TrainMarker({
     pathEl,
     stationArcs,
     resolved.direction,
+    pathLength,
   );
 
-  const isDelayed =
-    !train.isCanceled &&
-    train.delayMinutes !== null &&
-    train.delayMinutes >= DELAY_MINUTES_THRESHOLD;
+  const isDelayed = isTrainDelayed(train);
 
   // Riding swaps the on-time accent for blue; delayed/canceled win so the
   // status signal isn't lost.
@@ -143,3 +146,11 @@ export function TrainMarker({
     </g>
   );
 }
+
+/**
+ * Memoized: `now` is a stable reference between clock ticks, so a parent
+ * re-render that isn't a tick (pan/zoom, selecting another train) skips every
+ * marker whose own props are unchanged. On a tick `now` changes and all markers
+ * re-render to advance — the intended motion update.
+ */
+export const TrainMarker = memo(TrainMarkerImpl);

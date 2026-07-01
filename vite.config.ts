@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -79,6 +80,11 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+    },
+    test: {
+      // Pin the timezone for the whole run so local-time schedule/date math is
+      // deterministic regardless of the machine's zone. See src/test/setup.ts.
+      setupFiles: ["./src/test/setup.ts"],
     },
   };
 });

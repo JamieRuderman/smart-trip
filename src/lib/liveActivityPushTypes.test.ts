@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   isLiveActivityRegistration,
   isLiveActivityTokenPayload,
+  isRegistrationWithinHorizon,
+  MAX_REGISTRATION_DURATION_MS,
+  MAX_REGISTRATION_FUTURE_MS,
+  MAX_REGISTRATION_PAST_MS,
+  type LiveActivityRegistration,
 } from "./liveActivityPushTypes";
 
 const VALID_REG = {
@@ -79,6 +84,73 @@ describe("isLiveActivityRegistration", () => {
       isLiveActivityRegistration({ ...VALID_REG, scheduledDeparture: "x".repeat(20) }),
     ).toBe(false);
   });
+
+  it("rejects arrival at or before departure", () => {
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        arrivalEpochMs: VALID_REG.departureEpochMs,
+      }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        arrivalEpochMs: VALID_REG.departureEpochMs - 1,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("isRegistrationWithinHorizon", () => {
+  const now = 1_780_000_000_000;
+  const reg = (
+    departureEpochMs: number,
+    arrivalEpochMs: number,
+  ): LiveActivityRegistration => ({
+    ...VALID_REG,
+    direction: "northbound",
+    departureEpochMs,
+    arrivalEpochMs,
+  });
+
+  it("accepts a normal same-day trip", () => {
+    expect(
+      isRegistrationWithinHorizon(reg(now + 30 * 60_000, now + 120 * 60_000), now),
+    ).toBe(true);
+  });
+
+  it("accepts a trip that just started (within the past grace)", () => {
+    expect(
+      isRegistrationWithinHorizon(reg(now - 60 * 60_000, now + 30 * 60_000), now),
+    ).toBe(true);
+  });
+
+  it("rejects a departure too far in the future (DoS lifetime cap)", () => {
+    expect(
+      isRegistrationWithinHorizon(
+        reg(now + MAX_REGISTRATION_FUTURE_MS + 60_000, now + MAX_REGISTRATION_FUTURE_MS + 120_000),
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a departure too far in the past", () => {
+    expect(
+      isRegistrationWithinHorizon(
+        reg(now - MAX_REGISTRATION_PAST_MS - 60_000, now + 30 * 60_000),
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects an absurd trip duration", () => {
+    expect(
+      isRegistrationWithinHorizon(
+        reg(now, now + MAX_REGISTRATION_DURATION_MS + 60_000),
+        now,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("isLiveActivityTokenPayload", () => {
@@ -106,5 +178,17 @@ describe("isLiveActivityTokenPayload", () => {
         token: "a".repeat(600),
       }),
     ).toBe(false);
+  });
+
+  it("rejects a non-hex token (URL-metacharacter injection guard)", () => {
+    for (const token of ["abc/../x", "dead?beef", "ghijkl", "ab cd"]) {
+      expect(
+        isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token }),
+      ).toBe(false);
+    }
+    // A normal hex token still passes.
+    expect(
+      isLiveActivityTokenPayload({ id: "trip-7", activityId: "sys-1", token: "00ffAB12" }),
+    ).toBe(true);
   });
 });

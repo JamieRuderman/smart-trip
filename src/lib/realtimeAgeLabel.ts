@@ -20,19 +20,21 @@ export const REALTIME_STALE_THRESHOLD_MIN = 60;
  *   - stale (`isStale=true`):                  "Stale"
  *   - unavailable (`isUnavailable=true`):      "Live data unavailable"
  *
- * The unavailable state only fires when the 511 feed is failing AND we have no
- * timestamp to show (never fetched, or the cached data was cleared). When we
- * still have a timestamp we keep showing its age — the data is real, just
- * aging — and let it cross into "Stale" naturally.
+ * The unavailable state only fires when the feed is failing AND we have no
+ * timestamp to show (never fetched, or the cached data was cleared). `feedFailing`
+ * is any fetch failure — a 511 outage, our own API erroring, or a network drop —
+ * not just a 502, so a cold start with no data reads "unavailable" rather than a
+ * perpetual "loading". When we still have a timestamp we keep showing its age —
+ * the data is real, just aging — and let it cross into "Stale" naturally.
  */
 export function computeRealtimeAgeLabel(
   t: TFunction,
   lastUpdated: Date | null,
   currentTime: Date,
-  isUpstreamDown = false,
+  feedFailing = false,
 ): { text: string; isStale: boolean; isUnavailable: boolean } {
   if (!lastUpdated) {
-    if (isUpstreamDown) {
+    if (feedFailing) {
       return {
         text: t("schedule.liveDataUnavailable"),
         isStale: true,

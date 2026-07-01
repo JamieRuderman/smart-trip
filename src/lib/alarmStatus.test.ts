@@ -103,7 +103,7 @@ describe("selectAlarmStatus", () => {
   });
 
 
-  it("uses arrival countdown when GPS is reliable even if realtime is stale", () => {
+  it("uses arrival countdown from a live position even if realtime is stale", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: -5,
       minutesUntilArrival: 18,
@@ -113,7 +113,7 @@ describe("selectAlarmStatus", () => {
       isCanceledOrSkipped: false,
       isEnded: false,
       hasFreshRealtime: false,
-      hasReliableGps: true,
+      hasLivePosition: true,
     });
 
     expect(status.phase).toBe("EN_ROUTE_FRESH");
@@ -121,23 +121,6 @@ describe("selectAlarmStatus", () => {
     expect(status.minutesUntilArrival).toBe(18);
   });
 
-  it("treats rider as post-departure when on-train GPS is detected", () => {
-    const status = selectAlarmStatus({
-      minutesUntilDeparture: 1,
-      minutesUntilArrival: 46,
-      minutesAfterArrival: -46,
-      hasStarted: false,
-      isCanceled: false,
-      isCanceledOrSkipped: false,
-      isEnded: false,
-      hasFreshRealtime: false,
-      hasReliableGps: true,
-      isOnTrain: true,
-    });
-
-    expect(status.phase).toBe("EN_ROUTE_FRESH");
-    expect(status.kind).toBe("arrival-countdown");
-  });
   it("keeps exact departure countdown for delayed trips before live departure", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: 6,
@@ -171,11 +154,11 @@ describe("selectAlarmStatus", () => {
     expect(status.minutesUntilArrival).toBe(20);
   });
 
-  it("shows arriving soon near the destination with fresh realtime", () => {
+  it("shows arriving soon within a minute of the destination with fresh realtime", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: -68,
-      minutesUntilArrival: 2,
-      minutesAfterArrival: -2,
+      minutesUntilArrival: 1,
+      minutesAfterArrival: -1,
       hasStarted: true,
       isCanceled: false,
       isCanceledOrSkipped: false,
@@ -185,6 +168,23 @@ describe("selectAlarmStatus", () => {
 
     expect(status.phase).toBe("APPROACHING_DESTINATION");
     expect(status.translationKey).toBe("tracker.arrivingSoon");
+  });
+
+  it("still counts down at two minutes out", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: -67,
+      minutesUntilArrival: 2,
+      minutesAfterArrival: -2,
+      hasStarted: true,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: true,
+    });
+
+    expect(status.phase).toBe("EN_ROUTE_FRESH");
+    expect(status.kind).toBe("arrival-countdown");
+    expect(status.minutesUntilArrival).toBe(2);
   });
 
   it("shows at destination before the ended threshold", () => {

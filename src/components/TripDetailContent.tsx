@@ -222,6 +222,10 @@ export function TripDetailContent({
     isEnded,
     hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
     hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
+    // A matched vehicle position is already staleness-filtered by
+    // useVehiclePositionForTrip, so its presence means live train tracking —
+    // enough to show a live arrival countdown instead of "On the way".
+    hasLivePosition: vehiclePosition != null,
     lastUpdated,
     currentTime,
   });

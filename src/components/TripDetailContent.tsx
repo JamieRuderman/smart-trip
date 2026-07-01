@@ -224,7 +224,8 @@ export function TripDetailContent({
     hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
     // A matched vehicle position is already staleness-filtered by
     // useVehiclePositionForTrip, so its presence means live train tracking —
-    // enough to show a live arrival countdown instead of "On the way".
+    // enough to show a live arrival countdown instead of "On the way". (The
+    // dev-only vehiclePositionOverride deliberately counts, to simulate it.)
     hasLivePosition: vehiclePosition != null,
     lastUpdated,
     currentTime,

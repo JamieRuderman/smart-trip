@@ -5,13 +5,11 @@ import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedDepartureInstant,
-  reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { derivePhase } from "@/lib/native/liveActivity";
-import { toLocalDateKey } from "@/lib/timeUtils";
 
 /**
  * Invisible app-level syncer that keeps the focused trip's iOS Live Activity
@@ -38,34 +36,9 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const nowSeconds = useNow(30_000);
   const now = nowSeconds * 1000;
 
-  const trip = useMemo(() => reconstructFocusedTrip(focusedTrip), [focusedTrip]);
-  const trips = useMemo(() => (trip ? [trip] : []), [trip]);
-  const { statusMap, canceledByStartTime } = useTripRealtimeStatusMap(
-    focusedTrip.fromStation,
-    focusedTrip.toStation,
-    trips,
-  );
-
-  // Same primary + cancelled-fallback lookup as FocusedTripCard, so the lock
-  // screen and the pinned card always tell the same story.
-  const realtimeStatus = useMemo(() => {
-    if (!trip) return null;
-    const primary = statusMap.get(trip.departureTime);
-    if (primary) return primary;
-    if (canceledByStartTime.size > 0) {
-      for (const time of trip.times) {
-        const secondary = canceledByStartTime.get(time);
-        if (secondary) return secondary;
-      }
-    }
-    return null;
-  }, [statusMap, canceledByStartTime, trip]);
-
-  // The RT feed describes TODAY's runs only — a future-service focus (e.g. a
-  // weekend trip picked on a weekday) must not inherit live data from a
-  // same-numbered trip running today.
-  const live =
-    focusedTrip.serviceDate === toLocalDateKey(new Date(now)) ? realtimeStatus : null;
+  // Shared focused-trip realtime derivation (same lookup as the pinned card),
+  // so the lock screen and the card always tell the same story.
+  const { live } = useFocusedTripLive(focusedTrip, now);
 
   // Anchor onto the focused trip's own service date (overnight-safe) rather
   // than "today", so these are correct on any route/view and any clock day.

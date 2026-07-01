@@ -5,6 +5,7 @@ import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
 import { parseTimeToMinutes, toLocalDateKey } from "@/lib/timeUtils";
+import { FOCUS_ARRIVAL_EVICT_GRACE_MIN } from "@/lib/tripConstants";
 
 export interface FocusedTripReminder {
   leadMinutes: number;
@@ -201,8 +202,39 @@ export function anchorLiveTime(staticInstant: number, liveHHMM: string): number 
 }
 
 /**
- * Read the focused trip, clearing it once its (static) arrival on the service
- * date has passed, or when the trip can no longer be found in the schedule
+ * The instant at/after which a focused trip should auto-clear: its live-aware
+ * arrival plus `graceMs`. Delay-aware so a late train isn't dropped early:
+ *   • live arrival known → max(scheduled, live) + grace (never before scheduled,
+ *     so an early train still lingers the grace window);
+ *   • feed loaded but no live arrival (train passed the stop / on time, the feed
+ *     dropped the prediction) → scheduled + grace;
+ *   • feed not loaded yet (cold boot) → null: we can't tell a delayed run apart
+ *     from an arrived one, so defer to loadFocusedTrip's storage backstop rather
+ *     than risk clearing early.
+ */
+export function focusedTripClearInstant({
+  scheduledArrivalAt,
+  liveArrivalAt,
+  feedLoaded,
+  graceMs,
+}: {
+  scheduledArrivalAt: number | null;
+  liveArrivalAt: number | null;
+  feedLoaded: boolean;
+  graceMs: number;
+}): number | null {
+  if (scheduledArrivalAt == null) return null;
+  if (liveArrivalAt != null) {
+    return Math.max(scheduledArrivalAt, liveArrivalAt) + graceMs;
+  }
+  if (feedLoaded) return scheduledArrivalAt + graceMs;
+  return null;
+}
+
+/**
+ * Read the focused trip, clearing it once its scheduled arrival has passed by
+ * more than the storage backstop (the prompt, delay-aware clear is done live by
+ * FocusedTripAutoClear), or when the trip can no longer be found in the schedule
  * (timetable changed under a stale focus).
  */
 export function loadFocusedTrip(): FocusedTrip | null {
@@ -220,7 +252,11 @@ export function loadFocusedTrip(): FocusedTrip | null {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
-    if (arrivalInstant(parsed, trip) <= Date.now()) {
+    if (
+      arrivalInstant(parsed, trip) +
+        FOCUS_ARRIVAL_EVICT_GRACE_MIN * 60_000 <=
+      Date.now()
+    ) {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }

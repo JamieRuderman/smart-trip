@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import {
   X,
   AlertTriangle,
-  Timer,
   Calendar,
   Clock,
   MapPin,
@@ -236,15 +235,10 @@ export function TripDetailContent({
     ? t("tracker.remainingStopCount", { remaining: remainingStops, total: stopCount })
     : t("tracker.stopCount", { count: stopCount });
 
-  // Build the duration label: show remaining time when en route
-  const durationDisplay = minutesUntilArrival != null
-    ? minutesUntilArrival >= 60
-      ? t("tracker.remainingDurationHoursMinutes", {
-          hours: Math.floor(minutesUntilArrival / 60),
-          minutes: minutesUntilArrival % 60,
-        })
-      : t("tracker.remainingDurationMinutes", { minutes: minutesUntilArrival })
-    : tripDurationLabel;
+  // Once the rider has reached their destination the "approaching" cues stop
+  // making sense: the distance-to-stop grows as a through train pulls away, and
+  // the final stop shouldn't stay highlighted as the current stop.
+  const isAtDestination = alarmStatus.phase === "AT_DESTINATION";
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -339,7 +333,7 @@ export function TripDetailContent({
               aria-hidden="true"
             />
           ) : (
-            <Timer
+            <Clock
               className="h-6 w-6 text-muted-foreground"
               aria-hidden="true"
             />
@@ -358,11 +352,18 @@ export function TripDetailContent({
       <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
         <GutterRow className="text-sm text-muted-foreground">
           <span className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
-            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>{durationDisplay}</span>
+            {/* Total trip duration — hidden while en route, where the headline
+                already carries the live countdown ("N min to destination" /
+                "Arriving soon"), so a "N min left" here just repeats it. */}
+            {minutesUntilArrival == null && (
+              <>
+                <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{tripDurationLabel}</span>
+              </>
+            )}
             {stopCount > 0 && (
               <>
-                <span className="mx-1">·</span>
+                {minutesUntilArrival == null && <span className="mx-1">·</span>}
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{stopsLabel}</span>
               </>
@@ -399,7 +400,7 @@ export function TripDetailContent({
           </button>
         </GutterRow>
 
-        {!isOtherDay && !isEnded && distanceToNextStopMi != null && nextStop != null && (
+        {!isOtherDay && !isEnded && !isAtDestination && distanceToNextStopMi != null && nextStop != null && (
           <GutterRow className="text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <LocateFixed
@@ -515,6 +516,7 @@ export function TripDetailContent({
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isEnded={isEnded}
+          atDestination={isAtDestination}
           stopInference={stopInference}
           userFromStation={userFromStation}
           userToStation={userToStation}

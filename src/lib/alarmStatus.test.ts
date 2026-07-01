@@ -203,6 +203,26 @@ describe("selectAlarmStatus", () => {
     expect(status.translationKey).toBe("tracker.atDestination");
   });
 
+  it("does not show at destination while the live train is still approaching it", () => {
+    // Scheduled arrival has passed (running late) but the vehicle is still in
+    // transit to the destination — show "arriving soon", not "at destination".
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: -72,
+      minutesUntilArrival: -2,
+      minutesAfterArrival: 2,
+      hasStarted: true,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+      hasLivePosition: true,
+      stillApproachingDestination: true,
+    });
+
+    expect(status.phase).toBe("APPROACHING_DESTINATION");
+    expect(status.translationKey).toBe("tracker.arrivingSoon");
+  });
+
   it("preserves canceled and skipped overrides", () => {
     const canceled = selectAlarmStatus({
       minutesUntilDeparture: 10,

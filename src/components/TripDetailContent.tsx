@@ -120,7 +120,24 @@ export function TripDetailContent({
     minutesUntilArrival,
   } = progress;
 
-  const { hasStarted } = stopInference;
+  const { hasStarted, displayStops } = stopInference;
+
+  // The live vehicle position vetoes a premature "At destination": if the train
+  // is still in transit to the rider's destination (or sitting at an earlier
+  // stop), it hasn't arrived — even once the scheduled arrival minute has passed
+  // on a running-late train. "Arrived" is only the vehicle STOPPED_AT the final
+  // stop, or gone from the leg entirely (a through train that pulled away).
+  const vehicleStopIndex =
+    vehiclePosition?.currentStation != null
+      ? displayStops.indexOf(vehiclePosition.currentStation)
+      : -1;
+  const stillApproachingDestination =
+    vehiclePosition != null &&
+    vehicleStopIndex !== -1 &&
+    !(
+      vehicleStopIndex === displayStops.length - 1 &&
+      vehiclePosition.currentStatus === "STOPPED_AT"
+    );
 
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
@@ -226,6 +243,7 @@ export function TripDetailContent({
     // enough to show a live arrival countdown instead of "On the way". (The
     // dev-only vehiclePositionOverride deliberately counts, to simulate it.)
     hasLivePosition: vehiclePosition != null,
+    stillApproachingDestination,
     lastUpdated,
     currentTime,
   });
@@ -374,7 +392,7 @@ export function TripDetailContent({
                 <span>${fareInfo.price.toFixed(2)}</span>
               </>
             )}
-            {speedMph != null && (
+            {speedMph != null && !isAtDestination && !isEnded && (
               <>
                 <span className="mx-1">·</span>
                 <span>{t("tracker.speedMph", { speed: speedMph })}</span>

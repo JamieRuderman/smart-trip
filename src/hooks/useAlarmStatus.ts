@@ -21,6 +21,9 @@ interface UseAlarmStatusParams {
   hasLiveDepartureTime: boolean;
   /** A fresh live train position is available (GTFS-RT vehicle feed). */
   hasLivePosition?: boolean;
+  /** The live vehicle shows the train hasn't reached the destination yet —
+   *  vetoes "At destination" when only the schedule clock says otherwise. */
+  stillApproachingDestination?: boolean;
   lastUpdated: Date | null;
   currentTime: Date;
 }
@@ -43,6 +46,7 @@ export function useAlarmStatus(
     hasRealtimeStopData,
     hasLiveDepartureTime,
     hasLivePosition = false,
+    stillApproachingDestination = false,
     lastUpdated,
     currentTime,
   } = params;
@@ -78,6 +82,7 @@ export function useAlarmStatus(
         isEnded,
         hasFreshRealtime,
         hasLivePosition,
+        stillApproachingDestination,
         forcePostDeparture: shouldForcePostDeparture,
       }),
     [
@@ -92,6 +97,7 @@ export function useAlarmStatus(
       hasFreshRealtime,
       shouldForcePostDeparture,
       hasLivePosition,
+      stillApproachingDestination,
     ],
   );
 

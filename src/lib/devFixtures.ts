@@ -90,6 +90,7 @@ export const DEV_FIXTURE_IDS = [
   "canceled",
   "mid-trip",
   "arriving",
+  "late-arriving",
 ] as const;
 
 export type DevFixtureId = (typeof DEV_FIXTURE_IDS)[number];
@@ -186,6 +187,43 @@ export function getDevFixture(scenario: string): DevFixture | null {
           currentStopSequence: 14,
           position: { latitude: 37.9550, longitude: -122.5300, speed: 20, bearing: 175 },
           timestamp: Math.floor(now.getTime() / 1000) - 8,
+        },
+      };
+    }
+
+    case "at-destination": {
+      // Vehicle STOPPED_AT the destination — genuinely arrived. Should read
+      // "At destination", with the approaching cues (distance, mph, current-stop
+      // highlight) all gone.
+      return {
+        trip: makeTrip(113, -71),
+        realtimeStatus: null,
+        vehiclePosition: {
+          vehicleId: "113",
+          currentStation: "Larkspur",
+          currentStatus: "STOPPED_AT",
+          currentStopSequence: 14,
+          // Nonzero so the speed-hidden-at-destination gate is actually exercised.
+          position: { latitude: 37.9430, longitude: -122.5290, speed: 8, bearing: 175 },
+          timestamp: Math.floor(now.getTime() / 1000) - 6,
+        },
+      };
+    }
+
+    case "late-arriving": {
+      // Scheduled arrival was 2 min ago (running late, no live prediction) but
+      // the vehicle is still IN_TRANSIT_TO the destination — should read
+      // "Arriving soon", NOT "At destination".
+      return {
+        trip: makeTrip(111, -73),
+        realtimeStatus: null,
+        vehiclePosition: {
+          vehicleId: "111",
+          currentStation: "Larkspur",
+          currentStatus: "IN_TRANSIT_TO",
+          currentStopSequence: 14,
+          position: { latitude: 37.9500, longitude: -122.5290, speed: 18, bearing: 175 },
+          timestamp: Math.floor(now.getTime() / 1000) - 6,
         },
       };
     }

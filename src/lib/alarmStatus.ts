@@ -22,8 +22,15 @@ export interface AlarmStatusInput {
   isCanceledOrSkipped: boolean;
   isEnded: boolean;
   hasFreshRealtime: boolean;
-  hasReliableGps?: boolean;
-  isOnTrain?: boolean;
+  /** A fresh live train position (GTFS-RT vehicle feed) is available. Like
+   *  fresh realtime, it lets the en-route status show a live arrival countdown
+   *  instead of the generic "On the way". */
+  hasLivePosition?: boolean;
+  /** The live vehicle position shows the train hasn't reached the rider's
+   *  destination yet (still in transit to it, or at an earlier stop). Vetoes the
+   *  "At destination" state that the schedule clock alone would trigger once the
+   *  scheduled arrival minute passes on a running-late train. */
+  stillApproachingDestination?: boolean;
   forcePostDeparture?: boolean;
 }
 
@@ -64,9 +71,10 @@ function buildEndedLabel(minutesAfterArrival: number): AlarmStatusSelection {
 function buildEnRouteSelection(
   minutesUntilArrival: number,
   hasFreshRealtime: boolean,
-  hasReliableGps: boolean,
+  hasLivePosition: boolean,
+  stillApproachingDestination: boolean,
 ): AlarmStatusSelection {
-  if (minutesUntilArrival <= 0) {
+  if (minutesUntilArrival <= 0 && !stillApproachingDestination) {
     return {
       phase: "AT_DESTINATION",
       kind: "message",
@@ -75,7 +83,7 @@ function buildEnRouteSelection(
     };
   }
 
-  if (!hasFreshRealtime && !hasReliableGps) {
+  if (!hasFreshRealtime && !hasLivePosition) {
     return {
       phase: "EN_ROUTE_STALE",
       kind: "message",
@@ -84,7 +92,7 @@ function buildEnRouteSelection(
     };
   }
 
-  if (minutesUntilArrival <= 3) {
+  if (minutesUntilArrival <= 1) {
     return {
       phase: "APPROACHING_DESTINATION",
       kind: "message",
@@ -112,8 +120,8 @@ export function selectAlarmStatus(
     isCanceledOrSkipped,
     isEnded,
     hasFreshRealtime,
-    hasReliableGps = false,
-    isOnTrain = false,
+    hasLivePosition = false,
+    stillApproachingDestination = false,
     forcePostDeparture = false,
   } = input;
 
@@ -130,7 +138,7 @@ export function selectAlarmStatus(
     return buildEndedLabel(minutesAfterArrival);
   }
 
-  if (minutesUntilArrival <= 0) {
+  if (minutesUntilArrival <= 0 && !stillApproachingDestination) {
     return {
       phase: "AT_DESTINATION",
       kind: "message",
@@ -140,10 +148,15 @@ export function selectAlarmStatus(
   }
 
   const isPostDeparture =
-    forcePostDeparture || hasStarted || isOnTrain || minutesUntilDeparture < -2;
+    forcePostDeparture || hasStarted || minutesUntilDeparture < -2;
 
   if (isPostDeparture) {
-    return buildEnRouteSelection(minutesUntilArrival, hasFreshRealtime, hasReliableGps);
+    return buildEnRouteSelection(
+      minutesUntilArrival,
+      hasFreshRealtime,
+      hasLivePosition,
+      stillApproachingDestination,
+    );
   }
 
   // Lead with the "leave in" countdown while the armed reminder is still ahead,

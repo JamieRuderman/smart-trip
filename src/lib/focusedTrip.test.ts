@@ -11,6 +11,7 @@ import {
   reconstructFocusedTrip,
   focusedArrivalInstant,
   focusedDepartureInstant,
+  focusedTripClearInstant,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
 } from "./focusedTrip";
@@ -103,6 +104,79 @@ describe("focusedArrivalInstant / focusedDepartureInstant", () => {
 
   it("returns null when the trip is no longer in the schedule", () => {
     expect(focusedArrivalInstant(makeFocused({ tripNumber: 999999 }))).toBeNull();
+  });
+});
+
+describe("focusedTripClearInstant", () => {
+  const SCHED = new Date(2026, 5, 9, 9, 24, 0, 0).getTime();
+  const GRACE = 2 * 60_000;
+
+  it("clears at scheduled arrival + grace when on time (live == scheduled)", () => {
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: SCHED,
+        feedLoaded: true,
+        graceMs: GRACE,
+      }),
+    ).toBe(SCHED + GRACE);
+  });
+
+  it("waits for live arrival + grace when the train is delayed (no early clear)", () => {
+    const late = SCHED + 10 * 60_000;
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: late,
+        feedLoaded: true,
+        graceMs: GRACE,
+      }),
+    ).toBe(late + GRACE);
+  });
+
+  it("never clears before scheduled + grace even if live runs early", () => {
+    const early = SCHED - 5 * 60_000;
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: early,
+        feedLoaded: true,
+        graceMs: GRACE,
+      }),
+    ).toBe(SCHED + GRACE);
+  });
+
+  it("falls back to scheduled + grace once the feed is loaded but has no live arrival (train passed the stop)", () => {
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: null,
+        feedLoaded: true,
+        graceMs: GRACE,
+      }),
+    ).toBe(SCHED + GRACE);
+  });
+
+  it("defers (null) when the feed has not loaded yet, so a delayed run isn't cleared early on boot", () => {
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: null,
+        feedLoaded: false,
+        graceMs: GRACE,
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null without a scheduled arrival", () => {
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: null,
+        liveArrivalAt: null,
+        feedLoaded: true,
+        graceMs: GRACE,
+      }),
+    ).toBeNull();
   });
 });
 

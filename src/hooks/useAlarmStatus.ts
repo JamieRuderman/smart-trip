@@ -19,8 +19,11 @@ interface UseAlarmStatusParams {
   isEnded: boolean;
   hasRealtimeStopData: boolean;
   hasLiveDepartureTime: boolean;
-  hasReliableGps?: boolean;
-  isOnTrain?: boolean;
+  /** A fresh live train position is available (GTFS-RT vehicle feed). */
+  hasLivePosition?: boolean;
+  /** The live vehicle shows the train hasn't reached the destination yet —
+   *  vetoes "At destination" when only the schedule clock says otherwise. */
+  stillApproachingDestination?: boolean;
   lastUpdated: Date | null;
   currentTime: Date;
 }
@@ -42,8 +45,8 @@ export function useAlarmStatus(
     isEnded,
     hasRealtimeStopData,
     hasLiveDepartureTime,
-    hasReliableGps = false,
-    isOnTrain = false,
+    hasLivePosition = false,
+    stillApproachingDestination = false,
     lastUpdated,
     currentTime,
   } = params;
@@ -78,8 +81,8 @@ export function useAlarmStatus(
         isCanceledOrSkipped,
         isEnded,
         hasFreshRealtime,
-        hasReliableGps,
-        isOnTrain,
+        hasLivePosition,
+        stillApproachingDestination,
         forcePostDeparture: shouldForcePostDeparture,
       }),
     [
@@ -93,8 +96,8 @@ export function useAlarmStatus(
       isEnded,
       hasFreshRealtime,
       shouldForcePostDeparture,
-      hasReliableGps,
-      isOnTrain,
+      hasLivePosition,
+      stillApproachingDestination,
     ],
   );
 

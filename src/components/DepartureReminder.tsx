@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,10 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useStationSelection } from "@/contexts/stationSelection";
-import {
-  isIOSWebBrowser,
-  isReminderSupported,
-} from "@/lib/notificationScheduler";
+import { isReminderSupported } from "@/lib/notificationScheduler";
 import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import {
@@ -27,7 +23,6 @@ import {
   parseTimeToMinutes,
   toLocalDateKey,
 } from "@/lib/timeUtils";
-import { APP_STORE_URL } from "@/seo/constants";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
@@ -237,10 +232,6 @@ export function DepartureReminder({
     else doFocus();
   }, [doFocus, isOtherTripFocused]);
 
-  /** This trip's armed reminder, if any. Sourced from the focused-trip
-   *  context rather than the old per-trip hook. */
-  const reminder = isThisTripFocused ? focusedTrip?.reminder ?? null : null;
-
   // Boarding station for the reminder text: the focused leg's origin when this
   // trip is focused (so the line-map corridor view still names the user's
   // station), otherwise this displayed leg's origin.
@@ -319,111 +310,12 @@ export function DepartureReminder({
     </Dialog>
   ) : null;
 
-  // Order matters here:
-  //   1. Reminder status — this trip is focused with an armed reminder. Shown
-  //      read-only; editing/cancelling it and cancelling the trip both live on
-  //      the home "My Trip" card now, not in this sheet.
-  //   2. Going (no reminder) — this trip is focused but no reminder armed;
-  //      offer to open the reminder modal.
-  //   3. Go button — the default not-focused state. Respects the
-  //      departure-already-passed gate. Unlike the reminder, focusing works
-  //      without notification support, so Go shows regardless of
-  //      isReminderSupported().
-
-  if (isThisTripFocused && reminder) {
-    // Read-only reminder status. Tap the pill on the home "My Trip" card to
-    // edit or cancel it — the sheet no longer carries its own cancel control.
-    return (
-      <GutterRow>
-        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <BellRing
-              className="h-4 w-4 text-my-trip shrink-0"
-              aria-hidden="true"
-            />
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-foreground tabular-nums">
-                {t("departureReminder.remindAt", {
-                  time: formatClockTime(
-                    reminder.reminderAt,
-                    timeFormat,
-                    i18n.language,
-                  ),
-                })}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {reminder.alarmId
-                  ? t("departureReminder.leaveAlarmActive", {
-                      count: reminder.leadMinutes,
-                    })
-                  : t("departureReminder.minutesBefore", {
-                      count: reminder.leadMinutes,
-                    })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </GutterRow>
-    );
-  }
-
-  if (isThisTripFocused && !reminder) {
-    // The reminder sub-control needs notification support. When unsupported,
-    // offer the native-app CTA on iOS web (where the Notification API is
-    // absent) and otherwise just drop the reminder affordance — focusing the
-    // trip itself still works without notifications.
-    const reminderSupported = isReminderSupported();
-    const showAppCta = !reminderSupported && isIOSWebBrowser();
-    // Once there's too little lead left, drop the "Add reminder" affordance —
-    // the modal would only offer a degenerate, fire-immediately range. The
-    // trip stays focused; the user just can't add a reminder this close in.
-    const showAddReminder = reminderSupported && !tooLateToScheduleReminder;
-    return (
-      <GutterRow>
-        <div className="flex-1 min-w-0 rounded-lg bg-muted/40 p-3 animate-in slide-in-from-top-4 duration-200">
-          <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-foreground">
-            <TripIcon
-              className="h-4 w-4 text-my-trip shrink-0"
-              aria-hidden="true"
-            />
-            <span className="truncate">{t("focusedTrip.going")}</span>
-          </span>
-          {/* "Add reminder" and the iOS-web app CTA each get their own
-              full-width row below the "Going" label. */}
-          {showAddReminder && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openReminderDialog}
-              aria-label={t("departureReminder.setReminder")}
-              className="mt-2 h-9 w-full gap-1.5"
-            >
-              <BellRing className="h-3.5 w-3.5 text-my-trip" aria-hidden="true" />
-              <span>{t("departureReminder.setReminder")}</span>
-            </Button>
-          )}
-          {showAppCta && (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="mt-2 h-9 w-full gap-1.5"
-            >
-              <a
-                href={APP_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("departureReminder.appCta")}
-              >
-                <BellRing className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{t("departureReminder.appCta")}</span>
-              </a>
-            </Button>
-          )}
-        </div>
-      </GutterRow>
-    );
-  }
+  // A focused trip's status — "Going", the reminder countdown, Add-reminder,
+  // and Cancel — all live on the home "My Trip" card. Repeating them in the
+  // detail sheet is redundant, so once focused the sheet shows nothing here.
+  // (The live-drift reschedule effect above still runs while the sheet is
+  // open.) Not focused → the "Go" button below.
+  if (isThisTripFocused) return null;
 
   // "Going" means going somewhere — require a selected journey (origin +
   // destination). Without one (e.g. tapping a train on the line map before

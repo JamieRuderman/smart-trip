@@ -5,13 +5,11 @@ import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedDepartureInstant,
-  reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { derivePhase } from "@/lib/native/liveActivity";
-import { toLocalDateKey } from "@/lib/timeUtils";
 
 /**
  * Invisible app-level syncer that keeps the focused trip's iOS Live Activity
@@ -32,40 +30,15 @@ export function LiveActivitySync() {
 }
 
 function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
-  const { updateLiveActivity, clearFocusedTrip } = useStationSelection();
+  const { updateLiveActivity } = useStationSelection();
   // 30s tick: cheap re-render that re-evaluates the phase boundary between
   // realtime polls so the departure→arrival flip lands close to on time.
   const nowSeconds = useNow(30_000);
   const now = nowSeconds * 1000;
 
-  const trip = useMemo(() => reconstructFocusedTrip(focusedTrip), [focusedTrip]);
-  const trips = useMemo(() => (trip ? [trip] : []), [trip]);
-  const { statusMap, canceledByStartTime } = useTripRealtimeStatusMap(
-    focusedTrip.fromStation,
-    focusedTrip.toStation,
-    trips,
-  );
-
-  // Same primary + cancelled-fallback lookup as FocusedTripCard, so the lock
-  // screen and the pinned card always tell the same story.
-  const realtimeStatus = useMemo(() => {
-    if (!trip) return null;
-    const primary = statusMap.get(trip.departureTime);
-    if (primary) return primary;
-    if (canceledByStartTime.size > 0) {
-      for (const time of trip.times) {
-        const secondary = canceledByStartTime.get(time);
-        if (secondary) return secondary;
-      }
-    }
-    return null;
-  }, [statusMap, canceledByStartTime, trip]);
-
-  // The RT feed describes TODAY's runs only — a future-service focus (e.g. a
-  // weekend trip picked on a weekday) must not inherit live data from a
-  // same-numbered trip running today.
-  const live =
-    focusedTrip.serviceDate === toLocalDateKey(new Date(now)) ? realtimeStatus : null;
+  // Shared focused-trip realtime derivation (same lookup as the pinned card),
+  // so the lock screen and the card always tell the same story.
+  const { live } = useFocusedTripLive(focusedTrip, now);
 
   // Anchor onto the focused trip's own service date (overnight-safe) rather
   // than "today", so these are correct on any route/view and any clock day.
@@ -113,19 +86,11 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending]);
 
-  // Once arrival passes while the app is foreground, end the activity and clear
-  // the focus right away (the 30s tick is what crosses the boundary) — rather
-  // than leaving it in the Dynamic Island showing the clock-derived "Arrived"
-  // state until the next foreground reconcile. This closes the app-open-at-
-  // arrival gap; the backgrounded-through-arrival case can't be ended locally
-  // (ActivityKit can't schedule a future dismissal without ending — and so
-  // removing from the island — immediately), where iOS's expiry is the backstop.
-  // clearFocusedTrip is idempotent, and clearing the focus unmounts this syncer,
-  // so it can't re-fire.
-  useEffect(() => {
-    if (arrivalAt == null || now < arrivalAt) return;
-    void clearFocusedTrip();
-  }, [now, arrivalAt, clearFocusedTrip]);
+  // Post-arrival cleanup (ending the activity + clearing the focus) is owned by
+  // FocusedTripAutoClear, which fires a short, delay-aware grace after arrival on
+  // every platform; clearing the focus there unmounts this syncer and ends the
+  // activity via clearFocusedTrip. The backgrounded-through-arrival case still
+  // falls back to iOS's own Live Activity expiry.
 
   // NOTE: we deliberately do NOT end the activity when the app goes inactive.
   // An ended Live Activity drops out of the Dynamic Island (it only lingers on

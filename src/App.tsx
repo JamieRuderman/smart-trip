@@ -10,6 +10,7 @@ import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
+import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
@@ -43,6 +44,10 @@ const RoutedApp = () => {
             route changes and sheet closes, since the lock screen tracks the
             focused train regardless of view. */}
         <LiveActivitySync />
+        {/* Platform-independent auto-clear of the focused trip a short grace
+            after (live-aware) arrival — the pinned "My Trip" card exists on
+            web/Android too, where LiveActivitySync doesn't run. */}
+        <FocusedTripAutoClear />
         {/* App-level reminder modal host — lives here (like LiveActivitySync)
             so "Take this train" can pop it from any surface and it survives
             the triggering sheet/route change. */}

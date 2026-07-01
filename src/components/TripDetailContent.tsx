@@ -3,15 +3,12 @@ import { cn } from "@/lib/utils";
 import {
   X,
   AlertTriangle,
-  Timer,
   Calendar,
   Clock,
   MapPin,
   LocateFixed,
-  Loader2,
   ChevronDown,
   ChevronUp,
-  Smartphone,
   Train,
 } from "lucide-react";
 import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
@@ -116,22 +113,31 @@ export function TripDetailContent({
     minutesAfterArrival,
     nextStop,
     distanceToNextStopMi,
-    phoneDistanceToNextStopMi,
-    lat,
-    lng,
-    locationLoading,
-    requestLocation,
-    hasReliableGps,
-    isOnTrain,
     vehiclePosition,
     activeProgressSource,
-    distanceToTrainMi,
     stopInference,
     remainingStops,
     minutesUntilArrival,
   } = progress;
 
-  const { hasStarted } = stopInference;
+  const { hasStarted, displayStops } = stopInference;
+
+  // The live vehicle position vetoes a premature "At destination": if the train
+  // is still in transit to the rider's destination (or sitting at an earlier
+  // stop), it hasn't arrived — even once the scheduled arrival minute has passed
+  // on a running-late train. "Arrived" is only the vehicle STOPPED_AT the final
+  // stop, or gone from the leg entirely (a through train that pulled away).
+  const vehicleStopIndex =
+    vehiclePosition?.currentStation != null
+      ? displayStops.indexOf(vehiclePosition.currentStation)
+      : -1;
+  const stillApproachingDestination =
+    vehiclePosition != null &&
+    vehicleStopIndex !== -1 &&
+    !(
+      vehicleStopIndex === displayStops.length - 1 &&
+      vehiclePosition.currentStatus === "STOPPED_AT"
+    );
 
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
@@ -156,8 +162,6 @@ export function TripDetailContent({
       : null;
   const minutesUntilLeave =
     reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
-
-  const hasLocation = lat != null && lng != null;
 
   // Trip metadata
   const tripDurationMinutes =
@@ -234,8 +238,12 @@ export function TripDetailContent({
     isEnded,
     hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
     hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
-    hasReliableGps,
-    isOnTrain,
+    // A matched vehicle position is already staleness-filtered by
+    // useVehiclePositionForTrip, so its presence means live train tracking —
+    // enough to show a live arrival countdown instead of "On the way". (The
+    // dev-only vehiclePositionOverride deliberately counts, to simulate it.)
+    hasLivePosition: vehiclePosition != null,
+    stillApproachingDestination,
     lastUpdated,
     currentTime,
   });
@@ -245,15 +253,10 @@ export function TripDetailContent({
     ? t("tracker.remainingStopCount", { remaining: remainingStops, total: stopCount })
     : t("tracker.stopCount", { count: stopCount });
 
-  // Build the duration label: show remaining time when en route
-  const durationDisplay = minutesUntilArrival != null
-    ? minutesUntilArrival >= 60
-      ? t("tracker.remainingDurationHoursMinutes", {
-          hours: Math.floor(minutesUntilArrival / 60),
-          minutes: minutesUntilArrival % 60,
-        })
-      : t("tracker.remainingDurationMinutes", { minutes: minutesUntilArrival })
-    : tripDurationLabel;
+  // Once the rider has reached their destination the "approaching" cues stop
+  // making sense: the distance-to-stop grows as a through train pulls away, and
+  // the final stop shouldn't stay highlighted as the current stop.
+  const isAtDestination = alarmStatus.phase === "AT_DESTINATION";
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -348,7 +351,7 @@ export function TripDetailContent({
               aria-hidden="true"
             />
           ) : (
-            <Timer
+            <Clock
               className="h-6 w-6 text-muted-foreground"
               aria-hidden="true"
             />
@@ -367,11 +370,18 @@ export function TripDetailContent({
       <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
         <GutterRow className="text-sm text-muted-foreground">
           <span className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
-            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>{durationDisplay}</span>
+            {/* Total trip duration — hidden while en route, where the headline
+                already carries the live countdown ("N min to destination" /
+                "Arriving soon"), so a "N min left" here just repeats it. */}
+            {minutesUntilArrival == null && (
+              <>
+                <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{tripDurationLabel}</span>
+              </>
+            )}
             {stopCount > 0 && (
               <>
-                <span className="mx-1">·</span>
+                {minutesUntilArrival == null && <span className="mx-1">·</span>}
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{stopsLabel}</span>
               </>
@@ -382,7 +392,7 @@ export function TripDetailContent({
                 <span>${fareInfo.price.toFixed(2)}</span>
               </>
             )}
-            {speedMph != null && (
+            {speedMph != null && !isAtDestination && !isEnded && (
               <>
                 <span className="mx-1">·</span>
                 <span>{t("tracker.speedMph", { speed: speedMph })}</span>
@@ -408,7 +418,7 @@ export function TripDetailContent({
           </button>
         </GutterRow>
 
-        {!isOtherDay && !isEnded && distanceToNextStopMi != null && nextStop != null && (
+        {!isOtherDay && !isEnded && !isAtDestination && distanceToNextStopMi != null && nextStop != null && (
           <GutterRow className="text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <LocateFixed
@@ -424,30 +434,6 @@ export function TripDetailContent({
                     })}
               </span>
             </span>
-          </GutterRow>
-        )}
-
-        {!isOtherDay && !hasLocation && (
-          <GutterRow>
-            <button
-              onClick={requestLocation}
-              disabled={locationLoading}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              aria-label={t("header.useMyLocation")}
-            >
-              {locationLoading ? (
-                <Loader2
-                  className="h-3.5 w-3.5 animate-spin shrink-0"
-                  aria-hidden="true"
-                />
-              ) : (
-                <LocateFixed
-                  className="h-3.5 w-3.5 shrink-0"
-                  aria-hidden="true"
-                />
-              )}
-              <span>{t("header.useMyLocation")}</span>
-            </button>
           </GutterRow>
         )}
 
@@ -502,43 +488,11 @@ export function TripDetailContent({
                           · {mpsToMph(vehiclePosition.position.speed)} mph
                         </>
                       )}
-                      {distanceToTrainMi != null && (
-                        <> · {distanceToTrainMi.toFixed(1)} mi from phone</>
-                      )}
                       {" · "}age{" "}
                       {nowSec - Math.floor(vehiclePosition.timestamp)}s
                     </p>
                   ) : (
                     <p className="text-muted-foreground">No match</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Phone GPS row */}
-              <div className="flex items-start gap-2 px-3 py-2">
-                <span
-                  className={cn(
-                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
-                    activeProgressSource === "gps"
-                      ? "bg-green-500"
-                      : "bg-muted-foreground/30",
-                  )}
-                />
-                <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground/80">Phone GPS</p>
-                  {hasReliableGps ? (
-                    <p className="text-muted-foreground">
-                      {nextStop ? `Nearest: ${nextStop}` : "—"}
-                      {phoneDistanceToNextStopMi != null && (
-                        <> · {phoneDistanceToNextStopMi.toFixed(1)} mi</>
-                      )}
-                      {isOnTrain && <> · on train</>}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      {lat != null ? "Low accuracy / stale" : "No location"}
-                    </p>
                   )}
                 </div>
               </div>
@@ -580,6 +534,7 @@ export function TripDetailContent({
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isEnded={isEnded}
+          atDestination={isAtDestination}
           stopInference={stopInference}
           userFromStation={userFromStation}
           userToStation={userToStation}

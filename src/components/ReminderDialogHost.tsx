@@ -3,13 +3,11 @@ import { useStationSelection } from "@/contexts/stationSelection";
 import {
   anchorLiveTime,
   focusedDepartureInstant,
-  reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { ReminderDialog } from "./ReminderDialog";
-import { toLocalDateKey } from "@/lib/timeUtils";
 
 /**
  * App-level host for the departure-reminder modal. Lives at the root — NOT in a
@@ -46,32 +44,8 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
   const now = nowSeconds * 1000;
   const currentTime = useMemo(() => new Date(now), [now]);
 
-  const trip = useMemo(() => reconstructFocusedTrip(focusedTrip), [focusedTrip]);
-  const trips = useMemo(() => (trip ? [trip] : []), [trip]);
-  const { statusMap, canceledByStartTime } = useTripRealtimeStatusMap(
-    focusedTrip.fromStation,
-    focusedTrip.toStation,
-    trips,
-  );
-
-  // Same primary + cancelled-fallback lookup as FocusedTripCard / LiveActivitySync.
-  const realtimeStatus = useMemo(() => {
-    if (!trip) return null;
-    const primary = statusMap.get(trip.departureTime);
-    if (primary) return primary;
-    if (canceledByStartTime.size > 0) {
-      for (const time of trip.times) {
-        const secondary = canceledByStartTime.get(time);
-        if (secondary) return secondary;
-      }
-    }
-    return null;
-  }, [statusMap, canceledByStartTime, trip]);
-
-  // The RT feed describes today's runs only — a future-service focus must not
-  // inherit live data from a same-numbered trip running today.
-  const live =
-    focusedTrip.serviceDate === toLocalDateKey(new Date(now)) ? realtimeStatus : null;
+  // Shared focused-trip realtime derivation (same lookup as the pinned card).
+  const { live } = useFocusedTripLive(focusedTrip, now);
 
   // Live-anchored boarding departure on the focused trip's own service date.
   const staticDepartureAt = useMemo(

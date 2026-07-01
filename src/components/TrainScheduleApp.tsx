@@ -5,11 +5,8 @@ import { getFilteredTrips } from "@/lib/scheduleUtils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { useMapTrains } from "@/hooks/useMapTrains";
-import { useUserRiding } from "@/hooks/useUserRiding";
 import { getClosestStation, isSouthbound } from "@/lib/stationUtils";
 import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
-import { useAutoFocusOnRiding } from "@/hooks/useAutoFocusOnRiding";
 import {
   HEADER_HEIGHTS,
   HEADER_MAX_HEIGHTS,
@@ -108,50 +105,22 @@ export function TrainScheduleApp() {
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
-  // Geolocation for closest station + riding detection. `watch: true` keeps
-  // speedMps/heading fresh so `useUserRiding` can latch onto the train the
-  // user is on while they have the schedule open.
+  // One-shot location for closest-station auto-select. We fetch a single fix
+  // (native: on mount; web: on explicit request) rather than watching — the
+  // schedule page has no live-location UI, so a continuous watch would drain
+  // battery for no visible benefit. `requestLocation` re-fetches on demand for
+  // the "use my location" button.
   const {
     lat,
     lng,
-    speedMps,
-    heading,
     loading: locationLoading,
     requestLocation,
   } = useGeolocation({
-    watch: true,
+    watch: false,
     autoRequestOnNative: true,
   });
   const closestStation =
     lat != null && lng != null ? getClosestStation(lat, lng) : null;
-
-  // Live trains + which one the user is currently on. We only need this to
-  // highlight the matching row — pass the derived trip number + direction
-  // down rather than the full train list.
-  const { trains } = useMapTrains();
-  const { ridingTrainKey } = useUserRiding({
-    userLat: lat,
-    userLng: lng,
-    userSpeedMps: speedMps,
-    userHeading: heading,
-    trains,
-  });
-  const ridingTrain = useMemo(
-    () =>
-      ridingTrainKey ? trains.find((t) => t.key === ridingTrainKey) ?? null : null,
-    [trains, ridingTrainKey],
-  );
-  const ridingTripNumber = ridingTrain?.tripNumber ?? null;
-  const ridingIsSouthbound =
-    ridingTrain?.directionId == null ? null : ridingTrain.directionId === 0;
-
-  useAutoFocusOnRiding({
-    ridingTripNumber,
-    ridingIsSouthbound,
-    currentTime,
-    homeFromStation: fromStation,
-    homeToStation: toStation,
-  });
 
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.
@@ -289,8 +258,6 @@ export function TrainScheduleApp() {
             scheduleType={scheduleType}
             selectedTripNumber={selectedTripNumber}
             onSelectTrip={setSelectedTrip}
-            ridingTripNumber={ridingTripNumber}
-            ridingIsSouthbound={ridingIsSouthbound}
             focusedTripNumber={focusedTripNumber}
           />
         )}

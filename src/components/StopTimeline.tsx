@@ -24,6 +24,10 @@ interface StopTimelineProps {
   timeFormat: "12h" | "24h";
   /** When true all stops are rendered as past/muted — used for the ended state. */
   isEnded?: boolean;
+  /** When true the rider has reached their destination: like `isEnded`, no stop
+   *  stays highlighted as "current" (a through train pulling away shouldn't keep
+   *  the final stop lit), but the header band stays coloured, not grey. */
+  atDestination?: boolean;
   /** Pre-computed stop inference results from useTripProgress. */
   stopInference: StopInferenceResult;
   /** The user's selected origin (from URL/schedule). When set and distinct
@@ -46,6 +50,7 @@ export function StopTimeline({
   realtimeStatus,
   timeFormat,
   isEnded = false,
+  atDestination = false,
   stopInference,
   userFromStation = null,
   userToStation = null,
@@ -64,8 +69,9 @@ export function StopTimeline({
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
 
-  // When the trip has ended all stops are forced to "past" so nothing stays highlighted.
-  const states = isEnded
+  // Once ended — or once the rider has reached their destination — all stops are
+  // forced to "past" so nothing stays highlighted as the current stop.
+  const states = isEnded || atDestination
     ? inferredStates.map(() => "past" as const)
     : inferredStates;
 

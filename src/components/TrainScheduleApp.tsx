@@ -5,7 +5,11 @@ import { getFilteredTrips } from "@/lib/scheduleUtils";
 import { parseDebugTimeFromUrl } from "@/lib/debugTime";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { getClosestStation, isSouthbound } from "@/lib/stationUtils";
+import {
+  getClosestStationWithMargin,
+  isClosestStationConfident,
+  isSouthbound,
+} from "@/lib/stationUtils";
 import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
 import {
   HEADER_HEIGHTS,
@@ -113,21 +117,32 @@ export function TrainScheduleApp() {
   const {
     lat,
     lng,
+    accuracy,
+    timestampMs,
     loading: locationLoading,
     requestLocation,
   } = useGeolocation({
     watch: false,
     autoRequestOnNative: true,
   });
-  const closestStation =
-    lat != null && lng != null ? getClosestStation(lat, lng) : null;
+  const closestFix =
+    lat != null && lng != null ? getClosestStationWithMargin(lat, lng) : null;
+  const closestStation = closestFix?.station ?? null;
+  // A coarse fix (cell/Wi-Fi, off by ~1 km) can sit nearer a neighboring
+  // station than the true one; only trust the pick when its accuracy radius
+  // fits inside the margin to the runner-up.
+  const closestStationConfident =
+    closestFix != null &&
+    isClosestStationConfident(closestFix.marginKm, accuracy);
 
   // Auto-select from station when location first resolves (native or first web grant).
   // Skip if the closest station is already the destination — that would create an invalid route.
+  // Skip low-confidence fixes so a coarse first fix doesn't silently mis-snap.
   const didAutoSelect = useRef(false);
   useEffect(() => {
     if (
       closestStation &&
+      closestStationConfident &&
       !fromStation &&
       !didAutoSelect.current &&
       closestStation !== toStation
@@ -135,13 +150,19 @@ export function TrainScheduleApp() {
       didAutoSelect.current = true;
       setFromStation(closestStation);
     }
-  }, [closestStation, fromStation, toStation, setFromStation]);
+  }, [closestStation, closestStationConfident, fromStation, toStation, setFromStation]);
 
-  // When the user explicitly taps the location button: snap to closest station
-  // immediately if we already have it, otherwise request fresh location.
-  // A ref tracks whether a manual request is in flight so we can auto-select
-  // when the location resolves without clobbering the user's own selection otherwise.
+  // When the user explicitly taps the location button we ALWAYS request a fresh
+  // fix rather than reusing whatever position resolved on mount — a stale or
+  // coarse first fix must not be re-served on every tap. A ref marks the manual
+  // request as in flight; the effect below applies the result once the fresh
+  // fix lands (keyed on its timestamp so an identical repeat pick still clears
+  // the flag).
   const locationRequestedRef = useRef(false);
+  // Timestamp of the fix present when the tap fired; only a strictly newer fix
+  // counts as the fresh result, so a failed/timed-out re-request never falls
+  // back to re-applying the stale mount fix.
+  const requestedAtFixTsRef = useRef<number | null>(null);
 
   const applyClosestStation = useCallback(
     (station: NonNullable<typeof closestStation>) => {
@@ -154,20 +175,18 @@ export function TrainScheduleApp() {
   );
 
   useEffect(() => {
-    if (closestStation && locationRequestedRef.current) {
-      locationRequestedRef.current = false;
-      applyClosestStation(closestStation);
-    }
-  }, [applyClosestStation, closestStation]);
+    if (!locationRequestedRef.current || locationLoading) return;
+    if (closestStation == null || timestampMs == null) return;
+    if (timestampMs === requestedAtFixTsRef.current) return;
+    locationRequestedRef.current = false;
+    applyClosestStation(closestStation);
+  }, [applyClosestStation, closestStation, locationLoading, timestampMs]);
 
   const handleRequestLocation = useCallback(() => {
-    if (closestStation) {
-      applyClosestStation(closestStation);
-    } else {
-      locationRequestedRef.current = true;
-      requestLocation();
-    }
-  }, [applyClosestStation, closestStation, requestLocation]);
+    locationRequestedRef.current = true;
+    requestedAtFixTsRef.current = timestampMs;
+    requestLocation();
+  }, [requestLocation, timestampMs]);
 
   // Dev-only: ?devTrip=<scenario> opens the sheet with fixture data
   const devFixture = useMemo(() => {

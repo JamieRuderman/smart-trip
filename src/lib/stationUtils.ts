@@ -128,17 +128,66 @@ export function getClosestStationWithDistance(
   lat: number,
   lng: number
 ): { station: Station; distanceKm: number } {
+  const { station, distanceKm } = getClosestStationWithMargin(lat, lng);
+  return { station, distanceKm };
+}
+
+/**
+ * The two nearest stations to a point, plus the confidence margin between them.
+ *
+ * `marginKm` is how much further the second-closest station is than the
+ * closest; it is the slack we have before a fix's error could tip the pick to a
+ * neighbor (see {@link isClosestStationConfident}). Non-finite coordinates
+ * (e.g. an unresolved GPS fix) yield an `Infinity` distance and a `0` margin so
+ * callers never silently treat garbage input as a confident `stations[0]`.
+ */
+export function getClosestStationWithMargin(
+  lat: number,
+  lng: number
+): { station: Station; distanceKm: number; marginKm: number } {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { station: stations[0], distanceKm: Infinity, marginKm: 0 };
+  }
+
   let closest: Station = stations[0];
-  let minDist = Infinity;
+  let closestDist = Infinity;
+  let runnerUpDist = Infinity;
   for (const station of stations) {
     const coords = STATION_COORDINATES[station];
     const dist = haversineKm(lat, lng, coords.lat, coords.lng);
-    if (dist < minDist) {
-      minDist = dist;
+    if (dist < closestDist) {
+      runnerUpDist = closestDist;
+      closestDist = dist;
       closest = station;
+    } else if (dist < runnerUpDist) {
+      runnerUpDist = dist;
     }
   }
-  return { station: closest, distanceKm: minDist };
+  return {
+    station: closest,
+    distanceKm: closestDist,
+    marginKm: runnerUpDist - closestDist,
+  };
+}
+
+/**
+ * Whether a location fix confidently identifies the closest station.
+ *
+ * A straight-line "nearest station" pick is only trustworthy when the fix's
+ * accuracy radius is smaller than the margin to the runner-up — otherwise the
+ * true position could sit nearer that neighbor and we'd snap to the wrong one.
+ * SMART's tightest station pair is ~1.66 km apart, so a coarse (cell-tower /
+ * Wi-Fi) fix a kilometer off can straddle two stations; this guard keeps such a
+ * fix from silently auto-selecting the wrong one. `accuracyMeters == null`
+ * (browser omitted it) is treated as trustworthy so the guard never
+ * hard-blocks.
+ */
+export function isClosestStationConfident(
+  marginKm: number,
+  accuracyMeters: number | null
+): boolean {
+  if (accuracyMeters == null) return true;
+  return marginKm * 1000 >= accuracyMeters;
 }
 
 /**

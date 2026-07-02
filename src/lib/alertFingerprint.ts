@@ -42,3 +42,16 @@ export function getAlertFingerprint(alert: ServiceAlertData): string {
     })
   );
 }
+
+/**
+ * Return the stable identity used for dismissal persistence.
+ *
+ * Alert copy and active-period timestamps are intentionally excluded: agencies
+ * routinely edit those fields while an alert is live, and those edits should
+ * not undo an explicit dismissal. The fingerprint fallback only matters for a
+ * malformed alert without an agency-provided ID.
+ */
+export function getAlertDismissalKey(alert: ServiceAlertData): string {
+  const id = normalizePart(alert.id);
+  return id ? `id:${id}` : `fingerprint:${getAlertFingerprint(alert)}`;
+}

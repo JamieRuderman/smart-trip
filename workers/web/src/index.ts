@@ -8,6 +8,9 @@
  * - Native Live Activity backend: /api/liveactivity/{register,token,deregister}
  *   are handled here → routed to a per-activity Durable Object
  *   (`TripActivityDO`) that drives EXACT-TIME push transitions via DO alarms.
+ *   The class is implemented by the separate smart-trip-liveactivity Worker
+ *   (workers/liveactivity/) and reached via a cross-script binding, so THIS
+ *   Worker implements no DO and Cloudflare generates Preview URLs for it.
  * - Any other /api/* returns 404: every route is now native, so the legacy
  *   Vercel fallback proxy was removed once the migration completed.
  *
@@ -24,8 +27,6 @@ import {
   getTripUpdates,
   getVehiclePositions,
 } from "./lib/gtfsrt.js";
-
-export { TripActivityDO } from "./do/tripActivity.js";
 
 /** Wildcard CORS for the public GTFS-RT data + native Live Activity routes: the
  *  responses are identical for every caller, and the iOS app reads them from
@@ -81,14 +82,9 @@ interface RateLimiter {
 
 export interface Env {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
-  /** Per-activity Live Activity Durable Objects. */
+  /** Per-activity Live Activity Durable Objects (cross-script binding to the
+   *  smart-trip-liveactivity Worker; APNs creds live on THAT Worker's env). */
   TRIP_ACTIVITY: DurableObjectNamespace;
-  // APNs creds (forwarded to the DO via env) — see workers/web/src/lib/apns.ts.
-  APNS_KEY_ID?: string;
-  APNS_TEAM_ID?: string;
-  APNS_APP_ID?: string;
-  APNS_PRIVATE_KEY?: string;
-  APNS_HOST?: string;
   // GTFS-RT native feed (511 + edge Cache API) — see workers/web/src/lib/gtfsrt.ts.
   TRANSIT_511_API_KEY?: string;
   /** Optional per-IP rate limiter for the public /api/liveactivity/* mutation

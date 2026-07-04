@@ -1,0 +1,36 @@
+# smart-trip-liveactivity — Durable Object host for the Live Activity push
+# backend. Split out of smart-trip-web so the web Worker implements no Durable
+# Object (Cloudflare generates no Preview URLs for Workers that do), restoring
+# per-version preview builds there. smart-trip-web reaches TripActivityDO via a
+# cross-script binding (script_name = "smart-trip-liveactivity").
+#
+# Deployed MANUALLY from this directory (it changes rarely and is not wired to
+# Workers Builds):  npx wrangler deploy --config workers/liveactivity/wrangler.toml
+name = "smart-trip-liveactivity"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+# nodejs_compat for gtfs-realtime-bindings (protobufjs) — the DO reads the 511
+# feed natively via workers/web/src/lib/gtfsrt.ts.
+compatibility_flags = ["nodejs_compat"]
+
+# No public surface: the DO is only reachable through smart-trip-web's binding.
+workers_dev = false
+preview_urls = false
+
+[vars]
+# APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID +
+# PRIVATE KEY and the 511 key are SECRETS, set out-of-band on THIS Worker:
+#   npx wrangler secret put APNS_KEY_ID          --config workers/liveactivity/wrangler.toml
+#   npx wrangler secret put APNS_PRIVATE_KEY     --config workers/liveactivity/wrangler.toml
+#   npx wrangler secret put TRANSIT_511_API_KEY  --config workers/liveactivity/wrangler.toml
+APNS_APP_ID = "smart.trip"
+APNS_TEAM_ID = "6YH3537ZY9"
+
+# v1: take ownership of the existing Durable Objects (and their stored state —
+# registrations, tokens, pending alarms) from smart-trip-web, where the class
+# lived until the preview-URL split.
+[[migrations]]
+tag = "v1"
+transferred_classes = [
+  { from = "TripActivityDO", from_script = "smart-trip-web", to = "TripActivityDO" },
+]

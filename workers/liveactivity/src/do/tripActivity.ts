@@ -39,7 +39,7 @@ import {
   type ApnsConfig,
   type ApnsEnv,
 } from "../lib/apns.js";
-import { getTripUpdates, type GtfsRtEnv } from "../lib/gtfsrt.js";
+import { getTripUpdates, type GtfsRtEnv } from "../../../web/src/lib/gtfsrt.js";
 
 /** Env visible to the DO (Worker bindings): APNs creds + the native 511/KV feed. */
 export interface DoEnv extends ApnsEnv, GtfsRtEnv {}

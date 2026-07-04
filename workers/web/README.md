@@ -16,8 +16,11 @@ Also reachable at <https://smart-trip-web.smart-trip.workers.dev>.
   are served directly by the Worker (511 fetch + protobuf decode + normalize,
   cached in the edge Cache API). See `src/lib/gtfsrt.ts`.
 - **Live Activity push (native)** — `/api/liveactivity/{register,token,deregister}`
-  drive a per-activity Durable Object (`src/do/tripActivity.ts`) that fires
-  exact-time APNs pushes via the Alarms API.
+  drive a per-activity Durable Object (`TripActivityDO`, implemented by the
+  separate **smart-trip-liveactivity** Worker — see `workers/liveactivity/`)
+  that fires exact-time APNs pushes via the Alarms API. This Worker only
+  *binds* to it (`script_name` in the root wrangler.toml): implementing no DO
+  here is what lets Cloudflare generate per-version Preview URLs.
 - **No Vercel** — `run_worker_first = ["/api/*"]` runs the Worker before the SPA
   fallback so it owns every `/api/*`; all routes are native and any unknown
   `/api/*` returns 404. (The legacy Vercel fallback proxy was removed once the
@@ -37,8 +40,14 @@ npx wrangler deploy  # bundles workers/web/src + uploads ./dist
 - Build command: `npm run build` (falls back to `npx vite build` if the SEO
   prerender step needs a browser the CI lacks)
 - Deploy command: `npx wrangler deploy` (production) / `npx wrangler versions
-  upload` (preview branches)
+  upload` (non-production branches — the Workers Builds default; each upload
+  gets a Preview URL because this Worker implements no Durable Object)
 - Root directory: repo root (default)
+
+> Workers Builds pins every build to the connected Worker
+> (`WRANGLER_CI_OVERRIDE_NAME`), so `[env.*]` name overrides cannot deploy a
+> different Worker from CI. The old `smart-trip-web-preview` / `--env preview`
+> scaffolding was unreachable for that reason and has been removed.
 
 ## Build env
 

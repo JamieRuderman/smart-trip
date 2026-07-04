@@ -1,8 +1,9 @@
-# Cloudflare Workers config for the SMART trip web app + native Live Activity
-# push backend. Lives at the REPO ROOT so Cloudflare Workers Builds (CI) finds it
-# with the default `wrangler deploy` / `wrangler versions upload` command. The
-# Worker source is under workers/web/; build the SPA first (`npm run build` →
-# ./dist), then deploy from the repo root:  npx wrangler deploy
+# Cloudflare Workers config for the SMART trip web app + the public Live
+# Activity routes (the Durable Object itself lives in workers/liveactivity/).
+# Lives at the REPO ROOT so Cloudflare Workers Builds (CI) finds it with the
+# default `wrangler deploy` / `wrangler versions upload` command. The Worker
+# source is under workers/web/; build the SPA first (`npm run build` → ./dist),
+# then deploy from the repo root:  npx wrangler deploy
 name = "smart-trip-web"
 main = "workers/web/src/index.ts"
 compatibility_date = "2025-01-01"
@@ -34,24 +35,17 @@ not_found_handling = "single-page-application"
 # SPA fallback swallowing them; everything else is served straight from assets.
 run_worker_first = ["/api/*"]
 
-[vars]
-# APNs topic identifiers (not secret — already in docs). The .p8 KEY_ID + PRIVATE
-# KEY are SECRETS, set out-of-band (never committed):
-#   npx wrangler secret put APNS_KEY_ID
-#   npx wrangler secret put APNS_PRIVATE_KEY
-APNS_APP_ID = "smart.trip"
-APNS_TEAM_ID = "6YH3537ZY9"
-
 # Per-activity Live Activity Durable Object — drives exact-time push transitions
-# via the Alarms API (the native replacement for the Vercel poll-cron).
+# via the Alarms API (the native replacement for the Vercel poll-cron). The class
+# is IMPLEMENTED by the separate smart-trip-liveactivity Worker
+# (workers/liveactivity/) and reached from here via this cross-script binding:
+# Cloudflare generates no Preview URLs for Workers that implement a Durable
+# Object, so keeping this Worker DO-free is what makes per-version preview
+# builds possible. The APNs vars + secrets live on that Worker now, not here.
 [[durable_objects.bindings]]
 name = "TRIP_ACTIVITY"
 class_name = "TripActivityDO"
-
-# SQLite-backed DO (free-plan compatible).
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["TripActivityDO"]
+script_name = "smart-trip-liveactivity"
 
 # Per-IP rate limit for the PUBLIC /api/liveactivity/* mutation routes
 # (register/token/deregister). These are accountless by design, so without a
@@ -69,29 +63,11 @@ new_sqlite_classes = ["TripActivityDO"]
 # free-tier 1,000-writes/day cap was too low for a per-refresh cache and took the
 # feeds down.) See workers/web/src/lib/gtfsrt.ts.
 
-# Preview builds use a separate Worker with no Durable Object binding/export.
-# Cloudflare does not generate Preview URLs for Workers that implement Durable
-# Objects, so this environment serves the built SPA and proxies /api/* to the
-# production backend instead of running Live Activity routes locally.
-#
-# In Cloudflare Workers Builds, set the non-production branch deploy command to:
-#   npx wrangler versions upload --env preview
-[env.preview]
-name = "smart-trip-web-preview"
-main = "workers/web/src/preview.ts"
-routes = []
-workers_dev = true
-preview_urls = true
-# Production's Durable Object migration must not be applied to this stateless
-# preview Worker. Environment bindings are isolated, but migrations otherwise
-# inherit from the top-level configuration.
-migrations = []
-
-[env.preview.assets]
-directory = "./dist"
-binding = "ASSETS"
-not_found_handling = "single-page-application"
-run_worker_first = ["/api/*"]
-
-[env.preview.vars]
-API_ORIGIN = "https://smarttraintrip.com"
+# Preview builds: Workers Builds' default non-production deploy command
+# (`npx wrangler versions upload`) uploads a version of THIS Worker, and
+# Cloudflare generates a Preview URL for it because the Worker no longer
+# implements a Durable Object (the class moved to smart-trip-liveactivity).
+# Note that Workers Builds forces every build onto the connected Worker via
+# WRANGLER_CI_OVERRIDE_NAME, so `[env.*]` name overrides can never target a
+# different Worker from CI — the retired smart-trip-web-preview /
+# `--env preview` scaffolding was unreachable for that reason.

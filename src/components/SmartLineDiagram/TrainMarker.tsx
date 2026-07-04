@@ -6,6 +6,7 @@ import { gpsStationProgress } from "@/lib/trainGpsProgress";
 import { scheduledProgress } from "@/lib/trainMotion";
 import { isTrainDelayed } from "@/lib/realtimeConstants";
 import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
+import { keepLeftOnDoubleTrack } from "./doubleTrack";
 
 interface TrainMarkerProps {
   train: MapTrain;
@@ -50,12 +51,15 @@ function TrainMarkerImpl({
   const resolved =
     gps ?? scheduledProgress(train, now) ?? trainStationProgress(train);
 
-  const pos = positionOnPath(
+  const pos = keepLeftOnDoubleTrack(
+    positionOnPath(
+      resolved.progress,
+      pathEl,
+      stationArcs,
+      resolved.direction,
+      pathLength,
+    ),
     resolved.progress,
-    pathEl,
-    stationArcs,
-    resolved.direction,
-    pathLength,
   );
 
   const isDelayed = isTrainDelayed(train);

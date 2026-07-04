@@ -48,6 +48,22 @@ export interface PathPosition {
   bearing: number;
 }
 
+/** Convert fractional station progress to arc length measured from north. */
+export function arcFromNorthAtProgress(
+  progress: number,
+  stationArcs: number[],
+): number {
+  if (stationArcs.length < 2) return 0;
+  const last = stationArcs.length - 1;
+  const p = Math.max(0, Math.min(last, progress));
+  const i = Math.floor(p);
+  const t = p - i;
+  return (
+    stationArcs[i] +
+    (stationArcs[Math.min(last, i + 1)] - stationArcs[i]) * t
+  );
+}
+
 /**
  * Convert a fractional station index (e.g. 3.4 = 40% of the way from
  * station 3 → 4) to (x, y, bearing) on the path.
@@ -71,13 +87,7 @@ export function positionOnPath(
   if (stationArcs.length < 2) return { x: 0, y: 0, bearing: 0 };
 
   const L = pathLength ?? pathEl.getTotalLength();
-  const last = stationArcs.length - 1;
-  const p = Math.max(0, Math.min(last, progress));
-  const i = Math.floor(p);
-  const t = p - i;
-
-  const arcFromNorth =
-    stationArcs[i] + (stationArcs[Math.min(last, i + 1)] - stationArcs[i]) * t;
+  const arcFromNorth = arcFromNorthAtProgress(progress, stationArcs);
   const pathS = Math.max(0, Math.min(L, L - arcFromNorth));
   const pt = pathEl.getPointAtLength(pathS);
 

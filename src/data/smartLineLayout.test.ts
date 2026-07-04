@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { DIAGRAM_STATIONS } from "@/data/smartLineLayout";
+import {
+  DIAGRAM_STATIONS,
+  DOUBLE_TRACK_SEGMENTS,
+} from "@/data/smartLineLayout";
 import { STATION_ORDER } from "@/data/generated/stations.generated";
 
 describe("smartLineLayout drift guard", () => {
@@ -11,5 +14,21 @@ describe("smartLineLayout drift guard", () => {
   // the SVG layout in `smartLineLayout.ts` instead of editing this assertion.
   it("DIAGRAM_STATIONS matches GTFS-derived STATION_ORDER", () => {
     expect(DIAGRAM_STATIONS.map((s) => s.station)).toEqual([...STATION_ORDER]);
+  });
+
+  it("keeps double-track segments ordered and within the corridor", () => {
+    expect(DOUBLE_TRACK_SEGMENTS).toHaveLength(7);
+    for (const [index, segment] of DOUBLE_TRACK_SEGMENTS.entries()) {
+      expect(segment.northProgress).toBeGreaterThanOrEqual(0);
+      expect(segment.southProgress).toBeLessThanOrEqual(
+        DIAGRAM_STATIONS.length - 1,
+      );
+      expect(segment.southProgress).toBeGreaterThan(segment.northProgress);
+      if (index > 0) {
+        expect(segment.northProgress).toBeGreaterThan(
+          DOUBLE_TRACK_SEGMENTS[index - 1].southProgress,
+        );
+      }
+    }
   });
 });

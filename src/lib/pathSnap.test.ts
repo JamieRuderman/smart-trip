@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { positionOnPath } from "./pathSnap";
+import { arcFromNorthAtProgress, positionOnPath } from "./pathSnap";
 
 /** Minimal SVGPathElement stub: a straight horizontal line of length `len`. */
 function stubPath(len: number) {
@@ -15,6 +15,9 @@ function stubPath(len: number) {
 const ARCS = [0, 50, 100]; // 3 stations, arc-from-north
 
 describe("positionOnPath", () => {
+  it("interpolates fractional station progress into north-relative arc length", () => {
+    expect(arcFromNorthAtProgress(1.5, ARCS)).toBe(75);
+  });
   it("uses the cached pathLength instead of getTotalLength when provided", () => {
     const path = stubPath(100);
     positionOnPath(1, path, ARCS, "S", 100);

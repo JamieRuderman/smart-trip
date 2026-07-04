@@ -39,6 +39,7 @@ import { UserLocationMarker } from "./UserLocationMarker";
 import { TrainMarker } from "./TrainMarker";
 import { ZoneLabels } from "./ZoneLabels";
 import { ZoneSegments } from "./ZoneSegments";
+import { DoubleTrackSegments } from "./DoubleTrackSegments";
 import { FerryTerminus } from "./FerryTerminus";
 import { FerryLabels } from "./FerryLabels";
 
@@ -218,6 +219,14 @@ export function SmartLineDiagram({
               stationArcs={snap.arcs}
               fromStation={fromStation}
               toStation={toStation}
+            />
+          )}
+
+          {snap && (
+            <DoubleTrackSegments
+              pathD={ROUTE_PATH_D}
+              totalLength={snap.totalLength}
+              stationArcs={snap.arcs}
             />
           )}
 

@@ -43,6 +43,54 @@ export const ROUTE_PATH_D =
   "C306.003 512.003 300 490.333 300 467V430V358L300 310.836" +
   "C300 287.503 293.663 266.043 280.99 246.456L174.123 78.0837";
 
+/**
+ * The reference track diagram measures the corridor by northbound travel time
+ * from Larkspur. These values let its double-track endpoints share the same
+ * fractional-station coordinate system used by live train markers.
+ */
+export const TRAVEL_TIME_MINUTES = [
+  80, 75, 69, 65, 57, 53, 45, 40, 27, 24, 18, 12, 7, 0,
+] as const;
+
+export interface DoubleTrackSegment {
+  /** Fractional station indexes, north to south. */
+  northProgress: number;
+  southProgress: number;
+}
+
+function progressAtTravelTime(minutesFromLarkspur: number): number {
+  for (let i = 0; i < TRAVEL_TIME_MINUTES.length - 1; i++) {
+    const north = TRAVEL_TIME_MINUTES[i];
+    const south = TRAVEL_TIME_MINUTES[i + 1];
+    if (minutesFromLarkspur <= north && minutesFromLarkspur >= south) {
+      return i + (north - minutesFromLarkspur) / (north - south);
+    }
+  }
+  return minutesFromLarkspur >= TRAVEL_TIME_MINUTES[0]
+    ? 0
+    : TRAVEL_TIME_MINUTES.length - 1;
+}
+
+/**
+ * Passing sections shown in the supplied SMART track diagram. Endpoint labels
+ * are travel time from Larkspur (for example 76:40 means 76m 40s).
+ */
+const DOUBLE_TRACK_TRAVEL_TIME_RANGES = [
+  [76 + 40 / 60, 75 + 35 / 60],
+  [70, 64 + 15 / 60],
+  [54, 52 + 20 / 60],
+  [38 + 45 / 60, 37 + 25 / 60],
+  [22 + 5 / 60, 19 + 35 / 60],
+  [7 + 20 / 60, 4 + 10 / 60],
+  [25 / 60, 0],
+] as const;
+
+export const DOUBLE_TRACK_SEGMENTS: readonly DoubleTrackSegment[] =
+  DOUBLE_TRACK_TRAVEL_TIME_RANGES.map(([northTime, southTime]) => ({
+    northProgress: progressAtTravelTime(northTime),
+    southProgress: progressAtTravelTime(southTime),
+  }));
+
 export interface FerryWaypoint {
   id: "FERRY_LRK" | "FERRY_BEND" | "FERRY_SF";
   x: number;

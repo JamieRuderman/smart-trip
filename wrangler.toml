@@ -82,6 +82,10 @@ main = "workers/web/src/preview.ts"
 routes = []
 workers_dev = true
 preview_urls = true
+# Production's Durable Object migration must not be applied to this stateless
+# preview Worker. Environment bindings are isolated, but migrations otherwise
+# inherit from the top-level configuration.
+migrations = []
 
 [env.preview.assets]
 directory = "./dist"

@@ -18,6 +18,10 @@ export const FONT_FAMILY = "Inter, sans-serif";
 export const TOKEN = {
   // Line + station geometry
   lineW: 18,
+  /** Background-colored gap that visually separates paired passing tracks. */
+  doubleTrackGapW: 4,
+  /** Center of either rail within the original 18-unit track envelope. */
+  doubleTrackRailOffset: 5.5,
   stationStroke: 6,
   stationR: 11,
   terminalR: 16,

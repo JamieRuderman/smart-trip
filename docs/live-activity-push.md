@@ -11,7 +11,9 @@ This code is **inert until configured** — no APNs key, or the
 ## How it works
 
 The backend is a Cloudflare **Durable Object** (`TripActivityDO`,
-`workers/web/src/do/tripActivity.ts`): one instance per activity id, driving
+`workers/liveactivity/src/do/tripActivity.ts`, deployed as its own
+`smart-trip-liveactivity` Worker and reached from `smart-trip-web` via a
+cross-script binding): one instance per activity id, driving
 **exact-time** transitions via the DO Alarms API — no polling cron, no Redis.
 
 ```
@@ -104,8 +106,8 @@ the local-only start (`startTripActivity`), so nothing registers.
 | `src/lib/native/liveActivityPush.ts` | client: start-with-push + register / deregister (gated) |
 | `api/_liveActivityStatus.ts` | pure live-status derivation + push decision (shared) |
 | `workers/web/src/index.ts` | `/api/liveactivity/{register,token}` routes → the Durable Object |
-| `workers/web/src/do/tripActivity.ts` | the Durable Object: alarms, feed re-check, push decision, lifecycle |
-| `workers/web/src/lib/apns.ts` | APNs ES256 JWT (WebCrypto) + payload builder + `fetch()` HTTP/2 sender |
+| `workers/liveactivity/src/do/tripActivity.ts` | the Durable Object: alarms, feed re-check, push decision, lifecycle |
+| `workers/liveactivity/src/lib/apns.ts` | APNs ES256 JWT (WebCrypto) + payload builder + `fetch()` HTTP/2 sender |
 
 ## Verified vs pending
 

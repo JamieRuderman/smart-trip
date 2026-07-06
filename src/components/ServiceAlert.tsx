@@ -38,7 +38,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
           <button
             type="button"
             onClick={restoreAll}
-            className="underline underline-offset-2 hover:text-foreground"
+            className="text-foreground underline-offset-2 hover:underline"
           >
             {t("serviceAlert.restore")}
           </button>

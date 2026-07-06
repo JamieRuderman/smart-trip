@@ -137,7 +137,7 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
               href="https://sonomamarintrain.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:text-primary transition-colors"
+              className="text-foreground underline-offset-2 hover:underline hover:text-primary transition-colors"
             >
               sonomamarintrain.org
             </a>

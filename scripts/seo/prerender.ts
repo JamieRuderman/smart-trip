@@ -285,7 +285,55 @@ function buildFerryPage(
 }
 
 // ---------------------------------------------------------------------------
-// Inject site-wide JSON-LD into the SPA's dist/index.html (Phase 1 hygiene).
+// Build a crawlable sitelinks footer for the SPA homepage.
+//
+// The homepage (dist/index.html) is a client-rendered SPA whose <body> is just
+// `<div id="root">`, so it ships ZERO static <a href> links. That left every
+// prerendered station/route/ferry page orphaned: Google could only reach them
+// via the sitemap (no internal links from the one indexed, authoritative page),
+// which is the classic cause of "Discovered – currently not indexed".
+//
+// This footer lives OUTSIDE #root, so React never overwrites it, and it is
+// present in the raw HTML regardless of JS — giving Googlebot a crawl path from
+// the homepage into the whole landing-page cluster. Generated from the same
+// STATION_ORDER / TOP_ROUTE_PAIRS data as the pages + sitemap so it can't drift.
+// ---------------------------------------------------------------------------
+function buildSiteLinksFooter(): string {
+  const stationLinks = STATION_ORDER.map(
+    (station) =>
+      `<a href="/stations/${stationSlug(station)}/">${station}</a>`,
+  ).join('<span class="sep"> · </span>');
+
+  const routeLinks = TOP_ROUTE_PAIRS.map(
+    ([from, to]) =>
+      `<a href="/routes/${routePairSlug(from, to)}/">${from} → ${to}</a>`,
+  ).join('<span class="sep"> · </span>');
+
+  // Self-contained styles (scoped by id) so the block doesn't depend on the
+  // hashed app stylesheet's utility classes. Colors reference the app's global
+  // CSS custom properties (src/index.css) so the footer matches the muted
+  // "Help and legal" text in BottomInfoBar exactly and follows dark mode.
+  return `
+    <footer id="seo-sitelinks" aria-label="Browse SMART train stations and routes">
+      <style>
+        #seo-sitelinks{max-width:56rem;margin:0 auto;padding:1.5rem 1.25rem 2rem;font-size:.75rem;line-height:1.6;color:hsl(var(--muted-foreground));border-top:1px solid hsl(var(--border))}
+        #seo-sitelinks p{margin:.35rem 0}
+        #seo-sitelinks .label{color:hsl(var(--foreground));opacity:.7;font-weight:500}
+        #seo-sitelinks .sep{opacity:.4}
+        #seo-sitelinks a{color:hsl(var(--foreground));text-decoration:none;text-underline-offset:2px}
+        #seo-sitelinks a:hover{color:hsl(var(--foreground));text-decoration:underline}
+      </style>
+      <nav>
+        <p><span class="label">Stations:</span> ${stationLinks}</p>
+        <p><span class="label">Routes:</span> ${routeLinks}</p>
+        <p><span class="label">Connections:</span> <a href="/ferry-connection/">Larkspur ferry connection</a></p>
+      </nav>
+    </footer>`;
+}
+
+// ---------------------------------------------------------------------------
+// Inject site-wide JSON-LD + a crawlable sitelinks footer into the SPA's
+// dist/index.html (Phase 1 hygiene).
 // ---------------------------------------------------------------------------
 function enhanceSpaIndexHtml(): void {
   const indexPath = path.join(distDir, "index.html");
@@ -315,6 +363,11 @@ function enhanceSpaIndexHtml(): void {
     "</head>",
     `${canonical}    ${injection}\n  </head>`,
   );
+
+  // Crawlable internal links into the landing-page cluster. Placed just before
+  // </body>, after #root, so it survives React mounting.
+  html = html.replace("</body>", `    ${buildSiteLinksFooter()}\n  </body>`);
+
   fs.writeFileSync(indexPath, html, "utf8");
 }
 

@@ -320,7 +320,7 @@ function buildSiteLinksFooter(): string {
         #seo-sitelinks p{margin:.35rem 0}
         #seo-sitelinks .label{color:hsl(var(--foreground));opacity:.7;font-weight:500}
         #seo-sitelinks .sep{opacity:.4}
-        #seo-sitelinks a{color:inherit;text-decoration:none;text-underline-offset:2px}
+        #seo-sitelinks a{color:hsl(var(--foreground) / .8);text-decoration:none;text-underline-offset:2px}
         #seo-sitelinks a:hover{color:hsl(var(--foreground));text-decoration:underline}
       </style>
       <nav>

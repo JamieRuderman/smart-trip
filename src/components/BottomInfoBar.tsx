@@ -24,7 +24,7 @@ export function BottomInfoBar() {
                 href="https://member.everbridge.net/index/892807736728379#/login"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-foreground"
+                className="underline-offset-2 hover:underline hover:text-foreground"
               >
                 {t("bottomInfo.alertSignupLink")}
               </a>
@@ -42,7 +42,7 @@ export function BottomInfoBar() {
             href="https://511.org"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="underline-offset-2 hover:underline hover:text-foreground"
           >
             511.org
           </a>
@@ -55,7 +55,7 @@ export function BottomInfoBar() {
             href="/support.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="underline-offset-2 hover:underline hover:text-foreground"
           >
             {t("bottomInfo.supportLink")}
           </a>{" "}
@@ -64,7 +64,7 @@ export function BottomInfoBar() {
             href="/privacy.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="underline-offset-2 hover:underline hover:text-foreground"
           >
             {t("bottomInfo.privacyHostedLink")}
           </a>

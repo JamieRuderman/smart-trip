@@ -10,6 +10,16 @@
       ],
       "port": 5180,
       "autoPort": true
+    },
+    {
+      "name": "preview",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 20 >/dev/null && npx vite preview --port 5181 --strictPort"
+      ],
+      "port": 5181,
+      "autoPort": true
     }
   ]
 }

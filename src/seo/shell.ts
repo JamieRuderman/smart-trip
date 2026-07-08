@@ -66,6 +66,10 @@ function jsonLdScript(payload: unknown): string {
 export function renderShell(opts: ShellOptions): string {
   const canonical = `${SITE_URL}${opts.canonicalPath}`;
   const ogImage = `${SITE_URL}${opts.ogImagePath ?? "/og/default.png"}`;
+  const ogImageAlt =
+    opts.lang === "es"
+      ? "Planificador de viajes del tren SMART con horarios y mapa en vivo"
+      : "SMART Train trip planner showing schedules and a live map";
 
   const hreflangTags = opts.hreflang
     .map(
@@ -97,6 +101,9 @@ export function renderShell(opts: ShellOptions): string {
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${escapeHtml(canonical)}" />
     <meta property="og:image" content="${escapeHtml(ogImage)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="627" />
+    <meta property="og:image:alt" content="${escapeHtml(ogImageAlt)}" />
     <meta property="og:locale" content="${opts.lang === "es" ? "es_US" : "en_US"}" />
 
     <!-- Twitter -->
@@ -104,6 +111,7 @@ export function renderShell(opts: ShellOptions): string {
     <meta name="twitter:title" content="${escapeHtml(opts.title)}" />
     <meta name="twitter:description" content="${escapeHtml(opts.description)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
+    <meta name="twitter:image:alt" content="${escapeHtml(ogImageAlt)}" />
 
     <!-- Favicon -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

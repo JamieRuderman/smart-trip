@@ -10,9 +10,16 @@ import SwiftUI
 @available(iOS 26.0, *)
 struct LeaveAlarmMetadata: AlarmMetadata {}
 
-/// Runs when the alarm's secondary ("View trip") button is tapped: foregrounds
-/// the app, which lands on the focused-trip card. Not user-discoverable — it
-/// exists only as the alarm button's action.
+/// Runs when the alarm's secondary ("View trip") button is tapped: stops the
+/// ringing alarm, then foregrounds the app, which lands on the focused-trip
+/// card. Not user-discoverable — it exists only as the alarm button's action.
+///
+/// Stopping is our responsibility here: AlarmKit's `.custom` secondary behavior
+/// runs this intent but, unlike the stop button, does NOT silence the alarm. If
+/// we only opened the app the alert would be dismissed while the alarm kept
+/// ringing — and with its UI gone the user would have no way to stop it. So we
+/// stop the alarm by id (baked in at schedule time) before returning, matching
+/// Android's "View trip" which also dismisses the alarm.
 @available(iOS 26.0, *)
 struct OpenSmartTripIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Open SMART Trip"
@@ -20,8 +27,22 @@ struct OpenSmartTripIntent: LiveActivityIntent {
     static let isDiscoverable: Bool = false
     static let openAppWhenRun: Bool = true
 
+    /// The alarm to silence — set when the alarm is scheduled so the button
+    /// knows which alert it belongs to.
+    @Parameter(title: "Alarm ID")
+    var alarmID: String
+
+    init() {}
+
+    init(alarmID: String) {
+        self.alarmID = alarmID
+    }
+
     func perform() async throws -> some IntentResult {
-        .result()
+        if let uuid = UUID(uuidString: alarmID) {
+            try? AlarmManager.shared.stop(id: uuid)
+        }
+        return .result()
     }
 }
 #endif
@@ -92,6 +113,9 @@ enum LeaveAlarmKit {
         if #available(iOS 26.0, *) {
             Task {
                 do {
+                    // Generate the id up front so the "View trip" intent can
+                    // carry it and stop this exact alarm when tapped.
+                    let id = UUID()
                     let stopButton = AlarmButton(
                         text: LocalizedStringResource(String.LocalizationValue(stopButtonTitle)),
                         textColor: .white,
@@ -115,7 +139,7 @@ enum LeaveAlarmKit {
                             systemImageName: "arrow.right"
                         )
                         secondaryBehavior = .custom
-                        secondaryIntent = OpenSmartTripIntent()
+                        secondaryIntent = OpenSmartTripIntent(alarmID: id.uuidString)
                     }
                     let alert = AlarmPresentation.Alert(
                         title: LocalizedStringResource(String.LocalizationValue(title)),
@@ -133,7 +157,6 @@ enum LeaveAlarmKit {
                         attributes: attributes,
                         secondaryIntent: secondaryIntent
                     )
-                    let id = UUID()
                     _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
                     completion(.success(id.uuidString))
                 } catch {

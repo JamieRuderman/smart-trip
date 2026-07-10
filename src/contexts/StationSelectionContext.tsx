@@ -273,7 +273,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
 
   // Clear the focused trip once the train has arrived AND reconcile a
   // past-fire reminder. loadFocusedTrip() drops the trip record on arrival and
-  // strips the reminder sub-object once reminderAt has passed; this tick just
+  // stamps the reminder `firedAt` once reminderAt has passed; this tick just
   // notices and dispatches so the pinned card / reminder pill re-renders. On
   // native there's no JS callback when the OS-scheduled alarm fires, so this
   // tick is the only thing that catches up the UI within ~30s. A 30s cadence
@@ -291,8 +291,13 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
         return;
       }
+      // Nudge a re-read exactly once when the reminder first fires — the handler
+      // reloads the trip, which stamps `firedAt` and flips the card to its "time
+      // to go" state. Guarding on `!firedAt` stops this from re-dispatching every
+      // tick for the rest of the (still-focused) trip.
       if (
         focusedTrip.reminder &&
+        focusedTrip.reminder.firedAt == null &&
         focusedTrip.reminder.reminderAt <= Date.now()
       ) {
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));

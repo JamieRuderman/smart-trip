@@ -20,6 +20,12 @@ export interface FocusedTripReminder {
    *  local notification. Absent on the notification path (web, alarm
    *  unavailable/denied, or scheduling failure). */
   alarmId?: string;
+  /** Epoch ms the reminder actually fired. Set once `reminderAt` passes — the
+   *  OS delivered the alert (native) or the web timer ran — instead of dropping
+   *  the reminder sub-object, so the card can show a "time to go" indicator
+   *  through the fire → departure window. Absent while the reminder is still
+   *  armed and ahead of us; the trip record is cleared wholesale after arrival. */
+  firedAt?: number;
 }
 
 export interface FocusedTrip {
@@ -87,7 +93,9 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       typeof (r.reminder as Record<string, unknown>).title === "string" &&
       typeof (r.reminder as Record<string, unknown>).body === "string" &&
       ((r.reminder as Record<string, unknown>).alarmId === undefined ||
-        typeof (r.reminder as Record<string, unknown>).alarmId === "string"));
+        typeof (r.reminder as Record<string, unknown>).alarmId === "string") &&
+      ((r.reminder as Record<string, unknown>).firedAt === undefined ||
+        typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
   return (
@@ -260,15 +268,24 @@ export function loadFocusedTrip(): FocusedTrip | null {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
-    // The reminder has already fired — drop the sub-object so the "active
-    // reminder" pill doesn't linger. On native the OS delivered the alert at
-    // fire time but there's no JS callback (bootFocusedTrip skips the timer
-    // re-arm on native); on web a closed-tab miss has no way to deliver late
-    // anyway. Either way, "reminderAt is in the past" means we're done.
-    if (parsed.reminder && parsed.reminder.reminderAt <= Date.now()) {
-      const cleaned: FocusedTrip = { ...parsed, reminder: null };
-      saveFocusedTrip(cleaned);
-      return cleaned;
+    // The reminder has already fired — stamp `firedAt` (once) so the card can
+    // swap the "edit reminder" pill for a "time to go" indicator, rather than
+    // dropping the sub-object and reverting to a bare "Add reminder" that hides
+    // that the alarm went off. On native the OS delivered the alert at fire time
+    // but there's no JS callback (bootFocusedTrip skips the timer re-arm on
+    // native); on web a closed-tab miss has no way to deliver late anyway.
+    // Either way, "reminderAt is in the past" means it fired.
+    if (
+      parsed.reminder &&
+      parsed.reminder.firedAt == null &&
+      parsed.reminder.reminderAt <= Date.now()
+    ) {
+      const fired: FocusedTrip = {
+        ...parsed,
+        reminder: { ...parsed.reminder, firedAt: Date.now() },
+      };
+      saveFocusedTrip(fired);
+      return fired;
     }
     return parsed;
   } catch {
@@ -394,7 +411,12 @@ export function bootFocusedTrip(): void {
     },
     () => {
       const after = loadFocusedTrip();
-      if (after) saveFocusedTrip({ ...after, reminder: null });
+      if (after?.reminder) {
+        saveFocusedTrip({
+          ...after,
+          reminder: { ...after.reminder, firedAt: Date.now() },
+        });
+      }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
       }

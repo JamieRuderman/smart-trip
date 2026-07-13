@@ -58,21 +58,21 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
             <div className="flex items-start gap-2.5 flex-1 min-w-0">
               <AlertTriangle className="h-5 w-5 text-smart-gold flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-semibold text-sm text-smart-gold">
-                    {alert.title ?? t("serviceAlert.sectionTitle")}
-                  </div>
-                  {alert.startsAt && (
-                    <p className="shrink-0 text-xs text-smart-gold/60">
-                      {new Date(alert.startsAt).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  )}
+                <div className="font-semibold text-sm text-smart-gold">
+                  {alert.title ?? t("serviceAlert.sectionTitle")}
                 </div>
                 {alert.message && (
-                  <p className="text-xs text-smart-gold/80 mt-1">{alert.message}</p>
+                  <p className="text-xs text-foreground/90 mt-1 max-h-40 overflow-y-auto overscroll-contain pr-1">
+                    {alert.message}
+                  </p>
+                )}
+                {alert.startsAt && (
+                  <p className="mt-1.5 text-right text-xs text-smart-gold/60">
+                    {new Date(alert.startsAt).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
                 )}
               </div>
             </div>

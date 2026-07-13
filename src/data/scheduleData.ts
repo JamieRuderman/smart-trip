@@ -6,6 +6,7 @@ import {
   weekendInboundFerries,
 } from "@/data/ferrySchedule";
 import scheduleOverrides from "@/data/scheduleOverrides";
+import { SCHEDULE_GENERATED_AT } from "@/data/scheduleMeta";
 import type { FerryConnection, TrainSchedule } from "@/types/smartSchedule";
 
 export type FerrySchedules = {
@@ -38,6 +39,10 @@ export const bundledSchedulePayload: SchedulePayload = {
     weekendInboundFerries,
   },
   scheduleOverrides,
+  // Build-time stamp (the feed's fetchedAt) so a genuine offline cold-launch —
+  // before any remote or cached payload loads — still reports a real timestamp
+  // instead of the "Schedule timestamp unavailable" fallback.
+  generatedAt: SCHEDULE_GENERATED_AT,
 };
 
 function isValidScheduleOverrides(value: unknown): value is ScheduleOverrides {

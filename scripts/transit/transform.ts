@@ -29,6 +29,7 @@ import {
   extractStationCoordinates,
   groupStopTimesByTrip,
   renderFerrySchedulesFile,
+  renderScheduleMetaFile,
   renderScheduleOverridesFile,
   renderStationCoordinatesFile,
   renderStationPlatformsFile,
@@ -165,6 +166,10 @@ export function transformRawToGenerated(): void {
   writeOutput(
     "ferrySchedule.generated.ts",
     renderFerrySchedulesFile(ferrySchedules),
+  );
+  writeOutput(
+    "scheduleMeta.generated.ts",
+    renderScheduleMetaFile(smartFeed.fetchedAt),
   );
   emitPublicScheduleJson(
     trainSchedules,

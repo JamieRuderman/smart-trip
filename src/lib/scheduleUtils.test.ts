@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getFirstInProgressTripIndex,
   getNextTripIndex,
+  getScheduleMeta,
   getTodayScheduleType,
   setScheduleData,
   type ProcessedTrip,
@@ -187,6 +188,27 @@ describe("isSchedulePayload override validation", () => {
     expect(
       isSchedulePayload({ ...basePayload(), scheduleOverrides: [] }),
     ).toBe(false);
+  });
+});
+
+describe("bundled schedule generatedAt", () => {
+  afterEach(() => {
+    setScheduleData(bundledSchedulePayload);
+  });
+
+  it("stamps a valid ISO generatedAt into the bundled payload", () => {
+    // Regression guard: a missing generatedAt makes an offline cold-launch
+    // surface "Schedule timestamp unavailable" in the footer.
+    expect(bundledSchedulePayload.generatedAt).toBeTruthy();
+    const parsed = new Date(bundledSchedulePayload.generatedAt as string);
+    expect(Number.isNaN(parsed.getTime())).toBe(false);
+  });
+
+  it("surfaces a non-null generatedAt when the bundled payload is applied", () => {
+    setScheduleData(bundledSchedulePayload, "bundled");
+    const meta = getScheduleMeta();
+    expect(meta.source).toBe("bundled");
+    expect(meta.generatedAt).toBeInstanceOf(Date);
   });
 });
 

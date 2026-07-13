@@ -186,6 +186,20 @@ export default {
       return Response.json({ error: "Not found" }, { status: 404, headers: CORS });
     }
 
+    // --- Static schedule JSON: needs CORS for the iOS app ---
+    // The native app runs from capacitor://localhost but fetches this file at
+    // the absolute https origin (VITE_API_BASE_URL), so the cross-origin read is
+    // CORS-gated. Without these headers WKWebView blocks the response, the fetch
+    // rejects, and the app silently falls back to its timestamp-less bundled
+    // schedule ("Schedule timestamp unavailable"). The GTFS-RT feeds above carry
+    // CORS for the same reason; the static schedule file was the gap.
+    if (path === "/data/schedules.json") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: CORS });
+      }
+      return withCors(await env.ASSETS.fetch(request));
+    }
+
     // --- Static asset / SPA fallback ---
     return env.ASSETS.fetch(request);
   },

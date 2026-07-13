@@ -33,7 +33,10 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 # Invoke the Worker FIRST for /api/* so the DO routes + proxy run instead of the
 # SPA fallback swallowing them; everything else is served straight from assets.
-run_worker_first = ["/api/*"]
+# /data/schedules.json is also worker-first: it's a real static asset, so without
+# this the assets runtime serves it directly and bypasses the Worker's CORS branch
+# — the iOS app (capacitor://localhost) then can't read it cross-origin.
+run_worker_first = ["/api/*", "/data/schedules.json"]
 
 # Per-activity Live Activity Durable Object — drives exact-time push transitions
 # via the Alarms API (the native replacement for the Vercel poll-cron). The class

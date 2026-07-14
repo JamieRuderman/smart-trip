@@ -233,18 +233,24 @@ function deriveScheduledStatus(
   const isDelayed = delayMinutes != null;
 
   // Live arrival time at destination: 511 also shifts arrivalTime forward
-  // when delayed, but arrivalDelay is always 0. Show the live arrival time
-  // whenever the train is running late on departure.
+  // when delayed, but arrivalDelay is always 0. Diff the live arrival against
+  // the static schedule independently of the departure delay — a train can
+  // leave its origin on time and fall behind EN ROUTE, in which case
+  // delayMinutes (departure-based) stays undefined while the arrival is late.
+  // Gating the live arrival on isDelayed alone made such a trip look like it
+  // arrived on schedule, so the app ended it while it was still running.
   let liveArrivalTime: string | undefined;
   let arrivalDelayMinutes: number | undefined;
-  if (toUpdate?.arrivalTime && isDelayed) {
-    liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+  if (toUpdate?.arrivalTime) {
     if (scheduledArrivalParam && update.startDate) {
       arrivalDelayMinutes = computeDelayMinutes(
         toUpdate.arrivalTime,
         scheduledArrivalParam,
         update.startDate,
       );
+    }
+    if (isDelayed || arrivalDelayMinutes != null) {
+      liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
     }
   }
 

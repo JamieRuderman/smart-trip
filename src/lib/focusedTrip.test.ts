@@ -157,6 +157,43 @@ describe("focusedTripClearInstant", () => {
     ).toBe(SCHED + GRACE);
   });
 
+  it("defers (null) while the vehicle position shows the train still short of the destination", () => {
+    // Delayed run past its scheduled arrival whose arrival prediction dropped
+    // out of the trip updates feed — the positions feed is the only evidence
+    // it's still en route, and it must veto the scheduled+grace fallback.
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: null,
+        feedLoaded: true,
+        graceMs: GRACE,
+        vehicleShortOfDestination: true,
+      }),
+    ).toBeNull();
+    // The veto also outranks a stale last-seen live arrival.
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: SCHED + 5 * 60_000,
+        feedLoaded: true,
+        graceMs: GRACE,
+        vehicleShortOfDestination: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("resumes the normal clear rules once the vehicle is no longer short of the destination", () => {
+    expect(
+      focusedTripClearInstant({
+        scheduledArrivalAt: SCHED,
+        liveArrivalAt: null,
+        feedLoaded: true,
+        graceMs: GRACE,
+        vehicleShortOfDestination: false,
+      }),
+    ).toBe(SCHED + GRACE);
+  });
+
   it("defers (null) when the feed has not loaded yet, so a delayed run isn't cleared early on boot", () => {
     expect(
       focusedTripClearInstant({

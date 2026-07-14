@@ -63,15 +63,9 @@ export interface SmartLineDiagramProps {
   toStation?: Station | null;
   /** Station closest to the user's current location — shows a pulsing blue dot. */
   userStation?: Station | null;
-  /** Key (matches `MapTrain.key`) of the train the user is currently riding,
-   *  if any. Renders an inset blue dot on that train's marker. */
-  userRidingTrainKey?: string | null;
-  /** User's current GPS, used to override the latched train marker's
-   *  position when riding — phone GPS is typically 15–30 s ahead of the
-   *  train's GTFS-RT vehicle position, so the rider's marker should follow
-   *  reality, not the lagging feed. */
-  userLat?: number | null;
-  userLng?: number | null;
+  /** Key (matches `MapTrain.key`) of the user's focused ("Go") trip's live
+   *  marker, if any. Painted with the blue "my trip" treatment. */
+  myTrainKey?: string | null;
   /** Optional wrapper class (e.g. for max-width or padding). */
   className?: string;
 }
@@ -94,9 +88,7 @@ export function SmartLineDiagram({
   fromStation = null,
   toStation = null,
   userStation = null,
-  userRidingTrainKey = null,
-  userLat = null,
-  userLng = null,
+  myTrainKey = null,
   className,
 }: SmartLineDiagramProps) {
   const { t } = useTranslation();
@@ -268,26 +260,21 @@ export function SmartLineDiagram({
             // The user's train renders last so it paints on top of any
             // other marker that overlaps it on the schematic.
             [
-              ...trains.filter((t) => t.key !== userRidingTrainKey),
-              ...trains.filter((t) => t.key === userRidingTrainKey),
-            ].map((train) => {
-              const isUserRiding = train.key === userRidingTrainKey;
-              return (
-                <TrainMarker
-                  key={train.key}
-                  train={train}
-                  pathEl={pathRef.current!}
-                  stationArcs={snap.arcs}
-                  pathLength={snap.totalLength}
-                  selected={train.key === selectedTrainKey}
-                  userRiding={isUserRiding}
-                  overrideLat={isUserRiding ? userLat : null}
-                  overrideLng={isUserRiding ? userLng : null}
-                  onClick={onTrainClick}
-                  now={now}
-                />
-              );
-            })}
+              ...trains.filter((t) => t.key !== myTrainKey),
+              ...trains.filter((t) => t.key === myTrainKey),
+            ].map((train) => (
+              <TrainMarker
+                key={train.key}
+                train={train}
+                pathEl={pathRef.current!}
+                stationArcs={snap.arcs}
+                pathLength={snap.totalLength}
+                selected={train.key === selectedTrainKey}
+                isMyTrain={train.key === myTrainKey}
+                onClick={onTrainClick}
+                now={now}
+              />
+            ))}
         </g>
 
         {/* Label layer — constant CSS-pixel font sizes, hand-affined

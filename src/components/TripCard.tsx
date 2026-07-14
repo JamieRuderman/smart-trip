@@ -31,12 +31,9 @@ interface TripCardProps {
   scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
-  /** When true, the user is currently riding this train (GPS-detected) — the
-   *  card turns blue and shows a "Riding" pill near the trip number. */
-  isRiding?: boolean;
   /** When true, this is the user's focused ("Go") trip — the card turns blue
-   *  (same as riding) so it reads as "the trip I'm taking", overriding the
-   *  delay/cancel/on-time state colour. No "Riding" pill (that's GPS-only). */
+   *  so it reads as "the trip I'm taking", overriding the
+   *  delay/cancel/on-time state colour. */
   isFocused?: boolean;
 }
 
@@ -54,7 +51,6 @@ export const TripCard = memo(function TripCard({
   scheduleType,
   selectedTripNumber,
   onSelectTrip,
-  isRiding = false,
   isFocused = false,
 }: TripCardProps) {
   const { t } = useTranslation();
@@ -180,10 +176,9 @@ export const TripCard = memo(function TripCard({
           "relative flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
-          // Blue == "you're on/taking this train" and overrides the semantic
-          // state colour (green/gold/red). Applies to the GPS-riding trip and
-          // the user-focused ("Go") trip alike.
-          isRiding || isFocused ? ridingCardStyle : stateCardStyle[cardState],
+          // Blue == "you're taking this train" and overrides the semantic
+          // state colour (green/gold/red) for the user-focused ("Go") trip.
+          isFocused ? ridingCardStyle : stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -204,17 +199,6 @@ export const TripCard = memo(function TripCard({
           isSkipped={isOriginSkipped}
           isDelayed={isDelayed}
         />
-        {isRiding && (
-          // Floats over the start of the schedule text instead of sitting
-          // inline — keeps the times in their natural position (no awkward
-          // shove to the right) while the pill reads as layered on top.
-          <span
-            className="pointer-events-none absolute left-[5.25rem] top-1/2 z-20 -translate-y-1/2 shrink-0 rounded-md bg-my-trip-background px-2.5 py-1 text-sm font-bold uppercase leading-none tracking-wider text-white shadow-md ring-2 ring-background"
-            aria-label={t("tripCard.ridingAria", "Currently riding this train")}
-          >
-            {t("stationInfo.riding")}
-          </span>
-        )}
         {isMobile ? (
           <div className="flex flex-col items-start ml-4 w-full">
             <div className="flex flex-row gap-2 items-start text-lg whitespace-nowrap">
@@ -352,7 +336,7 @@ export const TripCard = memo(function TripCard({
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}
           showFerry={showFerry}
-          isFocused={isFocused || isRiding}
+          isFocused={isFocused}
           scheduleType={scheduleType}
         />
       )}

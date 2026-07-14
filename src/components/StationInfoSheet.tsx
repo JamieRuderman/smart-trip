@@ -86,12 +86,6 @@ export interface StationInfoSheetProps {
     fromStation: Station,
     toStation: Station,
   ) => void;
-  /** Trip number the user is currently riding (if any) — matching arrival
-   *  rows are visually emphasized so the user can spot their own train. */
-  ridingTripNumber?: number | null;
-  /** Direction the user's riding train is heading — disambiguates trip
-   *  numbers that are reused across schedule types. `null` when unknown. */
-  ridingIsSouthbound?: boolean | null;
 }
 
 /**
@@ -112,8 +106,6 @@ export function StationInfoSheet({
   onClearFrom,
   onClearTo,
   onArrivalClick,
-  ridingTripNumber = null,
-  ridingIsSouthbound = null,
 }: StationInfoSheetProps) {
   const { t } = useTranslation();
   const scheduleType = getTodayScheduleType();
@@ -322,11 +314,6 @@ export function StationInfoSheet({
         ) : (
           <ul className="flex flex-col gap-2">
             {arrivals.map((a) => {
-              const isRiding =
-                ridingTripNumber != null &&
-                ridingIsSouthbound != null &&
-                a.tripNumber === ridingTripNumber &&
-                a.isSouthbound === ridingIsSouthbound;
               // Highlight the user's focused ("Go") train blue here too,
               // matching the schedule rows and pinned card. Shared predicate:
               // number + direction + schedule type (the trip number is reused
@@ -341,7 +328,6 @@ export function StationInfoSheet({
                 <ArrivalRow
                   key={`${a.tripNumber}-${a.isSouthbound}`}
                   arrival={a}
-                  isRiding={isRiding}
                   isFocused={isFocused}
                   onClick={
                     onArrivalClick
@@ -420,16 +406,12 @@ function FromToColumn({
 
 function ArrivalRow({
   arrival,
-  isRiding = false,
   isFocused = false,
   onClick,
 }: {
   arrival: Arrival;
-  /** True when the user is currently riding this train — adds a "Riding"
-   *  badge and a blue card treatment so it stands out. */
-  isRiding?: boolean;
-  /** True when this is the user's focused ("Go") trip — same blue card
-   *  treatment as riding (no "Riding" pill; that's GPS-only). */
+  /** True when this is the user's focused ("Go") trip — blue card treatment
+   *  so it reads as "the trip I'm taking". */
   isFocused?: boolean;
   onClick?: () => void;
 }) {
@@ -460,18 +442,12 @@ function ArrivalRow({
   const rowContent = (
     <>
       {/* Train icon + number, tinted by trip state (delayed = gold,
-          canceled = red, otherwise foreground). When the user is riding
-          this train, a "Riding" pill sits beside the number. */}
+          canceled = red, otherwise foreground). */}
       <div className={cn("flex items-center gap-1.5 shrink-0", stateText[cardState])}>
         <TripIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
         <span className="text-2xl font-semibold tabular-nums leading-none">
           {arrival.tripNumber}
         </span>
-        {isRiding && (
-          <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-my-trip-background text-white text-[10px] font-bold uppercase tracking-wider leading-none">
-            {t("stationInfo.riding")}
-          </span>
-        )}
       </div>
 
       {/* Direction (top) + ETA copy (bottom). ETA is indented `pl-5` so it
@@ -529,9 +505,9 @@ function ArrivalRow({
 
   const cardClasses = cn(
     "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
-    // Blue == riding / "you're taking this train" — overrides the semantic
-    // state colour for the GPS-riding trip and the user-focused ("Go") trip.
-    isRiding || isFocused ? ridingCardStyle : stateCardStyle[cardState],
+    // Blue == "you're taking this train" — overrides the semantic state
+    // colour for the user-focused ("Go") trip.
+    isFocused ? ridingCardStyle : stateCardStyle[cardState],
   );
 
   return (

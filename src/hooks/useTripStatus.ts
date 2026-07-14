@@ -17,13 +17,17 @@ export function useTripStatus(
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
-  const isDelayed = !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
+  // A trip is delayed when it left its origin late (delayMinutes) OR fell
+  // behind en route so its destination arrival is late (arrivalDelayMinutes)
+  // — a train can depart on time and still arrive well behind schedule, and
+  // it must not read "On time" while its live arrival slips.
+  const displayDelayMinutes =
+    realtimeStatus?.delayMinutes ?? realtimeStatus?.arrivalDelayMinutes;
+  const isDelayed = !isCanceledOrSkipped && displayDelayMinutes != null;
   const isOnTime = realtimeStatus != null && !isCanceledOrSkipped && !isDelayed;
 
   const delayDisplay =
-    realtimeStatus?.delayMinutes === 0
-      ? "<1"
-      : String(realtimeStatus?.delayMinutes ?? "");
+    displayDelayMinutes === 0 ? "<1" : String(displayDelayMinutes ?? "");
 
   const statusLabel: string | null = isCanceled
     ? t("tripCard.canceled")

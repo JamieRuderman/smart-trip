@@ -89,7 +89,12 @@ export function useStopInference({
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const tripDelayMinutes = realtimeStatus?.delayMinutes ?? 0;
+  // Departure delay at the origin, falling back to the destination arrival
+  // delay — a train that left on time but fell behind en route is still
+  // delayed, and the header accent must not stay green while its live
+  // arrival slips.
+  const tripDelayMinutes =
+    realtimeStatus?.delayMinutes ?? realtimeStatus?.arrivalDelayMinutes ?? 0;
 
   const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 

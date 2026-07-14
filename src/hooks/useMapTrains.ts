@@ -3,16 +3,17 @@ import { useVehiclePositions } from "@/hooks/useVehiclePositions";
 import { useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
-import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
+import {
+  GTFS_STOP_ID_TO_PLATFORM,
+  GTFS_STOP_ID_TO_STATION,
+  stationIndexMap,
+} from "@/lib/stationUtils";
 import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
+import { agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
+import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { VehicleStopStatus } from "@/types/gtfsRt";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
-
-/** Per-stop delay floor (seconds) that counts toward a train's map delay —
- *  the at-a-glance color threshold expressed in seconds. */
-const MAP_DELAY_FLOOR_SECONDS = DELAY_MINUTES_THRESHOLD * 60;
 
 export interface MapTrain {
   key: string;
@@ -39,15 +40,21 @@ export interface MapTrain {
 const tripNumberKey = (directionId: number, startTime: string) =>
   `${directionId}|${startTime}`;
 
+interface TripIndexEntry {
+  tripNumber: number;
+  /** Static per-station scheduled times ("HH:MM"), indexed by stationIndexMap. */
+  times: string[];
+}
+
 /**
  * Build a lookup map from "directionId|startTime" to the trip's human
- * number for today's active schedule (weekday or weekend). Vehicles in the
- * GTFS-RT feed are always running today, so biasing to today avoids the
- * collision case where weekday and weekend share an origin time and would
- * otherwise overwrite each other.
+ * number and static per-station times for today's active schedule (weekday
+ * or weekend). Vehicles in the GTFS-RT feed are always running today, so
+ * biasing to today avoids the collision case where weekday and weekend share
+ * an origin time and would otherwise overwrite each other.
  */
-function buildTripNumberIndex(): Map<string, number> {
-  const index = new Map<string, number>();
+function buildTripIndex(): Map<string, TripIndexEntry> {
+  const index = new Map<string, TripIndexEntry>();
   const north = stations[0];
   const south = stations[stations.length - 1];
   const lastIdx = stations.length - 1;
@@ -59,7 +66,12 @@ function buildTripNumberIndex(): Map<string, number> {
     const dirId = sb ? 0 : 1;
     for (const trip of getFilteredTrips(from, to, scheduleType)) {
       const origin = trip.times[originIdx];
-      if (origin) index.set(tripNumberKey(dirId, origin), trip.trip);
+      if (origin) {
+        index.set(tripNumberKey(dirId, origin), {
+          tripNumber: trip.trip,
+          times: trip.times,
+        });
+      }
     }
   }
   return index;
@@ -80,8 +92,8 @@ export function useMapTrains(): {
   // Re-run lookups when cached/remote schedule data swaps in.
   const { version: scheduleVersion } = useScheduleData();
 
-  const tripNumberIndex = useMemo(
-    () => buildTripNumberIndex(),
+  const tripIndex = useMemo(
+    () => buildTripIndex(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when schedule data swaps in
     [scheduleVersion],
   );
@@ -99,14 +111,26 @@ export function useMapTrains(): {
       for (const update of tripData.updates) {
         const isCanceled = update.scheduleRelationship === "CANCELED";
         let maxDelay: number | null = null;
-        if (!isCanceled) {
+        // 511 always reports departureDelay: 0 even for late trains and only
+        // shifts the absolute departure.time, so delay must be derived by
+        // diffing each stop's live departure against the static schedule —
+        // the same method useTripUpdates uses for the schedule surfaces.
+        const originHHMM = update.startTime?.slice(0, 5);
+        if (!isCanceled && originHHMM && update.startDate) {
           for (const stu of update.stopTimeUpdates) {
-            if (
-              stu.departureDelay != null &&
-              stu.departureDelay >= MAP_DELAY_FLOOR_SECONDS
-            ) {
-              const mins = Math.round(stu.departureDelay / 60);
-              if (maxDelay === null || mins > maxDelay) maxDelay = mins;
+            if (stu.departureTime == null || !stu.stopId) continue;
+            const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
+            if (!platform) continue;
+            const dirId = platform.direction === "southbound" ? 0 : 1;
+            const entry = tripIndex.get(tripNumberKey(dirId, originHHMM));
+            const scheduledHHMM = entry?.times[stationIndexMap[platform.station]];
+            if (!scheduledHHMM || scheduledHHMM === "--") continue;
+            const delaySeconds =
+              stu.departureTime -
+              agencyWallTimeToEpochSeconds(update.startDate, scheduledHHMM);
+            const mins = delayMinutesFromSeconds(delaySeconds);
+            if (mins != null && (maxDelay === null || mins > maxDelay)) {
+              maxDelay = mins;
             }
           }
         }
@@ -137,8 +161,8 @@ export function useMapTrains(): {
         tripLabel: vehicle.trip.tripId ?? null,
         tripNumber:
           startTime != null && directionId != null
-            ? (tripNumberIndex.get(tripNumberKey(directionId, startTime)) ??
-              null)
+            ? (tripIndex.get(tripNumberKey(directionId, startTime))
+                ?.tripNumber ?? null)
             : null,
         nextStation,
         currentStatus: vehicle.currentStatus ?? null,
@@ -149,5 +173,5 @@ export function useMapTrains(): {
     }
 
     return { trains, lastUpdated, isUpstreamDown };
-  }, [vehicleData, tripData, tripNumberIndex, isUpstreamDown]);
+  }, [vehicleData, tripData, tripIndex, isUpstreamDown]);
 }

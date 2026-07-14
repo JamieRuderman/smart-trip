@@ -9,6 +9,7 @@ import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
 import { parseTimeToMinutes, isTimeInPast, toLocalDateKey } from "./timeUtils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type {
   Station,
   TrainTrip,
@@ -448,17 +449,24 @@ export { isTimeInPast } from "./timeUtils";
 
 // Fast next trip calculation
 /**
- * Finds the index of the next trip that hasn't departed yet
+ * Finds the index of the next trip that hasn't departed yet.
+ * "Departed" is judged by the live departure time when realtime data is
+ * available (keyed by scheduled departure, as in useTripRealtimeStatusMap) —
+ * a delayed train past its scheduled slot but still short of its live
+ * departure hasn't left and must not be sliced away as departed.
  * @param trips - Array of processed trips
  * @param currentTime - Current date/time
+ * @param realtimeStatusMap - Optional live status keyed by trip.departureTime
  * @returns Index of next trip, or -1 if no future trips
  */
 export function getNextTripIndex(
   trips: ProcessedTrip[],
-  currentTime: Date
+  currentTime: Date,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    const departureTime = trips[i].departureTime;
+    const live = realtimeStatusMap?.get(trips[i].departureTime);
+    const departureTime = live?.liveDepartureTime ?? trips[i].departureTime;
     if (!isTimeInPast(currentTime, departureTime)) {
       return i;
     }
@@ -468,17 +476,23 @@ export function getNextTripIndex(
 
 /**
  * Finds the index of the first trip that is still in progress
- * (departure is in the past but arrival is not yet past).
+ * (departure is in the past but arrival is not yet past), judged by live
+ * times when available so a delayed run stays "in progress" until its live
+ * arrival rather than dropping out at the scheduled one.
  * Returns -1 if no in-progress trips exist.
  */
 export function getFirstInProgressTripIndex(
   trips: ProcessedTrip[],
-  currentTime: Date
+  currentTime: Date,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
+    const live = realtimeStatusMap?.get(trips[i].departureTime);
+    const departureTime = live?.liveDepartureTime ?? trips[i].departureTime;
+    const arrivalTime = live?.liveArrivalTime ?? trips[i].arrivalTime;
     if (
-      isTimeInPast(currentTime, trips[i].departureTime) &&
-      !isTimeInPast(currentTime, trips[i].arrivalTime)
+      isTimeInPast(currentTime, departureTime) &&
+      !isTimeInPast(currentTime, arrivalTime)
     ) {
       return i;
     }

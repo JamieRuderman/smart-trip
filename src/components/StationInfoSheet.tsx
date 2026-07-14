@@ -155,7 +155,17 @@ export function StationInfoSheet({
           const effectiveTime = live ?? staticTime;
           const etaMinutes = parseTimeToMinutes(effectiveTime) - nowMinutes;
 
-          const delayMinutes = rt?.delayMinutes ?? null;
+          // Delay at THIS station — the displayed time (effectiveTime) is
+          // this station's live time, so the delayed styling must match it,
+          // not the origin's delay: a train on time at its origin can be
+          // late by the time it reaches this stop, and one delayed at its
+          // origin can have recovered. When the feed carries a live time for
+          // this station, its per-stop delay (absent = on time here) is
+          // authoritative; the trip-level origin delay is only the fallback
+          // for trips with no per-stop data.
+          const delayMinutes =
+            rt?.allStopDelayMinutes?.[station] ??
+            (live != null ? null : (rt?.delayMinutes ?? null));
           const terminus = isSouthbound ? LARKSPUR : WINDSOR;
 
           // Prefer the user's selected destination if direction matches the

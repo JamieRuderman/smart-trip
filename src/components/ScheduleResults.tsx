@@ -47,12 +47,12 @@ export function ScheduleResults({
 
   const nextTripIndex =
     filteredTrips.length > 0
-      ? getNextTripIndex(filteredTrips, currentTime)
+      ? getNextTripIndex(filteredTrips, currentTime, realtimeStatusMap)
       : -1;
 
   // Show in-progress trips (departed but not yet arrived) before the next upcoming trip.
   const firstInProgressIndex = !showAllTrips
-    ? getFirstInProgressTripIndex(filteredTrips, currentTime)
+    ? getFirstInProgressTripIndex(filteredTrips, currentTime, realtimeStatusMap)
     : -1;
 
   const sliceStart = showAllTrips
@@ -76,10 +76,15 @@ export function ScheduleResults({
       : displayedTrips;
 
   // First non-past index in visibleTrips — used to flag the "Next" row.
-  // Single pass instead of per-row .slice().every() (O(n) total vs O(n²)).
-  const nextVisibleIndex = visibleTrips.findIndex(
-    (trip) => !isTimeInPast(currentTime, trip.departureTime),
-  );
+  // Live-aware: a delayed train past its scheduled slot but before its live
+  // departure is still the next one. Single pass instead of per-row
+  // .slice().every() (O(n) total vs O(n²)).
+  const nextVisibleIndex = visibleTrips.findIndex((trip) => {
+    const departureTime =
+      realtimeStatusMap.get(trip.departureTime)?.liveDepartureTime ??
+      trip.departureTime;
+    return !isTimeInPast(currentTime, departureTime);
+  });
 
   if (!direction) return null;
 

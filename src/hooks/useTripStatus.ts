@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { TripState } from "@/lib/tripTheme";
 
@@ -17,12 +18,9 @@ export function useTripStatus(
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
-  // A trip is delayed when it left its origin late (delayMinutes) OR fell
-  // behind en route so its destination arrival is late (arrivalDelayMinutes)
-  // — a train can depart on time and still arrive well behind schedule, and
-  // it must not read "On time" while its live arrival slips.
-  const displayDelayMinutes =
-    realtimeStatus?.delayMinutes ?? realtimeStatus?.arrivalDelayMinutes;
+  // Departure delay, else en-route arrival delay — a train can depart on
+  // time and still arrive late, and must not read "On time" meanwhile.
+  const displayDelayMinutes = effectiveDelayMinutes(realtimeStatus);
   const isDelayed = !isCanceledOrSkipped && displayDelayMinutes != null;
   const isOnTime = realtimeStatus != null && !isCanceledOrSkipped && !isDelayed;
 

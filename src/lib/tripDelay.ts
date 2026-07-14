@@ -22,3 +22,20 @@ export const MIN_DELAY_SECONDS = 60;
 export function delayMinutesFromSeconds(delaySeconds: number): number | null {
   return delaySeconds >= MIN_DELAY_SECONDS ? Math.round(delaySeconds / 60) : null;
 }
+
+/**
+ * The delay a trip should DISPLAY as: the origin departure delay when the
+ * trip left late, else the destination arrival delay when it left on time
+ * but fell behind en route. Single source of truth for "is this trip
+ * delayed" so every surface — schedule cards, detail header accent, stop
+ * timeline, Live Activity pill — flips to the delayed treatment together
+ * (the same parity rule as delayMinutesFromSeconds above).
+ */
+export function effectiveDelayMinutes(
+  status:
+    | { delayMinutes?: number; arrivalDelayMinutes?: number }
+    | null
+    | undefined,
+): number | undefined {
+  return status?.delayMinutes ?? status?.arrivalDelayMinutes;
+}

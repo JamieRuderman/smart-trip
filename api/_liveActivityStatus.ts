@@ -228,10 +228,24 @@ function statusFromBoarding(
   const arrivalEpochMs =
     to?.arrivalTime != null ? to.arrivalTime * 1000 : reg.arrivalEpochMs + delayMs;
 
+  // Departure delay when the trip leaves late, else arrival delay when it
+  // leaves on time but the live destination arrival slips — the same
+  // precedence the client's effectiveDelayMinutes uses, so the pushed pill
+  // and the in-app "Delayed" badge flip together for en-route delays.
+  const departureDelayMinutes = delayMinutesBetween(
+    liveDepartureMs,
+    reg.departureEpochMs,
+  );
+  const arrivalDelayMinutes =
+    to?.arrivalTime != null
+      ? delayMinutesBetween(to.arrivalTime * 1000, reg.arrivalEpochMs)
+      : 0;
+
   return {
     departureEpochMs: reg.departureEpochMs + delayMs,
     arrivalEpochMs,
-    delayMinutes: delayMinutesBetween(liveDepartureMs, reg.departureEpochMs),
+    delayMinutes:
+      departureDelayMinutes > 0 ? departureDelayMinutes : arrivalDelayMinutes,
     isCanceled,
     isEnded: now >= arrivalEpochMs,
   };

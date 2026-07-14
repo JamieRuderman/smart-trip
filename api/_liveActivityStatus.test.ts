@@ -72,6 +72,23 @@ describe("computeLiveTripStatus", () => {
     expect(status!.arrivalEpochMs).toBe(lateArr * 1000);
   });
 
+  it("reports the arrival delay when the departure is on time but the trip slips en route", () => {
+    // Boarding still present and on time; the destination's live arrival is
+    // 8 min late. The pill must read "Delayed" in step with the in-app card
+    // (client effectiveDelayMinutes: departure delay, else arrival delay).
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({
+        depUnix: SCHED_DEP_MS / 1000,
+        arrUnix: SCHED_ARR_MS / 1000 + 8 * 60,
+      }),
+      now: SCHED_DEP_MS,
+    });
+    expect(status!.delayMinutes).toBe(8);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+    expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 8 * 60_000);
+  });
+
   it("falls back to scheduled-arrival + delay when the feed omits arrival", () => {
     const lateDep = SCHED_DEP_MS / 1000 + 3 * 60;
     const status = computeLiveTripStatus({

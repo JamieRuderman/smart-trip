@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useVehiclePositions } from "@/hooks/useVehiclePositions";
-import { useTripUpdates } from "@/hooks/useTripUpdates";
+import { computeDelayMinutes, useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
 import {
@@ -9,11 +9,10 @@ import {
   stationIndexMap,
 } from "@/lib/stationUtils";
 import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
-import { agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
-import type { VehicleStopStatus } from "@/types/gtfsRt";
+import type { GtfsRtTripUpdate, VehicleStopStatus } from "@/types/gtfsRt";
 
 export interface MapTrain {
   key: string;
@@ -106,49 +105,67 @@ export function useMapTrains(): {
 
     if (!vehicleData?.vehicles) return { trains: [], lastUpdated, isUpstreamDown };
 
-    const tripDelays = new Map<string, { delayMinutes: number | null; isCanceled: boolean }>();
-    if (tripData?.updates) {
-      for (const update of tripData.updates) {
-        const isCanceled = update.scheduleRelationship === "CANCELED";
-        let maxDelay: number | null = null;
-        // 511 always reports departureDelay: 0 even for late trains and only
-        // shifts the absolute departure.time, so delay must be derived by
-        // diffing each stop's live departure against the static schedule —
-        // the same method useTripUpdates uses for the schedule surfaces.
-        const originHHMM = update.startTime?.slice(0, 5);
-        if (!isCanceled && originHHMM && update.startDate) {
-          for (const stu of update.stopTimeUpdates) {
-            if (stu.departureTime == null || !stu.stopId) continue;
-            const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
-            if (!platform) continue;
-            const dirId = platform.direction === "southbound" ? 0 : 1;
-            const entry = tripIndex.get(tripNumberKey(dirId, originHHMM));
-            const scheduledHHMM = entry?.times[stationIndexMap[platform.station]];
-            if (!scheduledHHMM || scheduledHHMM === "--") continue;
-            const delaySeconds =
-              stu.departureTime -
-              agencyWallTimeToEpochSeconds(update.startDate, scheduledHHMM);
-            const mins = delayMinutesFromSeconds(delaySeconds);
-            if (mins != null && (maxDelay === null || mins > maxDelay)) {
-              maxDelay = mins;
-            }
-          }
-        }
-        tripDelays.set(update.tripId, { delayMinutes: maxDelay, isCanceled });
-      }
+    const updatesByTripId = new Map<string, GtfsRtTripUpdate>();
+    for (const update of tripData?.updates ?? []) {
+      updatesByTripId.set(update.tripId, update);
     }
+
+    // Max delay across the stops on the VEHICLE'S OWN direction. 511 always
+    // reports departureDelay: 0 for late trains and only shifts the absolute
+    // departure.time, so delay is derived by diffing each stop's live
+    // departure against the static schedule (computeDelayMinutes — the same
+    // method the schedule surfaces use). Direction matters: SMART encodes
+    // round trips as one GTFS trip whose stop_time_updates span BOTH legs, so
+    // opposite-direction platforms must be skipped or their times would be
+    // diffed against the wrong trip's schedule (mirrors the direction guard
+    // in useTripUpdates.buildStopRealtimeData). Falls back to the feed's own
+    // departureDelay for ADDED/DUPLICATED runs with no static match.
+    const delayForVehicle = (
+      update: GtfsRtTripUpdate,
+      directionId: number,
+      startTime: string,
+    ): number | null => {
+      const direction = directionId === 0 ? "southbound" : "northbound";
+      const entry = tripIndex.get(tripNumberKey(directionId, startTime));
+      let maxDelay: number | null = null;
+      for (const stu of update.stopTimeUpdates) {
+        if (stu.departureTime == null || !stu.stopId) continue;
+        const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
+        if (!platform || platform.direction !== direction) continue;
+        const scheduledHHMM = entry?.times[stationIndexMap[platform.station]];
+        const mins =
+          scheduledHHMM && scheduledHHMM !== "--" && update.startDate
+            ? (computeDelayMinutes(
+                stu.departureTime,
+                scheduledHHMM,
+                update.startDate,
+              ) ?? null)
+            : stu.departureDelay != null
+              ? delayMinutesFromSeconds(stu.departureDelay)
+              : null;
+        if (mins != null && (maxDelay === null || mins > maxDelay)) {
+          maxDelay = mins;
+        }
+      }
+      return maxDelay;
+    };
 
     const trains: MapTrain[] = [];
     for (const vehicle of vehicleData.vehicles) {
       if (!vehicle.trip) continue;
       if (vehicle.position.latitude === 0 && vehicle.position.longitude === 0) continue;
 
-      const tripInfo = tripDelays.get(vehicle.trip.tripId);
+      const update = updatesByTripId.get(vehicle.trip.tripId) ?? null;
+      const isCanceled = update?.scheduleRelationship === "CANCELED";
       const nextStation = vehicle.stopId
         ? (GTFS_STOP_ID_TO_STATION[vehicle.stopId] ?? null)
         : null;
       const startTime = vehicle.trip.startTime?.slice(0, 5) ?? null;
       const directionId = vehicle.trip.directionId ?? null;
+      const delayMinutes =
+        update != null && !isCanceled && directionId != null && startTime != null
+          ? delayForVehicle(update, directionId, startTime)
+          : null;
 
       trains.push({
         key: vehicle.vehicleId,
@@ -166,8 +183,8 @@ export function useMapTrains(): {
             : null,
         nextStation,
         currentStatus: vehicle.currentStatus ?? null,
-        delayMinutes: tripInfo?.delayMinutes ?? null,
-        isCanceled: tripInfo?.isCanceled ?? false,
+        delayMinutes,
+        isCanceled,
         startTime,
       });
     }

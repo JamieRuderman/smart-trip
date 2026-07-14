@@ -84,9 +84,10 @@ function findStopUpdate(
 /**
  * Diff a live Unix timestamp against a static scheduled "HH:MM" on a given date,
  * returning delay in whole minutes, or undefined if within the on-time threshold.
- * Used for both trip-level and per-stop delay so the logic stays in one place.
+ * Used for both trip-level and per-stop delay (and by useMapTrains for the map
+ * markers) so the logic stays in one place.
  */
-function computeDelayMinutes(
+export function computeDelayMinutes(
   liveUnix: number,
   scheduledHHMM: string,
   startDate: string

@@ -538,7 +538,7 @@ export function TripDetailContent({
           stopInference={stopInference}
           userFromStation={userFromStation}
           userToStation={userToStation}
-          isRiding={isFocused}
+          isFocused={isFocused}
         />
 
         {showFerry && trip.outboundFerry && (

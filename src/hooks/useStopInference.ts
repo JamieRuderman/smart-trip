@@ -5,6 +5,7 @@ import {
   isSouthbound as isSouthboundFn,
 } from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -89,12 +90,9 @@ export function useStopInference({
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
-  // Departure delay at the origin, falling back to the destination arrival
-  // delay — a train that left on time but fell behind en route is still
-  // delayed, and the header accent must not stay green while its live
-  // arrival slips.
-  const tripDelayMinutes =
-    realtimeStatus?.delayMinutes ?? realtimeStatus?.arrivalDelayMinutes ?? 0;
+  // Departure delay, else en-route arrival delay (shared precedence rule) —
+  // the header accent must not stay green while the live arrival slips.
+  const tripDelayMinutes = effectiveDelayMinutes(realtimeStatus) ?? 0;
 
   const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 

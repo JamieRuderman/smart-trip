@@ -26,7 +26,7 @@ import {
   cardTripState,
   stateCardStyle,
   stateText,
-  ridingCardStyle,
+  myTripCardStyle,
   type TripState,
 } from "@/lib/tripTheme";
 import type { Station } from "@/types/smartSchedule";
@@ -517,7 +517,7 @@ function ArrivalRow({
     "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
     // Blue == "you're taking this train" — overrides the semantic state
     // colour for the user-focused ("Go") trip.
-    isFocused ? ridingCardStyle : stateCardStyle[cardState],
+    isFocused ? myTripCardStyle : stateCardStyle[cardState],
   );
 
   return (

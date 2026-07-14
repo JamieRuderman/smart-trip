@@ -9,7 +9,7 @@ import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
-import { stateText, stateCardStyle, ridingCardStyle, cardTripState } from "@/lib/tripTheme";
+import { stateText, stateCardStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -90,10 +90,13 @@ export const TripCard = memo(function TripCard({
 
   const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 
+  // Per-column tone: only the time that actually shifted (has a live value)
+  // reads in the delayed gold — a train delayed only at arrival keeps its
+  // on-time departure in the normal tone rather than implying it moved.
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
       ? cn("line-through", stateText["canceled"])
-      : isDelayed || hasLiveTime
+      : isDelayed && hasLiveTime
       ? stateText["delayed"]
       : isNextTrip
       ? stateText["ontime"]
@@ -178,7 +181,7 @@ export const TripCard = memo(function TripCard({
           "focus:outline-none",
           // Blue == "you're taking this train" and overrides the semantic
           // state colour (green/gold/red) for the user-focused ("Go") trip.
-          isFocused ? ridingCardStyle : stateCardStyle[cardState],
+          isFocused ? myTripCardStyle : stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -218,16 +221,21 @@ export const TripCard = memo(function TripCard({
                 />
               </div>
             </div>
-            {isDelayed && (
+            {/* Struck-through scheduled times — only the ones that actually
+                shifted, so an arrival-only delay doesn't imply the departure
+                moved by striking an identical time. */}
+            {(hasLiveDepartureTime || hasLiveArrivalTime) && (
               <div className="flex flex-row gap-2 items-start text-xs text-muted-foreground whitespace-nowrap mt-2">
-                <TimeDisplay
-                  time={trip.departureTime}
-                  format={timeFormat}
-                  className="text-xs line-through"
-                />
-                {realtimeStatus?.liveArrivalTime != null && (
+                {hasLiveDepartureTime && (
+                  <TimeDisplay
+                    time={trip.departureTime}
+                    format={timeFormat}
+                    className="text-xs line-through"
+                  />
+                )}
+                {hasLiveArrivalTime && (
                   <>
-                    <span>→</span>
+                    {hasLiveDepartureTime && <span>→</span>}
                     <TimeDisplay
                       time={trip.arrivalTime}
                       format={timeFormat}
@@ -271,7 +279,7 @@ export const TripCard = memo(function TripCard({
                     getTimeToneClass(hasLiveDepartureTime),
                   )}
                 />
-                {isDelayed && (
+                {hasLiveDepartureTime && (
                   <TimeDisplay
                     time={trip.departureTime}
                     format={timeFormat}
@@ -287,7 +295,7 @@ export const TripCard = memo(function TripCard({
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
-                {isDelayed && realtimeStatus?.liveArrivalTime != null && (
+                {hasLiveArrivalTime && (
                   <TimeDisplay
                     time={trip.arrivalTime}
                     format={timeFormat}

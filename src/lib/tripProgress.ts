@@ -36,6 +36,21 @@ export function isVehicleShortOfDestination(
   return southbound ? stationIdx < toIdx : stationIdx > toIdx;
 }
 
+/**
+ * The trip's origin departure "HH:MM" used to match a GTFS-RT vehicle
+ * (vehicle.trip.startTime): a southbound run originates at the northernmost
+ * station (times[0]), a northbound one at the southernmost (times[last]).
+ * Shared by the trip-progress hook and the focused-trip auto-clear so the
+ * two can never disagree about which vehicle is "this trip's train".
+ */
+export function tripOriginStartTime(
+  times: readonly string[],
+  southbound: boolean,
+): string | undefined {
+  const origin = southbound ? times[0] : times[times.length - 1];
+  return origin?.slice(0, 5);
+}
+
 export function isNearSelectedRoute(routeDistanceKm: number): boolean {
   return routeDistanceKm <= 1.5;
 }

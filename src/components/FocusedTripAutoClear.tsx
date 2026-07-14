@@ -9,7 +9,10 @@ import {
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
-import { isVehicleShortOfDestination } from "@/lib/tripProgress";
+import {
+  isVehicleShortOfDestination,
+  tripOriginStartTime,
+} from "@/lib/tripProgress";
 import { isSouthbound } from "@/lib/stationUtils";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
 
@@ -65,9 +68,9 @@ function FocusedTripAutoClearInner({
   // Polling only starts shortly before the scheduled arrival — the clear can't
   // fire earlier, so a trip focused hours ahead doesn't pay for an all-day feed.
   const southbound = isSouthbound(focusedTrip.fromStation, focusedTrip.toStation);
-  const originStartTime = southbound
-    ? trip?.times[0]?.slice(0, 5)
-    : trip?.times[trip.times.length - 1]?.slice(0, 5);
+  const originStartTime = trip
+    ? tripOriginStartTime(trip.times, southbound)
+    : undefined;
   const nearArrival =
     scheduledArrivalAt != null &&
     now >= scheduledArrivalAt - VEHICLE_VETO_LEAD_MS;

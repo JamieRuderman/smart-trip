@@ -4,7 +4,13 @@ import { TripCard } from "./TripCard";
 import { ScheduleHeader } from "./ScheduleHeader";
 import { NoMoreTrainsAlert } from "./NoMoreTrainsAlert";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { isTimeInPast, getNextTripIndex, getFirstInProgressTripIndex } from "@/lib/scheduleUtils";
+import {
+  isTimeInPast,
+  getNextTripIndex,
+  getFirstInProgressTripIndex,
+  effectiveDepartureTime,
+} from "@/lib/scheduleUtils";
+import { parseTimeToMinutes } from "@/lib/timeUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
@@ -75,15 +81,20 @@ export function ScheduleResults({
         )
       : displayedTrips;
 
-  // First non-past index in visibleTrips — used to flag the "Next" row.
-  // Live-aware: a delayed train past its scheduled slot but before its live
-  // departure is still the next one. Single pass instead of per-row
-  // .slice().every() (O(n) total vs O(n²)).
-  const nextVisibleIndex = visibleTrips.findIndex((trip) => {
-    const departureTime =
-      realtimeStatusMap.get(trip.departureTime)?.liveDepartureTime ??
-      trip.departureTime;
-    return !isTimeInPast(currentTime, departureTime);
+  // The "Next" row: the not-yet-departed trip with the EARLIEST live-aware
+  // departure — not simply the first in schedule order, because a delayed
+  // early trip (live 10:00) must not steal the badge from an on-time later
+  // one (09:30) that actually leaves sooner. Single pass.
+  let nextVisibleIndex = -1;
+  let nextVisibleMinutes = Infinity;
+  visibleTrips.forEach((trip, i) => {
+    const departureTime = effectiveDepartureTime(trip, realtimeStatusMap);
+    if (isTimeInPast(currentTime, departureTime)) return;
+    const minutes = parseTimeToMinutes(departureTime);
+    if (minutes < nextVisibleMinutes) {
+      nextVisibleMinutes = minutes;
+      nextVisibleIndex = i;
+    }
   });
 
   if (!direction) return null;
@@ -124,7 +135,13 @@ export function ScheduleResults({
           aria-label="Train schedule results"
         >
           {visibleTrips.map((trip, index) => {
-            const isPastTrip = isTimeInPast(currentTime, trip.departureTime);
+            // Live-aware: a delayed train past its scheduled slot but before
+            // its live departure hasn't departed (keeps the aria "Departed"
+            // announcement and badge flags consistent with the Next logic).
+            const isPastTrip = isTimeInPast(
+              currentTime,
+              effectiveDepartureTime(trip, realtimeStatusMap),
+            );
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;
             const showFerry =

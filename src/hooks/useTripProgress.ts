@@ -5,6 +5,7 @@ import { getDistanceToStationKm, isSouthbound } from "@/lib/stationUtils";
 import {
   isVehicleShortOfDestination,
   selectNextStopTarget,
+  tripOriginStartTime,
 } from "@/lib/tripProgress";
 import {
   computeMinutesUntil,
@@ -65,9 +66,7 @@ export function useTripProgress({
 }): TripProgressResult {
   // ── Vehicle position matching ─────────────────────────────────────────────
   const southbound = isSouthbound(fromStation, toStation);
-  const originStartTime = southbound
-    ? trip.times[0]?.slice(0, 5)
-    : trip.times[trip.times.length - 1]?.slice(0, 5);
+  const originStartTime = tripOriginStartTime(trip.times, southbound);
   const tripDirectionId = southbound ? 0 : 1;
   const todayYYYYMMDD = formatDateYYYYMMDD(currentTime);
 

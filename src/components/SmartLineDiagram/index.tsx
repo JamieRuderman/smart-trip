@@ -74,12 +74,14 @@ export interface SmartLineDiagramProps {
 // labels ("Marin Civic Center", "Novato Downtown") fit on the right and
 // zone headings ("Zone 1") fit on the left at phone widths. The track
 // itself runs roughly x=180–560 in viewBox space.
-// Height includes ~80 units of padding below the ferry terminus so the
-// "San Francisco" / next-ferry labels (drawn below the glyph near the bottom
-// edge) keep a margin. On height-constrained wide viewports the content fills
-// the container edge-to-edge, so without this the ETA text clipped past the
-// bottom; narrow viewports letterbox and were already clear.
-const VIEW_BOX = { x: -50, y: 40, width: 900, height: 1470 } as const;
+// Vertically CENTER the content (Windsor at y≈49 down through the ferry
+// labels) with balanced padding top and bottom, rather than padding only the
+// bottom (which left the diagram bottom-heavy). The bottom must clear the
+// ferry "San Francisco" / next-ferry labels — they're constant CSS-px, so at
+// small fit scales they occupy more viewBox units and reach ~y1464, hence the
+// bottom sits at 1470 (≈30 units below) while the top sits ~30 units above
+// the content, keeping the two margins close across viewports.
+const VIEW_BOX = { x: -50, y: 20, width: 900, height: 1450 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────
 

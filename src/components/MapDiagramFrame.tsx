@@ -65,8 +65,12 @@ export function MapDiagramFrame({
       </header>
 
       {/* Background tap clears the train selection; inner station/train clicks
-          stopPropagation so they don't also clear it. */}
-      <div className="flex-1 min-h-0 overflow-auto" onClick={onBackground}>
+          stopPropagation so they don't also clear it. pb-safe reserves the iOS
+          home-indicator space so the diagram's bottom (ferry label) clears it. */}
+      <div
+        className="flex-1 min-h-0 overflow-auto pb-safe"
+        onClick={onBackground}
+      >
         {children}
       </div>
     </div>

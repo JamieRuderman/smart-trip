@@ -180,9 +180,18 @@ All colors MUST be HSL.
 
 @layer base {
   html,
-  body,
-  #root {
+  body {
     min-height: 100%;
+  }
+
+  /* Viewport-height (not %) so the EMPTY #root fills the screen during the
+   * client-render boot. The crawlable SEO sitelinks footer is injected after
+   * #root in the built index.html; with a content-sized #root it would sit at
+   * the top of the viewport and flash before React mounts. Filling the
+   * viewport pushes it below the fold until the app paints. */
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   * {

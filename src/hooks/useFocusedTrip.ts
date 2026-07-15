@@ -128,6 +128,10 @@ export function useFocusedTrip() {
     async (departureAt: number, text: ReminderText): Promise<void> => {
       const current = loadFocusedTrip();
       if (!current?.reminder) return;
+      // Never re-arm a reminder that already fired — its `reminderAt` is now in
+      // the past, and rescheduling to a past time would either be rejected
+      // (AlarmKit) or fire the fallback notification immediately.
+      if (current.reminder.firedAt != null) return;
       // Unclamped, to match DepartureReminder's drift short-circuit (see the
       // note in setReminder) — never reintroduce a Date.now() clamp here.
       const reminderAt = departureAt - current.reminder.leadMinutes * 60_000;

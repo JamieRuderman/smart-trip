@@ -204,6 +204,7 @@
     "closePicker": "Close",
     "skip": "Not now",
     "editReminder": "Edit reminder",
+    "timeToLeave": "Time to go",
     "remindAt": "Remind at {{time}}",
     "minutesBefore_one": "{{count}} min before",
     "minutesBefore_other": "{{count}} min before",

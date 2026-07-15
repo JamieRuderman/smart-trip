@@ -204,6 +204,7 @@
     "closePicker": "Cerrar",
     "skip": "Ahora no",
     "editReminder": "Editar recordatorio",
+    "timeToLeave": "Hora de salir",
     "remindAt": "Aviso a las {{time}}",
     "minutesBefore_one": "{{count}} min antes",
     "minutesBefore_other": "{{count}} min antes",

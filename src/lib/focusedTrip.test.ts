@@ -89,6 +89,58 @@ describe("focusedTrip storage", () => {
     localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
     expect(loadFocusedTrip()).toBeNull();
   });
+
+  it("leaves an armed, still-future reminder untouched", () => {
+    const f = makeFocused({
+      reminder: {
+        leadMinutes: 15,
+        reminderAt: Date.now() + 60 * 60_000,
+        notificationId: 7,
+        title: "t",
+        body: "b",
+      },
+    });
+    saveFocusedTrip(f);
+    const loaded = loadFocusedTrip();
+    expect(loaded?.reminder?.firedAt).toBeUndefined();
+    expect(loaded).toEqual(f);
+  });
+
+  it("stamps firedAt (keeping the reminder) once reminderAt has passed", () => {
+    const f = makeFocused({
+      reminder: {
+        leadMinutes: 15,
+        reminderAt: Date.now() - 60_000,
+        notificationId: 7,
+        title: "t",
+        body: "b",
+      },
+    });
+    saveFocusedTrip(f);
+    const loaded = loadFocusedTrip();
+    // Reminder is preserved (not dropped) so the card can show "time to go".
+    expect(loaded?.reminder).not.toBeNull();
+    expect(loaded?.reminder?.leadMinutes).toBe(15);
+    expect(typeof loaded?.reminder?.firedAt).toBe("number");
+    // Persisted, so a re-read sees the same fired stamp.
+    expect(loadFocusedTrip()?.reminder?.firedAt).toBe(loaded?.reminder?.firedAt);
+  });
+
+  it("does not re-stamp firedAt on a reminder that already fired", () => {
+    const firedAt = Date.now() - 5 * 60_000;
+    const f = makeFocused({
+      reminder: {
+        leadMinutes: 15,
+        reminderAt: Date.now() - 10 * 60_000,
+        notificationId: 7,
+        title: "t",
+        body: "b",
+        firedAt,
+      },
+    });
+    saveFocusedTrip(f);
+    expect(loadFocusedTrip()?.reminder?.firedAt).toBe(firedAt);
+  });
 });
 
 describe("focusedArrivalInstant / focusedDepartureInstant", () => {

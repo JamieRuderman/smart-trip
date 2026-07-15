@@ -209,6 +209,10 @@ function FocusedTripCardInner({
   const reminderTimeLabel = reminder
     ? formatClockTime(reminder.reminderAt, timeFormat, i18n.language)
     : null;
+  // The reminder has gone off (its lead has elapsed) but the train hasn't left
+  // yet — this is the "you should be heading out" window. Drives the "time to
+  // go" indicator that replaces the (now stale) edit-reminder pill.
+  const reminderFired = reminder?.firedAt != null;
 
   // Minutes until the user should head out — the armed reminder fires
   // `leadMinutes` before departure, so it tracks the same clock as the
@@ -296,6 +300,19 @@ function FocusedTripCardInner({
     !reminder &&
     isReminderSupported() &&
     (isFutureService || minutesUntil >= 2);
+
+  // "Time to go": the alarm fired and the train still hasn't left. Bounded to
+  // the fire → departure window — once the train departs (minutesUntil < 0) the
+  // countdown chip takes over with "Arrives in", and the spent reminder lingers
+  // in storage only until arrival auto-clears the trip.
+  const showTimeToGo =
+    reminderFired && !isCanceledOrSkipped && !isFutureService && minutesUntil >= 0;
+
+  // Alongside the "time to go" indicator, keep offering "Add reminder" (same
+  // near-departure gate as showAddReminder) so a user can still re-arm one
+  // before the train actually leaves.
+  const canReAddReminder =
+    showTimeToGo && isReminderSupported() && minutesUntil >= 2;
 
   return (
     <SectionCard
@@ -431,11 +448,35 @@ function FocusedTripCardInner({
         </button>
       </div>
 
-      {/* Reminder pill / full-width "Add reminder" — collapses on scroll. */}
-      {(reminder || showAddReminder) && (
+      {/* "Time to go" indicator (reminder fired) / reminder pill / full-width
+          "Add reminder" — collapses on scroll. A spent reminder that's already
+          past departure renders nothing here (the countdown chip carries it). */}
+      {(showTimeToGo || (reminder && !reminderFired) || showAddReminder) && (
         <Collapsible order={4}>
           <div className="px-4 md:px-6 pb-4">
-            {reminder ? (
+            {showTimeToGo ? (
+              // The alarm went off and the train hasn't left — tell the user to
+              // head out, keeping a compact "Add reminder" beside it (their
+              // reminder is spent; they can arm a fresh one before departure).
+              <div className="flex items-center gap-2">
+                <div className="flex flex-1 min-w-0 items-center gap-2 rounded-lg bg-white/25 px-3 h-9 text-sm font-semibold text-white">
+                  <WalkIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {t("departureReminder.timeToLeave")}
+                  </span>
+                </div>
+                {canReAddReminder && (
+                  <button
+                    type="button"
+                    onClick={openReminderDialog}
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/15 px-3 h-9 text-sm font-medium text-white transition-colors hover:bg-white/25"
+                  >
+                    <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {t("departureReminder.setReminder")}
+                  </button>
+                )}
+              </div>
+            ) : reminder && !reminderFired ? (
               <button
                 type="button"
                 onClick={openReminderDialog}

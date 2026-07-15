@@ -64,10 +64,16 @@ export async function cancelReminderChannels(
   if (reminder.alarmId) await cancelLeaveAlarm(reminder.alarmId);
 }
 
-/** Web-fire cleanup: drop only the reminder sub-object, keep the focus. */
+/** Web-fire cleanup: stamp the reminder as fired (keeps the focus + lead so the
+ *  card can show a "time to go" indicator), rather than dropping it. */
 function onReminderFired(): void {
   const after = loadFocusedTrip();
-  if (after) saveFocusedTrip({ ...after, reminder: null });
+  if (after?.reminder) {
+    saveFocusedTrip({
+      ...after,
+      reminder: { ...after.reminder, firedAt: Date.now() },
+    });
+  }
   notifyChange();
 }
 

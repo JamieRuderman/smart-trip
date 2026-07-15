@@ -10,9 +10,10 @@
  */
 
 /** Lateness below this (seconds) is on-time. 511 reports `departureDelay: 0`
- *  even for late trains and its `departure.time` carries sub-minute jitter, so
- *  anything under a minute is treated as on-time on every surface. */
-export const MIN_DELAY_SECONDS = 60;
+ *  even for late trains and its `departure.time` carries jitter, and a slip
+ *  under two minutes isn't actionable for a rider — so it is treated as
+ *  on-time on every surface (product choice; raised from 60s). */
+export const MIN_DELAY_SECONDS = 120;
 
 /**
  * Whole-minute lateness from a raw live-minus-scheduled diff in seconds, or

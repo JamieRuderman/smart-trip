@@ -99,33 +99,33 @@ describe("computeLiveTripStatus", () => {
     expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 3 * 60_000);
   });
 
-  it("treats a sub-minute live slip as on-time (matches the client threshold)", () => {
-    // 40 s late: the client floors anything under a minute to on-time, so the
-    // push backend must too — otherwise Math.round(40s) => 1 and the Live
-    // Activity shows "Delayed" while the in-app card reads "On time".
-    const slip = SCHED_DEP_MS / 1000 + 40;
+  it("treats an under-threshold live slip as on-time (matches the client threshold)", () => {
+    // 90 s late: the client floors anything under MIN_DELAY_SECONDS (2 min)
+    // to on-time, so the push backend must too — otherwise the Live Activity
+    // shows "Delayed" while the in-app card reads "On time".
+    const slip = SCHED_DEP_MS / 1000 + 90;
     const status = computeLiveTripStatus({
       reg: REG,
-      updates: feed({ depUnix: slip, arrUnix: SCHED_ARR_MS / 1000 + 40 }),
+      updates: feed({ depUnix: slip, arrUnix: SCHED_ARR_MS / 1000 + 90 }),
       now: SCHED_DEP_MS - 30 * 60_000,
     });
     expect(status!.delayMinutes).toBe(0);
-    // Countdown target stays on the scheduled departure, not the +40 s jitter.
+    // Countdown target stays on the scheduled departure, not the +90 s jitter.
     expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
   });
 
-  it("reports a delay once the slip reaches the one-minute threshold", () => {
-    const lateDep = SCHED_DEP_MS / 1000 + 65; // 1:05 late
+  it("reports a delay once the slip reaches the shared threshold", () => {
+    const lateDep = SCHED_DEP_MS / 1000 + 125; // 2:05 late
     const status = computeLiveTripStatus({
       reg: REG,
       updates: feed({ depUnix: lateDep }),
       now: SCHED_DEP_MS - 5 * 60_000,
     });
-    expect(status!.delayMinutes).toBe(1);
-    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 65_000);
+    expect(status!.delayMinutes).toBe(2);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 125_000);
   });
 
-  it("treats a sub-minute en-route arrival slip as on-time after boarding is pruned", () => {
+  it("treats an under-threshold en-route arrival slip as on-time after boarding is pruned", () => {
     // Boarding stop gone (en route); destination arrival is 45 s past schedule.
     const status = computeLiveTripStatus({
       reg: { ...REG, originStartTime: "08:10" },

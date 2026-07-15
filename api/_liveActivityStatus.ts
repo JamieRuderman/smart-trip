@@ -1,6 +1,9 @@
 import { GTFS_STOP_ID_TO_PLATFORM } from "../src/data/generated/stationPlatforms.generated.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
-import { delayMinutesFromSeconds } from "../src/lib/tripDelay.js";
+import {
+  delayMinutesFromSeconds,
+  effectiveDelayMinutes,
+} from "../src/lib/tripDelay.js";
 
 /**
  * Pure derivation of a registered trip's LIVE departure/arrival/delay from the
@@ -229,9 +232,9 @@ function statusFromBoarding(
     to?.arrivalTime != null ? to.arrivalTime * 1000 : reg.arrivalEpochMs + delayMs;
 
   // Departure delay when the trip leaves late, else arrival delay when it
-  // leaves on time but the live destination arrival slips — the same
-  // precedence the client's effectiveDelayMinutes uses, so the pushed pill
-  // and the in-app "Delayed" badge flip together for en-route delays.
+  // leaves on time but the live destination arrival slips — computed by the
+  // SAME effectiveDelayMinutes the client uses, so the pushed pill and the
+  // in-app "Delayed" badge flip together for en-route delays.
   const departureDelayMinutes = delayMinutesBetween(
     liveDepartureMs,
     reg.departureEpochMs,
@@ -245,7 +248,10 @@ function statusFromBoarding(
     departureEpochMs: reg.departureEpochMs + delayMs,
     arrivalEpochMs,
     delayMinutes:
-      departureDelayMinutes > 0 ? departureDelayMinutes : arrivalDelayMinutes,
+      effectiveDelayMinutes({
+        delayMinutes: departureDelayMinutes || undefined,
+        arrivalDelayMinutes: arrivalDelayMinutes || undefined,
+      }) ?? 0,
     isCanceled,
     isEnded: now >= arrivalEpochMs,
   };

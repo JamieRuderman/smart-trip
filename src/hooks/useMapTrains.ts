@@ -110,15 +110,21 @@ export function useMapTrains(): {
       updatesByTripId.set(update.tripId, update);
     }
 
-    // Max delay across the stops on the VEHICLE'S OWN direction. 511 always
-    // reports departureDelay: 0 for late trains and only shifts the absolute
-    // departure.time, so delay is derived by diffing each stop's live
-    // departure against the static schedule (computeDelayMinutes — the same
-    // method the schedule surfaces use). Direction matters: SMART encodes
-    // round trips as one GTFS trip whose stop_time_updates span BOTH legs, so
-    // opposite-direction platforms must be skipped or their times would be
-    // diffed against the wrong trip's schedule (mirrors the direction guard
-    // in useTripUpdates.buildStopRealtimeData). Falls back to the feed's own
+    // The vehicle's CURRENT lateness: the delay at its next stop — the
+    // earliest remaining same-direction stop_time_update (511 prunes served
+    // stops, so the soonest prediction is where the train is headed). This is
+    // deliberately NOT the max over all remaining stops: a transient slip
+    // predicted at one downstream stop must not paint a currently-on-time
+    // train orange, and the trip-detail sheet keys its header off the same
+    // current-stop delay, so the marker and the popup always agree.
+    //
+    // 511 always reports departureDelay: 0 for late trains and only shifts
+    // the absolute departure.time, so delay is derived by diffing the stop's
+    // live departure against the static schedule (computeDelayMinutes — the
+    // same method the schedule surfaces use). Direction matters: SMART
+    // encodes round trips as one GTFS trip whose stop_time_updates span BOTH
+    // legs, so opposite-direction platforms are skipped (mirrors the guard in
+    // useTripUpdates.buildStopRealtimeData). Falls back to the feed's own
     // departureDelay for ADDED/DUPLICATED runs with no static match.
     const delayForVehicle = (
       update: GtfsRtTripUpdate,
@@ -127,27 +133,31 @@ export function useMapTrains(): {
     ): number | null => {
       const direction = directionId === 0 ? "southbound" : "northbound";
       const entry = tripIndex.get(tripNumberKey(directionId, startTime));
-      let maxDelay: number | null = null;
+      let nextStu: (typeof update.stopTimeUpdates)[number] | null = null;
+      let nextStation: Station | null = null;
       for (const stu of update.stopTimeUpdates) {
         if (stu.departureTime == null || !stu.stopId) continue;
         const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
         if (!platform || platform.direction !== direction) continue;
-        const scheduledHHMM = entry?.times[stationIndexMap[platform.station]];
-        const mins =
-          scheduledHHMM && scheduledHHMM !== "--" && update.startDate
-            ? (computeDelayMinutes(
-                stu.departureTime,
-                scheduledHHMM,
-                update.startDate,
-              ) ?? null)
-            : stu.departureDelay != null
-              ? delayMinutesFromSeconds(stu.departureDelay)
-              : null;
-        if (mins != null && (maxDelay === null || mins > maxDelay)) {
-          maxDelay = mins;
+        if (nextStu == null || stu.departureTime < nextStu.departureTime!) {
+          nextStu = stu;
+          nextStation = platform.station;
         }
       }
-      return maxDelay;
+      if (nextStu == null || nextStation == null) return null;
+      const scheduledHHMM = entry?.times[stationIndexMap[nextStation]];
+      if (scheduledHHMM && scheduledHHMM !== "--" && update.startDate) {
+        return (
+          computeDelayMinutes(
+            nextStu.departureTime!,
+            scheduledHHMM,
+            update.startDate,
+          ) ?? null
+        );
+      }
+      return nextStu.departureDelay != null
+        ? delayMinutesFromSeconds(nextStu.departureDelay)
+        : null;
     };
 
     const trains: MapTrain[] = [];

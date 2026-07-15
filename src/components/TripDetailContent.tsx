@@ -120,7 +120,7 @@ export function TripDetailContent({
     minutesUntilArrival,
   } = progress;
 
-  const { hasStarted, displayStops } = stopInference;
+  const { hasStarted, displayStops, currentIndex } = stopInference;
 
   // The live vehicle position vetoes a premature "At destination": if the train
   // is still in transit to the rider's destination (or sitting at an earlier
@@ -139,7 +139,7 @@ export function TripDetailContent({
       vehiclePosition.currentStatus === "STOPPED_AT"
     );
 
-  const { isCanceled, isCanceledOrSkipped, statusLabel } =
+  const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
 
   const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
@@ -205,13 +205,26 @@ export function TripDetailContent({
     ? t("quickConnection.laterTrain")
     : t("quickConnection.earlierTrain");
 
+  // Delay at the stop the train is currently approaching — the SAME signal
+  // the map marker paints orange from. The endpoint-based statusLabel misses
+  // an en-route slip once the displayed leg's origin has been served and
+  // pruned from the feed, which read "On time" here while the marker showed
+  // the train delayed. (allStopDelayMinutes only carries entries at/above the
+  // shared threshold, so presence == delayed.)
+  const currentStopDelayMin =
+    currentIndex >= 0
+      ? (realtimeStatus?.allStopDelayMinutes?.[displayStops[currentIndex]] ?? 0)
+      : 0;
+
   // Small header badge — "Ended" for finished trips, realtime label otherwise.
   // Falls back to "Scheduled" before departure or "On time" once en route when
   // no realtime data is available (GPS is tracking, no delay reported).
   const headerStatusLabel = isEnded
     ? t("tracker.ended")
-    : statusLabel ??
-      (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
+    : !isCanceledOrSkipped && !isDelayed && currentStopDelayMin > 0
+      ? t("tripCard.delayed", { minutes: currentStopDelayMin })
+      : statusLabel ??
+        (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
   const directionLabel = isSouthbound(fromStation, toStation)
     ? t("tracker.southbound")

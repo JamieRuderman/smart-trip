@@ -190,6 +190,41 @@ describe("planTick", () => {
     expect(aps["dismissal-date"]).toBe(Math.floor(displayedArr / 1000));
   });
 
+  it("defers the terminal fallbacks while the vehicle is still short of the destination", () => {
+    const displayedArr = SCHED_ARR_MS + 4 * 60_000;
+    const lastSent = {
+      delayMinutes: 4,
+      phase: "en-route" as const,
+      isEnded: false,
+      isCanceled: false,
+      arrivalEpochMs: displayedArr,
+    };
+    // Feed read failed AND the positions feed shows the train en route:
+    // no synthesized end — keep polling instead of dismissing mid-ride.
+    const noFeed = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent,
+      updates: null,
+      now: displayedArr + 60_000,
+      vehicleShortOfDestination: true,
+    });
+    expect(noFeed.push).toBeNull();
+    expect(noFeed.stop).toBe(false);
+    // Feed present but the run is unlocatable (pruned): same veto applies
+    // through computeLiveTripStatus.
+    const unlocatable = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent,
+      updates: [],
+      now: displayedArr + 60_000,
+      vehicleShortOfDestination: true,
+    });
+    expect(unlocatable.push).toBeNull();
+    expect(unlocatable.stop).toBe(false);
+  });
+
   it("is silent when nothing changed since the last send", () => {
     const now = SCHED_DEP_MS - 20 * 60_000;
     const plan = planTick({

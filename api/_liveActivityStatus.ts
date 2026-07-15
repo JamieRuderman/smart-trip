@@ -1,4 +1,5 @@
 import { GTFS_STOP_ID_TO_PLATFORM } from "../src/data/generated/stationPlatforms.generated.js";
+import { STATION_ORDER } from "../src/data/generated/stations.generated.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
 import {
   delayMinutesFromSeconds,
@@ -33,6 +34,79 @@ export interface FeedTripUpdate {
    *  fallback's match key (cancelled runs often lose their stop updates). */
   startTime?: string;
   stopTimeUpdates: FeedStopTimeUpdate[];
+}
+
+/** Minimal normalized vehicle-positions shapes (what the worker's
+ *  `getVehiclePositions` returns / `/api/gtfsrt/vehiclepositions` serves). */
+export interface FeedVehicle {
+  trip?: {
+    startTime: string; // "HH:MM:SS" scheduled origin departure
+    startDate: string; // "YYYYMMDD"
+    directionId: number; // 0 = southbound, 1 = northbound
+  };
+  stopId?: string;
+  currentStatus?: string; // STOPPED_AT | IN_TRANSIT_TO | INCOMING_AT
+  timestamp?: number; // unix seconds of the vehicle report
+}
+export interface FeedVehiclePositions {
+  timestamp: number; // feed header, unix seconds
+  vehicles: FeedVehicle[];
+}
+
+// Freshness gates — mirror the client's useVehiclePositionForTrip so the
+// server veto lapses at the same point the client's does.
+const VEHICLE_FEED_STALE_SECONDS = 90;
+const VEHICLE_STALE_SECONDS = 60;
+
+const STATION_INDEX: Record<string, number> = Object.fromEntries(
+  STATION_ORDER.map((s, i) => [s, i]),
+);
+
+/**
+ * Whether the registration's own train is demonstrably still short of the
+ * rider's destination per the vehicle-positions feed — the server analog of
+ * the client's `isVehicleShortOfDestination` veto. A heavily delayed run can
+ * drop out of the TRIP-UPDATES feed entirely (no arrival prediction left), at
+ * which point `computeLiveTripStatus`'s terminal fallback would end the Live
+ * Activity at the scheduled arrival mid-ride; the positions feed is then the
+ * only evidence the train is still running.
+ *
+ * False when unmatched, stale, at/past the destination, or the data is
+ * missing — the time-based rules then resume, so the veto cannot pin an
+ * activity alive forever.
+ */
+export function vehicleShortOfDestinationForReg(
+  vp: FeedVehiclePositions | null,
+  reg: LiveActivityRegistration,
+  nowMs: number,
+): boolean {
+  if (!vp || !reg.originStartTime) return false;
+  const nowSec = Math.floor(nowMs / 1000);
+  if (vp.timestamp > 0 && nowSec - vp.timestamp > VEHICLE_FEED_STALE_SECONDS) {
+    return false;
+  }
+  const startDate = reg.serviceDate.replace(/-/g, "");
+  const directionId = reg.direction === "southbound" ? 0 : 1;
+  const toIdx = STATION_INDEX[reg.toStation];
+  if (toIdx == null) return false;
+
+  for (const v of vp.vehicles) {
+    if (!v.trip || !v.stopId) continue;
+    if (v.trip.startTime.slice(0, 5) !== reg.originStartTime) continue;
+    if (v.trip.startDate !== startDate) continue;
+    if (v.trip.directionId !== directionId) continue;
+    if (v.timestamp != null && nowSec - v.timestamp > VEHICLE_STALE_SECONDS) {
+      return false;
+    }
+    const platform = GTFS_STOP_ID_TO_PLATFORM[v.stopId];
+    if (!platform) return false;
+    const stationIdx = STATION_INDEX[platform.station];
+    if (stationIdx == null) return false;
+    if (stationIdx === toIdx) return v.currentStatus !== "STOPPED_AT";
+    // Southbound travels toward higher station indexes, northbound lower.
+    return reg.direction === "southbound" ? stationIdx < toIdx : stationIdx > toIdx;
+  }
+  return false;
 }
 
 export interface LiveTripStatus {
@@ -112,14 +186,23 @@ export function computeLiveTripStatus(args: {
   reg: LiveActivityRegistration;
   updates: FeedTripUpdate[];
   now: number;
+  /** Fresh vehicle-position evidence the train hasn't reached the destination
+   *  (see {@link vehicleShortOfDestinationForReg}). Vetoes the unlocatable
+   *  terminal fallback so a delayed run whose prediction dropped out of the
+   *  trip-updates feed isn't ended mid-ride at its scheduled arrival. */
+  vehicleShortOfDestination?: boolean;
 }): LiveTripStatus | null {
-  const { reg, updates, now } = args;
+  const { reg, updates, now, vehicleShortOfDestination = false } = args;
   const matched = matchLiveTripStatus(reg, updates, now);
   if (matched) return matched;
   // Unlocatable AND past the scheduled arrival → the run completed and 511
   // dropped it (a still-running late train would keep a live destination arrival
-  // and be matched above). End it so the activity doesn't stick at 0:00.
-  if (now >= reg.arrivalEpochMs + ARRIVED_DROP_GRACE_MS) {
+  // and be matched above). End it so the activity doesn't stick at 0:00 —
+  // UNLESS the positions feed shows the train demonstrably still en route.
+  if (
+    !vehicleShortOfDestination &&
+    now >= reg.arrivalEpochMs + ARRIVED_DROP_GRACE_MS
+  ) {
     return {
       departureEpochMs: reg.departureEpochMs,
       arrivalEpochMs: reg.arrivalEpochMs,

@@ -12,6 +12,7 @@ import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
+import { ReminderDriftSync } from "@/components/ReminderDriftSync";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
@@ -52,6 +53,10 @@ const RoutedApp = () => {
             so "Take this train" can pop it from any surface and it survives
             the triggering sheet/route change. */}
         <ReminderDialogHost />
+        {/* Keeps an armed leave-reminder's fire time tracking live departure
+            drift on every platform — the in-sheet reschedule only runs while
+            the trip detail sheet is open. */}
+        <ReminderDriftSync />
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />

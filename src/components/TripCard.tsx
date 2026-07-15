@@ -92,12 +92,14 @@ export const TripCard = memo(function TripCard({
 
   // Per-column tone: only the time that actually shifted (has a live value)
   // reads in the delayed gold — a train delayed only at arrival keeps its
-  // on-time departure in the normal tone rather than implying it moved.
+  // on-time departure in the normal tone rather than implying it moved. On a
+  // delayed trip the unshifted column stays neutral: the green next-train
+  // emphasis would clash with the gold card and read as "on time".
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
       ? cn("line-through", stateText["canceled"])
-      : isDelayed && hasLiveTime
-      ? stateText["delayed"]
+      : isDelayed
+      ? (hasLiveTime ? stateText["delayed"] : undefined)
       : isNextTrip
       ? stateText["ontime"]
       : isPastTrip
@@ -304,8 +306,17 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            {isNextTrip && !isCanceledOrSkipped && !isDelayed && (
-              <span className="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap bg-primary text-primary-foreground">
+            {/* A late next train is still the next train — keep the chip,
+                tinted gold so it doesn't fight the delayed card colour. */}
+            {isNextTrip && !isCanceledOrSkipped && (
+              <span
+                className={cn(
+                  "text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap",
+                  isDelayed
+                    ? "bg-smart-gold text-white"
+                    : "bg-primary text-primary-foreground",
+                )}
+              >
                 {t("tripCard.nextTrain")}
               </span>
             )}

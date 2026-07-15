@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeLiveTripStatus,
   decidePushAction,
+  vehicleShortOfDestinationForReg,
   type FeedTripUpdate,
+  type FeedVehiclePositions,
 } from "./_liveActivityStatus.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
 
@@ -381,6 +383,28 @@ describe("computeLiveTripStatus", () => {
       ).toBe(true);
     });
 
+    it("defers the terminal fallback while the vehicle is still short of the destination", () => {
+      // The trip-updates feed lost the run entirely, but the positions feed
+      // shows the train still en route — the veto must hold the activity.
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: otherRun,
+          now: SCHED_ARR_MS + 5 * 60_000,
+          vehicleShortOfDestination: true,
+        }),
+      ).toBeNull();
+      // Veto released (arrived / stale / unmatched) → normal rules resume.
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: otherRun,
+          now: SCHED_ARR_MS + 5 * 60_000,
+          vehicleShortOfDestination: false,
+        })!.isEnded,
+      ).toBe(true);
+    });
+
     it("does NOT end a late train still present in the feed past scheduled arrival", () => {
       // Past the SCHEDULED arrival, but the run still carries a live (later)
       // destination arrival, so it's matched and stays en route — never ended
@@ -496,5 +520,78 @@ describe("decidePushAction", () => {
         now: SCHED_ARR_MS + 1000,
       }).action,
     ).toBe("none");
+  });
+});
+
+describe("vehicleShortOfDestinationForReg", () => {
+  // REG is northbound Larkspur → San Rafael; the origin terminal is Larkspur,
+  // so the vehicle-match key is startTime 08:30 / dir 1 / date 20260609.
+  const regWithOrigin: LiveActivityRegistration = {
+    ...REG,
+    originStartTime: "08:30",
+  };
+  const NOW = SCHED_ARR_MS + 5 * 60_000;
+  const NOW_SEC = Math.floor(NOW / 1000);
+
+  const vp = (v: Partial<FeedVehiclePositions["vehicles"][number]>): FeedVehiclePositions => ({
+    timestamp: NOW_SEC - 10,
+    vehicles: [
+      {
+        trip: { startTime: "08:30:15", startDate: "20260609", directionId: 1 },
+        stopId: TO_STOP, // San Rafael northbound
+        currentStatus: "IN_TRANSIT_TO",
+        timestamp: NOW_SEC - 10,
+        ...v,
+      },
+    ],
+  });
+
+  it("is true while the matched train is approaching (not stopped at) the destination", () => {
+    expect(vehicleShortOfDestinationForReg(vp({}), regWithOrigin, NOW)).toBe(true);
+    // Still at the boarding terminal, upstream of the destination.
+    expect(
+      vehicleShortOfDestinationForReg(vp({ stopId: FROM_STOP }), regWithOrigin, NOW),
+    ).toBe(true);
+  });
+
+  it("is false once stopped at the destination", () => {
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ currentStatus: "STOPPED_AT" }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("is false when the report or feed is stale", () => {
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ timestamp: NOW_SEC - 120 }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false);
+    const staleFeed = { ...vp({}), timestamp: NOW_SEC - 300 };
+    expect(vehicleShortOfDestinationForReg(staleFeed, regWithOrigin, NOW)).toBe(false);
+  });
+
+  it("is false when unmatched, missing data, or no origin time on the registration", () => {
+    expect(vehicleShortOfDestinationForReg(null, regWithOrigin, NOW)).toBe(false);
+    expect(vehicleShortOfDestinationForReg(vp({}), REG, NOW)).toBe(false); // no originStartTime
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { startTime: "09:30:15", startDate: "20260609", directionId: 1 } }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false); // different run
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { startTime: "08:30:15", startDate: "20260609", directionId: 0 } }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false); // opposite direction
   });
 });

@@ -234,9 +234,15 @@ export default function MapDiagram() {
         trainsCount={trains.length}
         onBackground={() => setSelectedTrainKey(null)}
       >
+        {/* h-full (not min-h-full): SmartLineDiagram's root and SVG are
+            height:100%, which only resolves against a parent with a DEFINITE
+            height. A min-height-only wrapper leaves height auto, so the SVG
+            collapses to its tall intrinsic aspect ratio and renders oversized
+            with no fit-to-screen. The scroll container has a definite height,
+            so h-full here restores the correct fit. */}
         <div
           className={cn(
-            "min-h-full transition-opacity duration-500 ease-out motion-reduce:transition-none",
+            "h-full transition-opacity duration-500 ease-out motion-reduce:transition-none",
             diagramShown ? "opacity-100" : "opacity-0",
           )}
         >

@@ -15,7 +15,7 @@
  * dark mode. All sizes/animations live in `./tokens`.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Maximize2 } from "lucide-react";
 import type { MapTrain } from "@/hooks/useMapTrains";
@@ -122,7 +122,15 @@ export function SmartLineDiagram({
 
   // Path is drawn S → N, so we store arc-length-from-the-NORTH end for each
   // station — that's what `positionOnPath` expects to interpolate into.
-  useEffect(() => {
+  //
+  // useLayoutEffect (not useEffect): the zone-coloured track, station dots and
+  // train markers are all gated on `snap`, so with a post-paint effect the
+  // first painted frame shows a bare path with none of them, and they pop in
+  // on the next frame — a visible "blink" every time the diagram mounts.
+  // Measuring before paint renders the positioned diagram in one frame.
+  // Safe under SSR: this component only renders on the (non-prerendered)
+  // /map-diagram route, so the effect never runs server-side.
+  useLayoutEffect(() => {
     const el = pathRef.current;
     if (!el) return;
     const L = el.getTotalLength();

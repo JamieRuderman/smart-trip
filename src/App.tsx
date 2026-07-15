@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -17,11 +17,10 @@ import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-
-// Map routes pull in mapbox-gl (~700 KB JS + CSS). Lazy-load so users who
-// stay on the schedule view never pay that cost.
-const Map = lazy(() => import("./pages/Map"));
-const MapDiagram = lazy(() => import("./pages/MapDiagram"));
+// Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
+// schedule-only users never pay that cost. The home screen preloads these
+// chunks while idle — see lazyPages / MapDiagramPreviewCard.
+import { Map, MapDiagram } from "./pages/lazyPages";
 
 const queryClient = new QueryClient({
   defaultOptions: {

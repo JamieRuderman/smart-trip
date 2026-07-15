@@ -151,7 +151,20 @@ export function StationInfoSheet({
           if (!staticTime || staticTime === "~~") return null;
 
           const rt = statusMaps.statusMap.get(trip.departureTime) ?? null;
-          const live = rt?.allStopLiveDepartures?.[station];
+          const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+
+          // allStopLiveDepartures/allStopDelayMinutes are built from each
+          // stop's live DEPARTURE — the feed usually has no departure for
+          // the trip's own terminus (a train doesn't depart from where it
+          // ends), only an arrival. So when this row's station IS the
+          // trip's terminus, use the trip-level live arrival / arrival delay
+          // (computed by useTripUpdates from that same destination arrival,
+          // since statusMaps is keyed WINDSOR<->LARKSPUR here) instead of
+          // the per-stop map, which would otherwise miss it entirely.
+          const isTerminalRow = station === terminus;
+          const live = isTerminalRow
+            ? (rt?.liveArrivalTime ?? rt?.allStopLiveDepartures?.[station])
+            : rt?.allStopLiveDepartures?.[station];
           const effectiveTime = live ?? staticTime;
           const etaMinutes = parseTimeToMinutes(effectiveTime) - nowMinutes;
 
@@ -163,10 +176,12 @@ export function StationInfoSheet({
           // this station, its per-stop delay (absent = on time here) is
           // authoritative; the trip-level origin delay is only the fallback
           // for trips with no per-stop data.
-          const delayMinutes =
-            rt?.allStopDelayMinutes?.[station] ??
-            (live != null ? null : (rt?.delayMinutes ?? null));
-          const terminus = isSouthbound ? LARKSPUR : WINDSOR;
+          const delayMinutes = isTerminalRow
+            ? (rt?.arrivalDelayMinutes ??
+                rt?.allStopDelayMinutes?.[station] ??
+                (live != null ? null : (rt?.delayMinutes ?? null)))
+            : (rt?.allStopDelayMinutes?.[station] ??
+                (live != null ? null : (rt?.delayMinutes ?? null)));
 
           // Prefer the user's selected destination if direction matches the
           // train; otherwise fall back to the train's end-of-line terminus.

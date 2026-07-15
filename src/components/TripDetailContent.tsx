@@ -139,9 +139,11 @@ export function TripDetailContent({
       vehiclePosition.currentStatus === "STOPPED_AT"
     );
 
-  const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
+  const { isCanceled, isCanceledOrSkipped, statusLabel } =
     useTripStatus(realtimeStatus);
 
+  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
+  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
@@ -296,14 +298,18 @@ export function TripDetailContent({
             strikethrough={isCanceledOrSkipped}
             className="text-2xl font-semibold text-white"
           />
-          {/* Struck-through scheduled times shown only when delayed */}
-          {isDelayed && (
+          {/* Struck-through scheduled comparison — only the column(s) that
+              actually have a live value, so an arrival-only delay doesn't
+              show an unchanged departure struck through beside it. */}
+          {(hasLiveDepartureTime || hasLiveArrivalTime) && (
             <TimePair
               departure={trip.departureTime}
               arrival={trip.arrivalTime}
               format={timeFormat}
               className="text-xs mt-0.5 text-white/50"
               strikethrough
+              showDeparture={hasLiveDepartureTime}
+              showArrival={hasLiveArrivalTime}
             />
           )}
         </div>

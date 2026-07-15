@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Hand } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 
 import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
@@ -15,7 +15,6 @@ import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
 } from "@/lib/animationConstants";
-import { useTranslation } from "react-i18next";
 import { useNow } from "@/hooks/useNow";
 import { TripDetailSheet } from "@/components/TripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
@@ -28,18 +27,6 @@ const WINDSOR = stations[0];
 const LARKSPUR = stations[stations.length - 1];
 
 export default function MapDiagram() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { t } = useTranslation();
-
-  const backToSchedule = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  };
-
   const { trains } = useMapTrains();
   const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
 
@@ -88,6 +75,15 @@ export default function MapDiagram() {
   const nowSeconds = useNow(15_000);
   const nowMinute = Math.floor(nowSeconds / 60);
   const currentTime = useMemo(() => new Date(nowMinute * 60_000), [nowMinute]);
+
+  // Fade the diagram into the (already-visible) frame on mount, so the page
+  // reads as a deliberate load — green header + blank container first, then the
+  // diagram eases in — rather than the whole thing popping in at once.
+  const [diagramShown, setDiagramShown] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setDiagramShown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
   const [stationSheet, setStationSheet] = useState<Station | null>(null);
@@ -233,47 +229,31 @@ export default function MapDiagram() {
   }, [setToStation, closeStationSheet]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
-      <header
-        className="shrink-0 bg-smart-train-green px-3 pb-2 flex items-center gap-2"
-        style={{ paddingTop: "calc(12px + var(--safe-area-top))" }}
+    <>
+      <MapDiagramFrame
+        trainsCount={trains.length}
+        onBackground={() => setSelectedTrainKey(null)}
       >
-        <button
-          type="button"
-          onClick={backToSchedule}
-          className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/15 text-white hover:bg-white/25"
-          aria-label={t("mapDiagram.closeMap")}
+        <div
+          className={cn(
+            "min-h-full transition-opacity duration-500 ease-out motion-reduce:transition-none",
+            diagramShown ? "opacity-100" : "opacity-0",
+          )}
         >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-1.5 text-xs text-white/90 flex-1 min-w-0">
-          <Hand className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t("mapDiagram.tapHint")}</span>
+          <SmartLineDiagram
+            trains={trains}
+            selectedTrainKey={selectedTrainKey}
+            onTrainClick={handleTrainClick}
+            onStationClick={handleStationClick}
+            colorTrackByZone
+            fromStation={fromStation}
+            toStation={toStation}
+            userStation={userStation}
+            myTrainKey={myTrainKey}
+            className="min-h-full"
+          />
         </div>
-        <span className="text-xs font-semibold bg-white/15 text-white rounded-full px-2.5 py-1 whitespace-nowrap">
-          {t("mapDiagram.trainsCount", { count: trains.length })}
-        </span>
-      </header>
-
-      {/* Background tap clears the train selection; inner station/train
-          clicks stopPropagation so they don't also clear it. */}
-      <div
-        className="flex-1 min-h-0 overflow-auto"
-        onClick={() => setSelectedTrainKey(null)}
-      >
-        <SmartLineDiagram
-          trains={trains}
-          selectedTrainKey={selectedTrainKey}
-          onTrainClick={handleTrainClick}
-          onStationClick={handleStationClick}
-          colorTrackByZone
-          fromStation={fromStation}
-          toStation={toStation}
-          userStation={userStation}
-          myTrainKey={myTrainKey}
-          className="min-h-full"
-        />
-      </div>
+      </MapDiagramFrame>
 
       {stationSheet && (
         <StationInfoSheet
@@ -314,6 +294,6 @@ export default function MapDiagram() {
           userToStation={toStation}
         />
       )}
-    </div>
+    </>
   );
 }

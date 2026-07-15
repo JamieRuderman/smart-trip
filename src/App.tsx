@@ -13,6 +13,7 @@ import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { ReminderDriftSync } from "@/components/ReminderDriftSync";
+import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
@@ -60,7 +61,17 @@ const RoutedApp = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/map" element={<Map />} />
-            <Route path="/map-diagram" element={<MapDiagram />} />
+            {/* Per-route fallback: the line-diagram frame (green bar + blank
+                container) renders instantly while the code chunk loads, so the
+                page shell appears the moment you navigate. */}
+            <Route
+              path="/map-diagram"
+              element={
+                <Suspense fallback={<MapDiagramFrame />}>
+                  <MapDiagram />
+                </Suspense>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

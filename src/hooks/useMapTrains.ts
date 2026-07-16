@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 import { useVehiclePositions } from "@/hooks/useVehiclePositions";
-import { useTripUpdates } from "@/hooks/useTripUpdates";
+import { computeDelayMinutes, useTripUpdates } from "@/hooks/useTripUpdates";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { isUpstreamFeedDown } from "@/lib/gtfsRtFetch";
-import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
+import {
+  GTFS_STOP_ID_TO_PLATFORM,
+  GTFS_STOP_ID_TO_STATION,
+  stationIndexMap,
+} from "@/lib/stationUtils";
 import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
+import { delayMinutesFromSeconds } from "@/lib/tripDelay";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
-import type { VehicleStopStatus } from "@/types/gtfsRt";
-import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
-
-/** Per-stop delay floor (seconds) that counts toward a train's map delay —
- *  the at-a-glance color threshold expressed in seconds. */
-const MAP_DELAY_FLOOR_SECONDS = DELAY_MINUTES_THRESHOLD * 60;
+import type { GtfsRtTripUpdate, VehicleStopStatus } from "@/types/gtfsRt";
 
 export interface MapTrain {
   key: string;
@@ -39,15 +39,21 @@ export interface MapTrain {
 const tripNumberKey = (directionId: number, startTime: string) =>
   `${directionId}|${startTime}`;
 
+interface TripIndexEntry {
+  tripNumber: number;
+  /** Static per-station scheduled times ("HH:MM"), indexed by stationIndexMap. */
+  times: string[];
+}
+
 /**
  * Build a lookup map from "directionId|startTime" to the trip's human
- * number for today's active schedule (weekday or weekend). Vehicles in the
- * GTFS-RT feed are always running today, so biasing to today avoids the
- * collision case where weekday and weekend share an origin time and would
- * otherwise overwrite each other.
+ * number and static per-station times for today's active schedule (weekday
+ * or weekend). Vehicles in the GTFS-RT feed are always running today, so
+ * biasing to today avoids the collision case where weekday and weekend share
+ * an origin time and would otherwise overwrite each other.
  */
-function buildTripNumberIndex(): Map<string, number> {
-  const index = new Map<string, number>();
+function buildTripIndex(): Map<string, TripIndexEntry> {
+  const index = new Map<string, TripIndexEntry>();
   const north = stations[0];
   const south = stations[stations.length - 1];
   const lastIdx = stations.length - 1;
@@ -59,7 +65,12 @@ function buildTripNumberIndex(): Map<string, number> {
     const dirId = sb ? 0 : 1;
     for (const trip of getFilteredTrips(from, to, scheduleType)) {
       const origin = trip.times[originIdx];
-      if (origin) index.set(tripNumberKey(dirId, origin), trip.trip);
+      if (origin) {
+        index.set(tripNumberKey(dirId, origin), {
+          tripNumber: trip.trip,
+          times: trip.times,
+        });
+      }
     }
   }
   return index;
@@ -80,8 +91,8 @@ export function useMapTrains(): {
   // Re-run lookups when cached/remote schedule data swaps in.
   const { version: scheduleVersion } = useScheduleData();
 
-  const tripNumberIndex = useMemo(
-    () => buildTripNumberIndex(),
+  const tripIndex = useMemo(
+    () => buildTripIndex(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when schedule data swaps in
     [scheduleVersion],
   );
@@ -94,37 +105,77 @@ export function useMapTrains(): {
 
     if (!vehicleData?.vehicles) return { trains: [], lastUpdated, isUpstreamDown };
 
-    const tripDelays = new Map<string, { delayMinutes: number | null; isCanceled: boolean }>();
-    if (tripData?.updates) {
-      for (const update of tripData.updates) {
-        const isCanceled = update.scheduleRelationship === "CANCELED";
-        let maxDelay: number | null = null;
-        if (!isCanceled) {
-          for (const stu of update.stopTimeUpdates) {
-            if (
-              stu.departureDelay != null &&
-              stu.departureDelay >= MAP_DELAY_FLOOR_SECONDS
-            ) {
-              const mins = Math.round(stu.departureDelay / 60);
-              if (maxDelay === null || mins > maxDelay) maxDelay = mins;
-            }
-          }
-        }
-        tripDelays.set(update.tripId, { delayMinutes: maxDelay, isCanceled });
-      }
+    const updatesByTripId = new Map<string, GtfsRtTripUpdate>();
+    for (const update of tripData?.updates ?? []) {
+      updatesByTripId.set(update.tripId, update);
     }
+
+    // The vehicle's CURRENT lateness: the delay at its next stop — the
+    // earliest remaining same-direction stop_time_update (511 prunes served
+    // stops, so the soonest prediction is where the train is headed). This is
+    // deliberately NOT the max over all remaining stops: a transient slip
+    // predicted at one downstream stop must not paint a currently-on-time
+    // train orange, and the trip-detail sheet keys its header off the same
+    // current-stop delay, so the marker and the popup always agree.
+    //
+    // 511 always reports departureDelay: 0 for late trains and only shifts
+    // the absolute departure.time, so delay is derived by diffing the stop's
+    // live departure against the static schedule (computeDelayMinutes — the
+    // same method the schedule surfaces use). Direction matters: SMART
+    // encodes round trips as one GTFS trip whose stop_time_updates span BOTH
+    // legs, so opposite-direction platforms are skipped (mirrors the guard in
+    // useTripUpdates.buildStopRealtimeData). Falls back to the feed's own
+    // departureDelay for ADDED/DUPLICATED runs with no static match.
+    const delayForVehicle = (
+      update: GtfsRtTripUpdate,
+      directionId: number,
+      startTime: string,
+    ): number | null => {
+      const direction = directionId === 0 ? "southbound" : "northbound";
+      const entry = tripIndex.get(tripNumberKey(directionId, startTime));
+      let nextStu: (typeof update.stopTimeUpdates)[number] | null = null;
+      let nextStation: Station | null = null;
+      for (const stu of update.stopTimeUpdates) {
+        if (stu.departureTime == null || !stu.stopId) continue;
+        const platform = GTFS_STOP_ID_TO_PLATFORM[stu.stopId];
+        if (!platform || platform.direction !== direction) continue;
+        if (nextStu == null || stu.departureTime < nextStu.departureTime!) {
+          nextStu = stu;
+          nextStation = platform.station;
+        }
+      }
+      if (nextStu == null || nextStation == null) return null;
+      const scheduledHHMM = entry?.times[stationIndexMap[nextStation]];
+      if (scheduledHHMM && scheduledHHMM !== "--" && update.startDate) {
+        return (
+          computeDelayMinutes(
+            nextStu.departureTime!,
+            scheduledHHMM,
+            update.startDate,
+          ) ?? null
+        );
+      }
+      return nextStu.departureDelay != null
+        ? delayMinutesFromSeconds(nextStu.departureDelay)
+        : null;
+    };
 
     const trains: MapTrain[] = [];
     for (const vehicle of vehicleData.vehicles) {
       if (!vehicle.trip) continue;
       if (vehicle.position.latitude === 0 && vehicle.position.longitude === 0) continue;
 
-      const tripInfo = tripDelays.get(vehicle.trip.tripId);
+      const update = updatesByTripId.get(vehicle.trip.tripId) ?? null;
+      const isCanceled = update?.scheduleRelationship === "CANCELED";
       const nextStation = vehicle.stopId
         ? (GTFS_STOP_ID_TO_STATION[vehicle.stopId] ?? null)
         : null;
       const startTime = vehicle.trip.startTime?.slice(0, 5) ?? null;
       const directionId = vehicle.trip.directionId ?? null;
+      const delayMinutes =
+        update != null && !isCanceled && directionId != null && startTime != null
+          ? delayForVehicle(update, directionId, startTime)
+          : null;
 
       trains.push({
         key: vehicle.vehicleId,
@@ -137,17 +188,17 @@ export function useMapTrains(): {
         tripLabel: vehicle.trip.tripId ?? null,
         tripNumber:
           startTime != null && directionId != null
-            ? (tripNumberIndex.get(tripNumberKey(directionId, startTime)) ??
-              null)
+            ? (tripIndex.get(tripNumberKey(directionId, startTime))
+                ?.tripNumber ?? null)
             : null,
         nextStation,
         currentStatus: vehicle.currentStatus ?? null,
-        delayMinutes: tripInfo?.delayMinutes ?? null,
-        isCanceled: tripInfo?.isCanceled ?? false,
+        delayMinutes,
+        isCanceled,
         startTime,
       });
     }
 
     return { trains, lastUpdated, isUpstreamDown };
-  }, [vehicleData, tripData, tripNumberIndex, isUpstreamDown]);
+  }, [vehicleData, tripData, tripIndex, isUpstreamDown]);
 }

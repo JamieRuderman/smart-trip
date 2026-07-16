@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeLiveTripStatus,
   decidePushAction,
+  vehicleShortOfDestinationForReg,
   type FeedTripUpdate,
+  type FeedVehiclePositions,
 } from "./_liveActivityStatus.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
 
@@ -72,6 +74,23 @@ describe("computeLiveTripStatus", () => {
     expect(status!.arrivalEpochMs).toBe(lateArr * 1000);
   });
 
+  it("reports the arrival delay when the departure is on time but the trip slips en route", () => {
+    // Boarding still present and on time; the destination's live arrival is
+    // 8 min late. The pill must read "Delayed" in step with the in-app card
+    // (client effectiveDelayMinutes: departure delay, else arrival delay).
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: feed({
+        depUnix: SCHED_DEP_MS / 1000,
+        arrUnix: SCHED_ARR_MS / 1000 + 8 * 60,
+      }),
+      now: SCHED_DEP_MS,
+    });
+    expect(status!.delayMinutes).toBe(8);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+    expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 8 * 60_000);
+  });
+
   it("falls back to scheduled-arrival + delay when the feed omits arrival", () => {
     const lateDep = SCHED_DEP_MS / 1000 + 3 * 60;
     const status = computeLiveTripStatus({
@@ -82,33 +101,33 @@ describe("computeLiveTripStatus", () => {
     expect(status!.arrivalEpochMs).toBe(SCHED_ARR_MS + 3 * 60_000);
   });
 
-  it("treats a sub-minute live slip as on-time (matches the client threshold)", () => {
-    // 40 s late: the client floors anything under a minute to on-time, so the
-    // push backend must too — otherwise Math.round(40s) => 1 and the Live
-    // Activity shows "Delayed" while the in-app card reads "On time".
-    const slip = SCHED_DEP_MS / 1000 + 40;
+  it("treats an under-threshold live slip as on-time (matches the client threshold)", () => {
+    // 90 s late: the client floors anything under MIN_DELAY_SECONDS (2 min)
+    // to on-time, so the push backend must too — otherwise the Live Activity
+    // shows "Delayed" while the in-app card reads "On time".
+    const slip = SCHED_DEP_MS / 1000 + 90;
     const status = computeLiveTripStatus({
       reg: REG,
-      updates: feed({ depUnix: slip, arrUnix: SCHED_ARR_MS / 1000 + 40 }),
+      updates: feed({ depUnix: slip, arrUnix: SCHED_ARR_MS / 1000 + 90 }),
       now: SCHED_DEP_MS - 30 * 60_000,
     });
     expect(status!.delayMinutes).toBe(0);
-    // Countdown target stays on the scheduled departure, not the +40 s jitter.
+    // Countdown target stays on the scheduled departure, not the +90 s jitter.
     expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
   });
 
-  it("reports a delay once the slip reaches the one-minute threshold", () => {
-    const lateDep = SCHED_DEP_MS / 1000 + 65; // 1:05 late
+  it("reports a delay once the slip reaches the shared threshold", () => {
+    const lateDep = SCHED_DEP_MS / 1000 + 125; // 2:05 late
     const status = computeLiveTripStatus({
       reg: REG,
       updates: feed({ depUnix: lateDep }),
       now: SCHED_DEP_MS - 5 * 60_000,
     });
-    expect(status!.delayMinutes).toBe(1);
-    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 65_000);
+    expect(status!.delayMinutes).toBe(2);
+    expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 125_000);
   });
 
-  it("treats a sub-minute en-route arrival slip as on-time after boarding is pruned", () => {
+  it("treats an under-threshold en-route arrival slip as on-time after boarding is pruned", () => {
     // Boarding stop gone (en route); destination arrival is 45 s past schedule.
     const status = computeLiveTripStatus({
       reg: { ...REG, originStartTime: "08:10" },
@@ -364,6 +383,28 @@ describe("computeLiveTripStatus", () => {
       ).toBe(true);
     });
 
+    it("defers the terminal fallback while the vehicle is still short of the destination", () => {
+      // The trip-updates feed lost the run entirely, but the positions feed
+      // shows the train still en route — the veto must hold the activity.
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: otherRun,
+          now: SCHED_ARR_MS + 5 * 60_000,
+          vehicleShortOfDestination: true,
+        }),
+      ).toBeNull();
+      // Veto released (arrived / stale / unmatched) → normal rules resume.
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: otherRun,
+          now: SCHED_ARR_MS + 5 * 60_000,
+          vehicleShortOfDestination: false,
+        })!.isEnded,
+      ).toBe(true);
+    });
+
     it("does NOT end a late train still present in the feed past scheduled arrival", () => {
       // Past the SCHEDULED arrival, but the run still carries a live (later)
       // destination arrival, so it's matched and stays en route — never ended
@@ -479,5 +520,78 @@ describe("decidePushAction", () => {
         now: SCHED_ARR_MS + 1000,
       }).action,
     ).toBe("none");
+  });
+});
+
+describe("vehicleShortOfDestinationForReg", () => {
+  // REG is northbound Larkspur → San Rafael; the origin terminal is Larkspur,
+  // so the vehicle-match key is startTime 08:30 / dir 1 / date 20260609.
+  const regWithOrigin: LiveActivityRegistration = {
+    ...REG,
+    originStartTime: "08:30",
+  };
+  const NOW = SCHED_ARR_MS + 5 * 60_000;
+  const NOW_SEC = Math.floor(NOW / 1000);
+
+  const vp = (v: Partial<FeedVehiclePositions["vehicles"][number]>): FeedVehiclePositions => ({
+    timestamp: NOW_SEC - 10,
+    vehicles: [
+      {
+        trip: { startTime: "08:30:15", startDate: "20260609", directionId: 1 },
+        stopId: TO_STOP, // San Rafael northbound
+        currentStatus: "IN_TRANSIT_TO",
+        timestamp: NOW_SEC - 10,
+        ...v,
+      },
+    ],
+  });
+
+  it("is true while the matched train is approaching (not stopped at) the destination", () => {
+    expect(vehicleShortOfDestinationForReg(vp({}), regWithOrigin, NOW)).toBe(true);
+    // Still at the boarding terminal, upstream of the destination.
+    expect(
+      vehicleShortOfDestinationForReg(vp({ stopId: FROM_STOP }), regWithOrigin, NOW),
+    ).toBe(true);
+  });
+
+  it("is false once stopped at the destination", () => {
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ currentStatus: "STOPPED_AT" }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("is false when the report or feed is stale", () => {
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ timestamp: NOW_SEC - 120 }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false);
+    const staleFeed = { ...vp({}), timestamp: NOW_SEC - 300 };
+    expect(vehicleShortOfDestinationForReg(staleFeed, regWithOrigin, NOW)).toBe(false);
+  });
+
+  it("is false when unmatched, missing data, or no origin time on the registration", () => {
+    expect(vehicleShortOfDestinationForReg(null, regWithOrigin, NOW)).toBe(false);
+    expect(vehicleShortOfDestinationForReg(vp({}), REG, NOW)).toBe(false); // no originStartTime
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { startTime: "09:30:15", startDate: "20260609", directionId: 1 } }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false); // different run
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { startTime: "08:30:15", startDate: "20260609", directionId: 0 } }),
+        regWithOrigin,
+        NOW,
+      ),
+    ).toBe(false); // opposite direction
   });
 });

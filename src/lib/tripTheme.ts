@@ -78,12 +78,12 @@ export const stateCardStyle: Record<TripState, string> = {
 };
 
 /**
- * Blue "you're on / taking this train" card style. Blue == riding throughout
- * the app, so this OVERRIDES the semantic state style (green/gold/red) for the
- * riding trip (GPS-detected) and the user-focused trip ("Go"). Includes the
- * ring so the row pops out of the list at a glance.
+ * Blue "you're taking this train" card style. Blue == "my trip" throughout
+ * the app, so this OVERRIDES the semantic state style (green/gold/red) for
+ * the user-focused trip ("Go"). Includes the ring so the row pops out of the
+ * list at a glance.
  */
-export const ridingCardStyle =
+export const myTripCardStyle =
   "bg-my-trip/5 border-my-trip/40 hover:bg-my-trip/10 " +
   "ring-2 ring-my-trip ring-offset-2 ring-offset-background " +
   "focus:border-my-trip/80 focus:shadow-[0_0_0_1px_hsl(var(--my-trip)/0.8)]";

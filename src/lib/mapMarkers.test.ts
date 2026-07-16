@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { trainMarkerSignature } from "./mapMarkers";
+import { DELAY_MINUTES_THRESHOLD } from "./realtimeConstants";
 import type { MapTrain } from "@/hooks/useMapTrains";
 
 const base = {
@@ -23,8 +24,17 @@ describe("trainMarkerSignature", () => {
 
   it("changes when the delayed state crosses the threshold", () => {
     const onTime = trainMarkerSignature({ ...base, delayMinutes: 0 } as MapTrain, false);
-    const delayed = trainMarkerSignature({ ...base, delayMinutes: 1 } as MapTrain, false);
+    const delayed = trainMarkerSignature(
+      { ...base, delayMinutes: DELAY_MINUTES_THRESHOLD } as MapTrain,
+      false,
+    );
     expect(onTime).not.toBe(delayed);
+    // A slip under the threshold must NOT flip the marker.
+    const underThreshold = trainMarkerSignature(
+      { ...base, delayMinutes: DELAY_MINUTES_THRESHOLD - 1 } as MapTrain,
+      false,
+    );
+    expect(underThreshold).toBe(onTime);
   });
 
   it("changes on selection, cancellation, heading, and trip number", () => {

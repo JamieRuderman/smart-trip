@@ -8,7 +8,18 @@ import {
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
+import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
+import {
+  isVehicleShortOfDestination,
+  tripOriginStartTime,
+} from "@/lib/tripProgress";
+import { isSouthbound } from "@/lib/stationUtils";
 import { TRIP_ENDED_THRESHOLD_MIN } from "@/lib/tripConstants";
+
+/** How far before the scheduled arrival the vehicle-position veto starts
+ *  polling. The time-based clear can't fire before scheduled arrival + grace,
+ *  so a couple of poll cycles of lead is enough for fresh data at the boundary. */
+const VEHICLE_VETO_LEAD_MS = 5 * 60_000;
 
 /**
  * Invisible app-level worker that clears the focused trip a short grace after it
@@ -42,11 +53,37 @@ function FocusedTripAutoClearInner({
   const nowSeconds = useNow(30_000);
   const now = nowSeconds * 1000;
 
-  const { live, lastUpdated } = useFocusedTripLive(focusedTrip, now);
+  const { trip, live, lastUpdated } = useFocusedTripLive(focusedTrip, now);
 
   const scheduledArrivalAt = useMemo(
     () => focusedArrivalInstant(focusedTrip),
     [focusedTrip],
+  );
+
+  // Live vehicle position for the focused run (same strict start-time/date/
+  // direction match the detail sheet uses). A heavily delayed train can drop
+  // its arrival prediction from the trip updates feed entirely; the positions
+  // feed is then the only proof it's still en route, and it must veto the
+  // time-based clear below so the rider's active trip isn't stopped mid-ride.
+  // Polling only starts shortly before the scheduled arrival — the clear can't
+  // fire earlier, so a trip focused hours ahead doesn't pay for an all-day feed.
+  const southbound = isSouthbound(focusedTrip.fromStation, focusedTrip.toStation);
+  const originStartTime = trip
+    ? tripOriginStartTime(trip.times, southbound)
+    : undefined;
+  const nearArrival =
+    scheduledArrivalAt != null &&
+    now >= scheduledArrivalAt - VEHICLE_VETO_LEAD_MS;
+  const vehiclePosition = useVehiclePositionForTrip(
+    originStartTime,
+    focusedTrip.serviceDate.replace(/-/g, ""),
+    southbound ? 0 : 1,
+    nearArrival,
+  );
+  const vehicleShortOfDestination = isVehicleShortOfDestination(
+    vehiclePosition,
+    focusedTrip.toStation,
+    southbound,
   );
   const liveArrivalAt =
     scheduledArrivalAt != null && live?.liveArrivalTime
@@ -70,6 +107,7 @@ function FocusedTripAutoClearInner({
     liveArrivalAt: liveArrivalAt ?? lastLiveArrivalRef.current,
     feedLoaded: lastUpdated != null,
     graceMs: TRIP_ENDED_THRESHOLD_MIN * 60_000,
+    vehicleShortOfDestination,
   });
 
   useEffect(() => {

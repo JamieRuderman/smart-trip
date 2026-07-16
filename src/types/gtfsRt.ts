@@ -129,7 +129,9 @@ export interface TripRealtimeStatus {
   liveArrivalTime?: string;
   /** How many minutes late at departure (positive = late) — only set when > 0 */
   delayMinutes?: number;
-  /** How many minutes late at arrival (positive = late) — only set when > 0 and differs from delayMinutes */
+  /** How many minutes late at the destination arrival (≥ 1, whole minutes).
+   *  Computed independently of the departure delay, so it is set for a trip
+   *  that left its origin on time but fell behind en route. */
   arrivalDelayMinutes?: number;
   isOriginSkipped: boolean;
   isDestinationSkipped: boolean;

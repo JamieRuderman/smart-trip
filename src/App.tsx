@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -12,15 +12,16 @@ import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
+import { ReminderDriftSync } from "@/components/ReminderDriftSync";
+import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-
-// Map routes pull in mapbox-gl (~700 KB JS + CSS). Lazy-load so users who
-// stay on the schedule view never pay that cost.
-const Map = lazy(() => import("./pages/Map"));
-const MapDiagram = lazy(() => import("./pages/MapDiagram"));
+// Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
+// schedule-only users never pay that cost. The home screen preloads these
+// chunks while idle — see lazyPages / MapDiagramPreviewCard.
+import { Map, MapDiagram } from "./pages/lazyPages";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,11 +53,25 @@ const RoutedApp = () => {
             so "Take this train" can pop it from any surface and it survives
             the triggering sheet/route change. */}
         <ReminderDialogHost />
+        {/* Keeps an armed leave-reminder's fire time tracking live departure
+            drift on every platform — the in-sheet reschedule only runs while
+            the trip detail sheet is open. */}
+        <ReminderDriftSync />
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/map" element={<Map />} />
-            <Route path="/map-diagram" element={<MapDiagram />} />
+            {/* Per-route fallback: the line-diagram frame (green bar + blank
+                container) renders instantly while the code chunk loads, so the
+                page shell appears the moment you navigate. */}
+            <Route
+              path="/map-diagram"
+              element={
+                <Suspense fallback={<MapDiagramFrame />}>
+                  <MapDiagram />
+                </Suspense>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -120,7 +120,7 @@ export function TripDetailContent({
     minutesUntilArrival,
   } = progress;
 
-  const { hasStarted, displayStops } = stopInference;
+  const { hasStarted, displayStops, currentIndex } = stopInference;
 
   // The live vehicle position vetoes a premature "At destination": if the train
   // is still in transit to the rider's destination (or sitting at an earlier
@@ -142,6 +142,8 @@ export function TripDetailContent({
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
 
+  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
+  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
@@ -203,13 +205,26 @@ export function TripDetailContent({
     ? t("quickConnection.laterTrain")
     : t("quickConnection.earlierTrain");
 
+  // Delay at the stop the train is currently approaching — the SAME signal
+  // the map marker paints orange from. The endpoint-based statusLabel misses
+  // an en-route slip once the displayed leg's origin has been served and
+  // pruned from the feed, which read "On time" here while the marker showed
+  // the train delayed. (allStopDelayMinutes only carries entries at/above the
+  // shared threshold, so presence == delayed.)
+  const currentStopDelayMin =
+    currentIndex >= 0
+      ? (realtimeStatus?.allStopDelayMinutes?.[displayStops[currentIndex]] ?? 0)
+      : 0;
+
   // Small header badge — "Ended" for finished trips, realtime label otherwise.
   // Falls back to "Scheduled" before departure or "On time" once en route when
   // no realtime data is available (GPS is tracking, no delay reported).
   const headerStatusLabel = isEnded
     ? t("tracker.ended")
-    : statusLabel ??
-      (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
+    : !isCanceledOrSkipped && !isDelayed && currentStopDelayMin > 0
+      ? t("tripCard.delayed", { minutes: currentStopDelayMin })
+      : statusLabel ??
+        (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
 
   const directionLabel = isSouthbound(fromStation, toStation)
     ? t("tracker.southbound")
@@ -296,14 +311,18 @@ export function TripDetailContent({
             strikethrough={isCanceledOrSkipped}
             className="text-2xl font-semibold text-white"
           />
-          {/* Struck-through scheduled times shown only when delayed */}
-          {isDelayed && (
+          {/* Struck-through scheduled comparison — only the column(s) that
+              actually have a live value, so an arrival-only delay doesn't
+              show an unchanged departure struck through beside it. */}
+          {(hasLiveDepartureTime || hasLiveArrivalTime) && (
             <TimePair
               departure={trip.departureTime}
               arrival={trip.arrivalTime}
               format={timeFormat}
               className="text-xs mt-0.5 text-white/50"
               strikethrough
+              showDeparture={hasLiveDepartureTime}
+              showArrival={hasLiveArrivalTime}
             />
           )}
         </div>
@@ -538,7 +557,7 @@ export function TripDetailContent({
           stopInference={stopInference}
           userFromStation={userFromStation}
           userToStation={userToStation}
-          isRiding={isFocused}
+          isFocused={isFocused}
         />
 
         {showFerry && trip.outboundFerry && (

@@ -9,6 +9,7 @@ import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
 import { parseTimeToMinutes, isTimeInPast, toLocalDateKey } from "./timeUtils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type {
   Station,
   TrainTrip,
@@ -446,20 +447,55 @@ export function findFullCorridorTrip(
 // Time comparison function is now exported from timeUtils
 export { isTimeInPast } from "./timeUtils";
 
+/**
+ * A trip's departure time for has-it-left decisions: the live departure when
+ * realtime data has one (the status map is keyed by the SCHEDULED departure,
+ * as built by useTripRealtimeStatusMap), else the static schedule.
+ */
+export function effectiveDepartureTime(
+  trip: Pick<ProcessedTrip, "departureTime">,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
+): string {
+  return (
+    realtimeStatusMap?.get(trip.departureTime)?.liveDepartureTime ??
+    trip.departureTime
+  );
+}
+
+/** Live-aware arrival counterpart of {@link effectiveDepartureTime}. */
+export function effectiveArrivalTime(
+  trip: Pick<ProcessedTrip, "departureTime" | "arrivalTime">,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
+): string {
+  return (
+    realtimeStatusMap?.get(trip.departureTime)?.liveArrivalTime ??
+    trip.arrivalTime
+  );
+}
+
 // Fast next trip calculation
 /**
- * Finds the index of the next trip that hasn't departed yet
+ * Finds the index of the first trip that hasn't departed yet, in schedule
+ * order. "Departed" is judged by the live departure time when realtime data
+ * is available — a delayed train past its scheduled slot but still short of
+ * its live departure hasn't left and must not be sliced away as departed.
+ * NOTE: with live delays, departure order is no longer monotonic; this is
+ * the SLICE anchor (earliest schedule row still worth showing), not "the
+ * next train to physically depart".
  * @param trips - Array of processed trips
  * @param currentTime - Current date/time
+ * @param realtimeStatusMap - Optional live status keyed by trip.departureTime
  * @returns Index of next trip, or -1 if no future trips
  */
 export function getNextTripIndex(
   trips: ProcessedTrip[],
-  currentTime: Date
+  currentTime: Date,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    const departureTime = trips[i].departureTime;
-    if (!isTimeInPast(currentTime, departureTime)) {
+    if (
+      !isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap))
+    ) {
       return i;
     }
   }
@@ -468,17 +504,20 @@ export function getNextTripIndex(
 
 /**
  * Finds the index of the first trip that is still in progress
- * (departure is in the past but arrival is not yet past).
+ * (departure is in the past but arrival is not yet past), judged by live
+ * times when available so a delayed run stays "in progress" until its live
+ * arrival rather than dropping out at the scheduled one.
  * Returns -1 if no in-progress trips exist.
  */
 export function getFirstInProgressTripIndex(
   trips: ProcessedTrip[],
-  currentTime: Date
+  currentTime: Date,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
     if (
-      isTimeInPast(currentTime, trips[i].departureTime) &&
-      !isTimeInPast(currentTime, trips[i].arrivalTime)
+      isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap)) &&
+      !isTimeInPast(currentTime, effectiveArrivalTime(trips[i], realtimeStatusMap))
     ) {
       return i;
     }

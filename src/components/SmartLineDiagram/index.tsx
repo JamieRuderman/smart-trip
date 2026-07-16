@@ -15,7 +15,7 @@
  * dark mode. All sizes/animations live in `./tokens`.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Maximize2 } from "lucide-react";
 import type { MapTrain } from "@/hooks/useMapTrains";
@@ -63,15 +63,9 @@ export interface SmartLineDiagramProps {
   toStation?: Station | null;
   /** Station closest to the user's current location — shows a pulsing blue dot. */
   userStation?: Station | null;
-  /** Key (matches `MapTrain.key`) of the train the user is currently riding,
-   *  if any. Renders an inset blue dot on that train's marker. */
-  userRidingTrainKey?: string | null;
-  /** User's current GPS, used to override the latched train marker's
-   *  position when riding — phone GPS is typically 15–30 s ahead of the
-   *  train's GTFS-RT vehicle position, so the rider's marker should follow
-   *  reality, not the lagging feed. */
-  userLat?: number | null;
-  userLng?: number | null;
+  /** Key (matches `MapTrain.key`) of the user's focused ("Go") trip's live
+   *  marker, if any. Painted with the blue "my trip" treatment. */
+  myTrainKey?: string | null;
   /** Optional wrapper class (e.g. for max-width or padding). */
   className?: string;
 }
@@ -80,7 +74,14 @@ export interface SmartLineDiagramProps {
 // labels ("Marin Civic Center", "Novato Downtown") fit on the right and
 // zone headings ("Zone 1") fit on the left at phone widths. The track
 // itself runs roughly x=180–560 in viewBox space.
-const VIEW_BOX = { x: -50, y: 40, width: 900, height: 1390 } as const;
+// Vertically CENTER the content (Windsor at y≈49 down through the ferry
+// labels) with balanced padding top and bottom, rather than padding only the
+// bottom (which left the diagram bottom-heavy). The bottom must clear the
+// ferry "San Francisco" / next-ferry labels — they're constant CSS-px, so at
+// small fit scales they occupy more viewBox units and reach ~y1464, hence the
+// bottom sits at 1470 (≈30 units below) while the top sits ~30 units above
+// the content, keeping the two margins close across viewports.
+const VIEW_BOX = { x: -50, y: 20, width: 900, height: 1450 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -94,9 +95,7 @@ export function SmartLineDiagram({
   fromStation = null,
   toStation = null,
   userStation = null,
-  userRidingTrainKey = null,
-  userLat = null,
-  userLng = null,
+  myTrainKey = null,
   className,
 }: SmartLineDiagramProps) {
   const { t } = useTranslation();
@@ -130,7 +129,15 @@ export function SmartLineDiagram({
 
   // Path is drawn S → N, so we store arc-length-from-the-NORTH end for each
   // station — that's what `positionOnPath` expects to interpolate into.
-  useEffect(() => {
+  //
+  // useLayoutEffect (not useEffect): the zone-coloured track, station dots and
+  // train markers are all gated on `snap`, so with a post-paint effect the
+  // first painted frame shows a bare path with none of them, and they pop in
+  // on the next frame — a visible "blink" every time the diagram mounts.
+  // Measuring before paint renders the positioned diagram in one frame.
+  // Safe under SSR: this component only renders on the (non-prerendered)
+  // /map-diagram route, so the effect never runs server-side.
+  useLayoutEffect(() => {
     const el = pathRef.current;
     if (!el) return;
     const L = el.getTotalLength();
@@ -268,26 +275,21 @@ export function SmartLineDiagram({
             // The user's train renders last so it paints on top of any
             // other marker that overlaps it on the schematic.
             [
-              ...trains.filter((t) => t.key !== userRidingTrainKey),
-              ...trains.filter((t) => t.key === userRidingTrainKey),
-            ].map((train) => {
-              const isUserRiding = train.key === userRidingTrainKey;
-              return (
-                <TrainMarker
-                  key={train.key}
-                  train={train}
-                  pathEl={pathRef.current!}
-                  stationArcs={snap.arcs}
-                  pathLength={snap.totalLength}
-                  selected={train.key === selectedTrainKey}
-                  userRiding={isUserRiding}
-                  overrideLat={isUserRiding ? userLat : null}
-                  overrideLng={isUserRiding ? userLng : null}
-                  onClick={onTrainClick}
-                  now={now}
-                />
-              );
-            })}
+              ...trains.filter((t) => t.key !== myTrainKey),
+              ...trains.filter((t) => t.key === myTrainKey),
+            ].map((train) => (
+              <TrainMarker
+                key={train.key}
+                train={train}
+                pathEl={pathRef.current!}
+                stationArcs={snap.arcs}
+                pathLength={snap.totalLength}
+                selected={train.key === selectedTrainKey}
+                isMyTrain={train.key === myTrainKey}
+                onClick={onTrainClick}
+                now={now}
+              />
+            ))}
         </g>
 
         {/* Label layer — constant CSS-pixel font sizes, hand-affined

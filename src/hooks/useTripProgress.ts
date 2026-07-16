@@ -2,7 +2,11 @@ import { useStopInference } from "@/hooks/useStopInference";
 import type { StopInferenceResult, ProgressHint } from "@/hooks/useStopInference";
 import { useVehiclePositionForTrip } from "@/hooks/useVehiclePositions";
 import { getDistanceToStationKm, isSouthbound } from "@/lib/stationUtils";
-import { selectNextStopTarget } from "@/lib/tripProgress";
+import {
+  isVehicleShortOfDestination,
+  selectNextStopTarget,
+  tripOriginStartTime,
+} from "@/lib/tripProgress";
 import {
   computeMinutesUntil,
   formatDateYYYYMMDD,
@@ -60,16 +64,9 @@ export function useTripProgress({
   /** Dev-only: override the live vehicle position hook result. */
   vehiclePositionOverride?: VehiclePositionMatch | null;
 }): TripProgressResult {
-  // ── Trip ended detection ──────────────────────────────────────────────────
-  const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  const minutesAfterArrival = -(computeMinutesUntil(currentTime, arrivalTime));
-  const isEnded = minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN;
-
   // ── Vehicle position matching ─────────────────────────────────────────────
   const southbound = isSouthbound(fromStation, toStation);
-  const originStartTime = southbound
-    ? trip.times[0]?.slice(0, 5)
-    : trip.times[trip.times.length - 1]?.slice(0, 5);
+  const originStartTime = tripOriginStartTime(trip.times, southbound);
   const tripDirectionId = southbound ? 0 : 1;
   const todayYYYYMMDD = formatDateYYYYMMDD(currentTime);
 
@@ -82,6 +79,18 @@ export function useTripProgress({
     vehiclePositionOverride !== undefined
       ? vehiclePositionOverride
       : liveVehiclePosition;
+
+  // ── Trip ended detection ──────────────────────────────────────────────────
+  // Time-based: past the (live-aware) arrival plus a short grace. A fresh
+  // vehicle-position match that is still short of the destination vetoes the
+  // clock — a delayed train whose arrival prediction dropped out of the trip
+  // updates feed must not be declared "ended" while the positions feed shows
+  // it demonstrably still en route.
+  const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
+  const minutesAfterArrival = -(computeMinutesUntil(currentTime, arrivalTime));
+  const isEnded =
+    minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN &&
+    !isVehicleShortOfDestination(vehiclePosition, toStation, southbound);
 
   const progressHint: ProgressHint | null =
     vehiclePosition?.currentStation != null

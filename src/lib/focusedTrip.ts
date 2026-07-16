@@ -212,6 +212,10 @@ export function anchorLiveTime(staticInstant: number, liveHHMM: string): number 
 /**
  * The instant at/after which a focused trip should auto-clear: its live-aware
  * arrival plus `graceMs`. Delay-aware so a late train isn't dropped early:
+ *   • vehicle position shows the train still short of the destination → null:
+ *     the train demonstrably hasn't arrived (a heavily delayed run can lose its
+ *     arrival prediction in the trip updates feed entirely — the positions feed
+ *     is then the only evidence it's still running), so never clear yet;
  *   • live arrival known → max(scheduled, live) + grace (never before scheduled,
  *     so an early train still lingers the grace window);
  *   • feed loaded but no live arrival (train passed the stop / on time, the feed
@@ -225,13 +229,20 @@ export function focusedTripClearInstant({
   liveArrivalAt,
   feedLoaded,
   graceMs,
+  vehicleShortOfDestination = false,
 }: {
   scheduledArrivalAt: number | null;
   liveArrivalAt: number | null;
   feedLoaded: boolean;
   graceMs: number;
+  /** Fresh vehicle-position evidence that the train hasn't reached the rider's
+   *  destination yet (see {@link isVehicleShortOfDestination}). Vetoes the
+   *  time-based clear; goes false once the train arrives, passes the stop, or
+   *  the position goes stale, letting the normal rules resume. */
+  vehicleShortOfDestination?: boolean;
 }): number | null {
   if (scheduledArrivalAt == null) return null;
+  if (vehicleShortOfDestination) return null;
   if (liveArrivalAt != null) {
     return Math.max(scheduledArrivalAt, liveArrivalAt) + graceMs;
   }

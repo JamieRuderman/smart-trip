@@ -9,7 +9,7 @@ import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
-import { stateText, stateCardStyle, ridingCardStyle, cardTripState } from "@/lib/tripTheme";
+import { stateText, stateCardStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
@@ -31,12 +31,9 @@ interface TripCardProps {
   scheduleType: "weekday" | "weekend";
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
-  /** When true, the user is currently riding this train (GPS-detected) — the
-   *  card turns blue and shows a "Riding" pill near the trip number. */
-  isRiding?: boolean;
   /** When true, this is the user's focused ("Go") trip — the card turns blue
-   *  (same as riding) so it reads as "the trip I'm taking", overriding the
-   *  delay/cancel/on-time state colour. No "Riding" pill (that's GPS-only). */
+   *  so it reads as "the trip I'm taking", overriding the
+   *  delay/cancel/on-time state colour. */
   isFocused?: boolean;
 }
 
@@ -54,7 +51,6 @@ export const TripCard = memo(function TripCard({
   scheduleType,
   selectedTripNumber,
   onSelectTrip,
-  isRiding = false,
   isFocused = false,
 }: TripCardProps) {
   const { t } = useTranslation();
@@ -94,11 +90,16 @@ export const TripCard = memo(function TripCard({
 
   const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 
+  // Per-column tone: only the time that actually shifted (has a live value)
+  // reads in the delayed gold — a train delayed only at arrival keeps its
+  // on-time departure in the normal tone rather than implying it moved. On a
+  // delayed trip the unshifted column stays neutral: the green next-train
+  // emphasis would clash with the gold card and read as "on time".
   const getTimeToneClass = (hasLiveTime: boolean) =>
     isCanceledOrSkipped
       ? cn("line-through", stateText["canceled"])
-      : isDelayed || hasLiveTime
-      ? stateText["delayed"]
+      : isDelayed
+      ? (hasLiveTime ? stateText["delayed"] : undefined)
       : isNextTrip
       ? stateText["ontime"]
       : isPastTrip
@@ -180,10 +181,9 @@ export const TripCard = memo(function TripCard({
           "relative flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
           "focus:outline-none",
-          // Blue == "you're on/taking this train" and overrides the semantic
-          // state colour (green/gold/red). Applies to the GPS-riding trip and
-          // the user-focused ("Go") trip alike.
-          isRiding || isFocused ? ridingCardStyle : stateCardStyle[cardState],
+          // Blue == "you're taking this train" and overrides the semantic
+          // state colour (green/gold/red) for the user-focused ("Go") trip.
+          isFocused ? myTripCardStyle : stateCardStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -204,17 +204,6 @@ export const TripCard = memo(function TripCard({
           isSkipped={isOriginSkipped}
           isDelayed={isDelayed}
         />
-        {isRiding && (
-          // Floats over the start of the schedule text instead of sitting
-          // inline — keeps the times in their natural position (no awkward
-          // shove to the right) while the pill reads as layered on top.
-          <span
-            className="pointer-events-none absolute left-[5.25rem] top-1/2 z-20 -translate-y-1/2 shrink-0 rounded-md bg-my-trip-background px-2.5 py-1 text-sm font-bold uppercase leading-none tracking-wider text-white shadow-md ring-2 ring-background"
-            aria-label={t("tripCard.ridingAria", "Currently riding this train")}
-          >
-            {t("stationInfo.riding")}
-          </span>
-        )}
         {isMobile ? (
           <div className="flex flex-col items-start ml-4 w-full">
             <div className="flex flex-row gap-2 items-start text-lg whitespace-nowrap">
@@ -234,16 +223,21 @@ export const TripCard = memo(function TripCard({
                 />
               </div>
             </div>
-            {isDelayed && (
+            {/* Struck-through scheduled times — only the ones that actually
+                shifted, so an arrival-only delay doesn't imply the departure
+                moved by striking an identical time. */}
+            {(hasLiveDepartureTime || hasLiveArrivalTime) && (
               <div className="flex flex-row gap-2 items-start text-xs text-muted-foreground whitespace-nowrap mt-2">
-                <TimeDisplay
-                  time={trip.departureTime}
-                  format={timeFormat}
-                  className="text-xs line-through"
-                />
-                {realtimeStatus?.liveArrivalTime != null && (
+                {hasLiveDepartureTime && (
+                  <TimeDisplay
+                    time={trip.departureTime}
+                    format={timeFormat}
+                    className="text-xs line-through"
+                  />
+                )}
+                {hasLiveArrivalTime && (
                   <>
-                    <span>→</span>
+                    {hasLiveDepartureTime && <span>→</span>}
                     <TimeDisplay
                       time={trip.arrivalTime}
                       format={timeFormat}
@@ -287,7 +281,7 @@ export const TripCard = memo(function TripCard({
                     getTimeToneClass(hasLiveDepartureTime),
                   )}
                 />
-                {isDelayed && (
+                {hasLiveDepartureTime && (
                   <TimeDisplay
                     time={trip.departureTime}
                     format={timeFormat}
@@ -303,7 +297,7 @@ export const TripCard = memo(function TripCard({
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
-                {isDelayed && realtimeStatus?.liveArrivalTime != null && (
+                {hasLiveArrivalTime && (
                   <TimeDisplay
                     time={trip.arrivalTime}
                     format={timeFormat}
@@ -312,8 +306,17 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             </div>
-            {isNextTrip && !isCanceledOrSkipped && !isDelayed && (
-              <span className="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap bg-primary text-primary-foreground">
+            {/* A late next train is still the next train — keep the chip,
+                tinted gold so it doesn't fight the delayed card colour. */}
+            {isNextTrip && !isCanceledOrSkipped && (
+              <span
+                className={cn(
+                  "text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap",
+                  isDelayed
+                    ? "bg-smart-gold text-white"
+                    : "bg-primary text-primary-foreground",
+                )}
+              >
                 {t("tripCard.nextTrain")}
               </span>
             )}
@@ -352,7 +355,7 @@ export const TripCard = memo(function TripCard({
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}
           showFerry={showFerry}
-          isFocused={isFocused || isRiding}
+          isFocused={isFocused}
           scheduleType={scheduleType}
         />
       )}

@@ -20,11 +20,6 @@ import type { TrainProgress } from "@/lib/trainProgress";
  *  rail polyline — likely re-routed, parked off-line, or stale. */
 const MAX_RESIDUAL_KM = 0.5;
 
-/** Earth's radius in km (haversine + arc-length scaling). */
-export const EARTH_RADIUS_KM = 6371;
-/** km per degree of latitude (~constant). */
-export const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
-
 function directionFor(directionId: number | null): "S" | "N" {
   return directionId === 1 ? "N" : "S";
 }

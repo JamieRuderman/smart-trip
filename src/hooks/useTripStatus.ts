@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { TripState } from "@/lib/tripTheme";
 
@@ -17,13 +18,14 @@ export function useTripStatus(
   const isCanceled = realtimeStatus?.isCanceled ?? false;
   const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
   const isCanceledOrSkipped = isCanceled || isOriginSkipped;
-  const isDelayed = !isCanceledOrSkipped && realtimeStatus?.delayMinutes != null;
+  // Departure delay, else en-route arrival delay — a train can depart on
+  // time and still arrive late, and must not read "On time" meanwhile.
+  const displayDelayMinutes = effectiveDelayMinutes(realtimeStatus);
+  const isDelayed = !isCanceledOrSkipped && displayDelayMinutes != null;
   const isOnTime = realtimeStatus != null && !isCanceledOrSkipped && !isDelayed;
 
   const delayDisplay =
-    realtimeStatus?.delayMinutes === 0
-      ? "<1"
-      : String(realtimeStatus?.delayMinutes ?? "");
+    displayDelayMinutes === 0 ? "<1" : String(displayDelayMinutes ?? "");
 
   const statusLabel: string | null = isCanceled
     ? t("tripCard.canceled")

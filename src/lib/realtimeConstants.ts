@@ -5,13 +5,14 @@
  *
  * There is a SINGLE threshold: a train is "delayed" as soon as it is at least
  * this many whole minutes late. The whole-minute lateness itself is produced by
- * `delayMinutesFromSeconds` (see `tripDelay.ts`), which already treats a
- * sub-minute feed slip as on-time — so a reported delay is always >= 1 min and
- * every surface flips to the delayed treatment at the same point.
+ * `delayMinutesFromSeconds` (see `tripDelay.ts`), which already treats a slip
+ * under MIN_DELAY_SECONDS as on-time — so a reported delay is always >= this
+ * threshold and every surface flips to the delayed treatment at the same point.
  */
 
-/** Minimum whole minutes late before a train is treated as delayed, everywhere. */
-export const DELAY_MINUTES_THRESHOLD = 1;
+/** Minimum whole minutes late before a train is treated as delayed, everywhere.
+ *  Keep in lockstep with MIN_DELAY_SECONDS (tripDelay.ts). */
+export const DELAY_MINUTES_THRESHOLD = 2;
 
 /** Whether a train should render in the "delayed" state on any surface (schedule
  *  list, map, line diagram, station sheet). Canceled trains are never "delayed"

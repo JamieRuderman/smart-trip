@@ -13,6 +13,7 @@ import {
   isSchedulePayload,
   type SchedulePayload,
 } from "@/data/scheduleData";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 /** Minimal ProcessedTrip — these helpers only read departure/arrival times. */
 function trip(departureTime: string, arrivalTime: string): ProcessedTrip {
@@ -42,6 +43,15 @@ describe("getNextTripIndex", () => {
     const early = new Date(2026, 5, 18, 6, 0);
     expect(getNextTripIndex(trips, early)).toBe(0);
   });
+
+  it("keeps a delayed trip as next past its scheduled slot until its live departure", () => {
+    // 08:30 trip delayed to 09:10 — at 09:00 it has NOT departed yet, so it
+    // (index 1), not the 09:30 trip, is next.
+    const live = new Map([
+      ["08:30", { liveDepartureTime: "09:10" } as TripRealtimeStatus],
+    ]);
+    expect(getNextTripIndex(trips, now, live)).toBe(1);
+  });
 });
 
 describe("getFirstInProgressTripIndex", () => {
@@ -66,6 +76,16 @@ describe("getFirstInProgressTripIndex", () => {
   it("returns -1 before any trip starts", () => {
     const now = new Date(2026, 5, 18, 7, 0);
     expect(getFirstInProgressTripIndex(trips, now)).toBe(-1);
+  });
+
+  it("keeps a delayed trip in progress past its scheduled arrival until its live arrival", () => {
+    // 08:30→09:15 trip running late, live arrival 09:40 — at 09:20 it is
+    // still in progress even though its scheduled arrival has passed.
+    const now = new Date(2026, 5, 18, 9, 20);
+    const live = new Map([
+      ["08:30", { liveArrivalTime: "09:40" } as TripRealtimeStatus],
+    ]);
+    expect(getFirstInProgressTripIndex(trips, now, live)).toBe(1);
   });
 });
 

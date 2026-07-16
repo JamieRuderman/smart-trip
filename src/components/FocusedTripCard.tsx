@@ -174,6 +174,8 @@ function FocusedTripCardInner({
     useTripStatus(realtimeStatus);
   const { clearFocusedTrip, openReminderDialog } = useStationSelection();
 
+  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
+  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
@@ -374,13 +376,17 @@ function FocusedTripCardInner({
                 strikethrough={isCanceledOrSkipped}
                 className="text-2xl font-semibold text-white"
               />
-              {isDelayed && (
+              {/* Struck-through scheduled comparison — only the column(s)
+                  that actually have a live value (see TripDetailContent). */}
+              {(hasLiveDepartureTime || hasLiveArrivalTime) && (
                 <TimePair
                   departure={trip.departureTime}
                   arrival={trip.arrivalTime}
                   format={timeFormat}
                   className="text-xs mt-0.5 text-white/50"
                   strikethrough
+                  showDeparture={hasLiveDepartureTime}
+                  showArrival={hasLiveArrivalTime}
                 />
               )}
               <p className="text-xs font-medium text-white/80 mt-1 truncate">

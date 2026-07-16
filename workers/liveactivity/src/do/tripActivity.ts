@@ -22,7 +22,9 @@ import {
   ARRIVED_DROP_GRACE_MS,
   computeLiveTripStatus,
   decidePushAction,
+  vehicleShortOfDestinationForReg,
   type FeedTripUpdate,
+  type FeedVehiclePositions,
   type LiveTripStatus,
 } from "../../../../api/_liveActivityStatus.js";
 import {
@@ -39,7 +41,11 @@ import {
   type ApnsConfig,
   type ApnsEnv,
 } from "../lib/apns.js";
-import { getTripUpdates, type GtfsRtEnv } from "../../../web/src/lib/gtfsrt.js";
+import {
+  getTripUpdates,
+  getVehiclePositions,
+  type GtfsRtEnv,
+} from "../../../web/src/lib/gtfsrt.js";
 
 /** Env visible to the DO (Worker bindings): APNs creds + the native 511/KV feed. */
 export interface DoEnv extends ApnsEnv, GtfsRtEnv {}
@@ -117,6 +123,11 @@ export interface TickInput {
    *  grace, null is treated as terminal so the activity can't stick at 0:00. */
   updates: FeedTripUpdate[] | null;
   now: number;
+  /** Fresh vehicle-position evidence the train is still short of the rider's
+   *  destination (see vehicleShortOfDestinationForReg). Vetoes the terminal
+   *  fallbacks — a delayed run whose trip-updates prediction dropped must not
+   *  have its lock-screen activity dismissed mid-ride. */
+  vehicleShortOfDestination?: boolean;
 }
 
 export interface TickPlan {
@@ -141,15 +152,23 @@ export interface TickPlan {
  * the actual APNs outcome.
  */
 export function planTick(input: TickInput): TickPlan {
-  const { reg, token, lastSent, updates, now } = input;
+  const {
+    reg,
+    token,
+    lastSent,
+    updates,
+    now,
+    vehicleShortOfDestination = false,
+  } = input;
   const fallbackDelayMs = Math.max(0, lastSent?.delayMinutes ?? 0) * 60_000;
   const fallbackDepartureEpochMs = reg.departureEpochMs + fallbackDelayMs;
   const displayedArrivalEpochMs = lastSent?.arrivalEpochMs ?? reg.arrivalEpochMs;
   const reminderLeadMs =
     reg.reminderLeadMinutes != null ? reg.reminderLeadMinutes * 60_000 : null;
   const status = updates
-    ? computeLiveTripStatus({ reg, updates, now })
-    : now >= displayedArrivalEpochMs + ARRIVED_DROP_GRACE_MS
+    ? computeLiveTripStatus({ reg, updates, now, vehicleShortOfDestination })
+    : !vehicleShortOfDestination &&
+        now >= displayedArrivalEpochMs + ARRIVED_DROP_GRACE_MS
       ? {
           departureEpochMs: fallbackDepartureEpochMs,
           arrivalEpochMs: displayedArrivalEpochMs,
@@ -323,10 +342,11 @@ export class TripActivityDO {
 
     try {
       const now = Date.now();
-      const [token, lastSent, updates] = await Promise.all([
+      const [token, lastSent, updates, vehiclePositions] = await Promise.all([
         this.state.storage.get<string>("token"),
         this.state.storage.get<LastSent>("lastSent"),
         this.fetchUpdates(),
+        this.fetchVehiclePositions(),
       ]);
 
       const plan = planTick({
@@ -335,6 +355,11 @@ export class TripActivityDO {
         lastSent: lastSent ?? null,
         updates,
         now,
+        vehicleShortOfDestination: vehicleShortOfDestinationForReg(
+          vehiclePositions,
+          reg,
+          now,
+        ),
       });
 
       const s = plan.status;
@@ -374,6 +399,16 @@ export class TripActivityDO {
     try {
       const { updates } = await getTripUpdates(this.env);
       return updates;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Normalized vehicle positions (same in-process edge-cache path); null on
+   *  failure — the veto simply doesn't apply, and the time-based rules hold. */
+  private async fetchVehiclePositions(): Promise<FeedVehiclePositions | null> {
+    try {
+      return await getVehiclePositions(this.env);
     } catch {
       return null;
     }

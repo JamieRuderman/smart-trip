@@ -84,9 +84,10 @@ function findStopUpdate(
 /**
  * Diff a live Unix timestamp against a static scheduled "HH:MM" on a given date,
  * returning delay in whole minutes, or undefined if within the on-time threshold.
- * Used for both trip-level and per-stop delay so the logic stays in one place.
+ * Used for both trip-level and per-stop delay (and by useMapTrains for the map
+ * markers) so the logic stays in one place.
  */
-function computeDelayMinutes(
+export function computeDelayMinutes(
   liveUnix: number,
   scheduledHHMM: string,
   startDate: string
@@ -190,6 +191,72 @@ function deriveCanceledStatus(
 }
 
 /**
+ * EN-ROUTE branch: the leg's boarding stop has already been served and pruned
+ * from the feed (511 drops past stops), so there is no live departure to key
+ * on — but the run is still identifiable via its static-schedule match (trip
+ * startTime → scheduledDepartureParam). Surface the remaining per-stop live
+ * data and the destination arrival, so an en-route train keeps its realtime
+ * status — delay accents, live timeline times, live arrival for the trip
+ * sheet and auto-clear — instead of silently reverting to schedule-only
+ * display. Without this, the map marker (computed from the raw feed) showed a
+ * train delayed while its own detail sheet, whose status had vanished with
+ * the pruned origin, read "On time".
+ */
+function deriveEnRouteStatus(
+  update: GtfsRtTripUpdate,
+  toUpdate: GtfsRtStopTimeUpdate | undefined,
+  direction: TrainDirection,
+  scheduledDepartureParam: string | null,
+  scheduledArrivalParam: string | null,
+  scheduledTimesByStation: Partial<Record<string, string>>,
+  isOriginSkipped: boolean,
+): DerivedStatusResult {
+  // No static match → no stable key for the status map; a station-only match
+  // could attach this run's data to the wrong trip.
+  if (!scheduledDepartureParam) return { kind: "none" };
+
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+    update.stopTimeUpdates,
+    scheduledTimesByStation,
+    update.startDate,
+    direction,
+  );
+
+  let liveArrivalTime: string | undefined;
+  let arrivalDelayMinutes: number | undefined;
+  if (toUpdate?.arrivalTime && scheduledArrivalParam && update.startDate) {
+    arrivalDelayMinutes = computeDelayMinutes(
+      toUpdate.arrivalTime,
+      scheduledArrivalParam,
+      update.startDate,
+    );
+    if (arrivalDelayMinutes != null) {
+      liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+    }
+  }
+
+  const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
+  // Nothing usable on this leg's direction (e.g. only the opposite leg of a
+  // round-trip-encoded GTFS trip remains) — don't key an empty status.
+  if (!hasRealtimeStopData && liveArrivalTime == null) return { kind: "none" };
+
+  return {
+    kind: "primary",
+    scheduledDeparture: scheduledDepartureParam,
+    status: {
+      isCanceled: false,
+      liveArrivalTime,
+      arrivalDelayMinutes,
+      isOriginSkipped,
+      isDestinationSkipped: toUpdate?.scheduleRelationship === "SKIPPED",
+      allStopLiveDepartures,
+      allStopDelayMinutes,
+      hasRealtimeStopData,
+    },
+  };
+}
+
+/**
  * Normal (non-canceled) branch: compute live departure/arrival times,
  * delay minutes, and per-stop realtime data for the requested station pair.
  */
@@ -205,7 +272,17 @@ function deriveScheduledStatus(
   const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
   const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation, direction);
 
-  if (!fromUpdate?.departureTime) return { kind: "none" };
+  if (!fromUpdate?.departureTime) {
+    return deriveEnRouteStatus(
+      update,
+      toUpdate,
+      direction,
+      scheduledDepartureParam,
+      scheduledArrivalParam,
+      scheduledTimesByStation,
+      fromUpdate?.scheduleRelationship === "SKIPPED",
+    );
+  }
 
   const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
   const isDestinationSkipped = toUpdate?.scheduleRelationship === "SKIPPED";
@@ -233,18 +310,24 @@ function deriveScheduledStatus(
   const isDelayed = delayMinutes != null;
 
   // Live arrival time at destination: 511 also shifts arrivalTime forward
-  // when delayed, but arrivalDelay is always 0. Show the live arrival time
-  // whenever the train is running late on departure.
+  // when delayed, but arrivalDelay is always 0. Diff the live arrival against
+  // the static schedule independently of the departure delay — a train can
+  // leave its origin on time and fall behind EN ROUTE, in which case
+  // delayMinutes (departure-based) stays undefined while the arrival is late.
+  // Gating the live arrival on isDelayed alone made such a trip look like it
+  // arrived on schedule, so the app ended it while it was still running.
   let liveArrivalTime: string | undefined;
   let arrivalDelayMinutes: number | undefined;
-  if (toUpdate?.arrivalTime && isDelayed) {
-    liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
+  if (toUpdate?.arrivalTime) {
     if (scheduledArrivalParam && update.startDate) {
       arrivalDelayMinutes = computeDelayMinutes(
         toUpdate.arrivalTime,
         scheduledArrivalParam,
         update.startDate,
       );
+    }
+    if (isDelayed || arrivalDelayMinutes != null) {
+      liveArrivalTime = unixToTimeString(toUpdate.arrivalTime);
     }
   }
 
@@ -275,7 +358,8 @@ function deriveScheduledStatus(
   };
 }
 
-function deriveStatus(
+// Exported for unit tests (pure dispatcher over the branches above).
+export function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
   toStation: Station,

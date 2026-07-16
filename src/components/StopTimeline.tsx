@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import { TimeDisplay } from "./TimeDisplay";
 import { TripIcon } from "@/components/icons/TripIcon";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -37,10 +38,10 @@ interface StopTimelineProps {
   userFromStation?: Station | null;
   /** The user's selected destination (from URL/schedule). See userFromStation. */
   userToStation?: Station | null;
-  /** When true the displayed trip is the user's focused / riding trip — swap
+  /** When true the displayed trip is the user's focused ("Go") trip — swap
    *  the green on-time accent for my-trip blue to match the blue header band
-   *  and the ridingCardStyle elsewhere. */
-  isRiding?: boolean;
+   *  and the myTripCardStyle elsewhere. */
+  isFocused?: boolean;
 }
 
 export function StopTimeline({
@@ -54,7 +55,7 @@ export function StopTimeline({
   stopInference,
   userFromStation = null,
   userToStation = null,
-  isRiding = false,
+  isFocused = false,
 }: StopTimelineProps) {
   const { t } = useTranslation();
   void trip;
@@ -100,7 +101,7 @@ export function StopTimeline({
           // shift as a muted "+N" pill (so the live time isn't unexplained)
           // but skip the orange row tint and prominent "X min delay" chip
           // that would imply the trip itself is running late.
-          const tripIsDelayed = (realtimeStatus?.delayMinutes ?? 0) > 0;
+          const tripIsDelayed = (effectiveDelayMinutes(realtimeStatus) ?? 0) > 0;
           const perStopDelayMin = allStopDelayMinutes?.[station] ?? 0;
           const showStopDelay = perStopDelayMin > 0 && !isPast;
           const isStopDelayProminent = showStopDelay && tripIsDelayed;
@@ -119,16 +120,16 @@ export function StopTimeline({
             ? "past"
             : "future";
 
-          // For the focused / riding trip, the current-stop highlight reads
+          // For the focused ("Go") trip, the current-stop highlight reads
           // blue (matches the my-trip header / card style) rather than the
           // default green. Only the "ontime" accent — delayed / canceled keep
           // their warning colors.
-          const ridingAccent = isRiding && accent === "ontime";
-          const accentText = ridingAccent ? "text-my-trip" : stateText[accent];
-          const accentIconText = ridingAccent
+          const myTripAccent = isFocused && accent === "ontime";
+          const accentText = myTripAccent ? "text-my-trip" : stateText[accent];
+          const accentIconText = myTripAccent
             ? "text-my-trip"
             : stateIconText[accent];
-          const accentTint = ridingAccent ? "bg-my-trip/10" : stateTint[accent];
+          const accentTint = myTripAccent ? "bg-my-trip/10" : stateTint[accent];
 
           // Delay pill — orange "X min delay" when the trip itself is delayed,
           // muted "+N" indicator when only a mid-trip wobble is reported.

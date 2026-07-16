@@ -127,7 +127,10 @@ export interface TripRealtimeStatus {
   liveDepartureTime?: string;
   /** Live arrival time as "HH:MM" string at the destination station */
   liveArrivalTime?: string;
-  /** How many minutes late at departure (positive = late) — only set when > 0 */
+  /** How many minutes late (positive = late) — only set when > 0. Measured at
+   *  the fromStation departure while its prediction is in the feed; once the
+   *  train has departed (the feed drops served stops) it is measured at the
+   *  toStation arrival instead, so an en-route trip keeps a live delay. */
   delayMinutes?: number;
   /** How many minutes late at arrival (positive = late) — only set when > 0 and differs from delayMinutes */
   arrivalDelayMinutes?: number;

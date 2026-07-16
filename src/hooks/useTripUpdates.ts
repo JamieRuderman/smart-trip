@@ -190,6 +190,61 @@ function deriveCanceledStatus(
 }
 
 /**
+ * En-route fallback: once the train departs fromStation, the feed drops that
+ * stop's prediction entirely (GTFS-RT omits served stops — verified against
+ * SMART's live feed), so the origin-based derivation below has nothing to key
+ * on and the trip would silently lose its realtime status mid-ride — exactly
+ * when the arrival countdown is what's on screen. Derive the status from the
+ * DESTINATION's prediction instead. Delay is measured at arrival rather than
+ * departure — the departure is in the past, so the arrival is what the badge,
+ * the countdown, and the delay-aware auto-clear all need to track.
+ *
+ * Requires a static-trip match: the statusMap key is the static scheduled
+ * departure at fromStation, which the feed no longer carries at this point.
+ */
+function deriveEnRouteStatus(
+  update: GtfsRtTripUpdate,
+  toUpdate: GtfsRtStopTimeUpdate | undefined,
+  direction: TrainDirection,
+  scheduledDepartureParam: string | null,
+  scheduledArrivalParam: string | null,
+  scheduledTimesByStation: Partial<Record<string, string>>,
+): DerivedStatusResult {
+  // Terminal stops carry only arrivalTime; intermediate stops carry both.
+  const liveArrivalUnix = toUpdate?.arrivalTime ?? toUpdate?.departureTime;
+  if (!liveArrivalUnix || !scheduledDepartureParam) return { kind: "none" };
+
+  const arrivalDelayMinutes =
+    scheduledArrivalParam && update.startDate
+      ? computeDelayMinutes(liveArrivalUnix, scheduledArrivalParam, update.startDate)
+      : undefined;
+
+  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+    update.stopTimeUpdates,
+    scheduledTimesByStation,
+    update.startDate,
+    direction,
+  );
+
+  return {
+    kind: "primary",
+    scheduledDeparture: scheduledDepartureParam,
+    status: {
+      isCanceled: false,
+      liveArrivalTime:
+        arrivalDelayMinutes != null ? unixToTimeString(liveArrivalUnix) : undefined,
+      delayMinutes: arrivalDelayMinutes,
+      arrivalDelayMinutes,
+      isOriginSkipped: false,
+      isDestinationSkipped: toUpdate?.scheduleRelationship === "SKIPPED",
+      allStopLiveDepartures,
+      allStopDelayMinutes,
+      hasRealtimeStopData: Object.keys(allStopLiveDepartures).length > 0,
+    },
+  };
+}
+
+/**
  * Normal (non-canceled) branch: compute live departure/arrival times,
  * delay minutes, and per-stop realtime data for the requested station pair.
  */
@@ -205,7 +260,16 @@ function deriveScheduledStatus(
   const fromUpdate = findStopUpdate(update.stopTimeUpdates, fromStation, direction);
   const toUpdate = findStopUpdate(update.stopTimeUpdates, toStation, direction);
 
-  if (!fromUpdate?.departureTime) return { kind: "none" };
+  if (!fromUpdate?.departureTime) {
+    return deriveEnRouteStatus(
+      update,
+      toUpdate,
+      direction,
+      scheduledDepartureParam,
+      scheduledArrivalParam,
+      scheduledTimesByStation,
+    );
+  }
 
   const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
   const isDestinationSkipped = toUpdate?.scheduleRelationship === "SKIPPED";
@@ -275,7 +339,8 @@ function deriveScheduledStatus(
   };
 }
 
-function deriveStatus(
+/** Exported for tests. */
+export function deriveStatus(
   update: GtfsRtTripUpdate,
   fromStation: Station,
   toStation: Station,

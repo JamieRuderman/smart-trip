@@ -63,10 +63,10 @@ clear / arrival → DELETE /api/liveactivity/register?id=…   (or the DO ends i
 ## When the activity appears
 
 The activity is **not** started at focus time. `liveActivityStartAt()`
-(`src/lib/liveActivityContent.ts`) puts it one `LIVE_ACTIVITY_LEAD_MS` (1 h)
+(`src/lib/liveActivityContent.ts`) puts it one `LIVE_ACTIVITY_LEAD_MS` (30 min)
 ahead of the countdown it will show — the armed **leave alarm** when there is
 one, else departure. Pin a 6 pm train at 9 am with a 15-min reminder and nothing
-appears until 4:45 pm.
+appears until 5:15 pm.
 
 Getting there needs the OS, since the app is usually closed by then:
 

@@ -151,7 +151,8 @@ describe("liveActivityStartAt", () => {
   });
 
   it("leads the LEAVE alarm, not departure, when a reminder is armed", () => {
-    // 15-min lead → the activity appears 75 min before the train goes.
+    // 15-min reminder + a 30-min lead → the activity appears 45 min before the
+    // train goes, not 30.
     const reminderEpochMs = DEP - 15 * 60_000;
     expect(liveActivityStartAt({ departureEpochMs: DEP, reminderEpochMs })).toBe(
       reminderEpochMs - LIVE_ACTIVITY_LEAD_MS,
@@ -161,14 +162,22 @@ describe("liveActivityStartAt", () => {
 
 describe("shouldShowLiveActivity", () => {
   const base = {
-    departureEpochMs: DEP, // 30 min after NOW → inside the window
+    departureEpochMs: DEP,
     arrivalEpochMs: ARR,
     now: NOW,
   };
   const farFromDeparture = DEP - (LIVE_ACTIVITY_LEAD_MS + 60_000); // just past the window
 
   it("shows within the window before departure", () => {
-    expect(shouldShowLiveActivity(base)).toBe(true);
+    // Anchored to the constant, not the fixture clock, so retuning the lead
+    // can't quietly turn this into a boundary-only assertion.
+    const insideWindow = DEP - LIVE_ACTIVITY_LEAD_MS + 60_000;
+    expect(shouldShowLiveActivity({ ...base, now: insideWindow })).toBe(true);
+  });
+  it("shows exactly at the start instant (inclusive boundary)", () => {
+    const startAt = DEP - LIVE_ACTIVITY_LEAD_MS;
+    expect(shouldShowLiveActivity({ ...base, now: startAt })).toBe(true);
+    expect(shouldShowLiveActivity({ ...base, now: startAt - 1 })).toBe(false);
   });
   it("hides a far-ahead focus with no reminder", () => {
     expect(shouldShowLiveActivity({ ...base, now: farFromDeparture })).toBe(false);

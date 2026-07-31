@@ -105,6 +105,10 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
         typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
+  const liveActivityScheduledForOk =
+    r.liveActivityScheduledFor === undefined ||
+    (typeof r.liveActivityScheduledFor === "number" &&
+      Number.isFinite(r.liveActivityScheduledFor));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -114,7 +118,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
-    liveActivityIdOk
+    liveActivityIdOk &&
+    liveActivityScheduledForOk
   );
 }
 

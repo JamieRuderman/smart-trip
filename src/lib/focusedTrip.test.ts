@@ -90,6 +90,24 @@ describe("focusedTrip storage", () => {
     expect(loadFocusedTrip()).toBeNull();
   });
 
+  it("round-trips an optional liveActivityScheduledFor", () => {
+    const f = makeFocused({
+      liveActivityId: "trip-activity-1",
+      liveActivityScheduledFor: Date.now() + 60 * 60_000,
+    });
+    saveFocusedTrip(f);
+    expect(loadFocusedTrip()).toEqual(f);
+  });
+
+  it("rejects a non-numeric liveActivityScheduledFor", () => {
+    // A malformed value would break ensureActivityForFocus's strict instant
+    // comparison and churn the pending activity on every ensure.
+    const bad = makeFocused() as unknown as Record<string, unknown>;
+    bad.liveActivityScheduledFor = "soon";
+    localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
+    expect(loadFocusedTrip()).toBeNull();
+  });
+
   it("leaves an armed, still-future reminder untouched", () => {
     const f = makeFocused({
       reminder: {

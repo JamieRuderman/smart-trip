@@ -12,6 +12,16 @@
       "autoPort": true
     },
     {
+      "name": "dev-live",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 20 >/dev/null && npx vite --port 5182 --strictPort"
+      ],
+      "port": 5182,
+      "autoPort": true
+    },
+    {
       "name": "preview",
       "runtimeExecutable": "bash",
       "runtimeArgs": [

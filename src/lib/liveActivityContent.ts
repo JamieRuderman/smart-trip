@@ -77,9 +77,9 @@ export const MIN_SCHEDULED_ACTIVITY_IOS_MAJOR = 26;
  *  eligible to show. A focused trip further out than this stays dormant — no
  *  six-hour countdown parked on the lock screen all day — until it enters the
  *  window. The target is the armed leave alarm when there is one, else
- *  departure, so the activity appears an hour before *leaving*, not an hour
- *  before the train goes. */
-export const LIVE_ACTIVITY_LEAD_MS = 60 * 60 * 1000;
+ *  departure, so the activity appears half an hour before *leaving*, not before
+ *  the train goes. */
+export const LIVE_ACTIVITY_LEAD_MS = 30 * 60 * 1000;
 
 /** Random base36 slug for activity ids. `crypto.getRandomValues` exists in
  *  every WKWebView/browser/Node we run in; Math.random is a non-security

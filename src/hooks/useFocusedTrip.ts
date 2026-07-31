@@ -90,6 +90,11 @@ export function useFocusedTrip() {
         // Refresh the push registration so the backend stops baking the (now
         // cancelled) leave-alarm countdown into its locked-screen pushes.
         await reRegisterPushForFocus(cleared);
+        // A pending (iOS 26 scheduled) activity is still pinned an hour before
+        // the alarm that no longer exists — ActivityKit can't move it, so
+        // re-ensure to replace it with one pinned to departure. Fire-and-forget,
+        // like the arm path; no-op for a running activity.
+        void ensureActivityForFocus(cleared);
         return { ok: true };
       }
 
@@ -111,8 +116,10 @@ export function useFocusedTrip() {
         { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
         "Failed to schedule focused-trip reminder",
       );
-      // A set reminder forces the Live Activity on — ensure it's running (covers
-      // a far-ahead focus and recovers a dismissal). Fire-and-forget, like focus.
+      // Re-align the Live Activity with the new leave alarm: a pending
+      // (scheduled) one is re-pinned an hour before the alarm, a running one
+      // gets the alarm stage pushed, and a focus inside the new window gets one
+      // started. Fire-and-forget, like focus.
       if (result.ok) {
         const latest = loadFocusedTrip();
         if (latest) void ensureActivityForFocus(latest);
@@ -149,11 +156,19 @@ export function useFocusedTrip() {
       // first: if scheduling throws (permission revoked, exact-alarm denied),
       // the original reminder is still armed, so a failed drift-reschedule
       // degrades to "fires at the old time" rather than silently vanishing.
-      await armAndPersistReminder(
+      const result = await armAndPersistReminder(
         current,
         { leadMinutes, reminderAt, notificationId, title: text.title, body: text.body },
         "Failed to reschedule focused-trip reminder on drift",
       );
+      // The drift moved the leave alarm, and a pending (iOS 26 scheduled)
+      // activity is still pinned an hour before the OLD fire time — ActivityKit
+      // can't move it, so re-ensure to end + reschedule it against the new
+      // instant. No-op for a running activity (the content push is deduped).
+      if (result.ok) {
+        const latest = loadFocusedTrip();
+        if (latest) void ensureActivityForFocus(latest);
+      }
     },
     [],
   );

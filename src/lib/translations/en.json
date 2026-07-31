@@ -233,7 +233,9 @@
     "switchTitle": "Change my trip?",
     "switchBody": "Your trip is set to Train {{current}}. Change it to Train {{next}}?",
     "switchConfirm": "Change",
-    "switchCancel": "Cancel"
+    "switchCancel": "Cancel",
+    "activityStartTitle": "Trip from {{station}} coming up",
+    "activityStartBody": "Train {{trip}} — tracking it on your lock screen."
   },
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",

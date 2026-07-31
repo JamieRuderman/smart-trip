@@ -4,8 +4,10 @@ import { REMINDER_FIRE_BUFFER_MS } from "./focusedTrip";
 export const DEFAULT_LEAD_MINUTES = 15;
 /** Slider floor — the soonest lead we ever offer. */
 export const MIN_LEAD_MINUTES = 1;
-/** Slider ceiling — a full day of lead is plenty. */
-export const MAX_LEAD_MINUTES = 1440;
+/** Slider ceiling. Two hours: a longer lead makes the slider hopeless to aim
+ *  (a 1-min step across a full day), and nobody wants to be told to leave for a
+ *  train half a day early. */
+export const MAX_LEAD_MINUTES = 120;
 
 export interface ReminderLeadRange {
   /** Whole minutes between now and departure (negative once past). */

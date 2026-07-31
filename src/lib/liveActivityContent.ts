@@ -68,11 +68,18 @@ export interface TripActivityContentState {
 export const MIN_LIVE_ACTIVITY_IOS_MAJOR = 16;
 export const MIN_LIVE_ACTIVITY_IOS_MINOR = 2;
 
-/** How long before departure the Live Activity becomes eligible to show. A
- *  focused trip further out than this stays dormant (no hours-long lock-screen
- *  clutter) until it enters the window — unless a reminder is armed or it's
- *  already en route. */
-export const LIVE_ACTIVITY_WINDOW_MS = 2 * 60 * 60 * 1000;
+/** Minimum iOS for a *scheduled* Live Activity — `Activity.request(start:)`,
+ *  which lets the OS bring the activity up at a future instant with the app not
+ *  running. Below this the activity can only start while our JS is alive. */
+export const MIN_SCHEDULED_ACTIVITY_IOS_MAJOR = 26;
+
+/** How long before the countdown's target instant the Live Activity becomes
+ *  eligible to show. A focused trip further out than this stays dormant — no
+ *  six-hour countdown parked on the lock screen all day — until it enters the
+ *  window. The target is the armed leave alarm when there is one, else
+ *  departure, so the activity appears an hour before *leaving*, not an hour
+ *  before the train goes. */
+export const LIVE_ACTIVITY_LEAD_MS = 60 * 60 * 1000;
 
 /** Random base36 slug for activity ids. `crypto.getRandomValues` exists in
  *  every WKWebView/browser/Node we run in; Math.random is a non-security
@@ -132,23 +139,65 @@ export function canStartActivity(args: {
 }
 
 /**
+ * Whether this device can hand ActivityKit a *future* start date
+ * (`Activity.request(start:)`) instead of starting the activity now. That API
+ * is iOS 26+; below it the plugin rejects the call, so callers fall back to
+ * starting the activity the next time the app runs and is inside the window.
+ *
+ * Pure, mirroring {@link canStartActivity}. Requires `startAtEpochMs` to be
+ * genuinely in the future (ActivityKit rejects a past start) and the countdown
+ * target to still be ahead of that start, so we never schedule an activity that
+ * would appear already-expired.
+ */
+export function canScheduleActivity(args: {
+  platform: string;
+  iosMajor: number;
+  startAtEpochMs: number;
+  targetEpochMs: number;
+  now: number;
+}): boolean {
+  if (args.platform !== "ios") return false;
+  if (args.iosMajor < MIN_SCHEDULED_ACTIVITY_IOS_MAJOR) return false;
+  if (args.startAtEpochMs <= args.now) return false;
+  return args.targetEpochMs > args.startAtEpochMs;
+}
+
+/**
+ * The instant the focused trip's Live Activity should appear: one lead-time
+ * ahead of whichever countdown it will be showing — the armed leave alarm when
+ * there is one, otherwise departure. Pure, and the single source of truth for
+ * both the "is it time yet" gate below and the iOS 26 scheduled start, so the
+ * activity the OS wakes at this instant is the same one this gate would allow.
+ *
+ * An armed reminder no longer forces the activity on regardless of distance
+ * (which parked a six-hour countdown on the lock screen for an early-arm); it
+ * just moves the target earlier by the reminder's lead.
+ */
+export function liveActivityStartAt(args: {
+  /** Fire instant of the armed leave alarm, or null when none is armed. */
+  reminderEpochMs?: number | null;
+  departureEpochMs: number;
+}): number {
+  return (args.reminderEpochMs ?? args.departureEpochMs) - LIVE_ACTIVITY_LEAD_MS;
+}
+
+/**
  * Whether the focused trip's Live Activity should currently be on screen. Pure
- * + testable. Shows it within `LIVE_ACTIVITY_WINDOW_MS` of departure, whenever a
- * reminder is armed (a strong "I'm tracking this" signal that overrides the
- * window), or once it's en route ("riding"). Stops once arrival has passed.
- * Orthogonal to the iOS/version gate (`canStartActivity`): this is the WHETHER,
- * that is the CAN.
+ * + testable. Shows it from {@link liveActivityStartAt} onward, and always once
+ * it's en route ("riding") — a trip boarded before its start instant (a lead
+ * longer than the window, or a reminder armed late) still gets an activity.
+ * Stops once arrival has passed. Orthogonal to the iOS/version gate
+ * (`canStartActivity`): this is the WHETHER, that is the CAN.
  */
 export function shouldShowLiveActivity(args: {
-  hasReminder: boolean;
+  reminderEpochMs?: number | null;
   departureEpochMs: number;
   arrivalEpochMs: number;
   now: number;
 }): boolean {
   if (args.now >= args.arrivalEpochMs) return false;
-  if (args.hasReminder) return true;
   if (args.now >= args.departureEpochMs) return true;
-  return args.departureEpochMs - args.now <= LIVE_ACTIVITY_WINDOW_MS;
+  return args.now >= liveActivityStartAt(args);
 }
 
 /**

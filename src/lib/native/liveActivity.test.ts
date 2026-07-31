@@ -23,10 +23,15 @@ const endActivity = vi.fn(async (opts: unknown) => {
 const listActivities = vi.fn(async () => ({
   items: [{ id: "trip-7-2026-06-09", activityId: "sys-1", state: "active" }],
 }));
+const startActivityScheduled = vi.fn(async (opts: unknown) => {
+  void opts;
+  return { activityId: "sys-2" };
+});
 vi.mock("capacitor-live-activity", () => ({
   LiveActivity: {
     isAvailable: () => isAvailable(),
     startActivity: (opts: unknown) => startActivity(opts),
+    startActivityScheduled: (opts: unknown) => startActivityScheduled(opts),
     updateActivity: (opts: unknown) => updateActivity(opts),
     endActivity: (opts: unknown) => endActivity(opts),
     listActivities: () => listActivities(),
@@ -43,6 +48,7 @@ import {
   endTripActivity,
   isLiveActivityAvailable,
   listTripActivityRecords,
+  scheduleTripActivity,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
@@ -50,8 +56,10 @@ import {
   type TripActivityContentState,
 } from "@/lib/native/liveActivity";
 import {
+  canScheduleActivity,
+  liveActivityStartAt,
   shouldShowLiveActivity,
-  LIVE_ACTIVITY_WINDOW_MS,
+  LIVE_ACTIVITY_LEAD_MS,
 } from "@/lib/liveActivityContent";
 
 // Fixed "now": Tue 2026-06-09 08:00 local.
@@ -132,14 +140,32 @@ describe("canStartActivity", () => {
   });
 });
 
+describe("liveActivityStartAt", () => {
+  it("leads departure by the window when no reminder is armed", () => {
+    expect(liveActivityStartAt({ departureEpochMs: DEP })).toBe(
+      DEP - LIVE_ACTIVITY_LEAD_MS,
+    );
+    expect(
+      liveActivityStartAt({ departureEpochMs: DEP, reminderEpochMs: null }),
+    ).toBe(DEP - LIVE_ACTIVITY_LEAD_MS);
+  });
+
+  it("leads the LEAVE alarm, not departure, when a reminder is armed", () => {
+    // 15-min lead → the activity appears 75 min before the train goes.
+    const reminderEpochMs = DEP - 15 * 60_000;
+    expect(liveActivityStartAt({ departureEpochMs: DEP, reminderEpochMs })).toBe(
+      reminderEpochMs - LIVE_ACTIVITY_LEAD_MS,
+    );
+  });
+});
+
 describe("shouldShowLiveActivity", () => {
   const base = {
-    hasReminder: false,
     departureEpochMs: DEP, // 30 min after NOW → inside the window
     arrivalEpochMs: ARR,
     now: NOW,
   };
-  const farFromDeparture = DEP - (LIVE_ACTIVITY_WINDOW_MS + 60_000); // just past the window
+  const farFromDeparture = DEP - (LIVE_ACTIVITY_LEAD_MS + 60_000); // just past the window
 
   it("shows within the window before departure", () => {
     expect(shouldShowLiveActivity(base)).toBe(true);
@@ -147,17 +173,131 @@ describe("shouldShowLiveActivity", () => {
   it("hides a far-ahead focus with no reminder", () => {
     expect(shouldShowLiveActivity({ ...base, now: farFromDeparture })).toBe(false);
   });
-  it("an armed reminder overrides the window", () => {
+  it("still hides a far-ahead focus that HAS a reminder armed", () => {
+    // The reminder only shifts the target earlier by its lead — it no longer
+    // forces a countdown onto the lock screen hours before the trip. Six hours
+    // out with a 15-min reminder armed: dormant.
     expect(
-      shouldShowLiveActivity({ ...base, hasReminder: true, now: farFromDeparture }),
-    ).toBe(true);
+      shouldShowLiveActivity({
+        ...base,
+        reminderEpochMs: DEP - 15 * 60_000,
+        now: DEP - 6 * 60 * 60_000,
+      }),
+    ).toBe(false);
   });
-  it("shows once en route, then stops after arrival", () => {
+  it("an armed reminder brings the activity forward by its lead", () => {
+    const reminderEpochMs = DEP - 15 * 60_000;
+    const justBefore = reminderEpochMs - LIVE_ACTIVITY_LEAD_MS - 1;
+    expect(
+      shouldShowLiveActivity({ ...base, reminderEpochMs, now: justBefore }),
+    ).toBe(false);
+    expect(
+      shouldShowLiveActivity({ ...base, reminderEpochMs, now: justBefore + 1 }),
+    ).toBe(true);
+    // ...and that instant is earlier than the no-reminder one.
+    expect(shouldShowLiveActivity({ ...base, now: justBefore + 1 })).toBe(false);
+  });
+  it("shows once en route even if the start instant never passed", () => {
+    // Lead longer than the window (2h) → start instant is behind us anyway, but
+    // the en-route rule is what guarantees a boarded trip always has one.
     expect(shouldShowLiveActivity({ ...base, now: DEP + 1 })).toBe(true);
     expect(shouldShowLiveActivity({ ...base, now: ARR })).toBe(false);
     expect(
-      shouldShowLiveActivity({ ...base, hasReminder: true, now: ARR }),
+      shouldShowLiveActivity({
+        ...base,
+        reminderEpochMs: DEP - 15 * 60_000,
+        now: ARR,
+      }),
     ).toBe(false);
+  });
+});
+
+describe("canScheduleActivity", () => {
+  const base = {
+    platform: "ios",
+    iosMajor: 26,
+    startAtEpochMs: NOW + 60_000,
+    targetEpochMs: DEP,
+    now: NOW,
+  };
+
+  it("accepts a future start on iOS 26+", () => {
+    expect(canScheduleActivity(base)).toBe(true);
+  });
+  it("rejects below iOS 26 (the plugin would reject the call)", () => {
+    expect(canScheduleActivity({ ...base, iosMajor: 25 })).toBe(false);
+  });
+  it("rejects non-iOS", () => {
+    expect(canScheduleActivity({ ...base, platform: "android" })).toBe(false);
+  });
+  it("rejects a start instant that isn't in the future", () => {
+    expect(canScheduleActivity({ ...base, startAtEpochMs: NOW })).toBe(false);
+  });
+  it("rejects a countdown target that already passed by the start", () => {
+    expect(
+      canScheduleActivity({ ...base, targetEpochMs: base.startAtEpochMs }),
+    ).toBe(false);
+  });
+});
+
+describe("scheduleTripActivity", () => {
+  const attributes: TripActivityAttributes = {
+    tripNumber: 7,
+    fromStation: "Petaluma Downtown",
+    toStation: "Larkspur",
+    routeName: "SMART",
+    direction: "southbound",
+  };
+  const content = buildContentState({
+    departureEpochMs: DEP,
+    arrivalEpochMs: ARR,
+    delayMinutes: null,
+    nextStop: null,
+    remainingStops: null,
+    isCanceled: false,
+    isEnded: false,
+    now: NOW,
+  });
+  const args = {
+    id: "trip-7-2026-06-09-abc",
+    attributes,
+    content,
+    startAtEpochMs: NOW + 10 * 60_000,
+    alert: { title: "Trip coming up", body: "Train 7" },
+    enablePush: true,
+  };
+
+  beforeEach(() => {
+    getInfo.mockResolvedValue({ osVersion: "26.1" });
+  });
+
+  it("hands the plugin a UNIX-SECONDS start date", async () => {
+    await expect(scheduleTripActivity(args)).resolves.toEqual({ scheduled: true });
+    expect(startActivityScheduled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: args.id,
+        startDate: Math.floor(args.startAtEpochMs / 1000),
+        enablePushToUpdate: true,
+        alertConfiguration: { title: "Trip coming up", body: "Train 7" },
+      }),
+    );
+  });
+
+  it("no-ops below iOS 26 without calling the plugin", async () => {
+    getInfo.mockResolvedValue({ osVersion: "18.4" });
+    await expect(scheduleTripActivity(args)).resolves.toEqual({ scheduled: false });
+    expect(startActivityScheduled).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when Live Activities are disabled", async () => {
+    isAvailable.mockResolvedValue({ value: false });
+    await expect(scheduleTripActivity(args)).resolves.toEqual({ scheduled: false });
+    expect(startActivityScheduled).not.toHaveBeenCalled();
+  });
+
+  it("swallows a plugin rejection", async () => {
+    startActivityScheduled.mockRejectedValueOnce(new Error("nope"));
+    await expect(scheduleTripActivity(args)).resolves.toEqual({ scheduled: false });
   });
 });
 

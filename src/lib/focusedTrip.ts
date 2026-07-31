@@ -45,6 +45,13 @@ export interface FocusedTrip {
    *  OS keeps the activity alive independently of the webview. Mirrors how
    *  `reminder.alarmId` tracks an out-of-process alert. */
   liveActivityId?: string;
+  /** Epoch ms the activity under `liveActivityId` is SCHEDULED to appear, when
+   *  it was armed via ActivityKit's future-start API (iOS 26+) rather than
+   *  started immediately. Absent once it's running (or when it never was
+   *  scheduled). ActivityKit can't move a pending activity's start date, so this
+   *  is what tells us a re-armed reminder needs the pending one ended and a
+   *  fresh one scheduled. */
+  liveActivityScheduledFor?: number;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
@@ -98,6 +105,10 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
         typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
+  const liveActivityScheduledForOk =
+    r.liveActivityScheduledFor === undefined ||
+    (typeof r.liveActivityScheduledFor === "number" &&
+      Number.isFinite(r.liveActivityScheduledFor));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -107,7 +118,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
-    liveActivityIdOk
+    liveActivityIdOk &&
+    liveActivityScheduledForOk
   );
 }
 

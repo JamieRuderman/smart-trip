@@ -60,6 +60,38 @@ clear / arrival → DELETE /api/liveactivity/register?id=…   (or the DO ends i
   (idempotent upsert), so a failed register at focus time (offline) is repaired
   at the next launch.
 
+## When the activity appears
+
+The activity is **not** started at focus time. `liveActivityStartAt()`
+(`src/lib/liveActivityContent.ts`) puts it one `LIVE_ACTIVITY_LEAD_MS` (1 h)
+ahead of the countdown it will show — the armed **leave alarm** when there is
+one, else departure. Pin a 6 pm train at 9 am with a 15-min reminder and nothing
+appears until 4:45 pm.
+
+Getting there needs the OS, since the app is usually closed by then:
+
+- **iOS 26+** — `scheduleTripActivity()` hands ActivityKit a future start date
+  (`Activity.request(start:)`, via the plugin's `startActivityScheduled`). The
+  activity sits in ActivityKit's `pending` state and the OS brings it up at the
+  instant, app running or not, with a banner (`focusedTrip.activityStart*`).
+  ActivityKit **requires** that alert for a scheduled start.
+- **below iOS 26** — the scheduled start no-ops and the activity starts the next
+  time the app runs inside the window. The leave alarm itself is unaffected: it's
+  a separate AlarmKit / local-notification channel armed at reminder time.
+
+A pending activity's start date can't be moved, so re-arming a reminder (which
+shifts the instant) ends the pending activity and schedules a fresh one —
+`ensureActivityForFocus` compares against `FocusedTrip.liveActivityScheduledFor`
+and leaves an unchanged instant alone.
+
+The registration is POSTed **at schedule time**, not at start: once the OS brings
+the activity up the app may never run again before departure, so this is the only
+chance to wire up locked-screen correction. It carries `activityStartEpochMs`, and
+the DO sleeps to that instant instead of burning a 90s feed poll through the
+dormant hours (`nextWake`, plus the early return in `alarm()`). iOS POSTs the
+per-activity token to the natively-persisted token endpoint when the activity
+actually starts, with no JS involved.
+
 ## Required to go live
 
 ### 1. Native widget — ✅ shipped (`ios/App/SmartTripWidget/`)

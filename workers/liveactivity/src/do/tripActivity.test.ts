@@ -94,6 +94,18 @@ describe("nextWake", () => {
     const t = LEAVE_MS + 60_000; // past the leave instant, still pre-departure
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS)).toBe(t + POLL_MS);
   });
+  it("sleeps straight through to a scheduled activity's start instant", () => {
+    // Registered ahead of an iOS 26 future-start activity: nothing exists to
+    // push to yet, so don't burn a 90s poll for the hours in between.
+    const startAt = SCHED_DEP_MS - 75 * 60_000;
+    const t = startAt - 6 * 60 * 60_000;
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS, startAt)).toBe(startAt);
+  });
+  it("resumes normal polling once the scheduled start has passed", () => {
+    const startAt = SCHED_DEP_MS - 75 * 60_000;
+    const t = startAt + 1_000;
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, null, startAt)).toBe(t + POLL_MS);
+  });
   it("targets the arrival boundary within an end-game poll of it", () => {
     const t = SCHED_ARR_MS - 20_000; // < ENDGAME_POLL_MS from arrival
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(SCHED_ARR_MS);

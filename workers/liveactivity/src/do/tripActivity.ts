@@ -100,7 +100,16 @@ export function nextWake(
    *  refreshes its staleness target) on time while the phone is locked, rather
    *  than dimming until the next poll. */
   reminderEpochMs: number | null = null,
+  /** Instant a SCHEDULED activity is due to appear (iOS 26 future-start), when
+   *  the client registered ahead of time. */
+  activityStartEpochMs: number | null = null,
 ): number {
+  // Nothing to push to before the activity exists — no activity, no APNs token.
+  // Sleep straight through to its start instant instead of polling the feed for
+  // the (possibly hours) in between.
+  if (activityStartEpochMs != null && now < activityStartEpochMs) {
+    return activityStartEpochMs;
+  }
   if (now < departureEpochMs) {
     const next = Math.min(departureEpochMs, now + POLL_MS);
     return reminderEpochMs != null && reminderEpochMs > now
@@ -325,6 +334,7 @@ export class TripActivityDO {
       reg.arrivalEpochMs,
       Date.now(),
       reminderEpochMs,
+      reg.activityStartEpochMs ?? null,
     );
     const current = await this.state.storage.getAlarm();
     if (current == null || current > next) await this.state.storage.setAlarm(next);
@@ -338,6 +348,16 @@ export class TripActivityDO {
     if (!config) {
       console.warn(`[la] ${reg.id} alarm fired but APNs is not configured`);
       return; // unconfigured → no-op (and no reschedule spin)
+    }
+
+    // Registered ahead of a SCHEDULED activity (iOS 26 future-start): no
+    // activity exists yet, so iOS has minted no token and there is nothing to
+    // push to. Skip the feed fetches entirely and sleep to its start instant —
+    // otherwise a trip pinned six hours out burns a 511 poll every 90s for
+    // hours before the activity even appears.
+    if (reg.activityStartEpochMs != null && Date.now() < reg.activityStartEpochMs) {
+      await this.state.storage.setAlarm(reg.activityStartEpochMs);
+      return;
     }
 
     try {

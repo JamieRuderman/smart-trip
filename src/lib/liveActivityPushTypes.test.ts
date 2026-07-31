@@ -73,6 +73,35 @@ describe("isLiveActivityRegistration", () => {
     ).toBe(false);
   });
 
+  it("accepts an optional activityStartEpochMs before departure", () => {
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        activityStartEpochMs: VALID_REG.departureEpochMs - 75 * 60_000,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects an activityStartEpochMs at/after departure", () => {
+    // It's when the activity APPEARS and the DO sleeps until it — at/after
+    // departure it would park the alarm past the flip the activity exists for.
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        activityStartEpochMs: VALID_REG.departureEpochMs,
+      }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        activityStartEpochMs: VALID_REG.departureEpochMs + 60_000,
+      }),
+    ).toBe(false);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, activityStartEpochMs: "soon" }),
+    ).toBe(false);
+  });
+
   it("rejects oversized strings (public endpoint, bounded junk)", () => {
     expect(
       isLiveActivityRegistration({ ...VALID_REG, id: "x".repeat(200) }),

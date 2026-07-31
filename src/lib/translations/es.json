@@ -233,7 +233,9 @@
     "switchTitle": "¿Cambiar mi viaje?",
     "switchBody": "Tu viaje es el tren {{current}}. ¿Cambiarlo al tren {{next}}?",
     "switchConfirm": "Cambiar",
-    "switchCancel": "Cancelar"
+    "switchCancel": "Cancelar",
+    "activityStartTitle": "Tu viaje desde {{station}} se acerca",
+    "activityStartBody": "Tren {{trip}} — siguiéndolo en tu pantalla de bloqueo."
   },
   "tracker": {
     "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",

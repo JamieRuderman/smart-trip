@@ -40,6 +40,7 @@ import {
   shouldShowLiveActivity,
 } from "@/lib/liveActivityContent";
 import {
+  configureLiveActivityTokenEndpoint,
   deregisterPushActivity,
   isLiveActivityPushEnabled,
   registerPushActivity,
@@ -348,6 +349,13 @@ async function scheduleActivityForFocus(
     reminderEpochMs: saved.reminder?.reminderAt ?? null,
     now: startAt,
   });
+  const enablePush = isLiveActivityPushEnabled();
+  // Point iOS at the token endpoint BEFORE handing it the activity: the token
+  // is minted only when the OS starts it — likely with the app closed — and the
+  // endpoint is persisted natively, so configuring it now is what lets that
+  // future token reach the backend. (The immediate path does the same inside
+  // startAndRegisterPushActivity.)
+  if (enablePush) await configureLiveActivityTokenEndpoint();
   const { scheduled } = await scheduleTripActivity({
     id,
     attributes: attributesFor(saved),
@@ -360,7 +368,7 @@ async function scheduleActivityForFocus(
       title: i18n.t("focusedTrip.activityStartTitle", { station: saved.fromStation }),
       body: i18n.t("focusedTrip.activityStartBody", { trip: saved.tripNumber }),
     },
-    enablePush: isLiveActivityPushEnabled(),
+    enablePush,
   });
   if (!scheduled) return;
   const latest = loadFocusedTrip();
@@ -379,7 +387,7 @@ async function scheduleActivityForFocus(
   // up locked-screen delay correction. The backend sleeps until `startAt`
   // instead of polling through the dormant hours, and iOS POSTs the per-activity
   // token to the (natively persisted) token endpoint when the activity starts.
-  if (isLiveActivityPushEnabled()) {
+  if (enablePush) {
     const registration = buildRegistrationForFocus(saved, id, startAt);
     if (registration) await postRegistrationDeduped(registration);
   }

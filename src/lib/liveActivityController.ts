@@ -27,7 +27,6 @@ import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
 import {
   buildContentState,
   endTripActivity,
-  isTripActivityRunning,
   listTripActivityRecords,
   scheduleTripActivity,
   startTripActivity,
@@ -254,13 +253,7 @@ export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void
  * the user switched/cleared trips meanwhile; on commit we persist from the
  * LATEST record so a concurrently armed reminder isn't clobbered.
  */
-export async function startActivityForFocus(
-  saved: FocusedTrip,
-  /** Recovery path for an ActivityKit request that was immediately discarded
-   *  before iOS minted its push token. The local activity keeps the complete
-   *  timer/progress UI; only server-side delay corrections are unavailable. */
-  localOnly = false,
-): Promise<void> {
+export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
@@ -298,7 +291,7 @@ export async function startActivityForFocus(
   // countdown is corrected while the phone is locked; everything else uses the
   // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
   let started: boolean;
-  if (isLiveActivityPushEnabled() && !localOnly) {
+  if (isLiveActivityPushEnabled()) {
     const registration = buildRegistrationForFocus(
       saved,
       id,
@@ -471,30 +464,15 @@ async function startOrReviveActivity(
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
   const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
-  // `Activity.request` can resolve before ActivityKit publishes the new item
-  // through its global `.activities` inventory (observed on iOS 26.6). The
-  // plugin already owns the returned Activity object under this logical id, so
-  // trust that immediate per-id state during the inventory gap. Otherwise each
-  // reminder/reconcile pass starts another replacement before the first Live
-  // Activity has had a chance to appear.
-  if (keep != null && kept == null && (await isTripActivityRunning(keep))) {
-    return false;
-  }
+  // A successfully committed logical id is authoritative even when iOS 26.6's
+  // global `Activity.activities` inventory temporarily returns no record. The
+  // lifecycle stream can already report this exact activity as `.active` while
+  // both the inventory and the plugin's lookup lag behind. Replacing it here
+  // ends a healthy activity before the system can present it. This also keeps
+  // the original dismissal contract: when a person swipes the activity away,
+  // retain its committed id and do not respawn it automatically.
   if (keep != null && kept == null) {
-    // A push-enabled request can be accepted and then immediately discarded by
-    // ActivityKit before a push token is minted (seen on physical iOS 26.6).
-    // Retrying the same push request loops forever. Remove the dead logical id
-    // and retry once through ActivityKit's local-only request path instead.
-    await endFocusActivity(focused);
-    await startActivityForFocus(
-      {
-        ...focused,
-        liveActivityId: undefined,
-        liveActivityScheduledFor: undefined,
-      },
-      true,
-    );
-    return true;
+    return false;
   }
   // Push builds never schedule the local auto-dismiss (the cron ends the
   // activity server-side at live arrival), so there an `ended` activity is a

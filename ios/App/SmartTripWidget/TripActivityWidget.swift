@@ -63,6 +63,8 @@ struct TripActivityWidget: Widget {
                                         .font(.caption2.weight(.semibold))
                                         .textCase(.uppercase)
                                         .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
                                     RelativeCountdown(model: model)
                                         .font(.system(size: 22, weight: .bold))
                                         .foregroundStyle(accent)
@@ -94,13 +96,15 @@ struct TripActivityWidget: Widget {
                             }
                         }
 
-                        TripProgressTrack(
-                            model: model,
-                            completedColor: accent,
-                            remainingColor: .white.opacity(0.2),
-                            markerFill: accent,
-                            labelColor: .secondary
-                        )
+                        if !model.isCanceled {
+                            TripProgressTrack(
+                                model: model,
+                                completedColor: accent,
+                                remainingColor: .white.opacity(0.2),
+                                markerFill: accent,
+                                labelColor: .secondary
+                            )
+                        }
                     }
                     .padding(.horizontal, 8)
                     // Push the whole bottom row down off the header row so
@@ -166,7 +170,7 @@ private func countdownLabel(_ model: TripActivityModel) -> String {
     switch countdownStage(model) {
     case .alarm: return "Leave in"
     case .departure: return "Departs in"
-    case .arrival: return "To destination"
+    case .arrival: return "To \(model.toStation)"
     }
 }
 
@@ -768,6 +772,8 @@ private struct HeadlineCountdown: View {
                     .font(.caption2.weight(.semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 RelativeCountdown(model: model)
                     .font(.system(size: 19, weight: .bold))
                     .lineLimit(1)
@@ -942,15 +948,16 @@ private struct TripProgressTrack: View {
 }
 
 /// Lock-screen banner. White-on-status-colour to match the app's "My Trip"
-/// card. Always shows the absolute departure → arrival times plus an "arrives
-/// in" duration. Reminder state now lives in the progress timeline rather than
-/// appearing as a redundant bell in the header.
+/// card. The destination is folded into the active countdown label rather than
+/// consuming a separate route row, keeping the banner comfortably inside
+/// ActivityKit's 160-point lock-screen height limit. Reminder state lives in the
+/// progress timeline rather than appearing as a redundant bell in the header.
 private struct LockScreenView: View {
     let model: TripActivityModel
     let isStale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Label {
                     Text(Brand.name)
@@ -962,16 +969,6 @@ private struct LockScreenView: View {
                 Spacer()
                 StatusPill(model: model, onColoredBackground: true)
             }
-
-            HStack(spacing: 6) {
-                Text(model.fromStation).lineLimit(1)
-                Image(systemName: "arrow.right")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
-                Text(model.toStation).lineLimit(1)
-            }
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
 
             // Equal-width halves so the (variable) countdown on the leading edge
             // and the (fixed) clock times on the trailing edge render at the
@@ -994,15 +991,18 @@ private struct LockScreenView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
-            TripProgressTrack(
-                model: model,
-                completedColor: .white,
-                remainingColor: .white.opacity(0.28),
-                markerFill: .white,
-                labelColor: .white.opacity(0.72)
-            )
+            if !model.isCanceled {
+                TripProgressTrack(
+                    model: model,
+                    completedColor: .white,
+                    remainingColor: .white.opacity(0.28),
+                    markerFill: .white,
+                    labelColor: .white.opacity(0.72)
+                )
+            }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         // iOS flips isStale once staleAfterEpochMs passes with no fresher
         // update (phone locked, no push) — dim so the figures read as
         // "last known" rather than live truth.

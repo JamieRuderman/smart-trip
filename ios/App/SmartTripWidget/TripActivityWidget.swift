@@ -56,6 +56,7 @@ struct TripActivityWidget: Widget {
                         completedColor: accent,
                         walkingColor: accent,
                         markerFill: accent,
+                        progressTrackColorScheme: .dark,
                         primaryColor: .white,
                         secondaryColor: .secondary
                     )
@@ -650,6 +651,7 @@ private struct JourneyProgressAndTiming: View {
     let completedColor: Color
     let walkingColor: Color
     let markerFill: Color
+    let progressTrackColorScheme: ColorScheme
     let primaryColor: Color
     let secondaryColor: Color
 
@@ -663,6 +665,11 @@ private struct JourneyProgressAndTiming: View {
                     trainColor: markerFill,
                     iconColor: primaryColor
                 )
+                // Date-relative ProgressView does not expose a separate track
+                // color. Choosing the local control appearance lets the blue
+                // Lock Screen use a dark neutral track while the black Dynamic
+                // Island retains its lighter system track.
+                .environment(\.colorScheme, progressTrackColorScheme)
             }
 
             ActiveEventTimingRow(
@@ -1020,6 +1027,7 @@ private struct LockScreenView: View {
                 completedColor: .white,
                 walkingColor: .white,
                 markerFill: .white,
+                progressTrackColorScheme: .light,
                 primaryColor: .white,
                 secondaryColor: .white.opacity(0.72)
             )

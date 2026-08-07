@@ -254,7 +254,13 @@ export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void
  * the user switched/cleared trips meanwhile; on commit we persist from the
  * LATEST record so a concurrently armed reminder isn't clobbered.
  */
-export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
+export async function startActivityForFocus(
+  saved: FocusedTrip,
+  /** Recovery path for an ActivityKit request that was immediately discarded
+   *  before iOS minted its push token. The local activity keeps the complete
+   *  timer/progress UI; only server-side delay corrections are unavailable. */
+  localOnly = false,
+): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
@@ -292,7 +298,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   // countdown is corrected while the phone is locked; everything else uses the
   // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
   let started: boolean;
-  if (isLiveActivityPushEnabled()) {
+  if (isLiveActivityPushEnabled() && !localOnly) {
     const registration = buildRegistrationForFocus(
       saved,
       id,
@@ -473,6 +479,22 @@ async function startOrReviveActivity(
   // Activity has had a chance to appear.
   if (keep != null && kept == null && (await isTripActivityRunning(keep))) {
     return false;
+  }
+  if (keep != null && kept == null) {
+    // A push-enabled request can be accepted and then immediately discarded by
+    // ActivityKit before a push token is minted (seen on physical iOS 26.6).
+    // Retrying the same push request loops forever. Remove the dead logical id
+    // and retry once through ActivityKit's local-only request path instead.
+    await endFocusActivity(focused);
+    await startActivityForFocus(
+      {
+        ...focused,
+        liveActivityId: undefined,
+        liveActivityScheduledFor: undefined,
+      },
+      true,
+    );
+    return true;
   }
   // Push builds never schedule the local auto-dismiss (the cron ends the
   // activity server-side at live arrival), so there an `ended` activity is a

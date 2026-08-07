@@ -753,19 +753,26 @@ private struct TripProgressTrack: View {
     private let alarmLeadTime: TimeInterval = 60 * 60
     private let markerSize: CGFloat = 20
     private let iconSize: CGFloat = 12
-    private let trackY: CGFloat = 10
+    private let trackHeight: CGFloat = 28
+    private let trackY: CGFloat = 14
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { timeline in
             let values = progressValues(at: timeline.date)
 
             GeometryReader { geometry in
-                let startX = markerSize / 2
-                let endX = max(startX, geometry.size.width - markerSize / 2)
-                let usableWidth = max(0, endX - startX)
-                let markerX = startX + usableWidth * values.fraction
-                let leaveX = startX + usableWidth * values.leaveMilestone
-                let boardingX = startX + usableWidth * values.boardingMilestone
+                // The line spans the full content width so its ends align with
+                // the text above and below. Only the marker's centre is clamped
+                // at the endpoints, keeping its 20-point circle inside bounds.
+                let startX: CGFloat = 0
+                let endX = geometry.size.width
+                let markerInset = markerSize / 2
+                let markerX = min(
+                    max(endX * values.fraction, markerInset),
+                    max(markerInset, endX - markerInset)
+                )
+                let leaveX = endX * values.leaveMilestone
+                let boardingX = endX * values.boardingMilestone
 
                 ZStack(alignment: .leading) {
                     SegmentedTrackLines(
@@ -803,7 +810,7 @@ private struct TripProgressTrack: View {
                         .position(x: markerX, y: trackY)
                 }
             }
-            .frame(height: markerSize)
+            .frame(height: trackHeight)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(values.accessibilityLabel)
             .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))

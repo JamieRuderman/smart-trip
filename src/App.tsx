@@ -1,4 +1,6 @@
 import { Suspense, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
+import { LiveActivity } from "capacitor-live-activity";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -82,6 +84,32 @@ const RoutedApp = () => {
 };
 
 const App = () => {
+  // Native diagnostic with production value: ActivityKit can remove a Live
+  // Activity after a successful request without surfacing a reason through the
+  // request call. Keep the lifecycle stream visible in Xcode so an unexpected
+  // active/stale/ended/dismissed transition can be distinguished from a failed
+  // API call or backend push without attaching to the widget process.
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== "ios") return;
+    let disposed = false;
+    let remove: (() => Promise<void>) | undefined;
+    void LiveActivity.addListener("liveActivityUpdate", (event) => {
+      console.warn(
+        `[SMART Train] Live Activity ${event.id} (${event.activityId}) state=${event.state}`,
+      );
+    }).then((handle) => {
+      if (disposed) {
+        void handle.remove();
+      } else {
+        remove = () => handle.remove();
+      }
+    });
+    return () => {
+      disposed = true;
+      if (remove) void remove();
+    };
+  }, []);
+
   useAppForegroundRefresh(async () => {
     emitAppRefreshEvent();
     // Re-read the focused trip so a reminder that fired while we were away

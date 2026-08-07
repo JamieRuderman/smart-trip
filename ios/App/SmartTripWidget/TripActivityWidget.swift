@@ -38,11 +38,7 @@ struct TripActivityWidget: Widget {
             let accent = statusColor(model)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label {
-                        Text(Brand.name)
-                    } icon: {
-                        TrainIcon(size: 14).foregroundStyle(accent)
-                    }
+                    Text(Brand.name)
                     .font(.caption.weight(.semibold))
                     .padding(.leading, 8)
                 }
@@ -687,43 +683,37 @@ private struct ActiveEventTimingRow: View {
     let secondaryColor: Color
 
     var body: some View {
-        GeometryReader { geometry in
-            let gap: CGFloat = 6
-            let countdownWidth = min(156, max(144, geometry.size.width * 0.46))
-            let destinationWidth = max(0, geometry.size.width - countdownWidth - gap)
-
-            HStack(alignment: .firstTextBaseline, spacing: gap) {
-                Group {
-                    if model.isCanceled {
-                        Text("Cancelled")
-                    } else if isArrived(model) {
-                        Text("Arrived")
-                    } else {
-                        HStack(spacing: 4) {
-                            Text("\(activeEventLabel) in")
-                                .foregroundStyle(secondaryColor)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.78)
-                                .layoutPriority(1)
-                            RelativeCountdown(model: model)
-                                .monospacedDigit()
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Group {
+                if model.isCanceled {
+                    Text("Cancelled")
+                } else if isArrived(model) {
+                    Text("Arrived")
+                } else {
+                    HStack(spacing: 4) {
+                        Text("\(activeEventLabel) in")
+                            .foregroundStyle(secondaryColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .layoutPriority(1)
+                        RelativeCountdown(model: model)
+                            .monospacedDigit()
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 }
-                .font(.system(size: 17, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .frame(width: countdownWidth, alignment: .leading)
-
-                Text(model.toStation)
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .frame(width: destinationWidth, alignment: .trailing)
             }
-            .foregroundStyle(primaryColor)
+            .font(.system(size: 17, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .frame(minWidth: 144, idealWidth: 150, maxWidth: 156, alignment: .leading)
+
+            Text(model.toStation)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .foregroundStyle(primaryColor)
         .frame(height: 22)
     }
 
@@ -1014,11 +1004,7 @@ private struct LockScreenView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
-                Label {
-                    Text(Brand.name)
-                } icon: {
-                    TrainIcon(size: 16)
-                }
+                Text(Brand.name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.9))
                 Spacer()
@@ -1120,6 +1106,25 @@ private enum TripActivityPreviewData {
         ])
     }
 
+    /// A focused train without a leave alarm. This exercises the train-only
+    /// native bar and guards the countdown/destination row against disappearing.
+    static var noReminderState: GenericAttributes.ContentState {
+        let now = Date()
+        let departure = now.addingTimeInterval(5 * 60)
+        let arrival = now.addingTimeInterval(11 * 60)
+        return GenericAttributes.ContentState(values: [
+            "phase": "pre-departure",
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "false",
+            "alarmPending": "false",
+        ])
+    }
+
     private static func epochMs(_ date: Date) -> String {
         String(Int(date.timeIntervalSince1970 * 1000))
     }
@@ -1129,6 +1134,7 @@ private enum TripActivityPreviewData {
 #Preview("Lock Screen", as: .content, using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
@@ -1138,6 +1144,7 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Compact", as: .dynamicIsland(.compact), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
@@ -1147,6 +1154,7 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Expanded", as: .dynamicIsland(.expanded), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState

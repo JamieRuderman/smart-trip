@@ -5,8 +5,8 @@ import WidgetKit
 /**
  * The focused-trip Live Activity. The lock screen and expanded Dynamic Island
  * intentionally share the same compact hierarchy: brand + active clock time, an
- * alarm → walk → train → arrival timeline with the active icon inside its
- * moving marker, then the live countdown beside the destination. All
+ * alarm → walk → train timeline with system-managed progress segments and
+ * milestone icons, then the live countdown beside the destination. All
  * content arrives via
  * `GenericAttributes` from the app/server (see TripActivityModel).
  *
@@ -58,10 +58,8 @@ struct TripActivityWidget: Widget {
                     JourneyProgressAndTiming(
                         model: model,
                         completedColor: accent,
-                        remainingColor: .white.opacity(0.2),
                         walkingColor: accent,
                         markerFill: accent,
-                        markerForeground: .white,
                         primaryColor: .white,
                         secondaryColor: .secondary
                     )
@@ -654,10 +652,8 @@ private struct RelativeCountdown: View {
 private struct JourneyProgressAndTiming: View {
     let model: TripActivityModel
     let completedColor: Color
-    let remainingColor: Color
     let walkingColor: Color
     let markerFill: Color
-    let markerForeground: Color
     let primaryColor: Color
     let secondaryColor: Color
 
@@ -666,11 +662,10 @@ private struct JourneyProgressAndTiming: View {
             if !model.isCanceled {
                 TripProgressTrack(
                     model: model,
-                    completedColor: completedColor,
-                    remainingColor: remainingColor,
+                    alarmColor: completedColor.opacity(0.72),
                     walkingColor: walkingColor,
-                    markerFill: markerFill,
-                    markerForeground: markerForeground
+                    trainColor: markerFill,
+                    iconColor: primaryColor
                 )
             }
 
@@ -763,96 +758,101 @@ private struct ActiveEventClock: View {
     }
 }
 
-/// A self-advancing, three-stage journey track: time to the leave alarm,
-/// walking to the station, then riding the train. Segment widths are proportional
-/// to their real durations, with only a marker-width minimum for short stages.
-/// The alarm segment is dotted, the walk segment is deliberately thinner than
-/// the train segment, and the moving dot carries the active bell → walker →
-/// train → destination icon while the app is suspended.
+/// Three native, date-relative progress bars: time to the leave alarm, walking
+/// to the station, then riding the train. SwiftUI advances each segment from its
+/// date interval without requiring the widget extension to run a periodic
+/// timeline. Widths remain proportional to the real stage durations, with a
+/// small minimum for short stages. Bell → walker → train → destination
+/// icons label the four boundaries above the bars.
 private struct TripProgressTrack: View {
     let model: TripActivityModel
-    let completedColor: Color
-    let remainingColor: Color
+    let alarmColor: Color
     let walkingColor: Color
-    let markerFill: Color
-    let markerForeground: Color
+    let trainColor: Color
+    let iconColor: Color
 
     private let alarmLeadTime: TimeInterval = 60 * 60
-    private let markerSize: CGFloat = 20
-    private let iconSize: CGFloat = 12
-    private let trackHeight: CGFloat = 28
-    private let trackY: CGFloat = 14
+    private let minimumSegmentWidth: CGFloat = 20
+    private let iconSize: CGFloat = 11
+    private let segmentGap: CGFloat = 4
+    private let trackHeight: CGFloat = 30
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-            GeometryReader { geometry in
-                let values = progressValues(at: timeline.date, trackWidth: geometry.size.width)
-                // The line spans the full content width so its ends align with
-                // the text above and below. Only the marker's centre is clamped
-                // at the endpoints, keeping its 20-point circle inside bounds.
-                let startX: CGFloat = 0
-                let endX = geometry.size.width
-                let markerInset = markerSize / 2
-                let markerX = min(
-                    max(endX * values.fraction, markerInset),
-                    max(markerInset, endX - markerInset)
-                )
-                let leaveX = endX * values.leaveMilestone
-                let boardingX = endX * values.boardingMilestone
+        GeometryReader { geometry in
+            let hasReminderJourney: Bool = {
+                guard model.reminderSet,
+                      let reminder = model.reminderDate,
+                      let departure = model.departureDate else { return false }
+                return reminder < departure
+            }()
+            let gapCount: CGFloat = hasReminderJourney ? 2 : 0
+            let availableWidth = max(0, geometry.size.width - segmentGap * gapCount)
+            let values = segmentValues(trackWidth: availableWidth)
 
-                ZStack(alignment: .leading) {
-                    SegmentedTrackLines(
-                        startX: startX,
-                        leaveX: leaveX,
-                        boardingX: boardingX,
-                        endX: endX,
-                        y: trackY,
-                        hasReminderJourney: values.hasReminderJourney,
-                        color: remainingColor,
-                        walkColor: walkingColor,
-                        trainColor: markerFill
-                    )
+            ZStack(alignment: .topLeading) {
+                HStack(spacing: values.hasReminderJourney ? segmentGap : 0) {
+                    if values.hasReminderJourney,
+                       let progressStart = values.progressStart,
+                       let reminder = values.reminder {
+                        NativeTimerProgress(
+                            start: progressStart,
+                            end: reminder,
+                            color: alarmColor
+                        )
+                        .frame(width: values.widths[0])
 
-                    SegmentedTrackLines(
-                        startX: startX,
-                        leaveX: leaveX,
-                        boardingX: boardingX,
-                        endX: endX,
-                        y: trackY,
-                        hasReminderJourney: values.hasReminderJourney,
-                        color: completedColor,
-                        walkColor: walkingColor,
-                        trainColor: markerFill
-                    )
-                    .mask(alignment: .leading) {
-                        Rectangle().frame(width: markerX)
+                        NativeTimerProgress(
+                            start: reminder,
+                            end: values.departure,
+                            color: walkingColor
+                        )
+                        .frame(width: values.widths[1])
                     }
 
-                    Circle()
-                        .fill(markerFill)
-                        .frame(width: markerSize, height: markerSize)
-                        .overlay {
-                            ProgressMilestoneIcon(phase: values.phase, size: iconSize)
-                                .foregroundStyle(markerForeground)
-                        }
-                        .position(x: markerX, y: trackY)
-                        .animation(.linear(duration: 1), value: values.fraction)
+                    NativeTimerProgress(
+                        start: values.departure,
+                        end: values.arrival,
+                        color: trainColor
+                    )
+                    .frame(width: values.widths[2])
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(values.accessibilityLabel)
-                .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 17)
+
+                if values.hasReminderJourney {
+                    milestoneIcon(.alarm, x: 0, totalWidth: geometry.size.width)
+                    milestoneIcon(
+                        .walking,
+                        x: values.widths[0] + segmentGap / 2,
+                        totalWidth: geometry.size.width
+                    )
+                    milestoneIcon(
+                        .train,
+                        x: values.widths[0] + segmentGap + values.widths[1] + segmentGap / 2,
+                        totalWidth: geometry.size.width
+                    )
+                } else {
+                    milestoneIcon(.train, x: 0, totalWidth: geometry.size.width)
+                }
+                milestoneIcon(.arrival, x: geometry.size.width, totalWidth: geometry.size.width)
             }
-            .frame(height: trackHeight)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(
+                values.hasReminderJourney
+                    ? "Trip progress: alarm, walk, and train"
+                    : "Train trip progress"
+            ))
         }
+        .frame(height: trackHeight)
     }
 
-    private struct Values {
-        let fraction: CGFloat
-        let leaveMilestone: CGFloat
-        let boardingMilestone: CGFloat
+    private struct SegmentValues {
+        let widths: [CGFloat]
         let hasReminderJourney: Bool
-        let phase: ProgressPhase
-        let accessibilityLabel: Text
+        let progressStart: Date?
+        let reminder: Date?
+        let departure: Date
+        let arrival: Date
     }
 
     private enum ProgressPhase {
@@ -874,139 +874,90 @@ private struct TripProgressTrack: View {
         }
     }
 
-    private struct SegmentedTrackLines: View {
-        let startX: CGFloat
-        let leaveX: CGFloat
-        let boardingX: CGFloat
-        let endX: CGFloat
-        let y: CGFloat
-        let hasReminderJourney: Bool
+    private struct NativeTimerProgress: View {
+        let start: Date
+        let end: Date
         let color: Color
-        let walkColor: Color
-        let trainColor: Color
 
         var body: some View {
-            ZStack {
-                if hasReminderJourney {
-                    line(from: startX, to: leaveX)
-                        .stroke(
-                            color,
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 5])
-                        )
-                    line(from: leaveX, to: boardingX)
-                        .stroke(walkColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    line(from: boardingX, to: endX)
-                        .stroke(trainColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                } else {
-                    line(from: startX, to: endX)
-                        .stroke(trainColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                }
-            }
-        }
-
-        private func line(from start: CGFloat, to end: CGFloat) -> Path {
-            Path { path in
-                path.move(to: CGPoint(x: start, y: y))
-                path.addLine(to: CGPoint(x: end, y: y))
-            }
+            ProgressView(timerInterval: start...end, countsDown: false)
+                .tint(color)
+                .labelsHidden()
         }
     }
 
-    private func progressValues(at now: Date, trackWidth: CGFloat) -> Values {
+    private func milestoneIcon(
+        _ phase: ProgressPhase,
+        x: CGFloat,
+        totalWidth: CGFloat
+    ) -> some View {
+        let inset = iconSize / 2
+        let clampedX = min(max(x, inset), max(inset, totalWidth - inset))
+        return ProgressMilestoneIcon(phase: phase, size: iconSize)
+            .foregroundStyle(iconColor)
+            .position(x: clampedX, y: iconSize / 2)
+    }
+
+    private func segmentValues(trackWidth: CGFloat) -> SegmentValues {
         guard let departure = model.departureDate,
               let arrival = model.arrivalDate,
               arrival > departure else {
-            return Values(
-                fraction: 0,
-                leaveMilestone: 0,
-                boardingMilestone: 0,
+            let now = Date()
+            return SegmentValues(
+                widths: [0, 0, trackWidth],
                 hasReminderJourney: false,
-                phase: .train,
-                accessibilityLabel: Text("Trip progress")
+                progressStart: nil,
+                reminder: nil,
+                departure: now,
+                arrival: now.addingTimeInterval(1)
             )
         }
 
         let reminder = model.reminderSet ? model.reminderDate : nil
         let hasReminderJourney = reminder.map { $0 < departure } ?? false
-        let shares: [CGFloat]
+        let progressStart: Date?
+        let widths: [CGFloat]
         if hasReminderJourney, let reminder {
-            let progressStart = model.timelineStartDate
-                ?? reminder.addingTimeInterval(-alarmLeadTime)
-            shares = proportionalShares(
+            let start = min(
+                model.timelineStartDate ?? reminder.addingTimeInterval(-alarmLeadTime),
+                reminder.addingTimeInterval(-1)
+            )
+            progressStart = start
+            widths = proportionalWidths(
                 durations: [
-                    max(0, reminder.timeIntervalSince(progressStart)),
+                    max(0, reminder.timeIntervalSince(start)),
                     departure.timeIntervalSince(reminder),
                     arrival.timeIntervalSince(departure),
                 ],
                 trackWidth: trackWidth
             )
         } else {
-            shares = [0, 0, 1]
-        }
-        let alarmShare = shares[0]
-        let walkingShare = shares[1]
-        let trainShare = shares[2]
-        let leaveMilestone = alarmShare
-        let boardingMilestone = alarmShare + walkingShare
-        let fraction: CGFloat
-        let phase: ProgressPhase
-        let accessibilityLabel: Text
-
-        if now >= arrival {
-            fraction = 1
-            phase = .arrival
-            accessibilityLabel = Text("Arrived")
-        } else if hasReminderJourney, let reminder, now < reminder {
-            let progressStart = min(
-                model.timelineStartDate ?? reminder.addingTimeInterval(-alarmLeadTime),
-                reminder
-            )
-            fraction = alarmShare * elapsedFraction(from: progressStart, to: reminder, now: now)
-            phase = .alarm
-            accessibilityLabel = Text("Time until leave alarm")
-        } else if hasReminderJourney, let reminder, now < departure {
-            fraction = alarmShare + walkingShare * elapsedFraction(from: reminder, to: departure, now: now)
-            phase = .walking
-            accessibilityLabel = Text("Walking to the train")
-        } else if now < departure {
-            fraction = 0
-            phase = .train
-            accessibilityLabel = Text("Waiting for train departure")
-        } else {
-            let trainFraction = elapsedFraction(from: departure, to: arrival, now: now)
-            fraction = boardingMilestone + trainShare * trainFraction
-            phase = .train
-            accessibilityLabel = Text("Train trip progress")
+            progressStart = nil
+            widths = [0, 0, trackWidth]
         }
 
-        return Values(
-            fraction: min(max(fraction, 0), 1),
-            leaveMilestone: leaveMilestone,
-            boardingMilestone: boardingMilestone,
+        return SegmentValues(
+            widths: widths,
             hasReminderJourney: hasReminderJourney,
-            phase: phase,
-            accessibilityLabel: accessibilityLabel
+            progressStart: progressStart,
+            reminder: reminder,
+            departure: departure,
+            arrival: arrival
         )
     }
 
-    private func elapsedFraction(from start: Date, to end: Date, now: Date) -> CGFloat {
-        let duration = end.timeIntervalSince(start)
-        guard duration > 0 else { return now >= end ? 1 : 0 }
-        return CGFloat(min(max(now.timeIntervalSince(start) / duration, 0), 1))
-    }
-
     /// Allocate the available width proportionally, then clamp only genuinely
-    /// short stages to one marker diameter and redistribute the rest among the
-    /// longer stages. This preserves duration truth without letting a short walk
-    /// or alarm become too narrow to read beneath the moving marker.
-    private func proportionalShares(
+    /// short stages to a compact readable minimum and redistribute the rest
+    /// among the longer stages. This preserves duration truth without letting a
+    /// short walk or alarm become too narrow to recognize.
+    private func proportionalWidths(
         durations: [TimeInterval],
         trackWidth: CGFloat
     ) -> [CGFloat] {
-        guard !durations.isEmpty, trackWidth > 0 else { return [0, 0, 1] }
+        guard !durations.isEmpty, trackWidth > 0 else { return [0, 0, max(0, trackWidth)] }
 
         let positiveDurations = durations.map { max(0, $0) }
-        let minimumWidth = min(markerSize, trackWidth / CGFloat(durations.count))
+        let minimumWidth = min(minimumSegmentWidth, trackWidth / CGFloat(durations.count))
         var widths = Array(repeating: CGFloat.zero, count: durations.count)
         var remaining = Array(durations.indices)
         var remainingWidth = trackWidth
@@ -1035,7 +986,7 @@ private struct TripProgressTrack: View {
                 : remainingWidth / CGFloat(remaining.count)
         }
 
-        return widths.map { $0 / trackWidth }
+        return widths
     }
 }
 
@@ -1069,10 +1020,8 @@ private struct LockScreenView: View {
             JourneyProgressAndTiming(
                 model: model,
                 completedColor: .white,
-                remainingColor: .white.opacity(0.28),
                 walkingColor: .white,
                 markerFill: .white,
-                markerForeground: statusColor(model),
                 primaryColor: .white,
                 secondaryColor: .white.opacity(0.72)
             )

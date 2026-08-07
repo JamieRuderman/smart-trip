@@ -5,7 +5,8 @@ import WidgetKit
 /**
  * The focused-trip Live Activity: the lock screen and Dynamic Island show the
  * absolute departure → arrival clock times plus an "arrives in" duration, with a
- * bell when a reminder is armed. All content arrives via `GenericAttributes`
+ * a three-stage alarm → walk → train timeline when a reminder is armed. All
+ * content arrives via `GenericAttributes`
  * from the app/server (see TripActivityModel for the key contract).
  *
  * The headline countdown advances through three stages (see `CountdownStage`):
@@ -46,56 +47,60 @@ struct TripActivityWidget: Widget {
                     .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    HStack(spacing: 6) {
-                        StatusPill(model: model)
-                        if model.reminderSet {
-                            BellRingIcon(size: 13)
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                    }
+                    StatusPill(model: model)
                     .padding(.trailing, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack(alignment: .lastTextBaseline) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            if model.isCanceled {
-                                Text("Cancelled").font(.headline.weight(.bold)).foregroundStyle(accent)
-                            } else if isArrived(model) {
-                                Text("Arrived").font(.headline.weight(.bold)).foregroundStyle(accent)
-                            } else {
-                                Text(countdownLabel(model))
+                    VStack(spacing: 10) {
+                        HStack(alignment: .lastTextBaseline) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                if model.isCanceled {
+                                    Text("Cancelled").font(.headline.weight(.bold)).foregroundStyle(accent)
+                                } else if isArrived(model) {
+                                    Text("Arrived").font(.headline.weight(.bold)).foregroundStyle(accent)
+                                } else {
+                                    Text(countdownLabel(model))
+                                        .font(.caption2.weight(.semibold))
+                                        .textCase(.uppercase)
+                                        .foregroundStyle(.secondary)
+                                    RelativeCountdown(model: model)
+                                        .font(.system(size: 22, weight: .bold))
+                                        .foregroundStyle(accent)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                }
+                            }
+                            Spacer(minLength: 10)
+                            // spacing 1 (not 3) drops "TRIP n" down toward the route:
+                            // the 2-line route makes this column taller than the
+                            // countdown opposite, and `.lastTextBaseline` pins the
+                            // bottoms, so a tighter label gap lowers the label.
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text("Trip \(model.tripNumber)")
                                     .font(.caption2.weight(.semibold))
                                     .textCase(.uppercase)
                                     .foregroundStyle(.secondary)
-                                RelativeCountdown(model: model)
-                                    .font(.system(size: 22, weight: .bold))
-                                    .foregroundStyle(accent)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                            }
-                        }
-                        Spacer(minLength: 10)
-                        // spacing 1 (not 3) drops "TRIP n" down toward the route:
-                        // the 2-line route makes this column taller than the
-                        // countdown opposite, and `.lastTextBaseline` pins the
-                        // bottoms, so a tighter label gap lowers the label.
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text("Trip \(model.tripNumber)")
-                                .font(.caption2.weight(.semibold))
-                                .textCase(.uppercase)
-                                .foregroundStyle(.secondary)
-                            VStack(alignment: .trailing, spacing: 0) {
-                                Text(model.fromStation).lineLimit(1)
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.right")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text(model.toStation).lineLimit(1)
+                                VStack(alignment: .trailing, spacing: 0) {
+                                    Text(model.fromStation).lineLimit(1)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.right")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(model.toStation).lineLimit(1)
+                                    }
                                 }
+                                .font(.system(size: 14, weight: .semibold))
+                                .minimumScaleFactor(0.8)
                             }
-                            .font(.system(size: 14, weight: .semibold))
-                            .minimumScaleFactor(0.8)
                         }
+
+                        TripProgressTrack(
+                            model: model,
+                            completedColor: accent,
+                            remainingColor: .white.opacity(0.2),
+                            markerFill: accent,
+                            labelColor: .secondary
+                        )
                     }
                     .padding(.horizontal, 8)
                     // Push the whole bottom row down off the header row so
@@ -773,9 +778,173 @@ private struct HeadlineCountdown: View {
     }
 }
 
+/// A self-advancing, three-stage journey track: time to the leave alarm,
+/// walking to the station, then riding the train. Fixed visual shares keep the
+/// pre-alarm and walking stages legible even when the train ride is much longer.
+/// The marker uses the widget's own clock, so it keeps moving while the app is
+/// suspended and changes bell → walking person → train at each milestone.
+private struct TripProgressTrack: View {
+    let model: TripActivityModel
+    let completedColor: Color
+    let remainingColor: Color
+    let markerFill: Color
+    let labelColor: Color
+
+    private let alarmShare: CGFloat = 0.18
+    private let walkingShare: CGFloat = 0.26
+    private let alarmLeadTime: TimeInterval = 60 * 60
+    private let markerSize: CGFloat = 18
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            let values = progressValues(at: timeline.date)
+
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    if values.hasReminderJourney {
+                        ProgressLegendItem(phase: .alarm, text: "Alarm")
+                        Spacer(minLength: 5)
+                        ProgressLegendItem(phase: .walking, text: "Walk")
+                        Spacer(minLength: 5)
+                        ProgressLegendItem(phase: .train, text: "Train")
+                        Spacer(minLength: 5)
+                        ProgressLegendItem(phase: .arrival, text: "Arrive")
+                    } else {
+                        ProgressLegendItem(phase: .train, text: "Train")
+                        Spacer(minLength: 8)
+                        ProgressLegendItem(phase: .arrival, text: "Arrive")
+                    }
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(labelColor)
+
+                GeometryReader { geometry in
+                    let usableWidth = max(0, geometry.size.width - markerSize)
+                    let markerX = markerSize / 2 + usableWidth * values.fraction
+                    let leaveX = markerSize / 2 + usableWidth * values.leaveMilestone
+                    let boardingX = markerSize / 2 + usableWidth * values.boardingMilestone
+
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(remainingColor)
+                            .frame(height: 4)
+                            .padding(.horizontal, markerSize / 2)
+
+                        Capsule()
+                            .fill(completedColor)
+                            .frame(width: usableWidth * values.fraction, height: 4)
+                            .padding(.leading, markerSize / 2)
+
+                        if values.hasReminderJourney {
+                            ForEach([leaveX, boardingX], id: \.self) { milestoneX in
+                                Circle()
+                                    .fill(completedColor)
+                                    .frame(width: 7, height: 7)
+                                    .position(x: milestoneX, y: markerSize / 2)
+                            }
+                        }
+
+                        Circle()
+                            .fill(markerFill)
+                            .frame(width: markerSize, height: markerSize)
+                            .position(x: markerX, y: markerSize / 2)
+                    }
+                }
+                .frame(height: markerSize)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(values.accessibilityLabel)
+            .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))
+        }
+    }
+
+    private struct Values {
+        let fraction: CGFloat
+        let leaveMilestone: CGFloat
+        let boardingMilestone: CGFloat
+        let hasReminderJourney: Bool
+        let accessibilityLabel: Text
+    }
+
+    private enum ProgressPhase {
+        case alarm, walking, train, arrival
+    }
+
+    private struct ProgressLegendItem: View {
+        let phase: ProgressPhase
+        let text: String
+
+        var body: some View {
+            HStack(spacing: 4) {
+                Group {
+                    switch phase {
+                    case .alarm: BellRingIcon(size: 10, strokeRatio: 0.1)
+                    case .walking: WalkIcon(size: 10, strokeRatio: 0.1)
+                    case .train: TrainIcon(size: 10, strokeRatio: 0.1)
+                    case .arrival: MapPinIcon(size: 10, strokeRatio: 0.1)
+                    }
+                }
+                Text(text)
+            }
+        }
+    }
+
+    private func progressValues(at now: Date) -> Values {
+        guard let departure = model.departureDate,
+              let arrival = model.arrivalDate,
+              arrival > departure else {
+            return Values(
+                fraction: 0,
+                leaveMilestone: 0,
+                boardingMilestone: 0,
+                hasReminderJourney: false,
+                accessibilityLabel: Text("Trip progress")
+            )
+        }
+
+        let reminder = model.reminderSet ? model.reminderDate : nil
+        let hasReminderJourney = reminder.map { $0 < departure } ?? false
+        let leaveMilestone = hasReminderJourney ? alarmShare : 0
+        let boardingMilestone = hasReminderJourney ? alarmShare + walkingShare : 0
+        let fraction: CGFloat
+        let accessibilityLabel: Text
+
+        if hasReminderJourney, let reminder, now < reminder {
+            let progressStart = reminder.addingTimeInterval(-alarmLeadTime)
+            fraction = alarmShare * elapsedFraction(from: progressStart, to: reminder, now: now)
+            accessibilityLabel = Text("Time until leave alarm")
+        } else if hasReminderJourney, let reminder, now < departure {
+            fraction = alarmShare + walkingShare * elapsedFraction(from: reminder, to: departure, now: now)
+            accessibilityLabel = Text("Walking to the train")
+        } else if now < departure {
+            fraction = 0
+            accessibilityLabel = Text("Waiting for train departure")
+        } else {
+            let trainFraction = elapsedFraction(from: departure, to: arrival, now: now)
+            fraction = boardingMilestone + (1 - boardingMilestone) * trainFraction
+            accessibilityLabel = Text("Train trip progress")
+        }
+
+        return Values(
+            fraction: min(max(fraction, 0), 1),
+            leaveMilestone: leaveMilestone,
+            boardingMilestone: boardingMilestone,
+            hasReminderJourney: hasReminderJourney,
+            accessibilityLabel: accessibilityLabel
+        )
+    }
+
+    private func elapsedFraction(from start: Date, to end: Date, now: Date) -> CGFloat {
+        let duration = end.timeIntervalSince(start)
+        guard duration > 0 else { return now >= end ? 1 : 0 }
+        return CGFloat(min(max(now.timeIntervalSince(start) / duration, 0), 1))
+    }
+}
+
 /// Lock-screen banner. White-on-status-colour to match the app's "My Trip"
 /// card. Always shows the absolute departure → arrival times plus an "arrives
-/// in" duration; a bell flags an armed reminder.
+/// in" duration. Reminder state now lives in the progress timeline rather than
+/// appearing as a redundant bell in the header.
 private struct LockScreenView: View {
     let model: TripActivityModel
     let isStale: Bool
@@ -792,10 +961,6 @@ private struct LockScreenView: View {
                 .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 StatusPill(model: model, onColoredBackground: true)
-                if model.reminderSet {
-                    BellRingIcon(size: 15)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
             }
 
             HStack(spacing: 6) {
@@ -828,6 +993,14 @@ private struct LockScreenView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
+
+            TripProgressTrack(
+                model: model,
+                completedColor: .white,
+                remainingColor: .white.opacity(0.28),
+                markerFill: .white,
+                labelColor: .white.opacity(0.72)
+            )
         }
         .padding(16)
         // iOS flips isStale once staleAfterEpochMs passes with no fresher
@@ -889,6 +1062,27 @@ private enum TripActivityPreviewData {
         ])
     }
 
+    /// Leave alarm has fired and the rider is part-way through the walk to the
+    /// station, so previews exercise the first moving leg of the progress bar.
+    static var walkingState: GenericAttributes.ContentState {
+        let now = Date()
+        let reminder = now.addingTimeInterval(-5 * 60)
+        let departure = now.addingTimeInterval(10 * 60)
+        let arrival = now.addingTimeInterval(87 * 60)
+        return GenericAttributes.ContentState(values: [
+            "phase": "pre-departure",
+            "reminderEpochMs": epochMs(reminder),
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "true",
+            "alarmPending": "false",
+        ])
+    }
+
     private static func epochMs(_ date: Date) -> String {
         String(Int(date.timeIntervalSince1970 * 1000))
     }
@@ -899,6 +1093,7 @@ private enum TripActivityPreviewData {
     TripActivityWidget()
 } contentStates: {
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 
@@ -907,6 +1102,7 @@ private enum TripActivityPreviewData {
     TripActivityWidget()
 } contentStates: {
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 
@@ -915,6 +1111,7 @@ private enum TripActivityPreviewData {
     TripActivityWidget()
 } contentStates: {
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 

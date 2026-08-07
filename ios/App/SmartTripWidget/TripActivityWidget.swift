@@ -690,7 +690,7 @@ private struct ActiveEventTimingRow: View {
     let secondaryColor: Color
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .center, spacing: 6) {
             Group {
                 if model.isCanceled {
                     Text("Cancelled")
@@ -712,16 +712,18 @@ private struct ActiveEventTimingRow: View {
             .font(.system(size: 17, weight: .bold))
             .lineLimit(1)
             .minimumScaleFactor(0.78)
-            .frame(minWidth: 144, idealWidth: 150, maxWidth: 156, alignment: .leading)
+            .layoutPriority(2)
+
+            Spacer(minLength: 0)
 
             Text(model.toStation)
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .layoutPriority(1)
         }
         .foregroundStyle(primaryColor)
-        .frame(height: 22)
+        .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
     }
 
     private var activeEventLabel: String {

@@ -692,34 +692,40 @@ private struct ActiveEventTimingRow: View {
     let secondaryColor: Color
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Group {
-                if model.isCanceled {
-                    Text("Cancelled")
-                } else if isArrived(model) {
-                    Text("Arrived")
-                } else {
-                    HStack(spacing: 4) {
-                        Text("\(activeEventLabel) in")
-                            .foregroundStyle(secondaryColor)
-                        RelativeCountdown(model: model)
-                            .monospacedDigit()
+        GeometryReader { geometry in
+            let gap: CGFloat = 6
+            let countdownWidth = min(150, max(132, geometry.size.width * 0.43))
+            let destinationWidth = max(0, geometry.size.width - countdownWidth - gap)
+
+            HStack(alignment: .firstTextBaseline, spacing: gap) {
+                Group {
+                    if model.isCanceled {
+                        Text("Cancelled")
+                    } else if isArrived(model) {
+                        Text("Arrived")
+                    } else {
+                        HStack(spacing: 4) {
+                            Text("\(activeEventLabel) in")
+                                .foregroundStyle(secondaryColor)
+                            RelativeCountdown(model: model)
+                                .monospacedDigit()
+                        }
                     }
                 }
-            }
-            .font(.system(size: 17, weight: .bold))
-            .layoutPriority(2)
-
-            Spacer(minLength: 6)
-
-            Text(model.toStation)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 17, weight: .bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .layoutPriority(0)
+                .minimumScaleFactor(0.78)
+                .frame(width: countdownWidth, alignment: .leading)
+
+                Text(model.toStation)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(width: destinationWidth, alignment: .trailing)
+            }
+            .foregroundStyle(primaryColor)
         }
-        .foregroundStyle(primaryColor)
-        .lineLimit(1)
+        .frame(height: 22)
     }
 
     private var activeEventLabel: String {

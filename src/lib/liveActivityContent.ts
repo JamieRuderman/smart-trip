@@ -59,10 +59,6 @@ export interface TripActivityContentState {
    *  "Departs in" countdown. Mirrors `phase`'s precompute discipline — the
    *  widget keys its icon/label on this flag, never on its own clock. */
   alarmPending: boolean;
-  /** Stable instant this activity first became visible. The widget uses it as
-   *  the beginning of the alarm leg instead of assuming the full eligibility
-   *  window was visible. */
-  timelineStartEpochMs?: number;
   /** ActivityKit staleDate (epoch ms): when the OS should mark the activity
    *  visually stale because JS may not have corrected it (phone locked). */
   staleAfterEpochMs?: number;
@@ -252,7 +248,6 @@ export function buildContentState(args: {
   reminderSet?: boolean;
   /** Absolute fire instant of the armed leave alarm (epoch ms), if any. */
   reminderEpochMs?: number | null;
-  timelineStartEpochMs?: number | null;
   now: number;
 }): TripActivityContentState {
   const phase = derivePhase({ departureEpochMs: args.departureEpochMs, now: args.now });
@@ -280,9 +275,6 @@ export function buildContentState(args: {
     isEnded: args.isEnded,
     reminderSet,
     ...(reminderEpochMs != null ? { reminderEpochMs } : {}),
-    ...(args.timelineStartEpochMs != null
-      ? { timelineStartEpochMs: args.timelineStartEpochMs }
-      : {}),
     alarmPending,
     staleAfterEpochMs: alarmPending
       ? reminderEpochMs!
@@ -331,9 +323,6 @@ export function encodeContentState(
     alarmPending: String(c.alarmPending),
     ...(c.reminderEpochMs != null
       ? { reminderEpochMs: String(c.reminderEpochMs) }
-      : {}),
-    ...(c.timelineStartEpochMs != null
-      ? { timelineStartEpochMs: String(c.timelineStartEpochMs) }
       : {}),
     ...(c.staleAfterEpochMs != null
       ? { staleAfterEpochMs: String(c.staleAfterEpochMs) }

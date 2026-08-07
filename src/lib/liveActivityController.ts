@@ -197,7 +197,6 @@ function buildRegistrationForFocus(
   saved: FocusedTrip,
   id: string,
   activityStartEpochMs: number | undefined = saved.liveActivityScheduledFor,
-  timelineStartEpochMs: number | undefined = saved.liveActivityTimelineStart,
 ): LiveActivityRegistration | null {
   const trip = reconstructFocusedTrip(saved);
   const departureAt = focusedDepartureInstant(saved);
@@ -222,7 +221,6 @@ function buildRegistrationForFocus(
     // push would drop the "Leave in" stage back to "Departs in").
     ...(saved.reminder ? { reminderLeadMinutes: saved.reminder.leadMinutes } : {}),
     ...(activityStartEpochMs != null ? { activityStartEpochMs } : {}),
-    ...(timelineStartEpochMs != null ? { timelineStartEpochMs } : {}),
   };
 }
 
@@ -272,7 +270,6 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     return;
   }
   const id = tripActivityId(saved.tripNumber, saved.serviceDate);
-  const timelineStart = Date.now();
   const attributes = attributesFor(saved);
   const content = buildContentState({
     departureEpochMs: departureAt,
@@ -284,20 +281,14 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isEnded: false,
     reminderSet: saved.reminder != null,
     reminderEpochMs: saved.reminder?.reminderAt ?? null,
-    timelineStartEpochMs: timelineStart,
-    now: timelineStart,
+    now: Date.now(),
   });
   // Push-enabled builds register the trip + APNs token with the backend so the
   // countdown is corrected while the phone is locked; everything else uses the
   // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
   let started: boolean;
   if (isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(
-      saved,
-      id,
-      undefined,
-      timelineStart,
-    );
+    const registration = buildRegistrationForFocus(saved, id);
     started = registration
       ? (await startAndRegisterPushActivity(registration, attributes, content)).started
       : (await startTripActivity(id, attributes, content)).started;
@@ -315,11 +306,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   // Drop `liveActivityScheduledFor`: this activity is running NOW, not pending,
   // so there's no future start instant left to compare against — leaving a stale
   // one would make `ensureActivityForFocus` think it still had a pending slot.
-  const committed: FocusedTrip = {
-    ...latest,
-    liveActivityId: id,
-    liveActivityTimelineStart: timelineStart,
-  };
+  const committed: FocusedTrip = { ...latest, liveActivityId: id };
   delete committed.liveActivityScheduledFor;
   saveFocusedTrip(committed);
   notifyChange();
@@ -360,7 +347,6 @@ async function scheduleActivityForFocus(
     isEnded: false,
     reminderSet: saved.reminder != null,
     reminderEpochMs: saved.reminder?.reminderAt ?? null,
-    timelineStartEpochMs: startAt,
     now: startAt,
   });
   const enablePush = isLiveActivityPushEnabled();
@@ -394,7 +380,6 @@ async function scheduleActivityForFocus(
     ...latest,
     liveActivityId: id,
     liveActivityScheduledFor: startAt,
-    liveActivityTimelineStart: startAt,
   });
   notifyChange();
   // Register now rather than at start: once the OS brings the activity up the
@@ -403,7 +388,7 @@ async function scheduleActivityForFocus(
   // instead of polling through the dormant hours, and iOS POSTs the per-activity
   // token to the (natively persisted) token endpoint when the activity starts.
   if (enablePush) {
-    const registration = buildRegistrationForFocus(saved, id, startAt, startAt);
+    const registration = buildRegistrationForFocus(saved, id, startAt);
     if (registration) await postRegistrationDeduped(registration);
   }
 }
@@ -423,10 +408,6 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(focused);
   const arrivalAt = focusedArrivalInstant(focused);
   if (departureAt == null || arrivalAt == null) return;
-  const timelineStart = focused.liveActivityTimelineStart ?? Date.now();
-  if (focused.liveActivityTimelineStart == null) {
-    saveFocusedTrip({ ...focused, liveActivityTimelineStart: timelineStart });
-  }
   const content = buildContentState({
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
@@ -437,7 +418,6 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
     isEnded: false,
     reminderSet: focused.reminder != null,
     reminderEpochMs: focused.reminder?.reminderAt ?? null,
-    timelineStartEpochMs: timelineStart,
     now: Date.now(),
   });
   const json = JSON.stringify(content);
@@ -701,22 +681,13 @@ export async function syncFocusedActivityContent(args: {
   const current = loadFocusedTrip();
   const id = current?.liveActivityId;
   if (!id) return;
-  const timelineStart = current.liveActivityTimelineStart ?? Date.now();
-  if (current.liveActivityTimelineStart == null) {
-    saveFocusedTrip({ ...current, liveActivityTimelineStart: timelineStart });
-  }
   // Self-heal the push registration alongside the content sync: this fires
   // exactly when a leave-in is at risk (delay/phase/reminder change, and the
   // first time the activity id commits), so re-asserting the armed reminder's
   // lead here closes the gap where the arm-time POST was lost or raced the id.
   // Deduped, so unchanged registrations don't re-hit the backend.
   if (current && isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(
-      current,
-      id,
-      current.liveActivityScheduledFor,
-      timelineStart,
-    );
+    const registration = buildRegistrationForFocus(current, id);
     if (registration) void postRegistrationDeduped(registration);
   }
   const content = buildContentState({
@@ -729,7 +700,6 @@ export async function syncFocusedActivityContent(args: {
     isEnded: false,
     reminderSet: current?.reminder != null,
     reminderEpochMs: current?.reminder?.reminderAt ?? null,
-    timelineStartEpochMs: timelineStart,
     now: Date.now(),
   });
   const json = JSON.stringify(content);

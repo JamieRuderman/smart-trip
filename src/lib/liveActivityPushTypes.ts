@@ -65,10 +65,6 @@ export interface LiveActivityRegistration {
    *  it sleeps until this instant rather than burning a poll tick every 90s for
    *  the hours in between. Absent when the activity is already running. */
   activityStartEpochMs?: number;
-  /** Stable first-visible instant used to size and animate the journey track.
-   *  Unlike activityStartEpochMs, this remains present after a scheduled
-   *  activity starts and has no backend sleep semantics. */
-  timelineStartEpochMs?: number;
 }
 
 /** The per-activity APNs token payload iOS POSTs to the token endpoint (the
@@ -120,11 +116,7 @@ export function isLiveActivityRegistration(
     (r.activityStartEpochMs === undefined ||
       (typeof r.activityStartEpochMs === "number" &&
         Number.isFinite(r.activityStartEpochMs) &&
-        r.activityStartEpochMs < (r.departureEpochMs as number))) &&
-    (r.timelineStartEpochMs === undefined ||
-      (typeof r.timelineStartEpochMs === "number" &&
-        Number.isFinite(r.timelineStartEpochMs) &&
-        r.timelineStartEpochMs < (r.arrivalEpochMs as number)))
+        r.activityStartEpochMs < (r.departureEpochMs as number)))
   );
 }
 

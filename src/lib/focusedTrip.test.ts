@@ -108,18 +108,6 @@ describe("focusedTrip storage", () => {
     expect(loadFocusedTrip()).toBeNull();
   });
 
-  it("round-trips the Live Activity timeline start and rejects malformed values", () => {
-    const timelineStart = Date.now();
-    const focused = makeFocused({ liveActivityTimelineStart: timelineStart });
-    saveFocusedTrip(focused);
-    expect(loadFocusedTrip()).toEqual(focused);
-
-    const bad = makeFocused() as unknown as Record<string, unknown>;
-    bad.liveActivityTimelineStart = "recently";
-    localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
-    expect(loadFocusedTrip()).toBeNull();
-  });
-
   it("leaves an armed, still-future reminder untouched", () => {
     const f = makeFocused({
       reminder: {

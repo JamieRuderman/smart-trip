@@ -102,24 +102,6 @@ describe("isLiveActivityRegistration", () => {
     ).toBe(false);
   });
 
-  it("accepts a timeline start before arrival, including after departure", () => {
-    expect(
-      isLiveActivityRegistration({
-        ...VALID_REG,
-        timelineStartEpochMs: VALID_REG.departureEpochMs + 60_000,
-      }),
-    ).toBe(true);
-    expect(
-      isLiveActivityRegistration({
-        ...VALID_REG,
-        timelineStartEpochMs: VALID_REG.arrivalEpochMs,
-      }),
-    ).toBe(false);
-    expect(
-      isLiveActivityRegistration({ ...VALID_REG, timelineStartEpochMs: "recently" }),
-    ).toBe(false);
-  });
-
   it("rejects oversized strings (public endpoint, bounded junk)", () => {
     expect(
       isLiveActivityRegistration({ ...VALID_REG, id: "x".repeat(200) }),

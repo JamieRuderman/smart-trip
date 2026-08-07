@@ -61,7 +61,7 @@ struct TripActivityWidget: Widget {
                         remainingColor: .white.opacity(0.2),
                         walkingColor: accent,
                         markerFill: accent,
-                        markerForeground: .black,
+                        markerForeground: .white,
                         primaryColor: .white,
                         secondaryColor: .secondary
                     )
@@ -693,28 +693,33 @@ private struct ActiveEventTimingRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if model.isCanceled {
-                Text("Cancelled")
-            } else if isArrived(model) {
-                Text("Arrived")
-            } else {
-                HStack(spacing: 4) {
-                    Text("\(activeEventLabel) in")
-                        .foregroundStyle(secondaryColor)
-                    RelativeCountdown(model: model)
-                        .monospacedDigit()
+            Group {
+                if model.isCanceled {
+                    Text("Cancelled")
+                } else if isArrived(model) {
+                    Text("Arrived")
+                } else {
+                    HStack(spacing: 4) {
+                        Text("\(activeEventLabel) in")
+                            .foregroundStyle(secondaryColor)
+                        RelativeCountdown(model: model)
+                            .monospacedDigit()
+                    }
                 }
             }
-            Spacer(minLength: 8)
+            .font(.system(size: 17, weight: .bold))
+            .layoutPriority(2)
+
+            Spacer(minLength: 6)
+
             Text(model.toStation)
+                .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .layoutPriority(1)
+                .minimumScaleFactor(0.6)
+                .layoutPriority(0)
         }
-        .font(.system(size: 18, weight: .bold))
         .foregroundStyle(primaryColor)
         .lineLimit(1)
-        .minimumScaleFactor(0.7)
     }
 
     private var activeEventLabel: String {

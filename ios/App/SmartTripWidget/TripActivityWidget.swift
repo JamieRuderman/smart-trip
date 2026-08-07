@@ -689,7 +689,7 @@ private struct ActiveEventTimingRow: View {
     var body: some View {
         GeometryReader { geometry in
             let gap: CGFloat = 6
-            let countdownWidth = min(150, max(132, geometry.size.width * 0.43))
+            let countdownWidth = min(156, max(144, geometry.size.width * 0.46))
             let destinationWidth = max(0, geometry.size.width - countdownWidth - gap)
 
             HStack(alignment: .firstTextBaseline, spacing: gap) {
@@ -702,8 +702,12 @@ private struct ActiveEventTimingRow: View {
                         HStack(spacing: 4) {
                             Text("\(activeEventLabel) in")
                                 .foregroundStyle(secondaryColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                                .layoutPriority(1)
                             RelativeCountdown(model: model)
                                 .monospacedDigit()
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
@@ -773,7 +777,8 @@ private struct TripProgressTrack: View {
 
     private let alarmLeadTime: TimeInterval = 60 * 60
     private let minimumSegmentWidth: CGFloat = 20
-    private let iconSize: CGFloat = 11
+    private let iconSize: CGFloat = 12
+    private let walkingIconSize: CGFloat = 15
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
 
@@ -891,11 +896,18 @@ private struct TripProgressTrack: View {
         x: CGFloat,
         totalWidth: CGFloat
     ) -> some View {
-        let inset = iconSize / 2
+        let renderedSize: CGFloat
+        switch phase {
+        case .walking:
+            renderedSize = walkingIconSize
+        default:
+            renderedSize = iconSize
+        }
+        let inset = renderedSize / 2
         let clampedX = min(max(x, inset), max(inset, totalWidth - inset))
-        return ProgressMilestoneIcon(phase: phase, size: iconSize)
+        return ProgressMilestoneIcon(phase: phase, size: renderedSize)
             .foregroundStyle(iconColor)
-            .position(x: clampedX, y: iconSize / 2)
+            .position(x: clampedX, y: walkingIconSize / 2)
     }
 
     private func segmentValues(trackWidth: CGFloat) -> SegmentValues {

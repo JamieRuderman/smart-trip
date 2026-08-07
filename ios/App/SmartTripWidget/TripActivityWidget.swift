@@ -716,8 +716,8 @@ private struct ActiveEventTimingRow: View {
     private var activeEventLabel: String {
         switch countdownStage(model) {
         case .alarm: return "Leave"
-        case .departure: return "Depart"
-        case .arrival: return "Arrive"
+        case .departure: return "Departs"
+        case .arrival: return "Arrives"
         }
     }
 
@@ -736,8 +736,8 @@ private struct ActiveEventTimingRow: View {
 }
 
 /// A self-advancing, three-stage journey track: time to the leave alarm,
-/// walking to the station, then riding the train. Fixed visual shares keep the
-/// pre-alarm and walking stages legible even when the train ride is much longer.
+/// walking to the station, then riding the train. Segment widths are proportional
+/// to their real durations, with only a marker-width minimum for short stages.
 /// The alarm segment is dotted, the walk segment is deliberately thinner than
 /// the train segment, and the moving dot carries the active bell → walker →
 /// train → destination icon while the app is suspended.
@@ -748,8 +748,6 @@ private struct TripProgressTrack: View {
     let markerFill: Color
     let markerForeground: Color
 
-    private let alarmShare: CGFloat = 0.18
-    private let walkingShare: CGFloat = 0.26
     private let alarmLeadTime: TimeInterval = 60 * 60
     private let markerSize: CGFloat = 20
     private let iconSize: CGFloat = 12
@@ -757,10 +755,9 @@ private struct TripProgressTrack: View {
     private let trackY: CGFloat = 14
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { timeline in
-            let values = progressValues(at: timeline.date)
-
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
             GeometryReader { geometry in
+                let values = progressValues(at: timeline.date, trackWidth: geometry.size.width)
                 // The line spans the full content width so its ends align with
                 // the text above and below. Only the marker's centre is clamped
                 // at the endpoints, keeping its 20-point circle inside bounds.
@@ -808,12 +805,13 @@ private struct TripProgressTrack: View {
                                 .foregroundStyle(markerForeground)
                         }
                         .position(x: markerX, y: trackY)
+                        .animation(.linear(duration: 1), value: values.fraction)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(values.accessibilityLabel)
+                .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))
             }
             .frame(height: trackHeight)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(values.accessibilityLabel)
-            .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))
         }
     }
 
@@ -882,7 +880,7 @@ private struct TripProgressTrack: View {
         }
     }
 
-    private func progressValues(at now: Date) -> Values {
+    private func progressValues(at now: Date, trackWidth: CGFloat) -> Values {
         guard let departure = model.departureDate,
               let arrival = model.arrivalDate,
               arrival > departure else {
@@ -898,8 +896,24 @@ private struct TripProgressTrack: View {
 
         let reminder = model.reminderSet ? model.reminderDate : nil
         let hasReminderJourney = reminder.map { $0 < departure } ?? false
-        let leaveMilestone = hasReminderJourney ? alarmShare : 0
-        let boardingMilestone = hasReminderJourney ? alarmShare + walkingShare : 0
+        let shares: [CGFloat]
+        if hasReminderJourney, let reminder {
+            shares = proportionalShares(
+                durations: [
+                    alarmLeadTime,
+                    departure.timeIntervalSince(reminder),
+                    arrival.timeIntervalSince(departure),
+                ],
+                trackWidth: trackWidth
+            )
+        } else {
+            shares = [0, 0, 1]
+        }
+        let alarmShare = shares[0]
+        let walkingShare = shares[1]
+        let trainShare = shares[2]
+        let leaveMilestone = alarmShare
+        let boardingMilestone = alarmShare + walkingShare
         let fraction: CGFloat
         let phase: ProgressPhase
         let accessibilityLabel: Text
@@ -923,7 +937,7 @@ private struct TripProgressTrack: View {
             accessibilityLabel = Text("Waiting for train departure")
         } else {
             let trainFraction = elapsedFraction(from: departure, to: arrival, now: now)
-            fraction = boardingMilestone + (1 - boardingMilestone) * trainFraction
+            fraction = boardingMilestone + trainShare * trainFraction
             phase = .train
             accessibilityLabel = Text("Train trip progress")
         }
@@ -942,6 +956,49 @@ private struct TripProgressTrack: View {
         let duration = end.timeIntervalSince(start)
         guard duration > 0 else { return now >= end ? 1 : 0 }
         return CGFloat(min(max(now.timeIntervalSince(start) / duration, 0), 1))
+    }
+
+    /// Allocate the available width proportionally, then clamp only genuinely
+    /// short stages to one marker diameter and redistribute the rest among the
+    /// longer stages. This preserves duration truth without letting a short walk
+    /// or alarm become too narrow to read beneath the moving marker.
+    private func proportionalShares(
+        durations: [TimeInterval],
+        trackWidth: CGFloat
+    ) -> [CGFloat] {
+        guard !durations.isEmpty, trackWidth > 0 else { return [0, 0, 1] }
+
+        let positiveDurations = durations.map { max(0, $0) }
+        let minimumWidth = min(markerSize, trackWidth / CGFloat(durations.count))
+        var widths = Array(repeating: CGFloat.zero, count: durations.count)
+        var remaining = Array(durations.indices)
+        var remainingWidth = trackWidth
+        var remainingDuration = positiveDurations.reduce(0, +)
+
+        while !remaining.isEmpty {
+            let tooShort = remaining.filter { index in
+                let proposed = remainingDuration > 0
+                    ? remainingWidth * CGFloat(positiveDurations[index] / remainingDuration)
+                    : remainingWidth / CGFloat(remaining.count)
+                return proposed < minimumWidth
+            }
+            if tooShort.isEmpty { break }
+
+            for index in tooShort {
+                widths[index] = minimumWidth
+                remainingWidth -= minimumWidth
+                remainingDuration -= positiveDurations[index]
+            }
+            remaining.removeAll { tooShort.contains($0) }
+        }
+
+        for index in remaining {
+            widths[index] = remainingDuration > 0
+                ? remainingWidth * CGFloat(positiveDurations[index] / remainingDuration)
+                : remainingWidth / CGFloat(remaining.count)
+        }
+
+        return widths.map { $0 / trackWidth }
     }
 }
 

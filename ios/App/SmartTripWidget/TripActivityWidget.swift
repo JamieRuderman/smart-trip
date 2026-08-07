@@ -4,9 +4,9 @@ import WidgetKit
 
 /**
  * The focused-trip Live Activity. The lock screen and expanded Dynamic Island
- * intentionally share the same compact hierarchy: brand + destination, an
+ * intentionally share the same compact hierarchy: brand + active clock time, an
  * alarm → walk → train → arrival timeline with the active icon inside its
- * moving marker, then the live countdown beside its absolute clock time. All
+ * moving marker, then the live countdown beside the destination. All
  * content arrives via
  * `GenericAttributes` from the app/server (see TripActivityModel).
  *
@@ -47,11 +47,11 @@ struct TripActivityWidget: Widget {
                     .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(model.toStation)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                    ActiveEventClock(
+                        model: model,
+                        primaryColor: .white,
+                        secondaryColor: .secondary
+                    )
                         .padding(.trailing, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -59,6 +59,7 @@ struct TripActivityWidget: Widget {
                         model: model,
                         completedColor: accent,
                         remainingColor: .white.opacity(0.2),
+                        walkingColor: accent,
                         markerFill: accent,
                         markerForeground: .black,
                         primaryColor: .white,
@@ -647,13 +648,14 @@ private struct RelativeCountdown: View {
 }
 
 /// The shared compact body used verbatim by the lock screen and expanded
-/// Dynamic Island: segmented timeline first, active event time + countdown
+/// Dynamic Island: segmented timeline first, active countdown + destination
 /// directly below. Keeping the surfaces on one component prevents their
 /// heights and information hierarchy from drifting apart again.
 private struct JourneyProgressAndTiming: View {
     let model: TripActivityModel
     let completedColor: Color
     let remainingColor: Color
+    let walkingColor: Color
     let markerFill: Color
     let markerForeground: Color
     let primaryColor: Color
@@ -666,6 +668,7 @@ private struct JourneyProgressAndTiming: View {
                     model: model,
                     completedColor: completedColor,
                     remainingColor: remainingColor,
+                    walkingColor: walkingColor,
                     markerFill: markerFill,
                     markerForeground: markerForeground
                 )
@@ -680,9 +683,9 @@ private struct JourneyProgressAndTiming: View {
     }
 }
 
-/// "Arrive in 37 min                         at 8:55 AM" — the live relative
-/// countdown leads on the left and the matching absolute clock time anchors the
-/// right, following the requested compact reading order.
+/// "Arrives in 37 min                       Larkspur" — the live countdown
+/// leads on the left while the larger destination gets the roomier trailing
+/// position formerly occupied by the absolute time.
 private struct ActiveEventTimingRow: View {
     let model: TripActivityModel
     let primaryColor: Color
@@ -694,8 +697,6 @@ private struct ActiveEventTimingRow: View {
                 Text("Cancelled")
             } else if isArrived(model) {
                 Text("Arrived")
-                Spacer(minLength: 8)
-                clockTime(model.arrivalDate)
             } else {
                 HStack(spacing: 4) {
                     Text("\(activeEventLabel) in")
@@ -703,9 +704,12 @@ private struct ActiveEventTimingRow: View {
                     RelativeCountdown(model: model)
                         .monospacedDigit()
                 }
-                Spacer(minLength: 8)
-                clockTime(countdownTarget(model))
             }
+            Spacer(minLength: 8)
+            Text(model.toStation)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
         }
         .font(.system(size: 18, weight: .bold))
         .foregroundStyle(primaryColor)
@@ -721,16 +725,29 @@ private struct ActiveEventTimingRow: View {
         }
     }
 
-    @ViewBuilder
-    private func clockTime(_ date: Date?) -> some View {
-        HStack(spacing: 4) {
-            Text("at")
-                .foregroundStyle(secondaryColor)
-            if let date {
-                Text(date, style: .time)
-            } else {
-                Text("—")
+}
+
+/// Small absolute time in the upper-right header. The leading "at" keeps a bare
+/// clock value from reading like the current time; the phase-specific action is
+/// supplied by the larger countdown row directly below.
+private struct ActiveEventClock: View {
+    let model: TripActivityModel
+    let primaryColor: Color
+    let secondaryColor: Color
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            HStack(spacing: 3) {
+                Text("at").foregroundStyle(secondaryColor)
+                if let date = countdownTarget(model) {
+                    Text(date, style: .time)
+                } else {
+                    Text("—")
+                }
             }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(primaryColor)
+            .lineLimit(1)
         }
     }
 }
@@ -745,6 +762,7 @@ private struct TripProgressTrack: View {
     let model: TripActivityModel
     let completedColor: Color
     let remainingColor: Color
+    let walkingColor: Color
     let markerFill: Color
     let markerForeground: Color
 
@@ -780,6 +798,7 @@ private struct TripProgressTrack: View {
                         y: trackY,
                         hasReminderJourney: values.hasReminderJourney,
                         color: remainingColor,
+                        walkColor: walkingColor,
                         trainColor: markerFill
                     )
 
@@ -791,6 +810,7 @@ private struct TripProgressTrack: View {
                         y: trackY,
                         hasReminderJourney: values.hasReminderJourney,
                         color: completedColor,
+                        walkColor: walkingColor,
                         trainColor: markerFill
                     )
                     .mask(alignment: .leading) {
@@ -851,6 +871,7 @@ private struct TripProgressTrack: View {
         let y: CGFloat
         let hasReminderJourney: Bool
         let color: Color
+        let walkColor: Color
         let trainColor: Color
 
         var body: some View {
@@ -862,7 +883,7 @@ private struct TripProgressTrack: View {
                             style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 5])
                         )
                     line(from: leaveX, to: boardingX)
-                        .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .stroke(walkColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     line(from: boardingX, to: endX)
                         .stroke(trainColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 } else {
@@ -1003,7 +1024,8 @@ private struct TripProgressTrack: View {
 }
 
 /// Lock-screen banner. It intentionally mirrors the expanded Dynamic Island:
-/// brand + destination header, compact segmented progress, then one timing row.
+/// brand + active-time header, compact segmented progress, then one countdown /
+/// destination row.
 /// The shared body keeps both presentations well inside ActivityKit's height
 /// limits and avoids repeating origin, trip number, or route metadata.
 private struct LockScreenView: View {
@@ -1021,17 +1043,18 @@ private struct LockScreenView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.9))
                 Spacer()
-                Text(model.toStation)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                ActiveEventClock(
+                    model: model,
+                    primaryColor: .white,
+                    secondaryColor: .white.opacity(0.72)
+                )
             }
 
             JourneyProgressAndTiming(
                 model: model,
                 completedColor: .white,
                 remainingColor: .white.opacity(0.28),
+                walkingColor: .white,
                 markerFill: .white,
                 markerForeground: statusColor(model),
                 primaryColor: .white,

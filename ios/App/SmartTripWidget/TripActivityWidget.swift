@@ -1061,8 +1061,8 @@ private struct LockScreenView: View {
                 secondaryColor: .white.opacity(0.72)
             )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         // iOS flips isStale once staleAfterEpochMs passes with no fresher
         // update (phone locked, no push) — dim so the figures read as
         // "last known" rather than live truth.

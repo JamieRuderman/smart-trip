@@ -61,7 +61,7 @@ struct TripActivityWidget: Widget {
                         remainingColor: .white.opacity(0.2),
                         walkingColor: accent,
                         markerFill: accent,
-                        markerForeground: .black,
+                        markerForeground: .white,
                         primaryColor: .white,
                         secondaryColor: .secondary
                     )
@@ -704,17 +704,20 @@ private struct ActiveEventTimingRow: View {
                     RelativeCountdown(model: model)
                         .monospacedDigit()
                 }
-            }
-            Spacer(minLength: 8)
-            Text(model.toStation)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(1)
+            }
+            Spacer(minLength: 6)
+            Text(model.toStation)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .font(.system(size: 18, weight: .bold))
+        .font(.system(size: 17, weight: .bold))
         .foregroundStyle(primaryColor)
         .lineLimit(1)
-        .minimumScaleFactor(0.7)
+        .minimumScaleFactor(0.75)
     }
 
     private var activeEventLabel: String {
@@ -766,7 +769,6 @@ private struct TripProgressTrack: View {
     let markerFill: Color
     let markerForeground: Color
 
-    private let alarmLeadTime: TimeInterval = 60 * 60
     private let markerSize: CGFloat = 20
     private let iconSize: CGFloat = 12
     private let trackHeight: CGFloat = 28
@@ -921,7 +923,7 @@ private struct TripProgressTrack: View {
         if hasReminderJourney, let reminder {
             shares = proportionalShares(
                 durations: [
-                    alarmLeadTime,
+                    max(0, reminder.timeIntervalSince(model.timelineStartDate ?? reminder)),
                     departure.timeIntervalSince(reminder),
                     arrival.timeIntervalSince(departure),
                 ],
@@ -944,7 +946,7 @@ private struct TripProgressTrack: View {
             phase = .arrival
             accessibilityLabel = Text("Arrived")
         } else if hasReminderJourney, let reminder, now < reminder {
-            let progressStart = reminder.addingTimeInterval(-alarmLeadTime)
+            let progressStart = min(model.timelineStartDate ?? now, reminder)
             fraction = alarmShare * elapsedFraction(from: progressStart, to: reminder, now: now)
             phase = .alarm
             accessibilityLabel = Text("Time until leave alarm")
@@ -1086,10 +1088,12 @@ private enum TripActivityPreviewData {
         let now = Date()
         let departure = now.addingTimeInterval(-8 * 60)
         let arrival = now.addingTimeInterval(77 * 60 + 32)
+        let timelineStart = departure.addingTimeInterval(-20 * 60)
         return GenericAttributes.ContentState(values: [
             "phase": "en-route",
             "departureEpochMs": epochMs(departure),
             "arrivalEpochMs": epochMs(arrival),
+            "timelineStartEpochMs": epochMs(timelineStart),
             "delayMinutes": "0",
             "nextStop": "Petaluma Downtown",
             "remainingStops": "7",
@@ -1111,6 +1115,7 @@ private enum TripActivityPreviewData {
         return GenericAttributes.ContentState(values: [
             "phase": "pre-departure",
             "reminderEpochMs": epochMs(reminder),
+            "timelineStartEpochMs": epochMs(now),
             "departureEpochMs": epochMs(departure),
             "arrivalEpochMs": epochMs(arrival),
             "delayMinutes": "0",
@@ -1129,9 +1134,11 @@ private enum TripActivityPreviewData {
         let reminder = now.addingTimeInterval(-5 * 60)
         let departure = now.addingTimeInterval(10 * 60)
         let arrival = now.addingTimeInterval(87 * 60)
+        let timelineStart = reminder.addingTimeInterval(-12 * 60)
         return GenericAttributes.ContentState(values: [
             "phase": "pre-departure",
             "reminderEpochMs": epochMs(reminder),
+            "timelineStartEpochMs": epochMs(timelineStart),
             "departureEpochMs": epochMs(departure),
             "arrivalEpochMs": epochMs(arrival),
             "delayMinutes": "0",

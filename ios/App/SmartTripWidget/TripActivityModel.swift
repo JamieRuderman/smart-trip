@@ -28,6 +28,8 @@ struct TripActivityModel {
     /// Fire instant of the armed leave alarm, when one is set; the pre-alarm
     /// countdown target.
     let reminderDate: Date?
+    /// Stable left edge of the rendered journey timeline.
+    let timelineStartDate: Date?
     let delayMinutes: Int
     let nextStop: String?
     let remainingStops: Int?
@@ -52,6 +54,7 @@ struct TripActivityModel {
         departureDate = Self.epochMsDate(state["departureEpochMs"])
         arrivalDate = Self.epochMsDate(state["arrivalEpochMs"])
         reminderDate = Self.epochMsDate(state["reminderEpochMs"])
+        timelineStartDate = Self.epochMsDate(state["timelineStartEpochMs"])
         delayMinutes = Int(state["delayMinutes"] ?? "") ?? 0
         nextStop = Self.nonEmpty(state["nextStop"])
         remainingStops = Int(state["remainingStops"] ?? "")

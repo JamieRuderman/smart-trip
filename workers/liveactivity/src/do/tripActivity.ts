@@ -244,6 +244,7 @@ export function planTick(input: TickInput): TickPlan {
     isEnded: action === "end",
     reminderSet: reminderEpochMs != null,
     reminderEpochMs,
+    timelineStartEpochMs: reg.timelineStartEpochMs ?? reg.activityStartEpochMs ?? null,
     now,
   });
   const payload = buildLiveActivityPayload({

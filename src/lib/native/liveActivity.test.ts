@@ -365,10 +365,12 @@ describe("buildContentState", () => {
       isEnded: false,
       reminderSet: true,
       reminderEpochMs: reminderAt,
+      timelineStartEpochMs: NOW,
       now: NOW,
     });
     expect(c.alarmPending).toBe(true);
     expect(c.reminderEpochMs).toBe(reminderAt);
+    expect(c.timelineStartEpochMs).toBe(NOW);
     expect(c.staleAfterEpochMs).toBe(reminderAt); // alarm stage dims at the alarm
   });
   it("drops the alarm stage once the alarm has fired, falling back to departure", () => {
@@ -421,10 +423,15 @@ describe("encodeAttributes / encodeContentState", () => {
   it("serializes the alarm stage and omits reminderEpochMs when absent", () => {
     const reminderAt = DEP - 10 * 60_000;
     expect(
-      encodeContentState(content({ alarmPending: true, reminderEpochMs: reminderAt })),
+      encodeContentState(content({
+        alarmPending: true,
+        reminderEpochMs: reminderAt,
+        timelineStartEpochMs: NOW,
+      })),
     ).toMatchObject({
       alarmPending: "true",
       reminderEpochMs: String(reminderAt),
+      timelineStartEpochMs: String(NOW),
     });
     expect(encodeContentState(content())).not.toHaveProperty("reminderEpochMs");
   });

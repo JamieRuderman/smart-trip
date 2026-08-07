@@ -52,6 +52,10 @@ export interface FocusedTrip {
    *  is what tells us a re-armed reminder needs the pending one ended and a
    *  fresh one scheduled. */
   liveActivityScheduledFor?: number;
+  /** Epoch ms the current Live Activity first became visible. This is the
+   *  stable left edge of its journey timeline, so a five-minute alarm stage
+   *  stays five minutes wide across realtime content updates. */
+  liveActivityTimelineStart?: number;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
@@ -109,6 +113,10 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     r.liveActivityScheduledFor === undefined ||
     (typeof r.liveActivityScheduledFor === "number" &&
       Number.isFinite(r.liveActivityScheduledFor));
+  const liveActivityTimelineStartOk =
+    r.liveActivityTimelineStart === undefined ||
+    (typeof r.liveActivityTimelineStart === "number" &&
+      Number.isFinite(r.liveActivityTimelineStart));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -119,7 +127,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
     liveActivityIdOk &&
-    liveActivityScheduledForOk
+    liveActivityScheduledForOk &&
+    liveActivityTimelineStartOk
   );
 }
 

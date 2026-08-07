@@ -27,6 +27,7 @@ import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
 import {
   buildContentState,
   endTripActivity,
+  isTripActivityRunning,
   listTripActivityRecords,
   scheduleTripActivity,
   startTripActivity,
@@ -464,6 +465,15 @@ async function startOrReviveActivity(
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
   const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
+  // `Activity.request` can resolve before ActivityKit publishes the new item
+  // through its global `.activities` inventory (observed on iOS 26.6). The
+  // plugin already owns the returned Activity object under this logical id, so
+  // trust that immediate per-id state during the inventory gap. Otherwise each
+  // reminder/reconcile pass starts another replacement before the first Live
+  // Activity has had a chance to appear.
+  if (keep != null && kept == null && (await isTripActivityRunning(keep))) {
+    return false;
+  }
   // Push builds never schedule the local auto-dismiss (the cron ends the
   // activity server-side at live arrival), so there an `ended` activity is a
   // deliberate end — leave it be rather than resurrect it.

@@ -23,6 +23,10 @@ const endActivity = vi.fn(async (opts: unknown) => {
 const listActivities = vi.fn(async () => ({
   items: [{ id: "trip-7-2026-06-09", activityId: "sys-1", state: "active" }],
 }));
+const isRunning = vi.fn(async (opts?: unknown) => {
+  void opts;
+  return { value: true };
+});
 const startActivityScheduled = vi.fn(async (opts: unknown) => {
   void opts;
   return { activityId: "sys-2" };
@@ -34,6 +38,7 @@ vi.mock("capacitor-live-activity", () => ({
     startActivityScheduled: (opts: unknown) => startActivityScheduled(opts),
     updateActivity: (opts: unknown) => updateActivity(opts),
     endActivity: (opts: unknown) => endActivity(opts),
+    isRunning: (opts: unknown) => isRunning(opts),
     listActivities: () => listActivities(),
   },
 }));
@@ -47,6 +52,7 @@ import {
   encodeContentState,
   endTripActivity,
   isLiveActivityAvailable,
+  isTripActivityRunning,
   listTripActivityRecords,
   scheduleTripActivity,
   startTripActivity,
@@ -593,5 +599,21 @@ describe("listTripActivityRecords", () => {
   it("returns [] when the plugin throws", async () => {
     listActivities.mockRejectedValue(new Error("boom"));
     await expect(listTripActivityRecords()).resolves.toEqual([]);
+  });
+});
+
+describe("isTripActivityRunning", () => {
+  it("uses the plugin's immediate per-id activity state", async () => {
+    await expect(isTripActivityRunning("trip-7-2026-06-09")).resolves.toBe(true);
+    expect(isRunning).toHaveBeenCalledWith({ id: "trip-7-2026-06-09" });
+  });
+  it("returns false off-iOS", async () => {
+    getPlatform.mockReturnValue("web");
+    await expect(isTripActivityRunning("x")).resolves.toBe(false);
+    expect(isRunning).not.toHaveBeenCalled();
+  });
+  it("returns false when the plugin throws", async () => {
+    isRunning.mockRejectedValueOnce(new Error("boom"));
+    await expect(isTripActivityRunning("x")).resolves.toBe(false);
   });
 });

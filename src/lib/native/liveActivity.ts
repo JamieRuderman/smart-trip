@@ -298,6 +298,21 @@ export interface TripActivityRecord {
   state: string;
 }
 
+/** Immediate per-id running check backed by the plugin's in-process activity
+ * cache. ActivityKit's global `Activity.activities` inventory can briefly lag
+ * behind a successful request on newer iOS releases; this lets reconciliation
+ * recognize the activity it just started during that gap. */
+export async function isTripActivityRunning(id: string): Promise<boolean> {
+  if (Capacitor.getPlatform() !== "ios") return false;
+  try {
+    const { value } = await LiveActivity.isRunning({ id });
+    return value === true;
+  } catch (error) {
+    logger.warn("LiveActivity.isRunning failed", error);
+    return false;
+  }
+}
+
 /** Known activities (with lifecycle state) the OS still tracks — for boot /
  *  foreground reconciliation: end orphans, and tell an `ended` activity (one we
  *  scheduled to auto-dismiss after arrival) apart from a live one. `[]`

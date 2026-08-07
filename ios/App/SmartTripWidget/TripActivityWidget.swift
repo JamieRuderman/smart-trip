@@ -930,9 +930,11 @@ private struct TripProgressTrack: View {
         let hasReminderJourney = reminder.map { $0 < departure } ?? false
         let shares: [CGFloat]
         if hasReminderJourney, let reminder {
+            let progressStart = model.timelineStartDate
+                ?? reminder.addingTimeInterval(-alarmLeadTime)
             shares = proportionalShares(
                 durations: [
-                    alarmLeadTime,
+                    max(0, reminder.timeIntervalSince(progressStart)),
                     departure.timeIntervalSince(reminder),
                     arrival.timeIntervalSince(departure),
                 ],
@@ -955,7 +957,10 @@ private struct TripProgressTrack: View {
             phase = .arrival
             accessibilityLabel = Text("Arrived")
         } else if hasReminderJourney, let reminder, now < reminder {
-            let progressStart = reminder.addingTimeInterval(-alarmLeadTime)
+            let progressStart = min(
+                model.timelineStartDate ?? reminder.addingTimeInterval(-alarmLeadTime),
+                reminder
+            )
             fraction = alarmShare * elapsedFraction(from: progressStart, to: reminder, now: now)
             phase = .alarm
             accessibilityLabel = Text("Time until leave alarm")

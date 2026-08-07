@@ -159,7 +159,10 @@ function originStartTimeFor(
 
 /** Immutable widget attributes for a focus — identical on the start and the
  *  scheduled-start paths. */
-function attributesFor(saved: FocusedTrip): TripActivityAttributes {
+function attributesFor(
+  saved: FocusedTrip,
+  timelineStartEpochMs: number,
+): TripActivityAttributes {
   return {
     tripNumber: saved.tripNumber,
     fromStation: saved.fromStation,
@@ -168,6 +171,7 @@ function attributesFor(saved: FocusedTrip): TripActivityAttributes {
     direction: isSouthbound(saved.fromStation, saved.toStation)
       ? "southbound"
       : "northbound",
+    timelineStartEpochMs,
   };
 }
 
@@ -270,7 +274,8 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     return;
   }
   const id = tripActivityId(saved.tripNumber, saved.serviceDate);
-  const attributes = attributesFor(saved);
+  const timelineStart = Date.now();
+  const attributes = attributesFor(saved, timelineStart);
   const content = buildContentState({
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
@@ -281,7 +286,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isEnded: false,
     reminderSet: saved.reminder != null,
     reminderEpochMs: saved.reminder?.reminderAt ?? null,
-    now: Date.now(),
+    now: timelineStart,
   });
   // Push-enabled builds register the trip + APNs token with the backend so the
   // countdown is corrected while the phone is locked; everything else uses the
@@ -358,7 +363,7 @@ async function scheduleActivityForFocus(
   if (enablePush) await configureLiveActivityTokenEndpoint();
   const { scheduled } = await scheduleTripActivity({
     id,
-    attributes: attributesFor(saved),
+    attributes: attributesFor(saved, startAt),
     content,
     startAtEpochMs: startAt,
     // ActivityKit REQUIRES an alert for a scheduled start — iOS banners it when

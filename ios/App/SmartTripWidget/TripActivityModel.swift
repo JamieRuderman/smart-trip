@@ -20,6 +20,9 @@ struct TripActivityModel {
     let fromStation: String
     let toStation: String
     let routeName: String
+    /// Immutable first-visible instant, carried in static attributes so content
+    /// pushes cannot resize the timeline underneath the moving marker.
+    let timelineStartDate: Date?
 
     // Dynamic content state
     let phase: Phase
@@ -47,6 +50,7 @@ struct TripActivityModel {
         fromStation = attrs["fromStation"] ?? ""
         toStation = attrs["toStation"] ?? ""
         routeName = attrs["routeName"] ?? "SMART"
+        timelineStartDate = Self.epochMsDate(attrs["timelineStartEpochMs"])
 
         phase = Phase(rawValue: state["phase"] ?? "") ?? .preDeparture
         departureDate = Self.epochMsDate(state["departureEpochMs"])

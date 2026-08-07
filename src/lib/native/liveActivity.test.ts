@@ -400,6 +400,11 @@ describe("encodeAttributes / encodeContentState", () => {
       direction: "southbound",
     });
   });
+  it("serializes the immutable timeline start when provided", () => {
+    expect(
+      encodeAttributes({ ...ATTRS, timelineStartEpochMs: NOW }),
+    ).toMatchObject({ timelineStartEpochMs: String(NOW) });
+  });
   it("serializes content state, mapping null → empty string", () => {
     expect(encodeContentState(content({ nextStop: null, remainingStops: null }))).toMatchObject({
       phase: "pre-departure",

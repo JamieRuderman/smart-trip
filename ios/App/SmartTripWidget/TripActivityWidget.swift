@@ -5,13 +5,14 @@ import WidgetKit
 /**
  * The focused-trip Live Activity. The lock screen and expanded Dynamic Island
  * intentionally share the same compact hierarchy: brand + destination, an
- * icon-only alarm → walk → train → arrival timeline, then the active event's
- * absolute clock time beside its live countdown. All content arrives via
+ * alarm → walk → train → arrival timeline with the active icon inside its
+ * moving marker, then the live countdown beside its absolute clock time. All
+ * content arrives via
  * `GenericAttributes` from the app/server (see TripActivityModel).
  *
  * The headline countdown advances through three stages (see `CountdownStage`):
  * while a leave alarm is armed and still ahead it counts down to the *alarm*
- * ("Leave in"); once that fires it flips to the *departure* ("Departs in"); and
+ * ("Leave in"); once that fires it flips to the *departure* ("Depart in"); and
  * once the train leaves it counts down to *arrival*. On the lock screen and
  * expanded island this uses SwiftUI's self-updating
  * `Text(timerInterval:countsDown:)` (see `RelativeCountdown`). Crucially that
@@ -59,6 +60,7 @@ struct TripActivityWidget: Widget {
                         completedColor: accent,
                         remainingColor: .white.opacity(0.2),
                         markerFill: accent,
+                        markerForeground: .black,
                         primaryColor: .white,
                         secondaryColor: .secondary
                     )
@@ -653,6 +655,7 @@ private struct JourneyProgressAndTiming: View {
     let completedColor: Color
     let remainingColor: Color
     let markerFill: Color
+    let markerForeground: Color
     let primaryColor: Color
     let secondaryColor: Color
 
@@ -664,7 +667,7 @@ private struct JourneyProgressAndTiming: View {
                     completedColor: completedColor,
                     remainingColor: remainingColor,
                     markerFill: markerFill,
-                    iconColor: secondaryColor
+                    markerForeground: markerForeground
                 )
             }
 
@@ -677,10 +680,9 @@ private struct JourneyProgressAndTiming: View {
     }
 }
 
-/// "Arrive at 8:55 AM                         37 min" — mirrors the compact
-/// hierarchy in the supplied transit reference. The left side is the absolute
-/// time for the active stage; the right side is ActivityKit's self-ticking
-/// relative countdown to that same instant.
+/// "Arrive in 37 min                         at 8:55 AM" — the live relative
+/// countdown leads on the left and the matching absolute clock time anchors the
+/// right, following the requested compact reading order.
 private struct ActiveEventTimingRow: View {
     let model: TripActivityModel
     let primaryColor: Color
@@ -691,14 +693,18 @@ private struct ActiveEventTimingRow: View {
             if model.isCanceled {
                 Text("Cancelled")
             } else if isArrived(model) {
-                eventTime(label: "Arrived", date: model.arrivalDate)
-                Spacer(minLength: 8)
                 Text("Arrived")
-            } else {
-                eventTime(label: activeEventLabel, date: countdownTarget(model))
                 Spacer(minLength: 8)
-                RelativeCountdown(model: model)
-                    .monospacedDigit()
+                clockTime(model.arrivalDate)
+            } else {
+                HStack(spacing: 4) {
+                    Text("\(activeEventLabel) in")
+                        .foregroundStyle(secondaryColor)
+                    RelativeCountdown(model: model)
+                        .monospacedDigit()
+                }
+                Spacer(minLength: 8)
+                clockTime(countdownTarget(model))
             }
         }
         .font(.system(size: 18, weight: .bold))
@@ -716,9 +722,9 @@ private struct ActiveEventTimingRow: View {
     }
 
     @ViewBuilder
-    private func eventTime(label: String, date: Date?) -> some View {
+    private func clockTime(_ date: Date?) -> some View {
         HStack(spacing: 4) {
-            Text("\(label) at")
+            Text("at")
                 .foregroundStyle(secondaryColor)
             if let date {
                 Text(date, style: .time)
@@ -733,21 +739,21 @@ private struct ActiveEventTimingRow: View {
 /// walking to the station, then riding the train. Fixed visual shares keep the
 /// pre-alarm and walking stages legible even when the train ride is much longer.
 /// The alarm segment is dotted, the walk segment is deliberately thinner than
-/// the train segment, and an unadorned dot advances from bell → walker → train →
-/// destination while the app is suspended.
+/// the train segment, and the moving dot carries the active bell → walker →
+/// train → destination icon while the app is suspended.
 private struct TripProgressTrack: View {
     let model: TripActivityModel
     let completedColor: Color
     let remainingColor: Color
     let markerFill: Color
-    let iconColor: Color
+    let markerForeground: Color
 
     private let alarmShare: CGFloat = 0.18
     private let walkingShare: CGFloat = 0.26
     private let alarmLeadTime: TimeInterval = 60 * 60
-    private let markerSize: CGFloat = 14
-    private let iconSize: CGFloat = 11
-    private let trackY: CGFloat = 23
+    private let markerSize: CGFloat = 20
+    private let iconSize: CGFloat = 12
+    private let trackY: CGFloat = 10
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { timeline in
@@ -769,7 +775,8 @@ private struct TripProgressTrack: View {
                         endX: endX,
                         y: trackY,
                         hasReminderJourney: values.hasReminderJourney,
-                        color: remainingColor
+                        color: remainingColor,
+                        trainColor: markerFill
                     )
 
                     SegmentedTrackLines(
@@ -779,34 +786,24 @@ private struct TripProgressTrack: View {
                         endX: endX,
                         y: trackY,
                         hasReminderJourney: values.hasReminderJourney,
-                        color: completedColor
+                        color: completedColor,
+                        trainColor: markerFill
                     )
                     .mask(alignment: .leading) {
                         Rectangle().frame(width: markerX)
                     }
 
-                    if values.hasReminderJourney {
-                        ProgressMilestoneIcon(phase: .alarm, size: iconSize)
-                            .position(x: startX, y: iconSize / 2)
-                        ProgressMilestoneIcon(phase: .walking, size: iconSize)
-                            .position(x: leaveX, y: iconSize / 2)
-                        ProgressMilestoneIcon(phase: .train, size: iconSize)
-                            .position(x: boardingX, y: iconSize / 2)
-                    } else {
-                        ProgressMilestoneIcon(phase: .train, size: iconSize)
-                            .position(x: startX, y: iconSize / 2)
-                    }
-                    ProgressMilestoneIcon(phase: .arrival, size: iconSize)
-                        .position(x: endX, y: iconSize / 2)
-
                     Circle()
                         .fill(markerFill)
                         .frame(width: markerSize, height: markerSize)
+                        .overlay {
+                            ProgressMilestoneIcon(phase: values.phase, size: iconSize)
+                                .foregroundStyle(markerForeground)
+                        }
                         .position(x: markerX, y: trackY)
                 }
-                .foregroundStyle(iconColor)
             }
-            .frame(height: trackY + markerSize / 2)
+            .frame(height: markerSize)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(values.accessibilityLabel)
             .accessibilityValue(Text("\(Int((values.fraction * 100).rounded())) percent"))
@@ -818,6 +815,7 @@ private struct TripProgressTrack: View {
         let leaveMilestone: CGFloat
         let boardingMilestone: CGFloat
         let hasReminderJourney: Bool
+        let phase: ProgressPhase
         let accessibilityLabel: Text
     }
 
@@ -848,6 +846,7 @@ private struct TripProgressTrack: View {
         let y: CGFloat
         let hasReminderJourney: Bool
         let color: Color
+        let trainColor: Color
 
         var body: some View {
             ZStack {
@@ -860,10 +859,10 @@ private struct TripProgressTrack: View {
                     line(from: leaveX, to: boardingX)
                         .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     line(from: boardingX, to: endX)
-                        .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .stroke(trainColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 } else {
                     line(from: startX, to: endX)
-                        .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .stroke(trainColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 }
             }
         }
@@ -885,6 +884,7 @@ private struct TripProgressTrack: View {
                 leaveMilestone: 0,
                 boardingMilestone: 0,
                 hasReminderJourney: false,
+                phase: .train,
                 accessibilityLabel: Text("Trip progress")
             )
         }
@@ -894,21 +894,30 @@ private struct TripProgressTrack: View {
         let leaveMilestone = hasReminderJourney ? alarmShare : 0
         let boardingMilestone = hasReminderJourney ? alarmShare + walkingShare : 0
         let fraction: CGFloat
+        let phase: ProgressPhase
         let accessibilityLabel: Text
 
-        if hasReminderJourney, let reminder, now < reminder {
+        if now >= arrival {
+            fraction = 1
+            phase = .arrival
+            accessibilityLabel = Text("Arrived")
+        } else if hasReminderJourney, let reminder, now < reminder {
             let progressStart = reminder.addingTimeInterval(-alarmLeadTime)
             fraction = alarmShare * elapsedFraction(from: progressStart, to: reminder, now: now)
+            phase = .alarm
             accessibilityLabel = Text("Time until leave alarm")
         } else if hasReminderJourney, let reminder, now < departure {
             fraction = alarmShare + walkingShare * elapsedFraction(from: reminder, to: departure, now: now)
+            phase = .walking
             accessibilityLabel = Text("Walking to the train")
         } else if now < departure {
             fraction = 0
+            phase = .train
             accessibilityLabel = Text("Waiting for train departure")
         } else {
             let trainFraction = elapsedFraction(from: departure, to: arrival, now: now)
             fraction = boardingMilestone + (1 - boardingMilestone) * trainFraction
+            phase = .train
             accessibilityLabel = Text("Train trip progress")
         }
 
@@ -917,6 +926,7 @@ private struct TripProgressTrack: View {
             leaveMilestone: leaveMilestone,
             boardingMilestone: boardingMilestone,
             hasReminderJourney: hasReminderJourney,
+            phase: phase,
             accessibilityLabel: accessibilityLabel
         )
     }
@@ -959,6 +969,7 @@ private struct LockScreenView: View {
                 completedColor: .white,
                 remainingColor: .white.opacity(0.28),
                 markerFill: .white,
+                markerForeground: statusColor(model),
                 primaryColor: .white,
                 secondaryColor: .white.opacity(0.72)
             )

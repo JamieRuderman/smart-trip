@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "operatorId": "GF",
-  "fetchedAt": "2026-08-14T14:06:47.270Z",
+  "fetchedAt": "2026-08-15T13:21:26.155Z",
   "sourceUrl": "https://api.511.org/transit/datafeeds?operator_id=GF",
   "agency": [
     {

@@ -1,42 +1,44 @@
-import { Bell } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
+import { APP_STORE_URL } from "@/seo/constants";
 
 export function BottomInfoBar() {
   const { t } = useTranslation();
+
+  // Web-only prompt: inside the native app there's nothing to download.
+  const showAppPrompt = !Capacitor.isNativePlatform();
 
   return (
     <div className="container max-w-4xl mx-auto px-3 md:px-0 pb-safe space-y-3">
       <div className="pt-12 mt-6 md:px-8 md:py-4 text-sm text-muted-foreground border-t md:border-t-0">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2">
-            <Bell className="h-4 w-4 mt-0.5 shrink-0 text-foreground/70" />
-            <p className="text-sm">
-              {t("bottomInfo.alertSignupText")}{" "}
-              <span className="font-semibold">SMART</span>{" "}
-              {t("bottomInfo.alertSignupTo")}{" "}
-              <span className="font-semibold">888777</span>
-              {", "}
-              {t("bottomInfo.alertSignupOr")}{" "}
-              <a
-                href="https://member.everbridge.net/index/892807736728379#/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-foreground underline-offset-2 hover:underline"
-              >
-                {t("bottomInfo.alertSignupLink")}
-              </a>
-              .
-            </p>
-          </div>
+          {showAppPrompt ? (
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block hover:opacity-90 transition"
+            >
+              <img
+                src="/badges/app-store-en.svg"
+                alt={t("seo.cta.ios.appStore")}
+                width={120}
+                height={40}
+                className="h-10 w-auto block"
+              />
+            </a>
+          ) : (
+            <div />
+          )}
           <div className="-mb-4 flex items-center gap-2 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
-        <p className="ml-6 mt-3 text-xs">
+        <p className="mt-3 text-xs">
           {t("bottomInfo.dataProvidedBy")}{" "}
           <a
             href="https://511.org"
@@ -48,8 +50,8 @@ export function BottomInfoBar() {
           </a>
           . {t("bottomInfo.communityProject")}
         </p>
-        <ScheduleFreshnessLabel className="ml-6 mt-2" />
-        <p className="ml-6 mt-2 text-xs">
+        <ScheduleFreshnessLabel className="mt-2" />
+        <p className="mt-2 text-xs">
           {t("bottomInfo.linksIntro")}{" "}
           <a
             href="/support.html"

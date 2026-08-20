@@ -14,9 +14,15 @@ compatibility_flags = ["nodejs_compat"]
 # Production Worker routes/domains.
 #  - smarttraintrip.com/*: the apex production site. A zone route, so it activates
 #    only when the apex DNS record is Proxied (orange) and is inert while
-#    DNS-only (grey).
-# (The app.smarttraintrip.com test-scaffolding custom domain was retired — it was
-#  unused: only a local .env pointer referenced it, now repointed to the apex.)
+#    DNS-only (grey). That record is an `AAAA 100::` placeholder — a discard
+#    address that exists purely so there is something Proxied for this route to
+#    attach to. The origin is never contacted, so don't "fix" it to a real host.
+#  - app.smarttraintrip.com: ALSO live, but not declared here — it's a Worker
+#    Custom Domain bound to this Worker in the Cloudflare dashboard. Custom
+#    Domains persist independently of `routes`, so dropping it from this file
+#    never removed it; delete it under Workers > smart-trip-web > Settings >
+#    Domains & Routes if you want it gone. The local .env pointer that once
+#    used it now targets the apex.
 routes = [
   { pattern = "smarttraintrip.com/*", zone_name = "smarttraintrip.com" },
 ]

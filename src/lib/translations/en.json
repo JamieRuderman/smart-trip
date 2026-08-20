@@ -67,10 +67,6 @@
   "bottomInfo": {
     "dataProvidedBy": "Data provided by",
     "communityProject": "This is an open-source community project and is not an official SMART app.",
-    "alertSignupText": "Receive service alerts by texting",
-    "alertSignupTo": "to",
-    "alertSignupOr": "or",
-    "alertSignupLink": "sign up online",
     "linksIntro": "Help and legal:",
     "supportLink": "Support",
     "privacyHostedLink": "Privacy Policy",

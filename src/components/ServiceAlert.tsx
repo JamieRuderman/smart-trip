@@ -56,34 +56,38 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
         >
           <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5 flex-1 min-w-0">
-              <AlertTriangle className="h-5 w-5 text-smart-gold flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-smart-gold-dark flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-semibold text-sm text-smart-gold">
-                    {alert.title ?? t("serviceAlert.sectionTitle")}
-                  </div>
-                  {alert.startsAt && (
-                    <p className="shrink-0 text-xs text-smart-gold/60">
-                      {new Date(alert.startsAt).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  )}
+                <div className="font-semibold text-sm text-smart-gold-dark break-words">
+                  {alert.title ?? t("serviceAlert.sectionTitle")}
                 </div>
                 {alert.message && (
-                  <p className="text-xs text-smart-gold/80 mt-1">{alert.message}</p>
+                  <p className="text-xs text-smart-gold-dark mt-1 max-h-32 overflow-y-auto overscroll-contain pr-1 break-words">
+                    {alert.message}
+                  </p>
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              aria-label={t("serviceAlert.dismiss")}
-              onClick={() => dismissAlert(alert)}
-              className="shrink-0 -mr-2 -mt-2 -mb-2 p-3 rounded-lg text-smart-gold/70 hover:text-smart-gold hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {/* X + timestamp share a right-hand column so the time sits tucked
+                under the close button, right-aligned and clear of the text flow. */}
+            <div className="flex flex-col items-end gap-0.5 shrink-0 -mr-2 -mt-2">
+              <button
+                type="button"
+                aria-label={t("serviceAlert.dismiss")}
+                onClick={() => dismissAlert(alert)}
+                className="p-3 rounded-lg text-smart-gold-dark hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              {alert.startsAt && (
+                <p className="text-xs text-smart-gold-dark pr-3 -mt-1">
+                  {new Date(alert.startsAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              )}
+            </div>
           </div>
         </SectionCard>
       ))}

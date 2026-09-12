@@ -8,20 +8,8 @@ export const weekdayFerries: FerryConnection[] = [
     "arrive": "06:20"
   },
   {
-    "depart": "05:45",
-    "arrive": "06:20"
-  },
-  {
     "depart": "06:30",
     "arrive": "07:05"
-  },
-  {
-    "depart": "06:30",
-    "arrive": "07:05"
-  },
-  {
-    "depart": "07:15",
-    "arrive": "07:50"
   },
   {
     "depart": "07:15",
@@ -32,20 +20,8 @@ export const weekdayFerries: FerryConnection[] = [
     "arrive": "08:30"
   },
   {
-    "depart": "07:55",
-    "arrive": "08:30"
-  },
-  {
     "depart": "08:40",
     "arrive": "09:15"
-  },
-  {
-    "depart": "08:40",
-    "arrive": "09:15"
-  },
-  {
-    "depart": "09:25",
-    "arrive": "10:00"
   },
   {
     "depart": "09:25",
@@ -56,20 +32,8 @@ export const weekdayFerries: FerryConnection[] = [
     "arrive": "10:45"
   },
   {
-    "depart": "10:10",
-    "arrive": "10:45"
-  },
-  {
     "depart": "11:50",
     "arrive": "12:25"
-  },
-  {
-    "depart": "11:50",
-    "arrive": "12:25"
-  },
-  {
-    "depart": "13:00",
-    "arrive": "13:35"
   },
   {
     "depart": "13:00",
@@ -80,20 +44,8 @@ export const weekdayFerries: FerryConnection[] = [
     "arrive": "14:45"
   },
   {
-    "depart": "14:10",
-    "arrive": "14:45"
-  },
-  {
     "depart": "15:05",
     "arrive": "15:40"
-  },
-  {
-    "depart": "15:05",
-    "arrive": "15:40"
-  },
-  {
-    "depart": "15:45",
-    "arrive": "16:20"
   },
   {
     "depart": "15:45",
@@ -104,28 +56,12 @@ export const weekdayFerries: FerryConnection[] = [
     "arrive": "17:10"
   },
   {
-    "depart": "16:35",
-    "arrive": "17:10"
-  },
-  {
-    "depart": "17:15",
-    "arrive": "17:50"
-  },
-  {
     "depart": "17:15",
     "arrive": "17:50"
   },
   {
     "depart": "18:10",
     "arrive": "18:45"
-  },
-  {
-    "depart": "18:10",
-    "arrive": "18:45"
-  },
-  {
-    "depart": "19:15",
-    "arrive": "19:50"
   },
   {
     "depart": "19:15",
@@ -198,20 +134,8 @@ export const weekdayInboundFerries: FerryConnection[] = [
     "arrive": "07:05"
   },
   {
-    "depart": "06:30",
-    "arrive": "07:05"
-  },
-  {
     "depart": "07:15",
     "arrive": "07:45"
-  },
-  {
-    "depart": "07:15",
-    "arrive": "07:45"
-  },
-  {
-    "depart": "08:00",
-    "arrive": "08:30"
   },
   {
     "depart": "08:00",
@@ -222,20 +146,8 @@ export const weekdayInboundFerries: FerryConnection[] = [
     "arrive": "09:15"
   },
   {
-    "depart": "08:40",
-    "arrive": "09:15"
-  },
-  {
     "depart": "09:25",
     "arrive": "10:00"
-  },
-  {
-    "depart": "09:25",
-    "arrive": "10:00"
-  },
-  {
-    "depart": "10:10",
-    "arrive": "10:45"
   },
   {
     "depart": "10:10",
@@ -246,20 +158,8 @@ export const weekdayInboundFerries: FerryConnection[] = [
     "arrive": "12:25"
   },
   {
-    "depart": "11:50",
-    "arrive": "12:25"
-  },
-  {
     "depart": "12:35",
     "arrive": "13:10"
-  },
-  {
-    "depart": "12:35",
-    "arrive": "13:10"
-  },
-  {
-    "depart": "13:45",
-    "arrive": "14:20"
   },
   {
     "depart": "13:45",
@@ -270,20 +170,8 @@ export const weekdayInboundFerries: FerryConnection[] = [
     "arrive": "15:30"
   },
   {
-    "depart": "14:55",
-    "arrive": "15:30"
-  },
-  {
     "depart": "15:50",
     "arrive": "16:25"
-  },
-  {
-    "depart": "15:50",
-    "arrive": "16:25"
-  },
-  {
-    "depart": "16:30",
-    "arrive": "17:05"
   },
   {
     "depart": "16:30",
@@ -294,28 +182,12 @@ export const weekdayInboundFerries: FerryConnection[] = [
     "arrive": "18:00"
   },
   {
-    "depart": "17:25",
-    "arrive": "18:00"
-  },
-  {
-    "depart": "18:00",
-    "arrive": "18:35"
-  },
-  {
     "depart": "18:00",
     "arrive": "18:35"
   },
   {
     "depart": "18:55",
     "arrive": "19:25"
-  },
-  {
-    "depart": "18:55",
-    "arrive": "19:25"
-  },
-  {
-    "depart": "20:00",
-    "arrive": "20:30"
   },
   {
     "depart": "20:00",

@@ -3,19 +3,20 @@ import SwiftUI
 import WidgetKit
 
 /**
- * The focused-trip Live Activity: the lock screen and Dynamic Island show the
- * absolute departure → arrival clock times plus an "arrives in" duration, with a
- * bell when a reminder is armed. All content arrives via `GenericAttributes`
- * from the app/server (see TripActivityModel for the key contract).
+ * The focused-trip Live Activity. The lock screen and expanded Dynamic Island
+ * intentionally share the same compact hierarchy: brand + active clock time, an
+ * alarm → walk → train timeline with system-managed progress segments and
+ * milestone icons, then the live countdown beside the destination. All
+ * content arrives via
+ * `GenericAttributes` from the app/server (see TripActivityModel).
  *
  * The headline countdown advances through three stages (see `CountdownStage`):
  * while a leave alarm is armed and still ahead it counts down to the *alarm*
- * ("Leave in"); once that fires it flips to the *departure* ("Departs in"); and
- * once the train leaves it counts down to *arrival* ("To destination"). On the
- * lock screen and expanded island this uses SwiftUI's self-updating
- * `Text(timerInterval:countsDown:)` (see `RelativeCountdown`), pinned to the
- * *leading* edge so its changing width never shoves the fixed clock times /
- * route on the trailing edge. Crucially that timer CLAMPS at 0:00 once the
+ * ("Leave in"); once that fires it flips to the *departure* ("Depart in"); and
+ * once the train leaves it counts down to *arrival*. On the lock screen and
+ * expanded island this uses SwiftUI's self-updating
+ * `Text(timerInterval:countsDown:)` (see `RelativeCountdown`). Crucially that
+ * timer CLAMPS at 0:00 once the
  * target passes — it never counts *up*. A local (non-push) activity gets no
  * re-render at the stage/arrival boundary while the app is backgrounded, and the
  * earlier `.relative` style kept ticking *upward* past the target there, so the
@@ -37,70 +38,30 @@ struct TripActivityWidget: Widget {
             let accent = statusColor(model)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label {
-                        Text(Brand.name)
-                    } icon: {
-                        TrainIcon(size: 14).foregroundStyle(accent)
-                    }
+                    Text(Brand.name)
                     .font(.caption.weight(.semibold))
                     .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    HStack(spacing: 6) {
-                        StatusPill(model: model)
-                        if model.reminderSet {
-                            BellRingIcon(size: 13)
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                    }
-                    .padding(.trailing, 8)
+                    ActiveEventClock(
+                        model: model,
+                        primaryColor: .white,
+                        secondaryColor: .secondary
+                    )
+                        .padding(.trailing, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack(alignment: .lastTextBaseline) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            if model.isCanceled {
-                                Text("Cancelled").font(.headline.weight(.bold)).foregroundStyle(accent)
-                            } else if isArrived(model) {
-                                Text("Arrived").font(.headline.weight(.bold)).foregroundStyle(accent)
-                            } else {
-                                Text(countdownLabel(model))
-                                    .font(.caption2.weight(.semibold))
-                                    .textCase(.uppercase)
-                                    .foregroundStyle(.secondary)
-                                RelativeCountdown(model: model)
-                                    .font(.system(size: 22, weight: .bold))
-                                    .foregroundStyle(accent)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                            }
-                        }
-                        Spacer(minLength: 10)
-                        // spacing 1 (not 3) drops "TRIP n" down toward the route:
-                        // the 2-line route makes this column taller than the
-                        // countdown opposite, and `.lastTextBaseline` pins the
-                        // bottoms, so a tighter label gap lowers the label.
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text("Trip \(model.tripNumber)")
-                                .font(.caption2.weight(.semibold))
-                                .textCase(.uppercase)
-                                .foregroundStyle(.secondary)
-                            VStack(alignment: .trailing, spacing: 0) {
-                                Text(model.fromStation).lineLimit(1)
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.right")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text(model.toStation).lineLimit(1)
-                                }
-                            }
-                            .font(.system(size: 14, weight: .semibold))
-                            .minimumScaleFactor(0.8)
-                        }
-                    }
+                    JourneyProgressAndTiming(
+                        model: model,
+                        completedColor: accent,
+                        walkingColor: accent,
+                        markerFill: accent,
+                        progressTrackColorScheme: .dark,
+                        primaryColor: .white,
+                        secondaryColor: .secondary
+                    )
                     .padding(.horizontal, 8)
-                    // Push the whole bottom row down off the header row so
-                    // "TRIP n" isn't crowding the icon/status line above it.
-                    .padding(.top, 8)
+                    .padding(.top, 2)
                 }
             } compactLeading: {
                 CompactLeadingIcon(model: model, accent: accent)
@@ -153,16 +114,6 @@ private func countdownStage(_ model: TripActivityModel, now: Date = Date()) -> C
         return .departure
     }
     return .arrival
-}
-
-/// Uppercase label shown above the live countdown on the lock screen + expanded
-/// island.
-private func countdownLabel(_ model: TripActivityModel) -> String {
-    switch countdownStage(model) {
-    case .alarm: return "Leave in"
-    case .departure: return "Departs in"
-    case .arrival: return "To destination"
-    }
 }
 
 /// The instant the active stage's countdown ticks down to.
@@ -590,39 +541,10 @@ private struct WalkIconShape: Shape {
     }
 }
 
-/// Status pill. On the black Dynamic Island it carries the status colour
-/// itself; on the lock screen the card already supplies that colour, so the
-/// pill is a neutral frosted chip (`onColoredBackground`).
-private struct StatusPill: View {
-    let model: TripActivityModel
-    var onColoredBackground = false
-
-    var body: some View {
-        // "Arrived" overrides the (now stale) pushed status once the widget's own
-        // clock passes arrival, matching the headline's terminal state.
-        Text(!model.isCanceled && isArrived(model) ? "Arrived" : model.statusText)
-            .font(.caption2.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(background, in: Capsule())
-            .foregroundStyle(.white)
-    }
-
-    private var background: Color {
-        if onColoredBackground { return .white.opacity(0.22) }
-        if model.isCanceled { return Brand.red.opacity(0.9) }
-        if isArrived(model) { return .white.opacity(0.22) }
-        if model.delayMinutes > 0 { return Brand.gold.opacity(0.9) }
-        return .white.opacity(0.22)
-    }
-}
-
 /// Compact-leading glyph: tracks the active countdown stage so the icon always
 /// matches the timer beside it (and the home card) — a walking person to the
 /// leave alarm, the brand train to departure, then a map pin to the destination
-/// once en route. The walking figure (not a bell) keeps the leave countdown
-/// from doubling up on the "reminder armed" bell shown elsewhere.
+/// once en route.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
@@ -720,116 +642,400 @@ private struct RelativeCountdown: View {
     }
 }
 
-/// "8:18 PM → 8:44 PM" — the absolute departure and arrival clock times.
-private struct ScheduleTimes: View {
+/// The shared compact body used verbatim by the lock screen and expanded
+/// Dynamic Island: segmented timeline first, active countdown + destination
+/// directly below. Keeping the surfaces on one component prevents their
+/// heights and information hierarchy from drifting apart again.
+private struct JourneyProgressAndTiming: View {
     let model: TripActivityModel
+    let completedColor: Color
+    let walkingColor: Color
+    let markerFill: Color
+    let progressTrackColorScheme: ColorScheme
+    let primaryColor: Color
+    let secondaryColor: Color
 
     var body: some View {
-        HStack(spacing: 5) {
-            clock(model.departureDate)
-            Image(systemName: "arrow.right")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.55))
-            clock(model.arrivalDate)
-        }
-    }
+        VStack(spacing: 5) {
+            if !model.isCanceled {
+                TripProgressTrack(
+                    model: model,
+                    alarmColor: completedColor.opacity(0.72),
+                    walkingColor: walkingColor,
+                    trainColor: markerFill,
+                    iconColor: primaryColor
+                )
+                // Date-relative ProgressView does not expose a separate track
+                // color. Choosing the local control appearance lets the blue
+                // Lock Screen use a dark neutral track while the black Dynamic
+                // Island retains its lighter system track.
+                .environment(\.colorScheme, progressTrackColorScheme)
+            }
 
-    @ViewBuilder
-    private func clock(_ date: Date?) -> some View {
-        if let date {
-            Text(date, style: .time)
-        } else {
-            Text("—")
+            ActiveEventTimingRow(
+                model: model,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor
+            )
         }
     }
 }
 
-/// Bottom-*leading* block: the stage countdown label over the live relative
-/// countdown (see `RelativeCountdown`), or the terminal word once
-/// cancelled/arrived. Leading-aligned so the countdown's changing width grows
-/// into the centre gap rather than shoving the clock times pinned on the
-/// trailing edge.
-private struct HeadlineCountdown: View {
+/// "Arrives in 37 min                       Larkspur" — the live countdown
+/// leads on the left while the larger destination gets the roomier trailing
+/// position formerly occupied by the absolute time.
+private struct ActiveEventTimingRow: View {
     let model: TripActivityModel
+    let primaryColor: Color
+    let secondaryColor: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if model.isCanceled {
-                Text("Cancelled").font(.system(size: 19, weight: .bold))
-            } else if isArrived(model) {
-                Text("Arrived").font(.system(size: 19, weight: .bold))
-            } else {
-                Text(countdownLabel(model))
-                    .font(.caption2.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(.white.opacity(0.6))
-                RelativeCountdown(model: model)
-                    .font(.system(size: 19, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+        HStack(alignment: .center, spacing: 6) {
+            Group {
+                if model.isCanceled {
+                    Text("Cancelled")
+                } else if isArrived(model) {
+                    Text("Arrived")
+                } else {
+                    HStack(spacing: 4) {
+                        Text("\(activeEventLabel) in")
+                            .foregroundStyle(secondaryColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .layoutPriority(1)
+                        RelativeCountdown(model: model)
+                            .monospacedDigit()
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+            }
+            .font(.system(size: 17, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .layoutPriority(2)
+
+            Spacer(minLength: 0)
+
+            Text(model.toStation)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .layoutPriority(1)
+        }
+        .foregroundStyle(primaryColor)
+        .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+    }
+
+    private var activeEventLabel: String {
+        switch countdownStage(model) {
+        case .alarm: return "Leave"
+        case .departure: return "Departs"
+        case .arrival: return "Arrives"
+        }
+    }
+
+}
+
+/// Small absolute time in the upper-right header. The leading "at" keeps a bare
+/// clock value from reading like the current time; the phase-specific action is
+/// supplied by the larger countdown row directly below.
+private struct ActiveEventClock: View {
+    let model: TripActivityModel
+    let primaryColor: Color
+    let secondaryColor: Color
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            HStack(spacing: 3) {
+                Text("at").foregroundStyle(secondaryColor)
+                if let date = countdownTarget(model) {
+                    Text(date, style: .time)
+                } else {
+                    Text("—")
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(primaryColor)
+            .lineLimit(1)
+        }
+    }
+}
+
+/// Three native, date-relative progress bars: time to the leave alarm, walking
+/// to the station, then riding the train. SwiftUI advances each segment from its
+/// date interval without requiring the widget extension to run a periodic
+/// timeline. Widths remain proportional to the real stage durations, with a
+/// small minimum for short stages. Bell → walker → train → destination
+/// icons label the four boundaries above the bars.
+private struct TripProgressTrack: View {
+    let model: TripActivityModel
+    let alarmColor: Color
+    let walkingColor: Color
+    let trainColor: Color
+    let iconColor: Color
+
+    private let alarmLeadTime: TimeInterval = 60 * 60
+    private let minimumSegmentWidth: CGFloat = 20
+    private let iconSize: CGFloat = 12
+    private let walkingIconSize: CGFloat = 15
+    private let segmentGap: CGFloat = 4
+    private let trackHeight: CGFloat = 30
+
+    var body: some View {
+        GeometryReader { geometry in
+            let hasReminderJourney: Bool = {
+                guard model.reminderSet,
+                      let reminder = model.reminderDate,
+                      let departure = model.departureDate else { return false }
+                return reminder < departure
+            }()
+            let gapCount: CGFloat = hasReminderJourney ? 2 : 0
+            let availableWidth = max(0, geometry.size.width - segmentGap * gapCount)
+            let values = segmentValues(trackWidth: availableWidth)
+
+            ZStack(alignment: .topLeading) {
+                HStack(spacing: values.hasReminderJourney ? segmentGap : 0) {
+                    if values.hasReminderJourney,
+                       let progressStart = values.progressStart,
+                       let reminder = values.reminder {
+                        NativeTimerProgress(
+                            start: progressStart,
+                            end: reminder,
+                            color: alarmColor
+                        )
+                        .frame(width: values.widths[0])
+
+                        NativeTimerProgress(
+                            start: reminder,
+                            end: values.departure,
+                            color: walkingColor
+                        )
+                        .frame(width: values.widths[1])
+                    }
+
+                    NativeTimerProgress(
+                        start: values.departure,
+                        end: values.arrival,
+                        color: trainColor
+                    )
+                    .frame(width: values.widths[2])
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 17)
+
+                if values.hasReminderJourney {
+                    milestoneIcon(.alarm, x: 0, totalWidth: geometry.size.width)
+                    milestoneIcon(
+                        .walking,
+                        x: values.widths[0] + segmentGap / 2,
+                        totalWidth: geometry.size.width
+                    )
+                    milestoneIcon(
+                        .train,
+                        x: values.widths[0] + segmentGap + values.widths[1] + segmentGap / 2,
+                        totalWidth: geometry.size.width
+                    )
+                } else {
+                    milestoneIcon(.train, x: 0, totalWidth: geometry.size.width)
+                }
+                milestoneIcon(.arrival, x: geometry.size.width, totalWidth: geometry.size.width)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(
+                values.hasReminderJourney
+                    ? "Trip progress: alarm, walk, and train"
+                    : "Train trip progress"
+            ))
+        }
+        .frame(height: trackHeight)
+    }
+
+    private struct SegmentValues {
+        let widths: [CGFloat]
+        let hasReminderJourney: Bool
+        let progressStart: Date?
+        let reminder: Date?
+        let departure: Date
+        let arrival: Date
+    }
+
+    private enum ProgressPhase {
+        case alarm, walking, train, arrival
+    }
+
+    private struct ProgressMilestoneIcon: View {
+        let phase: ProgressPhase
+        let size: CGFloat
+
+        @ViewBuilder
+        var body: some View {
+            switch phase {
+            case .alarm: BellRingIcon(size: size, strokeRatio: 0.1)
+            case .walking: WalkIcon(size: size, strokeRatio: 0.1)
+            case .train: TrainIcon(size: size, strokeRatio: 0.1)
+            case .arrival: MapPinIcon(size: size, strokeRatio: 0.1)
             }
         }
-        .foregroundStyle(.white)
+    }
+
+    private struct NativeTimerProgress: View {
+        let start: Date
+        let end: Date
+        let color: Color
+
+        var body: some View {
+            ProgressView(timerInterval: start...end, countsDown: false)
+                .tint(color)
+                .labelsHidden()
+        }
+    }
+
+    private func milestoneIcon(
+        _ phase: ProgressPhase,
+        x: CGFloat,
+        totalWidth: CGFloat
+    ) -> some View {
+        let renderedSize: CGFloat
+        switch phase {
+        case .walking:
+            renderedSize = walkingIconSize
+        default:
+            renderedSize = iconSize
+        }
+        let inset = renderedSize / 2
+        let clampedX = min(max(x, inset), max(inset, totalWidth - inset))
+        return ProgressMilestoneIcon(phase: phase, size: renderedSize)
+            .foregroundStyle(iconColor)
+            .position(x: clampedX, y: walkingIconSize / 2)
+    }
+
+    private func segmentValues(trackWidth: CGFloat) -> SegmentValues {
+        guard let departure = model.departureDate,
+              let arrival = model.arrivalDate,
+              arrival > departure else {
+            let now = Date()
+            return SegmentValues(
+                widths: [0, 0, trackWidth],
+                hasReminderJourney: false,
+                progressStart: nil,
+                reminder: nil,
+                departure: now,
+                arrival: now.addingTimeInterval(1)
+            )
+        }
+
+        let reminder = model.reminderSet ? model.reminderDate : nil
+        let hasReminderJourney = reminder.map { $0 < departure } ?? false
+        let progressStart: Date?
+        let widths: [CGFloat]
+        if hasReminderJourney, let reminder {
+            let start = min(
+                model.timelineStartDate ?? reminder.addingTimeInterval(-alarmLeadTime),
+                reminder.addingTimeInterval(-1)
+            )
+            progressStart = start
+            widths = proportionalWidths(
+                durations: [
+                    max(0, reminder.timeIntervalSince(start)),
+                    departure.timeIntervalSince(reminder),
+                    arrival.timeIntervalSince(departure),
+                ],
+                trackWidth: trackWidth
+            )
+        } else {
+            progressStart = nil
+            widths = [0, 0, trackWidth]
+        }
+
+        return SegmentValues(
+            widths: widths,
+            hasReminderJourney: hasReminderJourney,
+            progressStart: progressStart,
+            reminder: reminder,
+            departure: departure,
+            arrival: arrival
+        )
+    }
+
+    /// Allocate the available width proportionally, then clamp only genuinely
+    /// short stages to a compact readable minimum and redistribute the rest
+    /// among the longer stages. This preserves duration truth without letting a
+    /// short walk or alarm become too narrow to recognize.
+    private func proportionalWidths(
+        durations: [TimeInterval],
+        trackWidth: CGFloat
+    ) -> [CGFloat] {
+        guard !durations.isEmpty, trackWidth > 0 else { return [0, 0, max(0, trackWidth)] }
+
+        let positiveDurations = durations.map { max(0, $0) }
+        let minimumWidth = min(minimumSegmentWidth, trackWidth / CGFloat(durations.count))
+        var widths = Array(repeating: CGFloat.zero, count: durations.count)
+        var remaining = Array(durations.indices)
+        var remainingWidth = trackWidth
+        var remainingDuration = positiveDurations.reduce(0, +)
+
+        while !remaining.isEmpty {
+            let tooShort = remaining.filter { index in
+                let proposed = remainingDuration > 0
+                    ? remainingWidth * CGFloat(positiveDurations[index] / remainingDuration)
+                    : remainingWidth / CGFloat(remaining.count)
+                return proposed < minimumWidth
+            }
+            if tooShort.isEmpty { break }
+
+            for index in tooShort {
+                widths[index] = minimumWidth
+                remainingWidth -= minimumWidth
+                remainingDuration -= positiveDurations[index]
+            }
+            remaining.removeAll { tooShort.contains($0) }
+        }
+
+        for index in remaining {
+            widths[index] = remainingDuration > 0
+                ? remainingWidth * CGFloat(positiveDurations[index] / remainingDuration)
+                : remainingWidth / CGFloat(remaining.count)
+        }
+
+        return widths
     }
 }
 
-/// Lock-screen banner. White-on-status-colour to match the app's "My Trip"
-/// card. Always shows the absolute departure → arrival times plus an "arrives
-/// in" duration; a bell flags an armed reminder.
+/// Lock-screen banner. It intentionally mirrors the expanded Dynamic Island:
+/// brand + active-time header, compact segmented progress, then one countdown /
+/// destination row.
+/// The shared body keeps both presentations well inside ActivityKit's height
+/// limits and avoids repeating origin, trip number, or route metadata.
 private struct LockScreenView: View {
     let model: TripActivityModel
     let isStale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
-                Label {
-                    Text(Brand.name)
-                } icon: {
-                    TrainIcon(size: 16)
-                }
+                Text(Brand.name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.9))
                 Spacer()
-                StatusPill(model: model, onColoredBackground: true)
-                if model.reminderSet {
-                    BellRingIcon(size: 15)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
+                ActiveEventClock(
+                    model: model,
+                    primaryColor: .white,
+                    secondaryColor: .white.opacity(0.72)
+                )
             }
 
-            HStack(spacing: 6) {
-                Text(model.fromStation).lineLimit(1)
-                Image(systemName: "arrow.right")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
-                Text(model.toStation).lineLimit(1)
-            }
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
-
-            // Equal-width halves so the (variable) countdown on the leading edge
-            // and the (fixed) clock times on the trailing edge render at the
-            // *same* size — at 19pt both fit their half without scaling, so
-            // neither side shrinks past the other.
-            HStack(alignment: .lastTextBaseline, spacing: 10) {
-                HeadlineCountdown(model: model)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Trip \(model.tripNumber)")
-                        .font(.caption2.weight(.semibold))
-                        .textCase(.uppercase)
-                        .foregroundStyle(.white.opacity(0.6))
-                    ScheduleTimes(model: model)
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
+            JourneyProgressAndTiming(
+                model: model,
+                completedColor: .white,
+                walkingColor: .white,
+                markerFill: .white,
+                progressTrackColorScheme: .light,
+                primaryColor: .white,
+                secondaryColor: .white.opacity(0.72)
+            )
         }
-        .padding(16)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         // iOS flips isStale once staleAfterEpochMs passes with no fresher
         // update (phone locked, no push) — dim so the figures read as
         // "last known" rather than live truth.
@@ -889,6 +1095,46 @@ private enum TripActivityPreviewData {
         ])
     }
 
+    /// Leave alarm has fired and the rider is part-way through the walk to the
+    /// station, so previews exercise the first moving leg of the progress bar.
+    static var walkingState: GenericAttributes.ContentState {
+        let now = Date()
+        let reminder = now.addingTimeInterval(-5 * 60)
+        let departure = now.addingTimeInterval(10 * 60)
+        let arrival = now.addingTimeInterval(87 * 60)
+        return GenericAttributes.ContentState(values: [
+            "phase": "pre-departure",
+            "reminderEpochMs": epochMs(reminder),
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "true",
+            "alarmPending": "false",
+        ])
+    }
+
+    /// A focused train without a leave alarm. This exercises the train-only
+    /// native bar and guards the countdown/destination row against disappearing.
+    static var noReminderState: GenericAttributes.ContentState {
+        let now = Date()
+        let departure = now.addingTimeInterval(5 * 60)
+        let arrival = now.addingTimeInterval(11 * 60)
+        return GenericAttributes.ContentState(values: [
+            "phase": "pre-departure",
+            "departureEpochMs": epochMs(departure),
+            "arrivalEpochMs": epochMs(arrival),
+            "delayMinutes": "0",
+            "statusText": "On time",
+            "isCanceled": "false",
+            "isEnded": "false",
+            "reminderSet": "false",
+            "alarmPending": "false",
+        ])
+    }
+
     private static func epochMs(_ date: Date) -> String {
         String(Int(date.timeIntervalSince1970 * 1000))
     }
@@ -898,7 +1144,9 @@ private enum TripActivityPreviewData {
 #Preview("Lock Screen", as: .content, using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 
@@ -906,7 +1154,9 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Compact", as: .dynamicIsland(.compact), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 
@@ -914,7 +1164,9 @@ private enum TripActivityPreviewData {
 #Preview("Dynamic Island Expanded", as: .dynamicIsland(.expanded), using: TripActivityPreviewData.attributes) {
     TripActivityWidget()
 } contentStates: {
+    TripActivityPreviewData.noReminderState
     TripActivityPreviewData.alarmPendingState
+    TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
 }
 

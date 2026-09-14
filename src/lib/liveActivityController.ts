@@ -162,7 +162,10 @@ function originStartTimeFor(
 
 /** Immutable widget attributes for a focus — identical on the start and the
  *  scheduled-start paths. */
-function attributesFor(saved: FocusedTrip): TripActivityAttributes {
+function attributesFor(
+  saved: FocusedTrip,
+  timelineStartEpochMs: number,
+): TripActivityAttributes {
   return {
     tripNumber: saved.tripNumber,
     fromStation: saved.fromStation,
@@ -171,6 +174,7 @@ function attributesFor(saved: FocusedTrip): TripActivityAttributes {
     direction: isSouthbound(saved.fromStation, saved.toStation)
       ? "southbound"
       : "northbound",
+    timelineStartEpochMs,
   };
 }
 
@@ -273,7 +277,8 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     return;
   }
   const id = tripActivityId(saved.tripNumber, saved.serviceDate);
-  const attributes = attributesFor(saved);
+  const timelineStart = Date.now();
+  const attributes = attributesFor(saved, timelineStart);
   const content = buildContentState({
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
@@ -284,7 +289,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     isEnded: false,
     reminderSet: saved.reminder != null,
     reminderEpochMs: saved.reminder?.reminderAt ?? null,
-    now: Date.now(),
+    now: timelineStart,
   });
   // Push-enabled builds register the trip + APNs token with the backend so the
   // countdown is corrected while the phone is locked; everything else uses the
@@ -361,7 +366,7 @@ async function scheduleActivityForFocus(
   if (enablePush) await configureLiveActivityTokenEndpoint();
   const { scheduled } = await scheduleTripActivity({
     id,
-    attributes: attributesFor(saved),
+    attributes: attributesFor(saved, startAt),
     content,
     startAtEpochMs: startAt,
     // ActivityKit REQUIRES an alert for a scheduled start — iOS banners it when
@@ -447,6 +452,16 @@ async function startOrReviveActivity(
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
   const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
+  // A successfully committed logical id is authoritative even when iOS 26.6's
+  // global `Activity.activities` inventory temporarily returns no record. The
+  // lifecycle stream can already report this exact activity as `.active` while
+  // both the inventory and the plugin's lookup lag behind. Replacing it here
+  // ends a healthy activity before the system can present it. This also keeps
+  // the original dismissal contract: when a person swipes the activity away,
+  // retain its committed id and do not respawn it automatically.
+  if (keep != null && kept == null) {
+    return false;
+  }
   // Push builds never schedule the local auto-dismiss (the cron ends the
   // activity server-side at live arrival), so there an `ended` activity is a
   // deliberate end — leave it be rather than resurrect it.
@@ -700,4 +715,3 @@ export async function syncFocusedActivityContent(args: {
   const { updated } = await updateTripActivity(id, content);
   if (updated) lastSentActivityContent.set(id, json);
 }
-

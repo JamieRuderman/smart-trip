@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "operatorId": "SA",
-  "fetchedAt": "2026-09-14T18:14:43.372Z",
+  "fetchedAt": "2026-09-15T17:22:35.837Z",
   "sourceUrl": "https://api.511.org/transit/datafeeds?operator_id=SA",
   "agency": [
     {

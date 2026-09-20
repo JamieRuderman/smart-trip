@@ -103,11 +103,12 @@ const App = () => {
   useEffect(() => {
     bootFocusedTrip();
     void reconcileTripActivities();
-    return subscribeTripActivityLifecycle((event) =>
+    return subscribeTripActivityLifecycle((event) => {
+      if (event.state === "active") return;
       logger.warn(
         `Live Activity ${event.id} (${event.activityId}) state=${event.state}`,
-      ),
-    );
+      );
+    });
   }, []);
 
   return (

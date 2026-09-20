@@ -15,14 +15,14 @@ import WidgetKit
  * once the train leaves it counts down to *arrival*. On the lock screen and
  * expanded island this uses SwiftUI's self-updating
  * `Text(timerInterval:countsDown:)` (see `RelativeCountdown`). Crucially that
- * timer CLAMPS at 0:00 once the target passes — it never counts *up*. A local (non-push) activity gets no
- * re-render at the stage/arrival boundary while the app is backgrounded, and the
- * earlier `.relative` style kept ticking *upward* past the target there, so the
- * lock screen / expanded island showed an ever-growing "2 min, 30 sec" of
- * elapsed time instead of holding at zero. The compact island pairs the same
- * clamping timer with a stage-matched glyph (see `CompactLeadingIcon`): a walking
- * person to the alarm, the train to departure, then a map pin to the
- * destination en route.
+ * timer CLAMPS at 0:00 once the target passes — it never counts *up*. A local
+ * (non-push) activity gets no re-render at the stage/arrival boundary while the
+ * app is backgrounded, and the earlier `.relative` style kept ticking *upward*
+ * past the target there, so the lock screen / expanded island showed an
+ * ever-growing "2 min, 30 sec" of elapsed time instead of holding at zero. The
+ * compact island pairs the same clamping timer with a stage-matched glyph (see
+ * `CompactLeadingIcon`): a walking person to the alarm, the train to departure,
+ * then a map pin to the destination en route.
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -37,8 +37,8 @@ struct TripActivityWidget: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(Brand.name)
-                    .font(.caption.weight(.semibold))
-                    .padding(.leading, 8)
+                        .font(.caption.weight(.semibold))
+                        .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ActiveEventClock(
@@ -770,8 +770,10 @@ private struct TripLegs {
         }
     }
 
-    var durations: [TimeInterval] {
-        guard let reminder else { return [0, 0, arrival.timeIntervalSince(departure)] }
+    /// Alarm, walk, and train durations; nil for a train-only trip, whose single
+    /// segment simply fills the track.
+    var durations: [TimeInterval]? {
+        guard let reminder else { return nil }
         return [
             reminder.reminder.timeIntervalSince(reminder.start),
             departure.timeIntervalSince(reminder.reminder),
@@ -800,11 +802,9 @@ private struct TripProgressTrack: View {
     var body: some View {
         GeometryReader { geometry in
             let totalWidth = geometry.size.width
-            let gapCount: CGFloat = legs.reminder == nil ? 0 : 2
-            let widths = proportionalWidths(
-                durations: legs.durations,
-                trackWidth: max(0, totalWidth - segmentGap * gapCount)
-            )
+            let widths = legs.durations.map {
+                proportionalWidths(durations: $0, trackWidth: max(0, totalWidth - segmentGap * 2))
+            } ?? [0, 0, totalWidth]
 
             ZStack(alignment: .topLeading) {
                 HStack(spacing: segmentGap) {
@@ -949,8 +949,8 @@ private struct LockScreenView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 Text(Brand.name)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 ActiveEventClock(
                     model: model,

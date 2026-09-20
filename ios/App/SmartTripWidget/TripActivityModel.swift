@@ -21,7 +21,7 @@ struct TripActivityModel {
     let toStation: String
     let routeName: String
     /// Immutable first-visible instant, carried in static attributes so content
-    /// pushes cannot resize the timeline underneath the moving marker.
+    /// pushes cannot resize the alarm leg of the progress track.
     let timelineStartDate: Date?
 
     // Dynamic content state
@@ -41,6 +41,9 @@ struct TripActivityModel {
     /// Precomputed by the app (see buildContentState): a reminder is armed and
     /// hasn't fired yet, so the surfaces lead with the alarm countdown.
     let alarmPending: Bool
+
+    /// The leave alarm's fire instant while one is armed; nil once cleared.
+    var armedReminderDate: Date? { reminderSet ? reminderDate : nil }
 
     init(context: ActivityViewContext<GenericAttributes>) {
         let attrs = context.attributes.staticValues

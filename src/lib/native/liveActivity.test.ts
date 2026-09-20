@@ -73,6 +73,7 @@ const ATTRS: TripActivityAttributes = {
   toStation: "B",
   routeName: "SMART",
   direction: "southbound",
+  timelineStartEpochMs: NOW,
 };
 
 function content(over: Partial<TripActivityContentState> = {}): TripActivityContentState {
@@ -247,6 +248,7 @@ describe("scheduleTripActivity", () => {
     toStation: "Larkspur",
     routeName: "SMART",
     direction: "southbound",
+    timelineStartEpochMs: NOW,
   };
   const content = buildContentState({
     departureEpochMs: DEP,
@@ -398,12 +400,8 @@ describe("encodeAttributes / encodeContentState", () => {
       toStation: "B",
       routeName: "SMART",
       direction: "southbound",
+      timelineStartEpochMs: String(NOW),
     });
-  });
-  it("serializes the immutable timeline start when provided", () => {
-    expect(
-      encodeAttributes({ ...ATTRS, timelineStartEpochMs: NOW }),
-    ).toMatchObject({ timelineStartEpochMs: String(NOW) });
   });
   it("serializes content state, mapping null → empty string", () => {
     expect(encodeContentState(content({ nextStop: null, remainingStops: null }))).toMatchObject({

@@ -449,26 +449,17 @@ async function startOrReviveActivity(
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
   const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
-  // A successfully committed logical id is authoritative even when iOS 26.6's
-  // global `Activity.activities` inventory temporarily returns no record. The
-  // lifecycle stream can already report this exact activity as `.active` while
-  // both the inventory and the plugin's lookup lag behind. Replacing it here
-  // ends a healthy activity before the system can present it. This also keeps
-  // the original dismissal contract: when a person swipes the activity away,
-  // retain its committed id and do not respawn it automatically.
-  if (keep != null && kept == null) {
-    return false;
-  }
-  // Push builds never schedule the local auto-dismiss (the cron ends the
-  // activity server-side at live arrival), so there an `ended` activity is a
-  // deliberate end — leave it be rather than resurrect it.
+  // A committed id is authoritative even when the OS inventory momentarily
+  // omits it (seen on iOS 26.6 right after start); replacing it there ended a
+  // healthy activity before the system presented it. The one record we do
+  // replace is the local auto-dismissed `ended` one — push builds never
+  // schedule that dismissal, so their `ended` is a deliberate server-side end.
   const keptFrozen =
-    kept != null && kept.state === "ended" && !isLiveActivityPushEnabled();
-  // Already covered (live / user-dismissed / push-ended) — don't touch it.
-  if (kept != null && !keptFrozen) return false;
+    kept?.state === "ended" && !isLiveActivityPushEnabled();
+  if (keep != null && !keptFrozen) return false;
   // End the frozen one first so its pending auto-dismissal can't remove the
   // freshly started activity.
-  if (keptFrozen && keep != null) await endTripActivity(keep);
+  if (keep != null && keptFrozen) await endTripActivity(keep);
   await startActivityForFocus(focused);
   return true;
 }
@@ -568,7 +559,7 @@ export async function reconcileTripActivities(): Promise<void> {
     records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
   // (Re)start or revive the focus's activity if nothing live is on screen for
-  // it (never started, frozen by the background auto-dismiss, system-purged).
+  // it (never started, or frozen by the background auto-dismiss).
   // Returns false when a live / user-dismissed / push-ended activity already
   // covers it, in which case we fall through to the push self-heal below.
   if (focused && (await startOrReviveActivity(focused, records))) return;

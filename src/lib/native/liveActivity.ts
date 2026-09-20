@@ -312,3 +312,28 @@ export async function listTripActivityRecords(): Promise<TripActivityRecord[]> {
     return [];
   }
 }
+
+/**
+ * Subscribe to ActivityKit lifecycle transitions (active/stale/ended/dismissed)
+ * and return a cleanup. ActivityKit can remove an activity after a successful
+ * request without surfacing a reason through the request call, so the app logs
+ * these to tell that apart from a failed API call or backend push. No-op
+ * off-iOS.
+ */
+export function subscribeTripActivityLifecycle(
+  onChange: (event: { id: string; activityId: string; state: string }) => void,
+): () => void {
+  if (Capacitor.getPlatform() !== "ios") return () => {};
+  let disposed = false;
+  let handle: { remove: () => Promise<void> } | undefined;
+  LiveActivity.addListener("liveActivityUpdate", onChange)
+    .then((h) => {
+      if (disposed) void h.remove();
+      else handle = h;
+    })
+    .catch((error) => logger.warn("LiveActivity.addListener failed", error));
+  return () => {
+    disposed = true;
+    void handle?.remove();
+  };
+}

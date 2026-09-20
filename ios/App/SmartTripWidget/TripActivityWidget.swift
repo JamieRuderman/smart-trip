@@ -36,8 +36,7 @@ struct TripActivityWidget: Widget {
             let accent = statusColor(model)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(Brand.name)
-                        .font(.caption.weight(.semibold))
+                    BrandHeader(model: model, delayColor: accent)
                         .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -717,6 +716,27 @@ private struct ActiveEventTimingRow: View {
     }
 }
 
+/// "SMART · Delayed 12 min" — the brand label with the live delay beside it
+/// while the trip is running late. This is the only place either surface says
+/// the train is late in words; the card tint alone is colour-only.
+private struct BrandHeader: View {
+    let model: TripActivityModel
+    let delayColor: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(Brand.name)
+            if model.delayMinutes > 0, !model.isCanceled, !isArrived(model) {
+                Text("· Delayed \(model.delayMinutes) min")
+                    .foregroundStyle(delayColor)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+}
+
 /// Small absolute time in the upper-right header. The leading "at" keeps a bare
 /// clock value from reading like the current time; the phase-specific action is
 /// supplied by the larger countdown row directly below.
@@ -948,8 +968,7 @@ private struct LockScreenView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
-                Text(Brand.name)
-                    .font(.caption.weight(.semibold))
+                BrandHeader(model: model, delayColor: .white)
                     .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 ActiveEventClock(
@@ -1015,6 +1034,17 @@ private enum TripActivityPreviewData {
         state(phase: "pre-departure", reminderMinutes: nil, departureMinutes: 5, arrivalMinutes: 11)
     }
 
+    /// Running 12 minutes late: gold tint plus the "Delayed" header label.
+    static var delayedState: GenericAttributes.ContentState {
+        state(
+            phase: "en-route",
+            reminderMinutes: nil,
+            departureMinutes: -3,
+            arrivalMinutes: 64,
+            extra: ["delayMinutes": "12", "statusText": "Delayed"]
+        )
+    }
+
     private static func state(
         phase: String,
         reminderMinutes: Int?,
@@ -1053,6 +1083,7 @@ private enum TripActivityPreviewData {
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
+    TripActivityPreviewData.delayedState
 }
 
 @available(iOSApplicationExtension 17.0, *)
@@ -1063,6 +1094,7 @@ private enum TripActivityPreviewData {
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
+    TripActivityPreviewData.delayedState
 }
 
 @available(iOSApplicationExtension 17.0, *)
@@ -1073,6 +1105,7 @@ private enum TripActivityPreviewData {
     TripActivityPreviewData.alarmPendingState
     TripActivityPreviewData.walkingState
     TripActivityPreviewData.runningState
+    TripActivityPreviewData.delayedState
 }
 
 @available(iOSApplicationExtension 17.0, *)

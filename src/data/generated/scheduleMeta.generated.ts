@@ -7,6 +7,6 @@
  * Lets the bundled fallback report a real timestamp instead of "unavailable"
  * on a genuine offline cold-launch (before any remote/cached payload loads).
  */
-export const SCHEDULE_GENERATED_AT = "2026-09-20T16:35:46.755Z";
+export const SCHEDULE_GENERATED_AT = "2026-09-21T18:21:45.593Z";
 
 export default SCHEDULE_GENERATED_AT;

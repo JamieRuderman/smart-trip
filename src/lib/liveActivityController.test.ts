@@ -53,8 +53,10 @@ vi.mock("@/lib/focusedTrip", async (importOriginal) => ({
 
 import {
   ensureActivityForFocus,
+  reconcileTripActivities,
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
+import { LIVE_ACTIVITY_LEAD_MS } from "@/lib/liveActivityContent";
 import type { FocusedTrip } from "@/lib/focusedTrip";
 
 const FOCUS: FocusedTrip = {
@@ -218,5 +220,30 @@ describe("content updates to a scheduled activity", () => {
     });
     expect(updateTripActivity).not.toHaveBeenCalled();
     expect(startTripActivity).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconcileTripActivities adoption", () => {
+  it("keeps the scheduled start when adopting an uncommitted pending activity", async () => {
+    listTripActivityRecords.mockResolvedValue([
+      { id: "trip-7-2026-06-09-adopted", state: "pending" },
+    ]);
+    await reconcileTripActivities();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liveActivityId: "trip-7-2026-06-09-adopted",
+        liveActivityScheduledFor: DEPARTURE - LIVE_ACTIVITY_LEAD_MS,
+      }),
+    );
+  });
+
+  it("adopts a running activity without a scheduled start", async () => {
+    listTripActivityRecords.mockResolvedValue([
+      { id: "trip-7-2026-06-09-running", state: "active" },
+    ]);
+    await reconcileTripActivities();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
   });
 });

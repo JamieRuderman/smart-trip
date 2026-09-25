@@ -582,6 +582,9 @@ export async function reconcileTripActivities(): Promise<void> {
     const adopted = records.find((r) => r.id.startsWith(prefix));
     if (adopted) {
       focused = { ...focused, liveActivityId: adopted.id };
+      const scheduledFor =
+        adopted.state === "pending" ? focusedActivityStartAt(focused) : null;
+      if (scheduledFor != null) focused.liveActivityScheduledFor = scheduledFor;
       saveFocusedTrip(focused);
       notifyChange();
     }

@@ -169,6 +169,27 @@ describe("ensureActivityForFocus revive decision", () => {
     });
     expect(endTripActivity).not.toHaveBeenCalled();
     expect(startTripActivity).not.toHaveBeenCalled();
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces a missing activity whose commit time is in the future", async () => {
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW + 60 * 60_000,
+    });
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces a pending activity whose start instant moved", async () => {
+    listTripActivityRecords.mockResolvedValue([{ id: ID, state: "pending" }]);
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityScheduledFor: NOW + 5 * 60_000,
+    });
+    expect(endTripActivity).toHaveBeenCalledWith(ID);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
   });
 
   it("does not respawn a missing activity the user dismissed", async () => {

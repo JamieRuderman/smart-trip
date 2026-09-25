@@ -511,9 +511,11 @@ async function startOrReviveActivity(
     if (kept == null) {
       // Replacing an activity the inventory hadn't listed yet (iOS 26.6, right
       // after the request) ended it before the system presented it.
-      const justCommitted =
-        focused.liveActivityCommittedAt != null &&
-        Date.now() - focused.liveActivityCommittedAt < COMMITTED_ACTIVITY_GRACE_MS;
+      const committedAgo =
+        focused.liveActivityCommittedAt != null
+          ? Date.now() - focused.liveActivityCommittedAt
+          : Infinity;
+      const justCommitted = committedAgo >= 0 && committedAgo < COMMITTED_ACTIVITY_GRACE_MS;
       if (justCommitted || focused.liveActivityDismissed) return false;
       await replaceFocusActivity(focused);
       return true;
@@ -545,7 +547,10 @@ async function startOrReviveActivity(
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
   const records = await listTripActivityRecords();
-  if (records == null) return;
+  if (records == null) {
+    await refreshActivityContent(focused);
+    return;
+  }
   const pending =
     focused.liveActivityId != null &&
     records.some((r) => r.id === focused.liveActivityId && r.state === "pending");

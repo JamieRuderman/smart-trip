@@ -835,7 +835,7 @@ private struct TripProgressTrack: View {
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
     private let fadedOpacity = 0.4
-    private let completedOutlineOpacity = 0.2
+    private let completedOpacity = 0.2
     /// Height of the native linear ProgressView bar (4pt on iOS 27), which the
     /// faded fill and completed outlines have to match to read as the same bar.
     private static let nativeBarHeight: CGFloat = 4
@@ -908,7 +908,7 @@ private struct TripProgressTrack: View {
     private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> some View {
         if end <= now {
             Capsule()
-                .strokeBorder(accent.opacity(completedOutlineOpacity), lineWidth: 1)
+                .strokeBorder(accent.opacity(completedOpacity), lineWidth: 1)
                 .frame(height: Self.nativeBarHeight)
         } else {
             NativeTimerProgress(
@@ -956,7 +956,7 @@ private struct TripProgressTrack: View {
             }
         }
         .foregroundStyle(iconColor)
-        .opacity(completed ? fadedOpacity : 1)
+        .opacity(completed ? completedOpacity : 1)
         .position(x: clampedX, y: walkingIconSize / 2)
     }
 

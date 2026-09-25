@@ -40,22 +40,11 @@ struct TripActivityWidget: Widget {
                         .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ActiveEventClock(
-                        model: model,
-                        primaryColor: .white,
-                        secondaryColor: .secondary
-                    )
-                    .padding(.trailing, 8)
+                    ActiveEventClock(model: model, style: .island)
+                        .padding(.trailing, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    JourneyProgressAndTiming(
-                        model: model,
-                        accent: accent,
-                        trackAppearance: .island,
-                        progressTrackColorScheme: .dark,
-                        primaryColor: .white,
-                        secondaryColor: .secondary
-                    )
+                    JourneyProgressAndTiming(model: model, accent: accent, style: .island)
                     .padding(.horizontal, 8)
                     .padding(.top, 2)
                 }
@@ -140,9 +129,13 @@ private func isArrived(_ model: TripActivityModel, now: Date = Date()) -> Bool {
 /// the precedence in `deriveStatusText` (cancelled > ended > delayed).
 private func statusColor(_ model: TripActivityModel) -> Color {
     if model.isCanceled { return Brand.red }
-    if isArrived(model) { return Brand.blue }
-    if model.delayMinutes > 0 { return Brand.gold }
+    if isRunningLate(model) { return Brand.gold }
     return Brand.blue
+}
+
+/// Delayed and still under way; a delay stops mattering once cancelled or arrived.
+private func isRunningLate(_ model: TripActivityModel) -> Bool {
+    model.delayMinutes > 0 && !model.isCanceled && !isArrived(model)
 }
 
 /// The SMART brand train icon (front view), drawn as a vector so the widget
@@ -657,27 +650,15 @@ private struct RelativeCountdown: View {
 private struct JourneyProgressAndTiming: View {
     let model: TripActivityModel
     let accent: Color
-    let trackAppearance: TrackAppearance
-    let progressTrackColorScheme: ColorScheme
-    let primaryColor: Color
-    let secondaryColor: Color
+    let style: SurfaceStyle
 
     var body: some View {
         VStack(spacing: 5) {
             if !model.isCanceled, let legs = TripLegs(model: model) {
-                TripProgressTrack(legs: legs, accent: accent, appearance: trackAppearance)
-                // Date-relative ProgressView does not expose a separate track
-                // color. Choosing the local control appearance lets the blue
-                // Lock Screen use a dark neutral track while the black Dynamic
-                // Island retains its lighter system track.
-                .environment(\.colorScheme, progressTrackColorScheme)
+                TripProgressTrack(legs: legs, accent: accent, style: style)
             }
 
-            ActiveEventTimingRow(
-                model: model,
-                primaryColor: primaryColor,
-                secondaryColor: secondaryColor
-            )
+            ActiveEventTimingRow(model: model, secondaryColor: style.secondaryColor)
         }
     }
 }
@@ -686,7 +667,6 @@ private struct JourneyProgressAndTiming: View {
 /// leads while the destination takes the trailing position.
 private struct ActiveEventTimingRow: View {
     let model: TripActivityModel
-    let primaryColor: Color
     let secondaryColor: Color
 
     var body: some View {
@@ -721,7 +701,7 @@ private struct ActiveEventTimingRow: View {
                 .minimumScaleFactor(0.6)
                 .layoutPriority(1)
         }
-        .foregroundStyle(primaryColor)
+        .foregroundStyle(.white)
         .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
     }
 
@@ -744,7 +724,7 @@ private struct BrandHeader: View {
     var body: some View {
         HStack(spacing: 4) {
             Text(Brand.name)
-            if model.delayMinutes > 0, !model.isCanceled, !isArrived(model) {
+            if isRunningLate(model) {
                 Text("· Delayed \(model.delayMinutes) min")
                     .foregroundStyle(delayColor)
             }
@@ -760,12 +740,11 @@ private struct BrandHeader: View {
 /// supplied by the larger countdown row directly below.
 private struct ActiveEventClock: View {
     let model: TripActivityModel
-    let primaryColor: Color
-    let secondaryColor: Color
+    let style: SurfaceStyle
 
     var body: some View {
         HStack(spacing: 3) {
-            Text("at").foregroundStyle(secondaryColor)
+            Text("at").foregroundStyle(style.secondaryColor)
             if let date = countdownTarget(model) {
                 Text(date, style: .time)
             } else {
@@ -773,40 +752,52 @@ private struct ActiveEventClock: View {
             }
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(primaryColor)
+        .foregroundStyle(.white)
         .lineLimit(1)
     }
 }
 
-/// How strongly the progress track's faded parts show on each surface: blue on
-/// the black island needs far more opacity than white on the blue lock-screen card.
-private struct TrackAppearance {
+/// Per-surface styling. The track's faded parts need far more opacity for blue on
+/// the black island than for white on the blue lock-screen card.
+private struct SurfaceStyle {
+    let secondaryColor: Color
     let remainingOpacity: Double
     let completedOpacity: Double
+    /// Date-relative ProgressView has no track colour of its own; this scheme gives the
+    /// blue card a dark neutral track and keeps the island's lighter system track.
+    let trackColorScheme: ColorScheme
 
-    static let lockScreen = TrackAppearance(remainingOpacity: 0.4, completedOpacity: 0.2)
-    static let island = TrackAppearance(remainingOpacity: 0.75, completedOpacity: 0.5)
+    static let lockScreen = SurfaceStyle(
+        secondaryColor: .white.opacity(0.72),
+        remainingOpacity: 0.4,
+        completedOpacity: 0.2,
+        trackColorScheme: .light
+    )
+    static let island = SurfaceStyle(
+        secondaryColor: .secondary,
+        remainingOpacity: 0.75,
+        completedOpacity: 0.5,
+        trackColorScheme: .dark
+    )
 }
 
 /// The date intervals behind the progress track. `nil` when the payload lacks
-/// a usable departure → arrival window; `reminder` is nil for a train-only trip.
+/// a usable departure → arrival window; `alarm` is nil for a train-only trip.
 private struct TripLegs {
-    struct ReminderLegs {
-        let start: Date
-        let reminder: Date
-    }
+    let alarm: ClosedRange<Date>?
+    let train: ClosedRange<Date>
 
-    let reminder: ReminderLegs?
-    let departure: Date
-    let arrival: Date
+    /// From the leave alarm to departure.
+    var walk: ClosedRange<Date>? {
+        alarm.map { $0.upperBound...train.lowerBound }
+    }
 
     init?(model: TripActivityModel) {
         guard let departure = model.departureDate,
               let arrival = model.arrivalDate,
               arrival > departure else { return nil }
-        self.departure = departure
-        self.arrival = arrival
-        reminder = model.armedReminderDate.flatMap { reminder in
+        train = departure...arrival
+        alarm = model.armedReminderDate.flatMap { reminder in
             guard reminder < departure else { return nil }
             // An activity started without a timeline start (or after the alarm
             // already fired) gets a near-empty alarm leg rather than a fabricated one.
@@ -814,19 +805,15 @@ private struct TripLegs {
                 model.timelineStartDate ?? reminder,
                 reminder.addingTimeInterval(-1)
             )
-            return ReminderLegs(start: start, reminder: reminder)
+            return start...reminder
         }
     }
 
     /// Alarm, walk, and train durations; nil for a train-only trip, whose single
     /// segment simply fills the track.
     var durations: [TimeInterval]? {
-        guard let reminder else { return nil }
-        return [
-            reminder.reminder.timeIntervalSince(reminder.start),
-            departure.timeIntervalSince(reminder.reminder),
-            arrival.timeIntervalSince(departure),
-        ]
+        guard let alarm, let walk else { return nil }
+        return [alarm, walk, train].map { $0.upperBound.timeIntervalSince($0.lowerBound) }
     }
 }
 
@@ -839,7 +826,7 @@ private struct TripLegs {
 private struct TripProgressTrack: View {
     let legs: TripLegs
     let accent: Color
-    let appearance: TrackAppearance
+    let style: SurfaceStyle
 
     private let minimumSegmentWidth: CGFloat = 20
     private let iconSize: CGFloat = 12
@@ -848,7 +835,7 @@ private struct TripProgressTrack: View {
     private let trackHeight: CGFloat = 30
     /// Height of the native linear ProgressView bar (4pt on iOS 27), which the
     /// faded fill and completed outlines have to match to read as the same bar.
-    private static let nativeBarHeight: CGFloat = 4
+    private let nativeBarHeight: CGFloat = 4
 
     var body: some View {
         GeometryReader { geometry in
@@ -860,52 +847,53 @@ private struct TripProgressTrack: View {
 
             ZStack(alignment: .topLeading) {
                 HStack(spacing: segmentGap) {
-                    if let reminder = legs.reminder {
-                        segment(accent.opacity(0.72), from: reminder.start, to: reminder.reminder, now: now)
+                    if let alarm = legs.alarm, let walk = legs.walk {
+                        segment(accent.opacity(0.72), alarm, now: now)
                             .frame(width: widths[0])
 
-                        segment(accent, from: reminder.reminder, to: legs.departure, now: now)
+                        segment(accent, walk, now: now)
                             .frame(width: widths[1])
                     }
 
-                    segment(accent, from: legs.departure, to: legs.arrival, now: now)
+                    segment(accent, legs.train, now: now)
                         .frame(width: widths[2])
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 17)
 
-                if let reminder = legs.reminder {
+                if let alarm = legs.alarm {
                     milestoneIcon(
                         .alarm,
                         x: 0,
                         totalWidth: totalWidth,
-                        completed: reminder.reminder <= now
+                        completed: alarm.upperBound <= now
                     )
                     milestoneIcon(
                         .walking,
                         x: widths[0] + segmentGap / 2,
                         totalWidth: totalWidth,
-                        completed: legs.departure <= now
+                        completed: legs.train.lowerBound <= now
                     )
                     milestoneIcon(
                         .train,
                         x: widths[0] + segmentGap + widths[1] + segmentGap / 2,
                         totalWidth: totalWidth,
-                        completed: legs.arrival <= now
+                        completed: legs.train.upperBound <= now
                     )
                 } else {
-                    milestoneIcon(.train, x: 0, totalWidth: totalWidth, completed: legs.arrival <= now)
+                    milestoneIcon(.train, x: 0, totalWidth: totalWidth, completed: legs.train.upperBound <= now)
                 }
                 milestoneIcon(.arrival, x: totalWidth, totalWidth: totalWidth, completed: false)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(
-                legs.reminder != nil
+                legs.alarm != nil
                     ? "Trip progress: alarm, walk, and train"
                     : "Train trip progress"
             ))
         }
         .frame(height: trackHeight)
+        .environment(\.colorScheme, style.trackColorScheme)
     }
 
     private enum ProgressPhase {
@@ -915,35 +903,19 @@ private struct TripProgressTrack: View {
     /// Completed legs are a faded outline; the current and upcoming legs are
     /// native bars whose distance still to cover is a faded solid fill.
     @ViewBuilder
-    private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> some View {
-        if end <= now {
+    private func segment(_ color: Color, _ interval: ClosedRange<Date>, now: Date) -> some View {
+        if interval.upperBound <= now {
             Capsule()
-                .strokeBorder(accent.opacity(appearance.completedOpacity), lineWidth: 1)
-                .frame(height: Self.nativeBarHeight)
+                .strokeBorder(accent.opacity(style.completedOpacity), lineWidth: 1)
+                .frame(height: nativeBarHeight)
         } else {
-            NativeTimerProgress(
-                start: start,
-                end: end,
-                color: color,
-                remainingColor: accent.opacity(appearance.remainingOpacity)
-            )
-        }
-    }
-
-    private struct NativeTimerProgress: View {
-        let start: Date
-        let end: Date
-        let color: Color
-        let remainingColor: Color
-
-        var body: some View {
-            ProgressView(timerInterval: start...end, countsDown: false)
+            ProgressView(timerInterval: interval, countsDown: false)
                 .tint(color)
                 .labelsHidden()
                 .background {
                     Capsule()
-                        .fill(remainingColor)
-                        .frame(height: TripProgressTrack.nativeBarHeight)
+                        .fill(accent.opacity(style.remainingOpacity))
+                        .frame(height: nativeBarHeight)
                 }
         }
     }
@@ -966,7 +938,7 @@ private struct TripProgressTrack: View {
             }
         }
         .foregroundStyle(accent)
-        .opacity(completed ? appearance.completedOpacity : 1)
+        .opacity(completed ? style.completedOpacity : 1)
         .position(x: clampedX, y: walkingIconSize / 2)
     }
 
@@ -1024,21 +996,10 @@ private struct LockScreenView: View {
                 BrandHeader(model: model, delayColor: .white)
                     .foregroundStyle(.white.opacity(0.9))
                 Spacer()
-                ActiveEventClock(
-                    model: model,
-                    primaryColor: .white,
-                    secondaryColor: .white.opacity(0.72)
-                )
+                ActiveEventClock(model: model, style: .lockScreen)
             }
 
-            JourneyProgressAndTiming(
-                model: model,
-                accent: .white,
-                trackAppearance: .lockScreen,
-                progressTrackColorScheme: .light,
-                primaryColor: .white,
-                secondaryColor: .white.opacity(0.72)
-            )
+            JourneyProgressAndTiming(model: model, accent: .white, style: .lockScreen)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)

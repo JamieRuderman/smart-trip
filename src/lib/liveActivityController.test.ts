@@ -40,15 +40,19 @@ const DEPARTURE = NOW + 20 * 60_000;
 const ARRIVAL = NOW + 80 * 60_000;
 
 const saveFocusedTrip = vi.fn();
+const loadFocusedTrip = vi.fn((): FocusedTrip | null => FOCUS);
 vi.mock("@/lib/focusedTrip", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/focusedTrip")>()),
   focusedDepartureInstant: () => DEPARTURE,
   focusedArrivalInstant: () => ARRIVAL,
-  loadFocusedTrip: () => FOCUS,
+  loadFocusedTrip: () => loadFocusedTrip(),
   saveFocusedTrip: (trip: unknown) => saveFocusedTrip(trip),
 }));
 
-import { ensureActivityForFocus } from "@/lib/liveActivityController";
+import {
+  ensureActivityForFocus,
+  syncFocusedActivityContent,
+} from "@/lib/liveActivityController";
 import type { FocusedTrip } from "@/lib/focusedTrip";
 
 const FOCUS: FocusedTrip = {
@@ -67,6 +71,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   listTripActivityRecords.mockResolvedValue([]);
   isLiveActivityPushEnabled.mockReturnValue(false);
+  loadFocusedTrip.mockReturnValue(FOCUS);
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -113,5 +118,34 @@ describe("ensureActivityForFocus revive decision", () => {
     await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID });
     expect(startTripActivity).not.toHaveBeenCalled();
     expect(endTripActivity).not.toHaveBeenCalled();
+  });
+});
+
+describe("content updates to a scheduled activity", () => {
+  const scheduled = (id: string): FocusedTrip => ({
+    ...FOCUS,
+    liveActivityId: id,
+    liveActivityScheduledFor: NOW + 10 * 60_000,
+  });
+  const sync = () =>
+    syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes: 3 });
+
+  it("skips the drift sync while iOS has not started the activity yet", async () => {
+    loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-pending"));
+    await sync();
+    expect(updateTripActivity).not.toHaveBeenCalled();
+  });
+
+  it("syncs once the scheduled start instant has passed", async () => {
+    loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-started"));
+    vi.setSystemTime(NOW + 11 * 60_000);
+    await sync();
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {
+    await ensureActivityForFocus(scheduled("trip-7-refresh-pending"));
+    expect(updateTripActivity).not.toHaveBeenCalled();
+    expect(startTripActivity).not.toHaveBeenCalled();
   });
 });

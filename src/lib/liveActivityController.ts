@@ -398,6 +398,13 @@ async function scheduleActivityForFocus(
   }
 }
 
+/** Whether the focus's activity is a scheduled one iOS hasn't started yet.
+ *  ActivityKit rejects a content update to a pending activity unless it carries
+ *  an alert, and the rejected update was retried on every sync tick. */
+function isScheduledActivityPending(focused: FocusedTrip, now = Date.now()): boolean {
+  return focused.liveActivityScheduledFor != null && now < focused.liveActivityScheduledFor;
+}
+
 /**
  * Push the focused trip's CURRENT content to its already-running Live Activity,
  * so a just-armed/cleared/rescheduled reminder (the "leave alarm" stage) is
@@ -409,7 +416,7 @@ async function scheduleActivityForFocus(
  */
 async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
   const id = focused.liveActivityId;
-  if (!id) return;
+  if (!id || isScheduledActivityPending(focused)) return;
   const departureAt = focusedDepartureInstant(focused);
   const arrivalAt = focusedArrivalInstant(focused);
   if (departureAt == null || arrivalAt == null) return;
@@ -686,6 +693,7 @@ export async function syncFocusedActivityContent(args: {
     const registration = buildRegistrationForFocus(current, id);
     if (registration) void postRegistrationDeduped(registration);
   }
+  if (current && isScheduledActivityPending(current)) return;
   const content = buildContentState({
     departureEpochMs: args.departureAt,
     arrivalEpochMs: args.arrivalAt,

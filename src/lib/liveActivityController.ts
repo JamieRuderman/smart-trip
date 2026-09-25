@@ -521,6 +521,7 @@ async function startOrReviveActivity(
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
   const records = await listTripActivityRecords();
+  if (records == null) return;
   const pending =
     focused.liveActivityId != null &&
     records.some((r) => r.id === focused.liveActivityId && r.state === "pending");
@@ -564,6 +565,7 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
 export async function reconcileTripActivities(): Promise<void> {
   let focused = loadFocusedTrip();
   const records = await listTripActivityRecords();
+  if (records == null) return;
   // Adopt a running activity for the SAME trip+service date when the focus's
   // committed `liveActivityId` hasn't landed yet — `startActivityForFocus`
   // commits it asynchronously, so a reconcile racing a just-started activity

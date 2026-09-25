@@ -586,8 +586,8 @@ describe("listTripActivityRecords", () => {
     await expect(listTripActivityRecords()).resolves.toEqual([]);
     expect(listActivities).not.toHaveBeenCalled();
   });
-  it("returns [] when the plugin throws", async () => {
+  it("returns null when the plugin throws", async () => {
     listActivities.mockRejectedValue(new Error("boom"));
-    await expect(listTripActivityRecords()).resolves.toEqual([]);
+    await expect(listTripActivityRecords()).resolves.toBeNull();
   });
 });

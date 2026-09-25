@@ -14,7 +14,9 @@ vi.mock("@/lib/notificationScheduler", () => ({
   scheduleNotification: async () => {},
 }));
 
-const listTripActivityRecords = vi.fn(async (): Promise<{ id: string; state: string }[]> => []);
+const listTripActivityRecords = vi.fn(
+  async (): Promise<{ id: string; state: string }[] | null> => [],
+);
 const startTripActivity = vi.fn(async () => ({ started: true }));
 const endTripActivity = vi.fn(async () => {});
 const updateTripActivity = vi.fn(async () => ({ updated: true }));
@@ -143,6 +145,17 @@ describe("ensureActivityForFocus revive decision", () => {
   it("replaces a missing activity whose commit time was never recorded", async () => {
     await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID });
     expect(startTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat a failed inventory read as a missing activity", async () => {
+    listTripActivityRecords.mockResolvedValue(null);
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW - 10 * 60_000,
+    });
+    expect(endTripActivity).not.toHaveBeenCalled();
+    expect(startTripActivity).not.toHaveBeenCalled();
   });
 
   it("does not respawn a missing activity the user dismissed", async () => {

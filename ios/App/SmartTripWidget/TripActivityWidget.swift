@@ -835,6 +835,9 @@ private struct TripProgressTrack: View {
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
     private let completedSegmentOpacity = 0.4
+    /// Height of the native linear ProgressView bar (4pt on iOS 27), which the
+    /// outline has to match to read as part of the same bar.
+    private static let nativeBarHeight: CGFloat = 4
 
     var body: some View {
         GeometryReader { geometry in
@@ -860,22 +863,29 @@ private struct TripProgressTrack: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 17)
 
-                if legs.reminder != nil {
-                    milestoneIcon(.alarm, x: 0, totalWidth: totalWidth)
+                if let reminder = legs.reminder {
+                    milestoneIcon(
+                        .alarm,
+                        x: 0,
+                        totalWidth: totalWidth,
+                        completed: reminder.reminder <= now
+                    )
                     milestoneIcon(
                         .walking,
                         x: widths[0] + segmentGap / 2,
-                        totalWidth: totalWidth
+                        totalWidth: totalWidth,
+                        completed: legs.departure <= now
                     )
                     milestoneIcon(
                         .train,
                         x: widths[0] + segmentGap + widths[1] + segmentGap / 2,
-                        totalWidth: totalWidth
+                        totalWidth: totalWidth,
+                        completed: legs.arrival <= now
                     )
                 } else {
-                    milestoneIcon(.train, x: 0, totalWidth: totalWidth)
+                    milestoneIcon(.train, x: 0, totalWidth: totalWidth, completed: legs.arrival <= now)
                 }
-                milestoneIcon(.arrival, x: totalWidth, totalWidth: totalWidth)
+                milestoneIcon(.arrival, x: totalWidth, totalWidth: totalWidth, completed: false)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(
@@ -915,7 +925,9 @@ private struct TripProgressTrack: View {
                 .labelsHidden()
                 .overlay {
                     if outlined {
-                        Capsule().strokeBorder(color, lineWidth: 1)
+                        Capsule()
+                            .strokeBorder(color, lineWidth: 1)
+                            .frame(height: TripProgressTrack.nativeBarHeight)
                     }
                 }
         }
@@ -924,7 +936,8 @@ private struct TripProgressTrack: View {
     private func milestoneIcon(
         _ phase: ProgressPhase,
         x: CGFloat,
-        totalWidth: CGFloat
+        totalWidth: CGFloat,
+        completed: Bool
     ) -> some View {
         let size = phase == .walking ? walkingIconSize : iconSize
         let inset = size / 2
@@ -938,6 +951,7 @@ private struct TripProgressTrack: View {
             }
         }
         .foregroundStyle(iconColor)
+        .opacity(completed ? completedSegmentOpacity : 1)
         .position(x: clampedX, y: walkingIconSize / 2)
     }
 

@@ -834,9 +834,11 @@ private struct TripProgressTrack: View {
     private let walkingIconSize: CGFloat = 15
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
+    private let completedSegmentOpacity = 0.4
 
     var body: some View {
         GeometryReader { geometry in
+            let now = Date()
             let totalWidth = geometry.size.width
             let widths = legs.durations.map {
                 proportionalWidths(durations: $0, trackWidth: max(0, totalWidth - segmentGap * 2))
@@ -848,14 +850,14 @@ private struct TripProgressTrack: View {
                         NativeTimerProgress(
                             start: reminder.start,
                             end: reminder.reminder,
-                            color: accent.opacity(0.72)
+                            color: segmentColor(accent.opacity(0.72), endingAt: reminder.reminder, now: now)
                         )
                         .frame(width: widths[0])
 
                         NativeTimerProgress(
                             start: reminder.reminder,
                             end: legs.departure,
-                            color: accent
+                            color: segmentColor(accent, endingAt: legs.departure, now: now)
                         )
                         .frame(width: widths[1])
                     }
@@ -863,7 +865,7 @@ private struct TripProgressTrack: View {
                     NativeTimerProgress(
                         start: legs.departure,
                         end: legs.arrival,
-                        color: accent
+                        color: segmentColor(accent, endingAt: legs.arrival, now: now)
                     )
                     .frame(width: widths[2])
                 }
@@ -899,6 +901,10 @@ private struct TripProgressTrack: View {
 
     private enum ProgressPhase {
         case alarm, walking, train, arrival
+    }
+
+    private func segmentColor(_ color: Color, endingAt end: Date, now: Date) -> Color {
+        end <= now ? accent.opacity(completedSegmentOpacity) : color
     }
 
     private struct NativeTimerProgress: View {

@@ -61,6 +61,9 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
 
   return (
     <ReminderDialog
+      // "Take this train" opens the dialog before the new focus lands; remounting
+      // per trip reseeds the slider, which otherwise kept the previous trip's lead.
+      key={`${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}`}
       open={reminderDialogOpen}
       onClose={closeReminderDialog}
       departureAt={departureAt}

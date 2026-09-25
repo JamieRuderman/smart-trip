@@ -70,13 +70,11 @@ export function ReminderDialog({
   const [leadMinutes, setLeadMinutes] = useState(DEFAULT_LEAD_MINUTES);
   const [error, setError] = useState<ReminderError>(null);
 
-  // Seed the slider each time the modal opens for a trip, clamped to what's
-  // available: when editing, open at the existing reminder's lead; otherwise at
-  // the default suggestion (15 min, or the max if less remains). "Take this
-  // train" opens the modal a tick before the new focus lands, so a seed keyed
-  // only on `open` kept the previous trip's lead (or its collapsed 1-min max).
-  // Not keyed on maxLeadMinutes, which ticks down with currentTime and must not
-  // stomp the user's drag mid-session.
+  // Seed the slider each time the modal opens, clamped to what's available:
+  // when editing, open at the existing reminder's lead; otherwise at the default
+  // suggestion (15 min, or the max if less remains). Intentionally keyed only on
+  // `open` — maxLeadMinutes ticks down with currentTime and must not stomp the
+  // user's drag mid-session.
   useEffect(() => {
     if (!open) return;
     setLeadMinutes(
@@ -84,7 +82,7 @@ export function ReminderDialog({
     );
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tripNumber, fromStation]);
+  }, [open]);
 
   // Clamp at render time so a long-open modal can't submit a value that drifted
   // past the shrinking max as currentTime ticked forward.

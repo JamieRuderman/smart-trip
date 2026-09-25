@@ -761,6 +761,8 @@ private struct ActiveEventClock: View {
 /// the black island than for white on the blue lock-screen card.
 private struct SurfaceStyle {
     let secondaryColor: Color
+    /// The alarm leg's fill has to stay brighter than `remainingOpacity`, or its progress disappears.
+    let alarmOpacity: Double
     let remainingOpacity: Double
     let completedOpacity: Double
     /// Date-relative ProgressView has no track colour of its own; this scheme gives the
@@ -769,12 +771,14 @@ private struct SurfaceStyle {
 
     static let lockScreen = SurfaceStyle(
         secondaryColor: .white.opacity(0.72),
+        alarmOpacity: 0.72,
         remainingOpacity: 0.4,
         completedOpacity: 0.2,
         trackColorScheme: .light
     )
     static let island = SurfaceStyle(
         secondaryColor: .secondary,
+        alarmOpacity: 1,
         remainingOpacity: 0.75,
         completedOpacity: 0.5,
         trackColorScheme: .dark
@@ -848,7 +852,7 @@ private struct TripProgressTrack: View {
             ZStack(alignment: .topLeading) {
                 HStack(spacing: segmentGap) {
                     if let alarm = legs.alarm, let walk = legs.walk {
-                        segment(accent.opacity(0.72), alarm, now: now)
+                        segment(accent.opacity(style.alarmOpacity), alarm, now: now)
                             .frame(width: widths[0])
 
                         segment(accent, walk, now: now)

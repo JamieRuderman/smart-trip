@@ -834,9 +834,9 @@ private struct TripProgressTrack: View {
     private let walkingIconSize: CGFloat = 15
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
-    private let completedSegmentOpacity = 0.4
+    private let fadedOpacity = 0.4
     /// Height of the native linear ProgressView bar (4pt on iOS 27), which the
-    /// outline has to match to read as part of the same bar.
+    /// faded fill and completed outlines have to match to read as the same bar.
     private static let nativeBarHeight: CGFloat = 4
 
     var body: some View {
@@ -901,34 +901,38 @@ private struct TripProgressTrack: View {
         case alarm, walking, train, arrival
     }
 
-    /// Completed legs are a faded solid bar; the current and upcoming legs are
-    /// outlined so the distance still to cover reads as an empty tube.
-    private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> NativeTimerProgress {
-        let completed = end <= now
-        return NativeTimerProgress(
-            start: start,
-            end: end,
-            color: completed ? accent.opacity(completedSegmentOpacity) : color,
-            outlined: !completed
-        )
+    /// Completed legs are a faded outline; the current and upcoming legs are
+    /// native bars whose distance still to cover is a faded solid fill.
+    @ViewBuilder
+    private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> some View {
+        if end <= now {
+            Capsule()
+                .strokeBorder(accent.opacity(fadedOpacity), lineWidth: 1)
+                .frame(height: Self.nativeBarHeight)
+        } else {
+            NativeTimerProgress(
+                start: start,
+                end: end,
+                color: color,
+                remainingColor: accent.opacity(fadedOpacity)
+            )
+        }
     }
 
     private struct NativeTimerProgress: View {
         let start: Date
         let end: Date
         let color: Color
-        let outlined: Bool
+        let remainingColor: Color
 
         var body: some View {
             ProgressView(timerInterval: start...end, countsDown: false)
                 .tint(color)
                 .labelsHidden()
-                .overlay {
-                    if outlined {
-                        Capsule()
-                            .strokeBorder(color, lineWidth: 1)
-                            .frame(height: TripProgressTrack.nativeBarHeight)
-                    }
+                .background {
+                    Capsule()
+                        .fill(remainingColor)
+                        .frame(height: TripProgressTrack.nativeBarHeight)
                 }
         }
     }
@@ -951,7 +955,7 @@ private struct TripProgressTrack: View {
             }
         }
         .foregroundStyle(iconColor)
-        .opacity(completed ? completedSegmentOpacity : 1)
+        .opacity(completed ? fadedOpacity : 1)
         .position(x: clampedX, y: walkingIconSize / 2)
     }
 

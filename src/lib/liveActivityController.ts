@@ -311,8 +311,13 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   // Drop `liveActivityScheduledFor`: this activity is running NOW, not pending,
   // so there's no future start instant left to compare against — leaving a stale
   // one would make `ensureActivityForFocus` think it still had a pending slot.
-  const committed: FocusedTrip = { ...latest, liveActivityId: id };
+  const committed: FocusedTrip = {
+    ...latest,
+    liveActivityId: id,
+    liveActivityCommittedAt: Date.now(),
+  };
   delete committed.liveActivityScheduledFor;
+  delete committed.liveActivityDismissed;
   saveFocusedTrip(committed);
   notifyChange();
 }
@@ -381,11 +386,14 @@ async function scheduleActivityForFocus(
     await endTripActivity(id);
     return;
   }
-  saveFocusedTrip({
+  const committed: FocusedTrip = {
     ...latest,
     liveActivityId: id,
     liveActivityScheduledFor: startAt,
-  });
+    liveActivityCommittedAt: Date.now(),
+  };
+  delete committed.liveActivityDismissed;
+  saveFocusedTrip(committed);
   notifyChange();
   // Register now rather than at start: once the OS brings the activity up the
   // app may never run again before departure, so this is our only chance to set
@@ -438,16 +446,30 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
   if (updated) lastSentActivityContent.set(id, json);
 }
 
+const COMMITTED_ACTIVITY_GRACE_MS = 2 * 60_000;
+
+/** Remember that the focus's activity was dismissed, so a later reconcile doesn't
+ *  respawn it once ActivityKit purges the record. Ignores other activities. */
+function noteActivityDismissed(id: string): void {
+  const focused = loadFocusedTrip();
+  if (focused?.liveActivityId !== id || focused.liveActivityDismissed) return;
+  saveFocusedTrip({ ...focused, liveActivityDismissed: true });
+}
+
 /**
  * Start the focus's Live Activity, or REVIVE it when the only thing on screen is
  * the frozen `ended` activity we scheduled to auto-dismiss after arrival (the
  * local background self-clear path). An `ended` activity still renders but can no
  * longer be updated, so we end it and start a fresh, updatable one.
  *
+ * Also restarts one that has vanished from the OS inventory (reinstall, app
+ * update, system purge) once it's older than the post-request grace window.
+ *
  * No-op (returns false) when a LIVE activity already exists for the focus
- * (`active`/`stale`/`pending`), when the user swiped it away (`dismissed`), or
- * when a push build deliberately ended it server-side at arrival — none of those
- * should be respawned. Returns true when it (re)started one. `startActivityForFocus`
+ * (`active`/`stale`/`pending`), when the user swiped it away (`dismissed`, or
+ * recorded as dismissed after the OS purged it), or when a push build
+ * deliberately ended it server-side at arrival — none of those should be
+ * respawned. Returns true when it (re)started one. `startActivityForFocus`
  * self-gates on the window/reminder/riding rule, so a dormant focus stays off.
  */
 async function startOrReviveActivity(
@@ -456,11 +478,25 @@ async function startOrReviveActivity(
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
   const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
-  // A committed id is authoritative even when the OS inventory momentarily
-  // omits it (seen on iOS 26.6 right after start); replacing it there ended a
-  // healthy activity before the system presented it. The one record we do
-  // replace is the local auto-dismissed `ended` one — push builds never
-  // schedule that dismissal, so their `ended` is a deliberate server-side end.
+  if (keep != null && kept == null) {
+    // Replacing an activity the inventory hadn't listed yet (iOS 26.6, right
+    // after the request) ended it before the system presented it.
+    const justCommitted =
+      focused.liveActivityCommittedAt != null &&
+      Date.now() - focused.liveActivityCommittedAt < COMMITTED_ACTIVITY_GRACE_MS;
+    if (justCommitted || focused.liveActivityDismissed) return false;
+    await endFocusActivity(focused);
+    await startActivityForFocus({
+      ...focused,
+      liveActivityId: undefined,
+      liveActivityScheduledFor: undefined,
+    });
+    return true;
+  }
+  if (kept?.state === "dismissed" && keep != null) noteActivityDismissed(keep);
+  // Push builds never schedule the local auto-dismiss (the cron ends the
+  // activity server-side at live arrival), so there an `ended` activity is a
+  // deliberate end — leave it be rather than resurrect it.
   const keptFrozen =
     kept?.state === "ended" && !isLiveActivityPushEnabled();
   if (keep != null && !keptFrozen) return false;
@@ -520,8 +556,9 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * failed, app killed between start and commit, or Live Activities were
  * disabled when the trip was focused and enabled since) gets a fresh start —
  * `startActivityForFocus` re-gates internally, so attempting every boot is
- * safe. A user-dismissed activity is NOT respawned: swiping it away leaves
- * `liveActivityId` committed, which skips the heal. Instant no-op off-iOS.
+ * safe. A user-dismissed activity is NOT respawned: the dismissal is recorded
+ * on the focus (`liveActivityDismissed`), which skips the heal. Instant no-op
+ * off-iOS.
  * Call alongside `bootFocusedTrip`.
  */
 export async function reconcileTripActivities(): Promise<void> {
@@ -566,7 +603,8 @@ export async function reconcileTripActivities(): Promise<void> {
     records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
   // (Re)start or revive the focus's activity if nothing live is on screen for
-  // it (never started, or frozen by the background auto-dismiss).
+  // it (never started, frozen by the background auto-dismiss, or gone from the
+  // OS inventory).
   // Returns false when a live / user-dismissed / push-ended activity already
   // covers it, in which case we fall through to the push self-heal below.
   if (focused && (await startOrReviveActivity(focused, records))) return;

@@ -52,6 +52,13 @@ export interface FocusedTrip {
    *  is what tells us a re-armed reminder needs the pending one ended and a
    *  fresh one scheduled. */
   liveActivityScheduledFor?: number;
+  /** Epoch ms `liveActivityId` was committed. ActivityKit's inventory can omit a
+   *  just-requested activity for a moment, so only a record missing past a grace
+   *  window counts as gone. */
+  liveActivityCommittedAt?: number;
+  /** Set once a reconcile sees the activity under `liveActivityId` listed as
+   *  dismissed (swiped away), so it isn't respawned after the OS purges it. */
+  liveActivityDismissed?: true;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
@@ -109,6 +116,12 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     r.liveActivityScheduledFor === undefined ||
     (typeof r.liveActivityScheduledFor === "number" &&
       Number.isFinite(r.liveActivityScheduledFor));
+  const liveActivityCommittedAtOk =
+    r.liveActivityCommittedAt === undefined ||
+    (typeof r.liveActivityCommittedAt === "number" &&
+      Number.isFinite(r.liveActivityCommittedAt));
+  const liveActivityDismissedOk =
+    r.liveActivityDismissed === undefined || r.liveActivityDismissed === true;
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -119,7 +132,9 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
     liveActivityIdOk &&
-    liveActivityScheduledForOk
+    liveActivityScheduledForOk &&
+    liveActivityCommittedAtOk &&
+    liveActivityDismissedOk
   );
 }
 

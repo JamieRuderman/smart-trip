@@ -114,10 +114,65 @@ describe("ensureActivityForFocus revive decision", () => {
     expect(startTripActivity).not.toHaveBeenCalled();
   });
 
-  it("trusts a committed id the OS inventory does not list and never restarts", async () => {
-    await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID });
+  it("trusts a just-committed id the OS inventory does not list yet", async () => {
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW - 30_000,
+    });
     expect(startTripActivity).not.toHaveBeenCalled();
     expect(endTripActivity).not.toHaveBeenCalled();
+  });
+
+  it("replaces an activity that has been missing past the grace window", async () => {
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW - 10 * 60_000,
+    });
+    expect(endTripActivity).toHaveBeenCalledWith(ID);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liveActivityId: expect.not.stringMatching(ID),
+        liveActivityCommittedAt: NOW,
+      }),
+    );
+  });
+
+  it("replaces a missing activity whose commit time was never recorded", async () => {
+    await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID });
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not respawn a missing activity the user dismissed", async () => {
+    await ensureActivityForFocus({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW - 10 * 60_000,
+      liveActivityDismissed: true,
+    });
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(endTripActivity).not.toHaveBeenCalled();
+  });
+
+  it("records a dismissed record so a later purge does not respawn it", async () => {
+    const focused = { ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW };
+    loadFocusedTrip.mockReturnValue(focused);
+    listTripActivityRecords.mockResolvedValue([{ id: ID, state: "dismissed" }]);
+    await ensureActivityForFocus(focused);
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({ liveActivityId: ID, liveActivityDismissed: true }),
+    );
+  });
+
+  it("clears a previous dismissal when a new activity is committed", async () => {
+    loadFocusedTrip.mockReturnValue({ ...FOCUS, liveActivityDismissed: true });
+    await ensureActivityForFocus(FOCUS);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityDismissed: true }),
+    );
   });
 });
 
@@ -144,7 +199,10 @@ describe("content updates to a scheduled activity", () => {
   });
 
   it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {
-    await ensureActivityForFocus(scheduled("trip-7-refresh-pending"));
+    await ensureActivityForFocus({
+      ...scheduled("trip-7-refresh-pending"),
+      liveActivityCommittedAt: NOW,
+    });
     expect(updateTripActivity).not.toHaveBeenCalled();
     expect(startTripActivity).not.toHaveBeenCalled();
   });

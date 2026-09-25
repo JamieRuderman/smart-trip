@@ -33,6 +33,7 @@ import {
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
+  type TripActivityContentState,
   type TripActivityRecord,
 } from "@/lib/native/liveActivity";
 import {
@@ -308,18 +309,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     await endTripActivity(id);
     return;
   }
-  // Drop `liveActivityScheduledFor`: this activity is running NOW, not pending,
-  // so there's no future start instant left to compare against — leaving a stale
-  // one would make `ensureActivityForFocus` think it still had a pending slot.
-  const committed: FocusedTrip = {
-    ...latest,
-    liveActivityId: id,
-    liveActivityCommittedAt: Date.now(),
-  };
-  delete committed.liveActivityScheduledFor;
-  delete committed.liveActivityDismissed;
-  saveFocusedTrip(committed);
-  notifyChange();
+  commitActivity(latest, id);
 }
 
 /**
@@ -386,15 +376,7 @@ async function scheduleActivityForFocus(
     await endTripActivity(id);
     return;
   }
-  const committed: FocusedTrip = {
-    ...latest,
-    liveActivityId: id,
-    liveActivityScheduledFor: startAt,
-    liveActivityCommittedAt: Date.now(),
-  };
-  delete committed.liveActivityDismissed;
-  saveFocusedTrip(committed);
-  notifyChange();
+  commitActivity(latest, id, startAt);
   // Register now rather than at start: once the OS brings the activity up the
   // app may never run again before departure, so this is our only chance to set
   // up locked-screen delay correction. The backend sleeps until `startAt`
@@ -406,11 +388,62 @@ async function scheduleActivityForFocus(
   }
 }
 
-/** Whether the focus's activity is a scheduled one iOS hasn't started yet.
- *  ActivityKit rejects a content update to a pending activity unless it carries
- *  an alert, and the rejected update was retried on every sync tick. */
-function isScheduledActivityPending(focused: FocusedTrip, now = Date.now()): boolean {
-  return focused.liveActivityScheduledFor != null && now < focused.liveActivityScheduledFor;
+/** Point the focus at a started, scheduled or adopted activity, rewriting every
+ *  bookkeeping field so none carries over from the activity it replaces. A running
+ *  activity drops `liveActivityScheduledFor`: a stale start instant would make
+ *  `ensureActivityForFocus` think it still had a pending slot. */
+function commitActivity(latest: FocusedTrip, id: string, scheduledFor?: number | null): FocusedTrip {
+  const committed: FocusedTrip = {
+    ...latest,
+    liveActivityId: id,
+    liveActivityCommittedAt: Date.now(),
+  };
+  if (scheduledFor != null) committed.liveActivityScheduledFor = scheduledFor;
+  else delete committed.liveActivityScheduledFor;
+  delete committed.liveActivityDismissed;
+  saveFocusedTrip(committed);
+  notifyChange();
+  return committed;
+}
+
+/** The focus with no activity committed to it. */
+function withoutActivity(focused: FocusedTrip): FocusedTrip {
+  const released: FocusedTrip = { ...focused };
+  delete released.liveActivityId;
+  delete released.liveActivityScheduledFor;
+  delete released.liveActivityCommittedAt;
+  return released;
+}
+
+/** End the focus's activity and start a fresh one. The old id is released first,
+ *  so a start that doesn't happen isn't followed by the same teardown every pass. */
+async function replaceFocusActivity(focused: FocusedTrip): Promise<void> {
+  await endFocusActivity(focused);
+  const latest = loadFocusedTrip();
+  if (latest != null && latest.liveActivityId === focused.liveActivityId) {
+    saveFocusedTrip(withoutActivity(latest));
+  }
+  await startActivityForFocus(withoutActivity(focused));
+}
+
+/**
+ * Send content to the focus's activity, deduped against the last send. Skips a
+ * scheduled activity iOS hasn't started: ActivityKit rejects content updates to a
+ * pending activity unless they carry an alert, and the rejected update was
+ * retried on every sync tick.
+ */
+async function sendActivityContent(
+  focused: FocusedTrip,
+  content: TripActivityContentState,
+): Promise<void> {
+  const id = focused.liveActivityId;
+  if (!id) return;
+  const scheduledFor = focused.liveActivityScheduledFor;
+  if (scheduledFor != null && Date.now() < scheduledFor) return;
+  const json = JSON.stringify(content);
+  if (lastSentActivityContent.get(id) === json) return;
+  const { updated } = await updateTripActivity(id, content);
+  if (updated) lastSentActivityContent.set(id, json);
 }
 
 /**
@@ -423,8 +456,7 @@ function isScheduledActivityPending(focused: FocusedTrip, now = Date.now()): boo
  * here (the next sync tick re-pushes it), matching the start path.
  */
 async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
-  const id = focused.liveActivityId;
-  if (!id || isScheduledActivityPending(focused)) return;
+  if (!focused.liveActivityId) return;
   const departureAt = focusedDepartureInstant(focused);
   const arrivalAt = focusedArrivalInstant(focused);
   if (departureAt == null || arrivalAt == null) return;
@@ -440,10 +472,7 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
     reminderEpochMs: focused.reminder?.reminderAt ?? null,
     now: Date.now(),
   });
-  const json = JSON.stringify(content);
-  if (lastSentActivityContent.get(id) === json) return;
-  const { updated } = await updateTripActivity(id, content);
-  if (updated) lastSentActivityContent.set(id, json);
+  await sendActivityContent(focused, content);
 }
 
 const COMMITTED_ACTIVITY_GRACE_MS = 2 * 60_000;
@@ -477,32 +506,27 @@ async function startOrReviveActivity(
   records: TripActivityRecord[],
 ): Promise<boolean> {
   const keep = focused.liveActivityId;
-  const kept = keep != null ? records.find((r) => r.id === keep) : undefined;
-  if (keep != null && kept == null) {
-    // Replacing an activity the inventory hadn't listed yet (iOS 26.6, right
-    // after the request) ended it before the system presented it.
-    const justCommitted =
-      focused.liveActivityCommittedAt != null &&
-      Date.now() - focused.liveActivityCommittedAt < COMMITTED_ACTIVITY_GRACE_MS;
-    if (justCommitted || focused.liveActivityDismissed) return false;
-    await endFocusActivity(focused);
-    await startActivityForFocus({
-      ...focused,
-      liveActivityId: undefined,
-      liveActivityScheduledFor: undefined,
-    });
-    return true;
+  if (keep != null) {
+    const kept = records.find((r) => r.id === keep);
+    if (kept == null) {
+      // Replacing an activity the inventory hadn't listed yet (iOS 26.6, right
+      // after the request) ended it before the system presented it.
+      const justCommitted =
+        focused.liveActivityCommittedAt != null &&
+        Date.now() - focused.liveActivityCommittedAt < COMMITTED_ACTIVITY_GRACE_MS;
+      if (justCommitted || focused.liveActivityDismissed) return false;
+      await replaceFocusActivity(focused);
+      return true;
+    }
+    if (kept.state === "dismissed") noteActivityDismissed(keep);
+    // Push builds never schedule the local auto-dismiss (the cron ends the
+    // activity server-side at live arrival), so there an `ended` activity is a
+    // deliberate end — leave it be rather than resurrect it.
+    if (kept.state !== "ended" || isLiveActivityPushEnabled()) return false;
+    // End the frozen one first so its pending auto-dismissal can't remove the
+    // freshly started activity.
+    await endTripActivity(keep);
   }
-  if (kept?.state === "dismissed" && keep != null) noteActivityDismissed(keep);
-  // Push builds never schedule the local auto-dismiss (the cron ends the
-  // activity server-side at live arrival), so there an `ended` activity is a
-  // deliberate end — leave it be rather than resurrect it.
-  const keptFrozen =
-    kept?.state === "ended" && !isLiveActivityPushEnabled();
-  if (keep != null && !keptFrozen) return false;
-  // End the frozen one first so its pending auto-dismissal can't remove the
-  // freshly started activity.
-  if (keep != null && keptFrozen) await endTripActivity(keep);
   await startActivityForFocus(focused);
   return true;
 }
@@ -533,12 +557,7 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
   if (pending) {
     const wanted = focusedActivityStartAt(focused);
     if (wanted == null || wanted === focused.liveActivityScheduledFor) return;
-    await endFocusActivity(focused);
-    await startActivityForFocus({
-      ...focused,
-      liveActivityId: undefined,
-      liveActivityScheduledFor: undefined,
-    });
+    await replaceFocusActivity(focused);
     return;
   }
   // Revive/start when nothing live covers the focus; otherwise push current
@@ -581,12 +600,9 @@ export async function reconcileTripActivities(): Promise<void> {
     const prefix = `trip-${focused.tripNumber}-${focused.serviceDate}-`;
     const adopted = records.find((r) => r.id.startsWith(prefix));
     if (adopted) {
-      focused = { ...focused, liveActivityId: adopted.id };
       const scheduledFor =
         adopted.state === "pending" ? focusedActivityStartAt(focused) : null;
-      if (scheduledFor != null) focused.liveActivityScheduledFor = scheduledFor;
-      saveFocusedTrip(focused);
-      notifyChange();
+      focused = commitActivity(focused, adopted.id, scheduledFor);
     }
   }
   // The OS started a scheduled activity while we weren't running: it's live now,
@@ -726,17 +742,16 @@ export async function syncFocusedActivityContent(args: {
 }): Promise<void> {
   const current = loadFocusedTrip();
   const id = current?.liveActivityId;
-  if (!id) return;
+  if (!current || !id) return;
   // Self-heal the push registration alongside the content sync: this fires
   // exactly when a leave-in is at risk (delay/phase/reminder change, and the
   // first time the activity id commits), so re-asserting the armed reminder's
   // lead here closes the gap where the arm-time POST was lost or raced the id.
   // Deduped, so unchanged registrations don't re-hit the backend.
-  if (current && isLiveActivityPushEnabled()) {
+  if (isLiveActivityPushEnabled()) {
     const registration = buildRegistrationForFocus(current, id);
     if (registration) void postRegistrationDeduped(registration);
   }
-  if (current && isScheduledActivityPending(current)) return;
   const content = buildContentState({
     departureEpochMs: args.departureAt,
     arrivalEpochMs: args.arrivalAt,
@@ -745,12 +760,9 @@ export async function syncFocusedActivityContent(args: {
     remainingStops: args.remainingStops ?? null,
     isCanceled: args.isCanceled ?? false,
     isEnded: false,
-    reminderSet: current?.reminder != null,
-    reminderEpochMs: current?.reminder?.reminderAt ?? null,
+    reminderSet: current.reminder != null,
+    reminderEpochMs: current.reminder?.reminderAt ?? null,
     now: Date.now(),
   });
-  const json = JSON.stringify(content);
-  if (lastSentActivityContent.get(id) === json) return;
-  const { updated } = await updateTripActivity(id, content);
-  if (updated) lastSentActivityContent.set(id, json);
+  await sendActivityContent(current, content);
 }

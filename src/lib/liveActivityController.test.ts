@@ -18,7 +18,7 @@ const listTripActivityRecords = vi.fn(
   async (): Promise<{ id: string; state: string }[] | null> => [],
 );
 const startTripActivity = vi.fn(async () => ({ started: true }));
-const endTripActivity = vi.fn(async () => {});
+const endTripActivity = vi.fn<(id: string) => Promise<void>>(async () => {});
 const updateTripActivity = vi.fn(async () => ({ updated: true }));
 vi.mock("@/lib/native/liveActivity", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/native/liveActivity")>()),
@@ -144,6 +144,17 @@ describe("ensureActivityForFocus revive decision", () => {
     );
   });
 
+  it("releases a vanished id when its replacement does not start", async () => {
+    const focused = { ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW - 10 * 60_000 };
+    loadFocusedTrip.mockReturnValue(focused);
+    startTripActivity.mockResolvedValueOnce({ started: false });
+    await ensureActivityForFocus(focused);
+    expect(saveFocusedTrip).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityId: expect.anything() }),
+    );
+  });
+
   it("replaces a missing activity whose commit time was never recorded", async () => {
     await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID });
     expect(startTripActivity).toHaveBeenCalledTimes(1);
@@ -234,6 +245,24 @@ describe("reconcileTripActivities adoption", () => {
         liveActivityId: "trip-7-2026-06-09-adopted",
         liveActivityScheduledFor: DEPARTURE - LIVE_ACTIVITY_LEAD_MS,
       }),
+    );
+  });
+
+  it("does not carry a previous activity's dismissal onto an adopted one", async () => {
+    loadFocusedTrip.mockReturnValue({
+      ...FOCUS,
+      liveActivityId: "trip-7-2026-06-09-gone",
+      liveActivityDismissed: true,
+    });
+    listTripActivityRecords.mockResolvedValue([
+      { id: "trip-7-2026-06-09-running", state: "active" },
+    ]);
+    await reconcileTripActivities();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({ liveActivityId: "trip-7-2026-06-09-running" }),
+    );
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityDismissed: true }),
     );
   });
 

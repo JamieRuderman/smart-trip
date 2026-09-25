@@ -112,14 +112,10 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
         typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
-  const liveActivityScheduledForOk =
-    r.liveActivityScheduledFor === undefined ||
-    (typeof r.liveActivityScheduledFor === "number" &&
-      Number.isFinite(r.liveActivityScheduledFor));
-  const liveActivityCommittedAtOk =
-    r.liveActivityCommittedAt === undefined ||
-    (typeof r.liveActivityCommittedAt === "number" &&
-      Number.isFinite(r.liveActivityCommittedAt));
+  const isOptionalFiniteNumber = (v: unknown) =>
+    v === undefined || (typeof v === "number" && Number.isFinite(v));
+  const liveActivityScheduledForOk = isOptionalFiniteNumber(r.liveActivityScheduledFor);
+  const liveActivityCommittedAtOk = isOptionalFiniteNumber(r.liveActivityCommittedAt);
   const liveActivityDismissedOk =
     r.liveActivityDismissed === undefined || r.liveActivityDismissed === true;
   return (

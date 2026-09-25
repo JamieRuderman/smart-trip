@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		34E78BDF66D8685FAB06A1CB /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6170A6D91E2BD5FAE4CCFD26 /* SceneDelegate.swift */; };
 		4585AB0B988AD24734CAD3BB /* TripActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -64,6 +65,7 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		6170A6D91E2BD5FAE4CCFD26 /* SceneDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		7D958A492FE7504A00B68A62 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmKit.swift; sourceTree = "<group>"; };
 		92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SmartTripWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -139,6 +141,7 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				F09BF3F276A99C4388386BDB /* MainViewController.swift */,
 				E4EC4CEBE64FBFD42A61507F /* LeaveAlarm */,
+				6170A6D91E2BD5FAE4CCFD26 /* SceneDelegate.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -328,6 +331,7 @@
 				BA1DC9F6D7EF3AB2F5E585CB /* MainViewController.swift in Sources */,
 				82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */,
 				51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */,
+				34E78BDF66D8685FAB06A1CB /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

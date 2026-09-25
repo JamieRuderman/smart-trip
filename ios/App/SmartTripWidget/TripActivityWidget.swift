@@ -685,8 +685,10 @@ private struct ActiveEventTimingRow: View {
                         Text("\(activeEventLabel) in")
                             .foregroundStyle(secondaryColor)
                             .layoutPriority(1)
+                        // Timer text takes whatever width it's offered. fixedSize asked for its
+                        // unbounded ideal width, which overflowed the row and crashed the widget.
                         RelativeCountdown(model: model)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: 80, alignment: .leading)
                     }
                 }
             }
@@ -820,13 +822,6 @@ private struct TripProgressTrack: View {
     private let trackHeight: CGFloat = 30
 
     var body: some View {
-        FiniteWidthLayout {
-            trackBody
-        }
-        .frame(height: trackHeight)
-    }
-
-    private var trackBody: some View {
         GeometryReader { geometry in
             let totalWidth = geometry.size.width
             let widths = legs.durations.map {
@@ -885,28 +880,7 @@ private struct TripProgressTrack: View {
                     : "Train trip progress"
             ))
         }
-    }
-
-    /// Some Live Activity layout passes run inside an infinitely wide parent, so
-    /// the track is offered an infinite width and placed at a NaN origin.
-    /// `place(at:)` asserts on both, which crashed the widget extension and made
-    /// chronod discard the activity.
-    private struct FiniteWidthLayout: Layout {
-        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-            let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 0
-            let height = subviews.first?
-                .sizeThatFits(ProposedViewSize(width: width, height: proposal.height))
-                .height ?? 0
-            return CGSize(width: width, height: height)
-        }
-
-        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-            let finite = { (value: CGFloat) in value.isFinite ? value : 0 }
-            subviews.first?.place(
-                at: CGPoint(x: finite(bounds.minX), y: finite(bounds.minY)),
-                proposal: ProposedViewSize(width: finite(bounds.width), height: finite(bounds.height))
-            )
-        }
+        .frame(height: trackHeight)
     }
 
     private enum ProgressPhase {

@@ -619,13 +619,27 @@ private struct DigitalTimer: View {
 /// missing; callers handle the cancelled/arrived states.
 private struct RelativeCountdown: View {
     let model: TripActivityModel
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     var body: some View {
         let now = Date()
         if let target = countdownTarget(model) {
             if target > now {
-                Text(timerInterval: now...target, countsDown: true)
-                    .monospacedDigit()
+                if #available(iOS 18.0, *), isLuminanceReduced {
+                    // The Always-On lock screen refreshes once a minute and draws a
+                    // timer's seconds as "--"; a minute-precision timer still clamps at 0.
+                    Text(
+                        .currentDate,
+                        format: .timer(
+                            countingDownIn: now..<target,
+                            showsHours: false,
+                            maxPrecision: .seconds(60)
+                        )
+                    )
+                } else {
+                    Text(timerInterval: now...target, countsDown: true)
+                        .monospacedDigit()
+                }
             } else {
                 // Target already elapsed with no re-render to flip the parent to
                 // its "Arrived" terminal word yet — hold at zero, never count up.
@@ -688,7 +702,7 @@ private struct ActiveEventTimingRow: View {
                         // Timer text takes whatever width it's offered. fixedSize asked for its
                         // unbounded ideal width, which overflowed the row and crashed the widget.
                         RelativeCountdown(model: model)
-                            .frame(maxWidth: 80, alignment: .leading)
+                            .frame(maxWidth: 100, alignment: .leading)
                     }
                 }
             }

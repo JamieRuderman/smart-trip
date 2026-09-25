@@ -9,8 +9,6 @@ import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/lib/liveActivityController";
-import { subscribeTripActivityLifecycle } from "@/lib/native/liveActivity";
-import { logger } from "@/lib/logger";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { ReminderDialogHost } from "@/components/ReminderDialogHost";
@@ -103,11 +101,6 @@ const App = () => {
   useEffect(() => {
     bootFocusedTrip();
     void reconcileTripActivities();
-    return subscribeTripActivityLifecycle((event) =>
-      logger.warn(
-        `Live Activity ${event.id} (${event.activityId}) state=${event.state}`,
-      ),
-    );
   }, []);
 
   return (

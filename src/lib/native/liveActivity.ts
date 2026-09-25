@@ -313,27 +313,3 @@ export async function listTripActivityRecords(): Promise<TripActivityRecord[] | 
     return null;
   }
 }
-
-/**
- * Subscribe to newly started Live Activities (including OS-scheduled and
- * push-to-start ones) and return a cleanup. The plugin observes
- * `Activity.activityUpdates`, which fires once per new activity, not on later
- * state changes, so a dismissal or discard never arrives here. No-op off-iOS.
- */
-export function subscribeTripActivityLifecycle(
-  onChange: (event: { id: string; activityId: string; state: string }) => void,
-): () => void {
-  if (Capacitor.getPlatform() !== "ios") return () => {};
-  let disposed = false;
-  let handle: { remove: () => Promise<void> } | undefined;
-  LiveActivity.addListener("liveActivityUpdate", onChange)
-    .then((h) => {
-      if (disposed) void h.remove();
-      else handle = h;
-    })
-    .catch((error) => logger.warn("LiveActivity.addListener failed", error));
-  return () => {
-    disposed = true;
-    void handle?.remove();
-  };
-}

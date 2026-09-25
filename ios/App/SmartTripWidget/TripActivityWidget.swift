@@ -51,6 +51,7 @@ struct TripActivityWidget: Widget {
                     JourneyProgressAndTiming(
                         model: model,
                         accent: accent,
+                        trackAppearance: .island,
                         progressTrackColorScheme: .dark,
                         primaryColor: .white,
                         secondaryColor: .secondary
@@ -656,6 +657,7 @@ private struct RelativeCountdown: View {
 private struct JourneyProgressAndTiming: View {
     let model: TripActivityModel
     let accent: Color
+    let trackAppearance: TrackAppearance
     let progressTrackColorScheme: ColorScheme
     let primaryColor: Color
     let secondaryColor: Color
@@ -663,7 +665,7 @@ private struct JourneyProgressAndTiming: View {
     var body: some View {
         VStack(spacing: 5) {
             if !model.isCanceled, let legs = TripLegs(model: model) {
-                TripProgressTrack(legs: legs, accent: accent, iconColor: primaryColor)
+                TripProgressTrack(legs: legs, accent: accent, appearance: trackAppearance)
                 // Date-relative ProgressView does not expose a separate track
                 // color. Choosing the local control appearance lets the blue
                 // Lock Screen use a dark neutral track while the black Dynamic
@@ -776,6 +778,16 @@ private struct ActiveEventClock: View {
     }
 }
 
+/// How strongly the progress track's faded parts show on each surface: blue on
+/// the black island needs far more opacity than white on the blue lock-screen card.
+private struct TrackAppearance {
+    let remainingOpacity: Double
+    let completedOpacity: Double
+
+    static let lockScreen = TrackAppearance(remainingOpacity: 0.4, completedOpacity: 0.2)
+    static let island = TrackAppearance(remainingOpacity: 0.75, completedOpacity: 0.5)
+}
+
 /// The date intervals behind the progress track. `nil` when the payload lacks
 /// a usable departure → arrival window; `reminder` is nil for a train-only trip.
 private struct TripLegs {
@@ -827,15 +839,13 @@ private struct TripLegs {
 private struct TripProgressTrack: View {
     let legs: TripLegs
     let accent: Color
-    let iconColor: Color
+    let appearance: TrackAppearance
 
     private let minimumSegmentWidth: CGFloat = 20
     private let iconSize: CGFloat = 12
     private let walkingIconSize: CGFloat = 15
     private let segmentGap: CGFloat = 4
     private let trackHeight: CGFloat = 30
-    private let fadedOpacity = 0.4
-    private let completedOpacity = 0.2
     /// Height of the native linear ProgressView bar (4pt on iOS 27), which the
     /// faded fill and completed outlines have to match to read as the same bar.
     private static let nativeBarHeight: CGFloat = 4
@@ -908,14 +918,14 @@ private struct TripProgressTrack: View {
     private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> some View {
         if end <= now {
             Capsule()
-                .strokeBorder(accent.opacity(completedOpacity), lineWidth: 1)
+                .strokeBorder(accent.opacity(appearance.completedOpacity), lineWidth: 1)
                 .frame(height: Self.nativeBarHeight)
         } else {
             NativeTimerProgress(
                 start: start,
                 end: end,
                 color: color,
-                remainingColor: accent.opacity(fadedOpacity)
+                remainingColor: accent.opacity(appearance.remainingOpacity)
             )
         }
     }
@@ -955,8 +965,8 @@ private struct TripProgressTrack: View {
             case .arrival: MapPinIcon(size: size, strokeRatio: 0.1)
             }
         }
-        .foregroundStyle(iconColor)
-        .opacity(completed ? completedOpacity : 1)
+        .foregroundStyle(accent)
+        .opacity(completed ? appearance.completedOpacity : 1)
         .position(x: clampedX, y: walkingIconSize / 2)
     }
 
@@ -1024,6 +1034,7 @@ private struct LockScreenView: View {
             JourneyProgressAndTiming(
                 model: model,
                 accent: .white,
+                trackAppearance: .lockScreen,
                 progressTrackColorScheme: .light,
                 primaryColor: .white,
                 secondaryColor: .white.opacity(0.72)

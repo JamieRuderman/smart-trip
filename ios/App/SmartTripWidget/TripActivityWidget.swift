@@ -847,27 +847,15 @@ private struct TripProgressTrack: View {
             ZStack(alignment: .topLeading) {
                 HStack(spacing: segmentGap) {
                     if let reminder = legs.reminder {
-                        NativeTimerProgress(
-                            start: reminder.start,
-                            end: reminder.reminder,
-                            color: segmentColor(accent.opacity(0.72), endingAt: reminder.reminder, now: now)
-                        )
-                        .frame(width: widths[0])
+                        segment(accent.opacity(0.72), from: reminder.start, to: reminder.reminder, now: now)
+                            .frame(width: widths[0])
 
-                        NativeTimerProgress(
-                            start: reminder.reminder,
-                            end: legs.departure,
-                            color: segmentColor(accent, endingAt: legs.departure, now: now)
-                        )
-                        .frame(width: widths[1])
+                        segment(accent, from: reminder.reminder, to: legs.departure, now: now)
+                            .frame(width: widths[1])
                     }
 
-                    NativeTimerProgress(
-                        start: legs.departure,
-                        end: legs.arrival,
-                        color: segmentColor(accent, endingAt: legs.arrival, now: now)
-                    )
-                    .frame(width: widths[2])
+                    segment(accent, from: legs.departure, to: legs.arrival, now: now)
+                        .frame(width: widths[2])
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 17)
@@ -903,19 +891,33 @@ private struct TripProgressTrack: View {
         case alarm, walking, train, arrival
     }
 
-    private func segmentColor(_ color: Color, endingAt end: Date, now: Date) -> Color {
-        end <= now ? accent.opacity(completedSegmentOpacity) : color
+    /// Completed legs are a faded solid bar; the current and upcoming legs are
+    /// outlined so the distance still to cover reads as an empty tube.
+    private func segment(_ color: Color, from start: Date, to end: Date, now: Date) -> NativeTimerProgress {
+        let completed = end <= now
+        return NativeTimerProgress(
+            start: start,
+            end: end,
+            color: completed ? accent.opacity(completedSegmentOpacity) : color,
+            outlined: !completed
+        )
     }
 
     private struct NativeTimerProgress: View {
         let start: Date
         let end: Date
         let color: Color
+        let outlined: Bool
 
         var body: some View {
             ProgressView(timerInterval: start...end, countsDown: false)
                 .tint(color)
                 .labelsHidden()
+                .overlay {
+                    if outlined {
+                        Capsule().strokeBorder(color, lineWidth: 1)
+                    }
+                }
         }
     }
 

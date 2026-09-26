@@ -68,7 +68,7 @@ struct StopLeaveAlarmIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         if let uuid = UUID(uuidString: alarmID) {
-            try AlarmManager.shared.stop(id: uuid)
+            try? AlarmManager.shared.stop(id: uuid)
         }
         return .result()
     }

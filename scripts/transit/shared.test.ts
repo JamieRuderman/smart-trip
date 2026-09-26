@@ -297,7 +297,9 @@ describe("buildTrainSchedules", () => {
     // tripping the sanity floor. Assert they survive the new pipeline.
     expect(result.weekday.southbound).toHaveLength(1);
     expect(result.weekday.southbound[0].trip).toBe(101);
+    expect(result.weekday.southbound[0].tripId).toBe("T1");
     expect(result.weekend.southbound).toHaveLength(1);
     expect(result.weekend.southbound[0].trip).toBe(202);
+    expect(result.weekend.southbound[0].tripId).toBe("T2");
   });
 });

@@ -23,6 +23,7 @@ import type {
 // Pre-processed data structures
 export interface ProcessedTrip {
   trip: number;
+  tripId?: string;
   times: string[];
   outboundFerry?: FerryConnection;
   inboundFerry?: FerryConnection;
@@ -169,6 +170,7 @@ function processScheduleData(payload: SchedulePayload): ScheduleCache {
 
                   cache[key].push({
                     trip: trip.trip,
+                    tripId: trip.tripId,
                     times: trip.times,
                     outboundFerry:
                       toStation === FERRY_CONSTANTS.FERRY_STATION &&

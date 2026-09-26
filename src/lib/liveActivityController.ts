@@ -224,6 +224,7 @@ function buildRegistrationForFocus(
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
     ...(originStartTime ? { originStartTime } : {}),
+    ...(trip.tripId ? { tripId: trip.tripId } : {}),
     // Carry the armed reminder's lead so the server can keep the leave-alarm
     // countdown alive across its locked-screen delay pushes (otherwise every
     // push would drop the "Leave in" stage back to "Departs in").

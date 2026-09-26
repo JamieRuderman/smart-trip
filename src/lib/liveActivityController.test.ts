@@ -163,36 +163,38 @@ describe("ensureActivityForFocus revive decision", () => {
     expect(endTripActivity).not.toHaveBeenCalled();
   });
 
-  it("replaces an activity that has been missing past the grace window", async () => {
+  it("treats an activity missing past the grace window as dismissed", async () => {
     await ensureStored({
       ...FOCUS,
       liveActivityId: ID,
       liveActivityCommittedAt: NOW - 10 * 60_000,
     });
-    expect(endTripActivity).toHaveBeenCalledWith(ID);
-    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(endTripActivity).not.toHaveBeenCalled();
+    expect(updateTripActivity).not.toHaveBeenCalled();
     expect(saveFocusedTrip).toHaveBeenCalledWith(
-      expect.objectContaining({
-        liveActivityId: expect.not.stringMatching(ID),
-        liveActivityCommittedAt: NOW,
-      }),
+      expect.objectContaining({ liveActivityId: ID, liveActivityDismissed: true }),
     );
   });
 
-  it("releases a vanished id when its replacement does not start", async () => {
-    const focused = { ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW - 10 * 60_000 };
-    loadFocusedTrip.mockReturnValue(focused);
-    startTripActivity.mockResolvedValueOnce({ started: false });
-    await ensureActivityForFocus(focused);
-    expect(saveFocusedTrip).toHaveBeenCalledTimes(1);
-    expect(saveFocusedTrip).toHaveBeenCalledWith(
-      expect.not.objectContaining({ liveActivityId: expect.anything() }),
-    );
-  });
-
-  it("replaces a missing activity whose commit time was never recorded", async () => {
+  it("treats a missing activity whose commit time was never recorded as dismissed", async () => {
     await ensureStored({ ...FOCUS, liveActivityId: ID });
-    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({ liveActivityDismissed: true }),
+    );
+  });
+
+  it("keeps a scheduled activity the inventory does not list before it starts", async () => {
+    await ensureStored({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityCommittedAt: NOW - 10 * 60_000,
+      liveActivityScheduledFor: NOW + 5 * 60_000,
+    });
+    expect(saveFocusedTrip).not.toHaveBeenCalled();
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(endTripActivity).not.toHaveBeenCalled();
   });
 
   it("does not treat a failed inventory read as a missing activity", async () => {
@@ -207,13 +209,16 @@ describe("ensureActivityForFocus revive decision", () => {
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
   });
 
-  it("replaces a missing activity whose commit time is in the future", async () => {
+  it("treats a missing activity whose commit time is in the future as dismissed", async () => {
     await ensureStored({
       ...FOCUS,
       liveActivityId: ID,
       liveActivityCommittedAt: NOW + 60 * 60_000,
     });
-    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.objectContaining({ liveActivityDismissed: true }),
+    );
   });
 
   it("replaces a pending activity whose start instant moved", async () => {
@@ -514,6 +519,15 @@ describe("a dismissed activity", () => {
     expect(deregisterPushActivity).toHaveBeenCalledTimes(1);
     expect(deregisterPushActivity).toHaveBeenCalledWith(id);
     expect(registerPushActivity).not.toHaveBeenCalled();
+  });
+
+  it("is deregistered once it has been missing past the grace window", async () => {
+    loadFocusedTrip.mockReturnValue({ ...committed(), liveActivityCommittedAt: NOW - 10 * 60_000 });
+    listTripActivityRecords.mockResolvedValue([]);
+    await reconcileTripActivities();
+    expect(deregisterPushActivity).toHaveBeenCalledWith(id);
+    expect(registerPushActivity).not.toHaveBeenCalled();
+    expect(startTripActivityWithPush).not.toHaveBeenCalled();
   });
 
   it("is deregistered only after an in-flight registration lands", async () => {

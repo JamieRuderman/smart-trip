@@ -599,10 +599,26 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
 
 const COMMITTED_ACTIVITY_GRACE_MS = 2 * 60_000;
 
-/** Remember that `records` lists the focus's activity as dismissed, so a later
- *  reconcile doesn't respawn it once ActivityKit purges the record, and keep it
- *  deregistered so the backend stops pushing to it (a failed deregistration is
- *  retried on the next pass). Returns the focus with the dismissal applied. */
+/** Whether the focus's committed activity was dismissed. ActivityKit drops a
+ *  swiped-away activity from its inventory within a second, so a later read
+ *  almost never lists it as `dismissed`: one missing past the grace window counts. */
+function activityDismissed(focused: FocusedTrip, records: TripActivityRecord[]): boolean {
+  const record = records.find((r) => r.id === focused.liveActivityId);
+  if (record) return record.state === "dismissed";
+  const now = Date.now();
+  const scheduledFor = focused.liveActivityScheduledFor;
+  if (scheduledFor != null && now < scheduledFor + COMMITTED_ACTIVITY_GRACE_MS) return false;
+  // The inventory can lag a fresh request (iOS 26.6), and ending an activity it
+  // hadn't listed yet removed it before the system presented it.
+  const committedAgo =
+    focused.liveActivityCommittedAt != null ? now - focused.liveActivityCommittedAt : Infinity;
+  return !(committedAgo >= 0 && committedAgo < COMMITTED_ACTIVITY_GRACE_MS);
+}
+
+/** Remember that the focus's activity was dismissed, so later passes don't
+ *  respawn it, and keep it deregistered so the backend stops pushing to it (a
+ *  failed deregistration is retried on the next pass). Returns the focus with
+ *  the dismissal applied. */
 async function noteActivityDismissed(
   focused: FocusedTrip,
   records: TripActivityRecord[],
@@ -610,7 +626,7 @@ async function noteActivityDismissed(
   const id = focused.liveActivityId;
   if (id == null) return focused;
   if (!focused.liveActivityDismissed) {
-    if (!records.some((r) => r.id === id && r.state === "dismissed")) return focused;
+    if (!activityDismissed(focused, records)) return focused;
     const latest = loadFocusedTrip();
     if (latest?.liveActivityId === id && !latest.liveActivityDismissed) {
       saveFocusedTrip({ ...latest, liveActivityDismissed: true });
@@ -626,12 +642,9 @@ async function noteActivityDismissed(
  * local background self-clear path). An `ended` activity still renders but can no
  * longer be updated, so we end it and start a fresh, updatable one.
  *
- * Also restarts one that has vanished from the OS inventory (reinstall, app
- * update, system purge) once it's older than the post-request grace window.
- *
  * No-op (returns false) when a LIVE activity already exists for the focus
- * (`active`/`stale`/`pending`), when the user swiped it away (`dismissed`, or
- * recorded as dismissed after the OS purged it), or when a push build
+ * (`active`/`stale`/`pending`), when it isn't listed (just requested, or
+ * dismissed — see {@link activityDismissed}), or when a push build
  * deliberately ended it server-side at arrival — none of those should be
  * respawned. Returns true when it (re)started one. `startActivityForFocus`
  * self-gates on the window/reminder/riding rule, so a dormant focus stays off.
@@ -643,18 +656,7 @@ async function startOrReviveActivity(
   const keep = focused.liveActivityId;
   if (keep != null) {
     const kept = records.find((r) => r.id === keep);
-    if (kept == null) {
-      // Replacing an activity the inventory hadn't listed yet (iOS 26.6, right
-      // after the request) ended it before the system presented it.
-      const committedAgo =
-        focused.liveActivityCommittedAt != null
-          ? Date.now() - focused.liveActivityCommittedAt
-          : Infinity;
-      const justCommitted = committedAgo >= 0 && committedAgo < COMMITTED_ACTIVITY_GRACE_MS;
-      if (justCommitted || focused.liveActivityDismissed) return false;
-      await replaceFocusActivity(focused);
-      return true;
-    }
+    if (kept == null) return false;
     // Push builds never schedule the local auto-dismiss (the cron ends the
     // activity server-side at live arrival), so there an `ended` activity is a
     // deliberate end — leave it be rather than resurrect it.
@@ -772,8 +774,7 @@ async function reconcileActivities(): Promise<void> {
   if (!focused) return;
   focused = await noteActivityDismissed(focused, records);
   // (Re)start or revive the focus's activity if nothing live is on screen for
-  // it (never started, frozen by the background auto-dismiss, or gone from the
-  // OS inventory).
+  // it (never started, or frozen by the background auto-dismiss).
   // Returns false when a live / user-dismissed / push-ended activity already
   // covers it, in which case we fall through to the push self-heal below.
   if (await startOrReviveActivity(focused, records)) return;

@@ -64,7 +64,7 @@ struct TripActivityWidget: Widget {
     }
 }
 
-private enum Brand {
+enum Brand {
     /// The app's display name (`CFBundleDisplayName`). Shown as the wordmark on
     /// the lock screen and Dynamic Island.
     static let name = "SMART trip"

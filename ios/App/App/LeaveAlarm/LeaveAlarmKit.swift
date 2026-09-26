@@ -78,7 +78,7 @@ enum LeaveAlarmKit {
                     let stopButton = AlarmButton(
                         text: LocalizedStringResource(String.LocalizationValue(stopButtonTitle)),
                         textColor: .white,
-                        systemImageName: "stop.fill"
+                        systemImageName: LeaveAlarmMetadata.stopSystemImageName
                     )
                     var secondaryButton: AlarmButton?
                     var secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?

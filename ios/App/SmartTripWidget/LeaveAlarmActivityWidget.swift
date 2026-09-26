@@ -4,6 +4,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+@available(iOS 26.0, *)
+private typealias LeaveAlarmContext = ActivityViewContext<AlarmAttributes<LeaveAlarmMetadata>>
+
 /**
  * The ringing leave alarm's Live Activity. AlarmKit starts it when the alarm
  * fires and SpringBoard asks this extension to render it, so without this
@@ -15,11 +18,12 @@ import WidgetKit
 struct LeaveAlarmActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlarmAttributes<LeaveAlarmMetadata>.self) { context in
-            LeaveAlarmLockScreenView(attributes: context.attributes, state: context.state)
+            LeaveAlarmLockScreenView(context: context)
                 .activityBackgroundTint(context.attributes.tintColor)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             let tint = context.attributes.tintColor
+            let bell = BellRingIcon(size: 20).foregroundStyle(tint)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     BellRingIcon(size: 24)
@@ -34,21 +38,18 @@ struct LeaveAlarmActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 10) {
                         AlarmTitle(attributes: context.attributes)
-                        LeaveAlarmControls(attributes: context.attributes, state: context.state, onTint: false)
+                        LeaveAlarmControls(context: context, onLockScreen: false)
                     }
                     .padding(.horizontal, 8)
                 }
             } compactLeading: {
-                BellRingIcon(size: 20)
-                    .foregroundStyle(tint)
-                    .padding(.horizontal, 2)
+                bell.padding(.horizontal, 2)
             } compactTrailing: {
                 AlarmTime(state: context.state)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(tint)
             } minimal: {
-                BellRingIcon(size: 20)
-                    .foregroundStyle(tint)
+                bell
             }
             .keylineTint(tint)
         }
@@ -57,20 +58,19 @@ struct LeaveAlarmActivityWidget: Widget {
 
 @available(iOS 26.0, *)
 private struct LeaveAlarmLockScreenView: View {
-    let attributes: AlarmAttributes<LeaveAlarmMetadata>
-    let state: AlarmPresentationState
+    let context: LeaveAlarmContext
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 BellRingIcon(size: 22)
-                AlarmTitle(attributes: attributes)
+                AlarmTitle(attributes: context.attributes)
                 Spacer(minLength: 0)
-                AlarmTime(state: state)
+                AlarmTime(state: context.state)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.72))
             }
-            LeaveAlarmControls(attributes: attributes, state: state, onTint: true)
+            LeaveAlarmControls(context: context, onLockScreen: true)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 20)
@@ -106,16 +106,14 @@ private struct AlarmTime: View {
     }
 }
 
-/// "View trip" and Stop. `onTint` is the lock screen, where the card itself is
-/// the tint, so Stop inverts to white; on the black island Stop takes the tint.
 @available(iOS 26.0, *)
 private struct LeaveAlarmControls: View {
-    let attributes: AlarmAttributes<LeaveAlarmMetadata>
-    let state: AlarmPresentationState
-    let onTint: Bool
+    let context: LeaveAlarmContext
+    let onLockScreen: Bool
 
     var body: some View {
-        let alarmID = state.alarmID.uuidString
+        let attributes = context.attributes
+        let alarmID = context.state.alarmID.uuidString
         let tint = attributes.tintColor
         HStack(spacing: 8) {
             if let viewTrip = attributes.presentation.alert.secondaryButton {
@@ -127,12 +125,15 @@ private struct LeaveAlarmControls: View {
                 .tint(.white)
             }
             Button(intent: StopLeaveAlarmIntent(alarmID: alarmID)) {
-                Label(attributes.metadata?.stopButtonTitle ?? "Stop", systemImage: "stop.fill")
-                    .foregroundStyle(onTint ? tint : .white)
-                    .frame(maxWidth: .infinity)
+                Label(
+                    attributes.metadata?.stopButtonTitle ?? "Stop",
+                    systemImage: LeaveAlarmMetadata.stopSystemImageName
+                )
+                .foregroundStyle(onLockScreen ? tint : .white)
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(onTint ? .white : tint)
+            .tint(onLockScreen ? .white : tint)
         }
         .font(.subheadline.weight(.semibold))
         .lineLimit(1)
@@ -150,7 +151,7 @@ private enum LeaveAlarmPreviewData {
             )
         ),
         metadata: LeaveAlarmMetadata(stopButtonTitle: "Stop"),
-        tintColor: Color(red: 0.12, green: 0.47, blue: 0.84)
+        tintColor: Brand.blue
     )
 
     static let ringing = AlarmPresentationState(

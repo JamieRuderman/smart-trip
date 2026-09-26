@@ -6,10 +6,10 @@ import Foundation
 // Compiled into both the App and SmartTripWidget targets: the widget matches the
 // alarm's Live Activity and its button intents by these type names.
 
-/// AlarmKit's metadata type for the leave alarm, carried to the widget that
-/// renders the ringing alarm's Live Activity.
 @available(iOS 26.0, *)
 struct LeaveAlarmMetadata: AlarmMetadata {
+    static let stopSystemImageName = "stop.fill"
+
     /// The localized Stop label. AlarmKit no longer exposes the alert's stop
     /// button (deprecated in iOS 26.1), so the widget reads it from here.
     var stopButtonTitle: String?
@@ -51,7 +51,6 @@ struct OpenSmartTripIntent: LiveActivityIntent {
     }
 }
 
-/// The Stop button on the alarm's Live Activity.
 @available(iOS 26.0, *)
 struct StopLeaveAlarmIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Stop Leave Alarm"

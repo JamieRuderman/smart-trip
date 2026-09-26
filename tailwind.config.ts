@@ -86,6 +86,8 @@ export default {
           "train-green":
             "hsl(var(--smart-train-green))" /* #11ab75 - main UI */,
           gold: "hsl(var(--smart-gold))" /* rgb(216, 146, 63) */,
+          "gold-foreground":
+            "hsl(var(--smart-gold-foreground))" /* gold text on gold-tinted surfaces */,
           "dark-green": "hsl(var(--smart-dark-green))",
           "light-green": "hsl(var(--smart-light-green))",
           neutral: "hsl(228deg 2.65% 45%)" /* default sheet header */,

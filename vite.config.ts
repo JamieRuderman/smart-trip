@@ -1,5 +1,5 @@
-/// <reference types="vitest/config" />
 import { defineConfig, loadEnv, type ViteDevServer } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { readFileSync } from "node:fs";
@@ -85,6 +85,8 @@ export default defineConfig(({ mode }) => {
       // Pin the timezone for the whole run so local-time schedule/date math is
       // deterministic regardless of the machine's zone. See src/test/setup.ts.
       setupFiles: ["./src/test/setup.ts"],
+      // Claude Code worktrees in .claude/ are full checkouts; their tests fail against this node_modules.
+      exclude: [...configDefaults.exclude, ".claude/**"],
     },
   };
 });

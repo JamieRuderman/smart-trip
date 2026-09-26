@@ -64,7 +64,7 @@ struct TripActivityWidget: Widget {
     }
 }
 
-private enum Brand {
+enum Brand {
     /// The app's display name (`CFBundleDisplayName`). Shown as the wordmark on
     /// the lock screen and Dynamic Island.
     static let name = "SMART trip"
@@ -306,7 +306,7 @@ private enum SVGPath {
 /// drawn as a vector so the "reminder armed" badge matches the web app's icon
 /// exactly. SF Symbols' bells don't carry the ring lines. Stroked like
 /// `TrainIcon`; mirror of lucide-react's `BellRing` (keep in lockstep).
-private struct BellRingIcon: View {
+struct BellRingIcon: View {
     var size: CGFloat
     var strokeRatio: CGFloat = 0.083
 

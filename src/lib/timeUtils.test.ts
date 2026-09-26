@@ -4,7 +4,9 @@ import {
   agencyWallTimeToEpochSeconds,
   computeMinutesUntil,
   formatClockTime,
+  formatStartedLabel,
   isTimeInPast,
+  parseDateOrInstant,
   parseServiceDate,
   parseTimeToMinutes,
   serviceDateWeekdayLabel,
@@ -162,5 +164,35 @@ describe("formatClockTime", () => {
 
   it("uses 24-hour format when timeFormat is 24h", () => {
     expect(formatClockTime(epoch, "24h", "en-US")).toBe("14:05");
+  });
+});
+
+describe("formatStartedLabel", () => {
+  const start = new Date(2026, 1, 21, 16, 26).getTime();
+
+  it("shows the clock time when it started today", () => {
+    const laterToday = new Date(2026, 1, 21, 23, 59).getTime();
+    expect(formatStartedLabel(start, laterToday, "12h", "en-US")).toBe("4:26 PM");
+  });
+
+  it("shows the date when it started on an earlier day", () => {
+    const nextDay = new Date(2026, 1, 22, 0, 1).getTime();
+    expect(formatStartedLabel(start, nextDay, "12h", "en-US")).toBe("Feb 21");
+  });
+});
+
+describe("parseDateOrInstant", () => {
+  it("reads a date-only value as local midnight, not UTC", () => {
+    expect(parseDateOrInstant("2026-02-21")).toBe(new Date(2026, 1, 21).getTime());
+  });
+
+  it("parses a full ISO instant as-is", () => {
+    expect(parseDateOrInstant("2026-02-22T00:26:40.000Z")).toBe(
+      Date.UTC(2026, 1, 22, 0, 26, 40),
+    );
+  });
+
+  it("returns NaN for an unparseable value", () => {
+    expect(parseDateOrInstant("soon")).toBeNaN();
   });
 });

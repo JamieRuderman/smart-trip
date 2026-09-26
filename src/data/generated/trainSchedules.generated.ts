@@ -9,6 +9,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
     "northbound": [
       {
         "trip": 2,
+        "tripId": "t_6153517_b_86615_tn_0",
         "times": [
           "06:49",
           "06:44",
@@ -28,6 +29,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 4,
+        "tripId": "t_6153518_b_86615_tn_0",
         "times": [
           "07:53",
           "07:48",
@@ -47,6 +49,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 6,
+        "tripId": "t_6153519_b_86615_tn_0",
         "times": [
           "08:25",
           "08:20",
@@ -66,6 +69,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 8,
+        "tripId": "t_6153520_b_86615_tn_0",
         "times": [
           "08:57",
           "08:52",
@@ -85,6 +89,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 10,
+        "tripId": "t_6153521_b_86615_tn_0",
         "times": [
           "09:29",
           "09:24",
@@ -104,6 +109,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 12,
+        "tripId": "t_6153522_b_86615_tn_0",
         "times": [
           "10:01",
           "09:56",
@@ -123,6 +129,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 14,
+        "tripId": "t_6153523_b_86615_tn_0",
         "times": [
           "10:33",
           "10:28",
@@ -142,6 +149,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 16,
+        "tripId": "t_6153524_b_86615_tn_0",
         "times": [
           "11:05",
           "11:00",
@@ -161,6 +169,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 18,
+        "tripId": "t_6153525_b_86615_tn_0",
         "times": [
           "12:09",
           "12:04",
@@ -180,6 +189,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 20,
+        "tripId": "t_6153526_b_86615_tn_0",
         "times": [
           "13:13",
           "13:08",
@@ -199,6 +209,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 22,
+        "tripId": "t_6153527_b_86615_tn_0",
         "times": [
           "14:17",
           "14:12",
@@ -218,6 +229,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 24,
+        "tripId": "t_6153528_b_86615_tn_0",
         "times": [
           "15:21",
           "15:16",
@@ -237,6 +249,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 26,
+        "tripId": "t_6153529_b_86615_tn_0",
         "times": [
           "16:25",
           "16:20",
@@ -256,6 +269,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 28,
+        "tripId": "t_6153530_b_86615_tn_0",
         "times": [
           "16:57",
           "16:52",
@@ -275,6 +289,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 30,
+        "tripId": "t_6153531_b_86615_tn_0",
         "times": [
           "17:29",
           "17:24",
@@ -294,6 +309,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 32,
+        "tripId": "t_6153532_b_86615_tn_0",
         "times": [
           "18:01",
           "17:56",
@@ -313,6 +329,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 34,
+        "tripId": "t_6153533_b_86615_tn_0",
         "times": [
           "18:33",
           "18:28",
@@ -332,6 +349,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 36,
+        "tripId": "t_6153534_b_86615_tn_0",
         "times": [
           "19:05",
           "19:00",
@@ -351,6 +369,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 38,
+        "tripId": "t_6153535_b_86615_tn_0",
         "times": [
           "19:37",
           "19:32",
@@ -370,6 +389,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 40,
+        "tripId": "t_6153536_b_86615_tn_0",
         "times": [
           "20:09",
           "20:04",
@@ -389,6 +409,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 42,
+        "tripId": "t_6153537_b_86615_tn_0",
         "times": [
           "20:41",
           "20:36",
@@ -408,6 +429,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 44,
+        "tripId": "t_6153538_b_86615_tn_0",
         "times": [
           "21:13",
           "21:08",
@@ -427,6 +449,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 46,
+        "tripId": "t_6153539_b_86615_tn_0",
         "times": [
           "22:17",
           "22:12",
@@ -448,6 +471,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
     "southbound": [
       {
         "trip": 1,
+        "tripId": "t_6153485_b_86615_tn_0",
         "times": [
           "03:56",
           "04:00",
@@ -467,6 +491,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 3,
+        "tripId": "t_6153486_b_86615_tn_0",
         "times": [
           "04:50",
           "04:54",
@@ -486,6 +511,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 5,
+        "tripId": "t_6153513_b_86615_tn_0",
         "times": [
           "05:22",
           "05:26",
@@ -505,6 +531,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 7,
+        "tripId": "t_6153487_b_86615_tn_0",
         "times": [
           "05:54",
           "05:58",
@@ -524,6 +551,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 9,
+        "tripId": "t_6153488_b_86615_tn_0",
         "times": [
           "06:26",
           "06:30",
@@ -543,6 +571,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 11,
+        "tripId": "t_6153493_b_86615_tn_0",
         "times": [
           "06:58",
           "07:02",
@@ -562,6 +591,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 13,
+        "tripId": "t_6153494_b_86615_tn_0",
         "times": [
           "07:30",
           "07:34",
@@ -581,6 +611,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 15,
+        "tripId": "t_6153495_b_86615_tn_0",
         "times": [
           "08:02",
           "08:06",
@@ -600,6 +631,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 17,
+        "tripId": "t_6153496_b_86615_tn_0",
         "times": [
           "09:06",
           "09:10",
@@ -619,6 +651,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 19,
+        "tripId": "t_6153497_b_86615_tn_0",
         "times": [
           "10:10",
           "10:14",
@@ -638,6 +671,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 21,
+        "tripId": "t_6153498_b_86615_tn_0",
         "times": [
           "11:14",
           "11:18",
@@ -657,6 +691,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 23,
+        "tripId": "t_6153499_b_86615_tn_0",
         "times": [
           "12:18",
           "12:22",
@@ -676,6 +711,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 25,
+        "tripId": "t_6153500_b_86615_tn_0",
         "times": [
           "13:22",
           "13:26",
@@ -695,6 +731,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 27,
+        "tripId": "t_6153501_b_86615_tn_0",
         "times": [
           "13:54",
           "13:58",
@@ -714,6 +751,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 29,
+        "tripId": "t_6153502_b_86615_tn_0",
         "times": [
           "14:26",
           "14:30",
@@ -733,6 +771,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 31,
+        "tripId": "t_6153503_b_86615_tn_0",
         "times": [
           "14:58",
           "15:02",
@@ -752,6 +791,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 33,
+        "tripId": "t_6153504_b_86615_tn_0",
         "times": [
           "15:30",
           "15:34",
@@ -771,6 +811,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 35,
+        "tripId": "t_6153505_b_86615_tn_0",
         "times": [
           "16:02",
           "16:06",
@@ -790,6 +831,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 37,
+        "tripId": "t_6153506_b_86615_tn_0",
         "times": [
           "16:34",
           "16:38",
@@ -809,6 +851,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 39,
+        "tripId": "t_6153507_b_86615_tn_0",
         "times": [
           "17:06",
           "17:10",
@@ -828,6 +871,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 41,
+        "tripId": "t_6153508_b_86615_tn_0",
         "times": [
           "17:38",
           "17:42",
@@ -847,6 +891,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 43,
+        "tripId": "t_6153509_b_86615_tn_0",
         "times": [
           "18:10",
           "18:14",
@@ -866,6 +911,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 45,
+        "tripId": "t_6153510_b_86615_tn_0",
         "times": [
           "19:14",
           "19:18",
@@ -885,6 +931,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 47,
+        "tripId": "t_6153511_b_86615_tn_0",
         "times": [
           "20:18",
           "20:22",
@@ -908,6 +955,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
     "northbound": [
       {
         "trip": 2,
+        "tripId": "t_6153590_b_86615_tn_0",
         "times": [
           "10:18",
           "10:13",
@@ -927,6 +975,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 4,
+        "tripId": "t_6153611_b_86615_tn_0",
         "times": [
           "11:22",
           "11:17",
@@ -946,6 +995,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 6,
+        "tripId": "t_6153612_b_86615_tn_0",
         "times": [
           "12:26",
           "12:21",
@@ -965,6 +1015,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 8,
+        "tripId": "t_6153613_b_86615_tn_0",
         "times": [
           "13:30",
           "13:25",
@@ -984,6 +1035,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 10,
+        "tripId": "t_6153614_b_86615_tn_0",
         "times": [
           "14:34",
           "14:29",
@@ -1003,6 +1055,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 12,
+        "tripId": "t_6153615_b_86615_tn_0",
         "times": [
           "15:38",
           "15:33",
@@ -1022,6 +1075,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 14,
+        "tripId": "t_6153616_b_86615_tn_0",
         "times": [
           "16:42",
           "16:37",
@@ -1041,6 +1095,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 16,
+        "tripId": "t_6153617_b_86615_tn_0",
         "times": [
           "17:46",
           "17:41",
@@ -1060,6 +1115,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 18,
+        "tripId": "t_6153618_b_86615_tn_0",
         "times": [
           "18:50",
           "18:45",
@@ -1079,6 +1135,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 20,
+        "tripId": "t_6153619_b_86615_tn_0",
         "times": [
           "19:54",
           "19:49",
@@ -1098,6 +1155,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 22,
+        "tripId": "t_6153620_b_86615_tn_0",
         "times": [
           "21:30",
           "21:25",
@@ -1117,6 +1175,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 24,
+        "tripId": "t_6153621_b_86615_tn_0",
         "times": [
           "23:14",
           "23:09",
@@ -1136,6 +1195,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 48,
+        "tripId": "t_6153540_b_86615_tn_0",
         "times": [
           "23:21",
           "23:16",
@@ -1157,6 +1217,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
     "southbound": [
       {
         "trip": 1,
+        "tripId": "t_6153577_b_86615_tn_0",
         "times": [
           "07:08",
           "07:12",
@@ -1176,6 +1237,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 3,
+        "tripId": "t_6153578_b_86615_tn_0",
         "times": [
           "08:19",
           "08:23",
@@ -1195,6 +1257,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 5,
+        "tripId": "t_6153579_b_86615_tn_0",
         "times": [
           "09:23",
           "09:27",
@@ -1214,6 +1277,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 7,
+        "tripId": "t_6153580_b_86615_tn_0",
         "times": [
           "10:27",
           "10:31",
@@ -1233,6 +1297,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 9,
+        "tripId": "t_6153581_b_86615_tn_0",
         "times": [
           "11:31",
           "11:35",
@@ -1252,6 +1317,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 11,
+        "tripId": "t_6153582_b_86615_tn_0",
         "times": [
           "12:35",
           "12:39",
@@ -1271,6 +1337,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 13,
+        "tripId": "t_6153583_b_86615_tn_0",
         "times": [
           "13:39",
           "13:43",
@@ -1290,6 +1357,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 15,
+        "tripId": "t_6153584_b_86615_tn_0",
         "times": [
           "14:43",
           "14:47",
@@ -1309,6 +1377,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 17,
+        "tripId": "t_6153585_b_86615_tn_0",
         "times": [
           "15:47",
           "15:51",
@@ -1328,6 +1397,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 19,
+        "tripId": "t_6153586_b_86615_tn_0",
         "times": [
           "16:51",
           "16:55",
@@ -1347,6 +1417,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 21,
+        "tripId": "t_6153587_b_86615_tn_0",
         "times": [
           "18:27",
           "18:31",
@@ -1366,6 +1437,7 @@ export const trainSchedules: Record<ScheduleType, TrainSchedule> = {
       },
       {
         "trip": 23,
+        "tripId": "t_6153588_b_86615_tn_0",
         "times": [
           "20:03",
           "20:07",

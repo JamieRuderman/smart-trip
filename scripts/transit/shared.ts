@@ -44,6 +44,9 @@ export type StationParent = {
 
 export type TrainTripOutput = {
   trip: number;
+  /** GTFS `trip_id` of the first trip de-duplicated into this row, so it can
+   *  differ from the id running on a given day; consumers must fall back. */
+  tripId: string;
   times: string[];
 };
 
@@ -653,6 +656,7 @@ export function buildTrainSchedules(
 
     bucket.push({
       trip: tripNumber,
+      tripId,
       times,
     });
   }

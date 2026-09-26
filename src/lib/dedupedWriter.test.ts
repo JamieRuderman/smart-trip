@@ -78,6 +78,25 @@ describe("createDedupedWriter", () => {
     expect(writer.isAccepted(REG.id, { ...REG, lead: 45 })).toBe(true);
   });
 
+  it("re-sends an accepted payload restored while a different one is in flight", async () => {
+    // A lead changed and changed back mid-flight: the in-flight payload lands
+    // last, so skipping the restore would leave the sink on the intermediate value.
+    const { send, calls } = controllableSink();
+    const writer = createDedupedWriter(send);
+    const first = writer.write(REG.id, REG);
+    calls[0].resolve(true);
+    await first;
+
+    void writer.write(REG.id, { ...REG, lead: 45 });
+    const restored = writer.write(REG.id, REG);
+    calls[1].resolve(true);
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
+    expect(send).toHaveBeenLastCalledWith(REG);
+    calls[2].resolve(true);
+    await restored;
+    expect(writer.isAccepted(REG.id, REG)).toBe(true);
+  });
+
   it("does not remember a REJECTED write, so the next call retries", async () => {
     const { send, calls } = controllableSink();
     const writer = createDedupedWriter(send);
@@ -112,17 +131,39 @@ describe("createDedupedWriter", () => {
     calls.forEach((c) => c.resolve(true));
   });
 
-  it("forget() makes an unchanged payload send again", async () => {
+  it("close() waits for the in-flight write and drops the one queued behind it", async () => {
+    // Teardown DELETEs the remote record once close() resolves; a queued write
+    // reaching the sink after that would re-create it.
     const { send, calls } = controllableSink();
     const writer = createDedupedWriter(send);
-    const first = writer.write(REG.id, REG);
-    calls[0].resolve(true);
-    await first;
+    void writer.write(REG.id, REG);
+    const queued = writer.write(REG.id, { ...REG, lead: 45 });
+    let closed = false;
+    const done = writer.close(REG.id).then(() => {
+      closed = true;
+    });
+    await Promise.resolve();
+    expect(closed).toBe(false);
 
-    writer.forget(REG.id);
-    const again = writer.write(REG.id, REG);
-    expect(send).toHaveBeenCalledTimes(2);
-    calls[1].resolve(true);
-    await again;
+    calls[0].resolve(true);
+    await Promise.all([done, queued]);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("close() refuses later writes, even of a new payload", async () => {
+    const { send } = controllableSink();
+    const writer = createDedupedWriter(send);
+    await writer.close(REG.id);
+    await writer.write(REG.id, { ...REG, lead: 45 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("close() leaves other keys writable", async () => {
+    const { send, calls } = controllableSink();
+    const writer = createDedupedWriter(send);
+    await writer.close("trip-1");
+    void writer.write("trip-2", REG);
+    expect(send).toHaveBeenCalledTimes(1);
+    calls[0].resolve(true);
   });
 });

@@ -6,7 +6,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "source ~/.nvm/nvm.sh && nvm use 20 >/dev/null && USE_SAMPLE_DATA=true npx vite --port 5180 --strictPort"
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && USE_SAMPLE_DATA=true npx vite --port 5180 --strictPort"
       ],
       "port": 5180,
       "autoPort": true
@@ -16,7 +16,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "source ~/.nvm/nvm.sh && nvm use 20 >/dev/null && npx vite --port 5182 --strictPort"
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npx vite --port 5182 --strictPort"
       ],
       "port": 5182,
       "autoPort": true
@@ -26,7 +26,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "source ~/.nvm/nvm.sh && nvm use 20 >/dev/null && npx vite preview --port 5181 --strictPort"
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && npx vite preview --port 5181 --strictPort"
       ],
       "port": 5181,
       "autoPort": true

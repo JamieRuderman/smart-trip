@@ -4,6 +4,7 @@ import {
   getAlertFingerprint,
 } from "@/lib/alertFingerprint";
 import type { ServiceAlertData } from "@/types/smartSchedule";
+import { parseDateOrInstant } from "@/lib/timeUtils";
 
 const DISMISSED_ALERTS_KEY = "smart-train-service-alerts-dismissed-v1";
 export const ALERT_DISMISSAL_TTL_MS = 24 * 60 * 60 * 1000;
@@ -59,7 +60,7 @@ export function getAlertDismissalExpiryMs(
 ): number {
   const minimumExpiryMs = dismissedAtMs + ALERT_DISMISSAL_TTL_MS;
   if (alert.endsAt) {
-    const parsed = Date.parse(alert.endsAt);
+    const parsed = parseDateOrInstant(alert.endsAt);
     if (Number.isFinite(parsed)) return Math.max(parsed, minimumExpiryMs);
   }
   return minimumExpiryMs;

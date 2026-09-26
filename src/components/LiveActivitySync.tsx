@@ -77,6 +77,10 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   // "Alarm in" countdown for the train + "Departs in" countdown on time.
   const reminderAt = focusedTrip.reminder?.reminderAt ?? null;
   const alarmPending = reminderAt != null && now < reminderAt;
+  // iOS can start a scheduled activity after its stored instant, and the sync
+  // holds content until then, so re-sync every tick until the instant is cleared.
+  const scheduledFor = focusedTrip.liveActivityScheduledFor ?? null;
+  const startDueTick = scheduledFor != null && now >= scheduledFor ? nowSeconds : null;
 
   // `phase` / `alarmPending` are deps so crossing the alarm fire time and then
   // departure each push exactly one update that flips the leading countdown;
@@ -87,7 +91,7 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     if (!liveActivityId || departureAt == null || arrivalAt == null) return;
     void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending]);
+  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending, scheduledFor, startDueTick]);
 
   // Post-arrival cleanup (ending the activity + clearing the focus) is owned by
   // FocusedTripAutoClear, which fires a short, delay-aware grace after arrival on

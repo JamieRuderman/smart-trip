@@ -48,7 +48,9 @@ clear / arrival → DELETE /api/liveactivity/register?id=…   (or the DO ends i
   `end` once arrived. Unchanged state = no push (APNs throttles updates).
   Cancellation is detected two ways: from the matched trip update's `CANCELED`
   relationship, or — when 511 strips the cancelled run's stop updates entirely —
-  by matching the feed `startTime` against the registration's `originStartTime`.
+  by identifying the run from its feed `trip_id` (the registration's `tripId`,
+  taken from the static schedule) or, failing that, by matching the feed
+  `startTime` against the registration's `originStartTime`.
 - The signed APNs provider JWT is **cached in DO storage for ~40 min** and
   reused across ticks: APNs throttles provider-token churn
   (`TooManyProviderTokenUpdates`), so a fresh signature per tick would get

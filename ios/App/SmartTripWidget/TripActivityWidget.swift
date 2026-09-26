@@ -772,14 +772,14 @@ private struct SurfaceStyle {
     static let lockScreen = SurfaceStyle(
         secondaryColor: .white.opacity(0.72),
         alarmOpacity: 0.72,
-        remainingOpacity: 0.4,
+        remainingOpacity: 0.25,
         completedOpacity: 0.2,
         trackColorScheme: .light
     )
     static let island = SurfaceStyle(
         secondaryColor: .secondary,
         alarmOpacity: 1,
-        remainingOpacity: 0.75,
+        remainingOpacity: 0.5,
         completedOpacity: 0.5,
         trackColorScheme: .dark
     )

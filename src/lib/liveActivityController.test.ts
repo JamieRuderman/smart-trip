@@ -264,18 +264,87 @@ describe("content updates to a scheduled activity", () => {
     liveActivityId: id,
     liveActivityScheduledFor: NOW + 10 * 60_000,
   });
+  const sync = (delayMinutes = 3) =>
+    syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes });
+  const pastStart = NOW + 11 * 60_000;
+  const lateStart = (id: string, records: { id: string; state: string }[] | null) => {
+    loadFocusedTrip.mockReturnValue(scheduled(id));
+    listTripActivityRecords.mockResolvedValue(records);
+    vi.setSystemTime(pastStart);
+  };
 
   it("skips the drift sync while iOS has not started the activity yet", async () => {
     loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-pending"));
     await sync();
     expect(updateTripActivity).not.toHaveBeenCalled();
+    expect(listTripActivityRecords).not.toHaveBeenCalled();
   });
 
-  it("syncs once the scheduled start instant has passed", async () => {
-    loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-started"));
-    vi.setSystemTime(NOW + 11 * 60_000);
+  it("syncs, then drops the start instant, once the inventory shows the activity running", async () => {
+    const id = "trip-7-sync-started";
+    lateStart(id, [{ id, state: "active" }]);
     await sync();
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
+    expect(updateTripActivity.mock.invocationCallOrder[0]).toBeLessThan(
+      saveFocusedTrip.mock.invocationCallOrder[0],
+    );
+
+    loadFocusedTrip.mockReturnValue(saveFocusedTrip.mock.lastCall![0] as FocusedTrip);
+    vi.setSystemTime(pastStart + 5 * 60_000);
+    await sync(5);
+    expect(updateTripActivity).toHaveBeenCalledTimes(2);
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["lists it as pending", (id: string) => [{ id, state: "pending" }]],
+    ["does not list it", () => []],
+    ["cannot be read", () => null],
+  ])("holds content past the start instant while the inventory %s", async (label, records) => {
+    const id = `trip-7-sync-held-${label}`;
+    lateStart(id, records(id));
+    await sync();
+    expect(updateTripActivity).not.toHaveBeenCalled();
+    expect(saveFocusedTrip).not.toHaveBeenCalled();
+  });
+
+  it("reads the inventory at most once a minute while the start is late", async () => {
+    const id = "trip-7-sync-backoff";
+    lateStart(id, [{ id, state: "pending" }]);
+    await sync();
+    vi.setSystemTime(pastStart + 30_000);
+    await sync();
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(1);
+
+    listTripActivityRecords.mockResolvedValue([{ id, state: "active" }]);
+    vi.setSystemTime(pastStart + 60_000);
+    await sync();
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(2);
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads the inventory when the clock steps back past the last read", async () => {
+    const id = "trip-7-sync-clock";
+    lateStart(id, [{ id, state: "pending" }]);
+    vi.setSystemTime(pastStart + 10 * 60_000);
+    await sync();
+    vi.setSystemTime(pastStart);
+    await sync();
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes a started scheduled activity on ensure and drops its start instant", async () => {
+    const id = "trip-7-refresh-started";
+    lateStart(id, [{ id, state: "active" }]);
+    await ensureActivityForFocus(scheduled(id));
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
   });
 
   it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {
@@ -318,6 +387,21 @@ describe("reconcileTripActivities adoption", () => {
     expect(saveFocusedTrip).toHaveBeenCalledWith(
       expect.not.objectContaining({ liveActivityDismissed: true }),
     );
+  });
+
+  it("drops the start instant once the OS has started the scheduled activity", async () => {
+    loadFocusedTrip.mockReturnValue({
+      ...FOCUS,
+      liveActivityId: ID,
+      liveActivityScheduledFor: NOW - 60_000,
+    });
+    listTripActivityRecords.mockResolvedValue([{ id: ID, state: "active" }]);
+    await reconcileTripActivities();
+    expect(saveFocusedTrip).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
+    expect(endTripActivity).not.toHaveBeenCalled();
   });
 
   it("adopts a running activity without a scheduled start", async () => {

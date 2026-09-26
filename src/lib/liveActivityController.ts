@@ -132,6 +132,13 @@ const deregistrationWriter = createDedupedWriter<string>((id) =>
   deregisterPushActivity(id),
 );
 
+const SCHEDULED_START_RECHECK_MS = 60_000;
+
+/** When each scheduled activity's inventory record was last read past its start
+ *  instant, so a late start costs one read per
+ *  {@link SCHEDULED_START_RECHECK_MS} rather than one per sync. */
+const startCheckedAt = new Map<string, number>();
+
 async function postRegistrationDeduped(
   registration: LiveActivityRegistration,
 ): Promise<void> {
@@ -150,6 +157,7 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
 /** Stop registering `id` and deregister it from the push backend. */
 async function forgetActivity(id: string): Promise<void> {
   lastSentActivityContent.delete(id);
+  startCheckedAt.delete(id);
   // The backend re-creates a registration whose POST it handles after the DELETE.
   await registrationWriter.close(id);
   if (isLiveActivityPushEnabled()) await deregistrationWriter.write(id, id);
@@ -449,11 +457,41 @@ async function replaceFocusActivity(focused: FocusedTrip): Promise<void> {
   await startActivityForFocus(withoutActivity(focused));
 }
 
+/** Drop the pinned start instant from the latest focus once iOS has started its
+ *  scheduled activity. Returns the latest focus. */
+function noteScheduledActivityStarted(id: string): FocusedTrip | null {
+  const latest = loadFocusedTrip();
+  if (latest?.liveActivityId !== id || latest.liveActivityScheduledFor == null) return latest;
+  const running: FocusedTrip = { ...latest };
+  delete running.liveActivityScheduledFor;
+  saveFocusedTrip(running);
+  notifyChange();
+  return running;
+}
+
 /**
- * Send content to the focus's activity, deduped against the last send. Skips a
- * scheduled activity iOS hasn't started: ActivityKit rejects content updates to a
- * pending activity unless they carry an alert, and the rejected update was
- * retried on every sync tick.
+ * Whether the focus's scheduled activity hasn't started yet. Certain before its
+ * stored start instant; after it iOS can start the activity late, so only an
+ * inventory record past `pending` counts as started.
+ */
+async function awaitingScheduledStart(focused: FocusedTrip, id: string): Promise<boolean> {
+  const scheduledFor = focused.liveActivityScheduledFor;
+  if (scheduledFor == null) return false;
+  const now = Date.now();
+  if (now < scheduledFor) return true;
+  const checkedAt = startCheckedAt.get(id);
+  const checkedAgo = checkedAt != null ? now - checkedAt : Infinity;
+  if (checkedAgo >= 0 && checkedAgo < SCHEDULED_START_RECHECK_MS) return true;
+  startCheckedAt.set(id, now);
+  const record = (await listTripActivityRecords())?.find((r) => r.id === id);
+  return record == null || record.state === "pending";
+}
+
+/**
+ * Send content to the focus's activity, deduped against the last send. Holds it
+ * while a scheduled activity is still pending: ActivityKit drops a content update
+ * to a pending activity unless it carries an alert, yet `Activity.update` doesn't
+ * throw, so the plugin resolves and the dropped content would be cached as sent.
  */
 async function sendActivityContent(
   focused: FocusedTrip,
@@ -461,12 +499,14 @@ async function sendActivityContent(
 ): Promise<void> {
   const id = focused.liveActivityId;
   if (!id || focused.liveActivityDismissed) return;
-  const scheduledFor = focused.liveActivityScheduledFor;
-  if (scheduledFor != null && Date.now() < scheduledFor) return;
   const json = JSON.stringify(content);
   if (lastSentActivityContent.get(id) === json) return;
+  if (await awaitingScheduledStart(focused, id)) return;
   const { updated } = await updateTripActivity(id, content);
   if (updated) lastSentActivityContent.set(id, json);
+  // Only once the send is cached: dropping the instant re-fires the sync effect,
+  // which would otherwise send the same content again.
+  if (focused.liveActivityScheduledFor != null) noteScheduledActivityStarted(id);
 }
 
 /**
@@ -650,15 +690,9 @@ export async function reconcileTripActivities(): Promise<void> {
   // so drop the pinned start instant. Otherwise `ensureActivityForFocus` keeps
   // comparing against a spent instant, and every re-registration would still
   // tell the backend to sleep until it.
-  if (
-    focused?.liveActivityScheduledFor != null &&
-    records.some((r) => r.id === focused!.liveActivityId && r.state !== "pending")
-  ) {
-    const running: FocusedTrip = { ...focused };
-    delete running.liveActivityScheduledFor;
-    focused = running;
-    saveFocusedTrip(focused);
-    notifyChange();
+  const scheduledId = focused?.liveActivityScheduledFor != null ? focused.liveActivityId : undefined;
+  if (scheduledId && records.some((r) => r.id === scheduledId && r.state !== "pending")) {
+    focused = noteScheduledActivityStarted(scheduledId);
   }
   const keep = focused?.liveActivityId;
   await Promise.all(

@@ -18,12 +18,17 @@ const listTripActivityRecords = vi.fn(
   async (): Promise<{ id: string; state: string }[] | null> => [],
 );
 const startTripActivity = vi.fn(async () => ({ started: true }));
+const startTripActivityWithPush = vi.fn(async (id: string) => {
+  void id;
+  return { started: true };
+});
 const endTripActivity = vi.fn<(id: string) => Promise<void>>(async () => {});
 const updateTripActivity = vi.fn(async () => ({ updated: true }));
 vi.mock("@/lib/native/liveActivity", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/native/liveActivity")>()),
   listTripActivityRecords: () => listTripActivityRecords(),
   startTripActivity: () => startTripActivity(),
+  startTripActivityWithPush: (id: string) => startTripActivityWithPush(id),
   endTripActivity: (id: string) => endTripActivity(id),
   updateTripActivity: () => updateTripActivity(),
 }));
@@ -36,7 +41,6 @@ vi.mock("@/lib/native/liveActivityPush", () => ({
   configureLiveActivityTokenEndpoint: async () => {},
   deregisterPushActivity: (id: string) => deregisterPushActivity(id),
   registerPushActivity: () => registerPushActivity(),
-  startAndRegisterPushActivity: async () => ({ started: true }),
 }));
 
 const NOW = new Date(2026, 5, 9, 8, 0, 0, 0).getTime();
@@ -381,6 +385,27 @@ describe("a dismissed activity", () => {
     land(true);
     await Promise.all([reconciled, stale]);
     expect(registerPushActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("is deregistered only after the start's registration lands, and stays dismissed", async () => {
+    let stored: FocusedTrip | null = { ...FOCUS };
+    loadFocusedTrip.mockImplementation(() => stored);
+    saveFocusedTrip.mockImplementation((trip: FocusedTrip | null) => {
+      stored = trip;
+    });
+    const land = holdNextRegistration();
+    const starting = ensureActivityForFocus(stored);
+    await vi.waitFor(() => expect(registerPushActivity).toHaveBeenCalled());
+    id = startTripActivityWithPush.mock.calls[0][0];
+
+    listedDismissed();
+    const reconciled = reconcileTripActivities();
+    await vi.waitFor(() => expect(stored).toMatchObject({ liveActivityDismissed: true }));
+    expect(deregisterPushActivity).not.toHaveBeenCalled();
+    land(true);
+    await Promise.all([starting, reconciled]);
+    expect(deregisterPushActivity).toHaveBeenCalledWith(id);
+    expect(stored).toMatchObject({ liveActivityId: id, liveActivityDismissed: true });
   });
 
   it("is not deregistered off push builds", async () => {

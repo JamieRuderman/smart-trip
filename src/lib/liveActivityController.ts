@@ -31,6 +31,7 @@ import {
   listTripActivityRecords,
   scheduleTripActivity,
   startTripActivity,
+  startTripActivityWithPush,
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
@@ -46,7 +47,6 @@ import {
   deregisterPushActivity,
   isLiveActivityPushEnabled,
   registerPushActivity,
-  startAndRegisterPushActivity,
 } from "@/lib/native/liveActivityPush";
 import { createDedupedWriter } from "@/lib/dedupedWriter";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
@@ -307,16 +307,21 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   // Push-enabled builds register the trip + APNs token with the backend so the
   // countdown is corrected while the phone is locked; everything else uses the
   // local-only start. Both gate internally (off-iOS / <16.2 / disabled).
+  const registration = isLiveActivityPushEnabled()
+    ? buildRegistrationForFocus(saved, id)
+    : null;
   let started: boolean;
-  if (isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(saved, id);
-    started = registration
-      ? (await startAndRegisterPushActivity(registration, attributes, content)).started
-      : (await startTripActivity(id, attributes, content)).started;
+  if (registration) {
+    // Configure the token sink BEFORE starting, so the token iOS mints at start
+    // has somewhere to go.
+    await configureLiveActivityTokenEndpoint();
+    started = (await startTripActivityWithPush(id, attributes, content)).started;
   } else {
     started = (await startTripActivity(id, attributes, content)).started;
   }
   if (!started) return;
+  // Through the writer, so a teardown racing this start waits for the POST.
+  if (registration) await postRegistrationDeduped(registration);
   lastSentActivityContent.set(id, JSON.stringify(content));
   const latest = loadFocusedTrip();
   if (latest == null || !sameFocusIdentity(latest, saved)) {
@@ -368,8 +373,8 @@ async function scheduleActivityForFocus(
   // Point iOS at the token endpoint BEFORE handing it the activity: the token
   // is minted only when the OS starts it — likely with the app closed — and the
   // endpoint is persisted natively, so configuring it now is what lets that
-  // future token reach the backend. (The immediate path does the same inside
-  // startAndRegisterPushActivity.)
+  // future token reach the backend. (The immediate path does the same before
+  // it starts the activity.)
   if (enablePush) await configureLiveActivityTokenEndpoint();
   const { scheduled } = await scheduleTripActivity({
     id,
@@ -406,7 +411,9 @@ async function scheduleActivityForFocus(
 /** Point the focus at a started, scheduled or adopted activity, rewriting every
  *  bookkeeping field so none carries over from the activity it replaces. A running
  *  activity drops `liveActivityScheduledFor`: a stale start instant would make
- *  `ensureActivityForFocus` think it still had a pending slot. */
+ *  `ensureActivityForFocus` think it still had a pending slot. Re-committing the
+ *  same id keeps its dismissal: a start can land after a reconcile adopted and
+ *  flagged it. */
 function commitActivity(latest: FocusedTrip, id: string, scheduledFor?: number | null): FocusedTrip {
   const committed: FocusedTrip = {
     ...latest,
@@ -415,7 +422,7 @@ function commitActivity(latest: FocusedTrip, id: string, scheduledFor?: number |
   };
   if (scheduledFor != null) committed.liveActivityScheduledFor = scheduledFor;
   else delete committed.liveActivityScheduledFor;
-  delete committed.liveActivityDismissed;
+  if (latest.liveActivityId !== id) delete committed.liveActivityDismissed;
   saveFocusedTrip(committed);
   notifyChange();
   return committed;

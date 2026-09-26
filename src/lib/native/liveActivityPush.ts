@@ -10,14 +10,7 @@
 import { Capacitor } from "@capacitor/core";
 import { apiBaseUrl, readOptionalEnvString } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import {
-  setLiveActivityTokenEndpoint,
-  startTripActivityWithPush,
-} from "@/lib/native/liveActivity";
-import type {
-  TripActivityAttributes,
-  TripActivityContentState,
-} from "@/lib/liveActivityContent";
+import { setLiveActivityTokenEndpoint } from "@/lib/native/liveActivity";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 
 const REGISTER_PATH = "/api/liveactivity/register";
@@ -43,33 +36,6 @@ export function isLiveActivityPushEnabled(): boolean {
  */
 export async function configureLiveActivityTokenEndpoint(): Promise<void> {
   await setLiveActivityTokenEndpoint(`${apiBaseUrl}${TOKEN_PATH}`);
-}
-
-/**
- * Start a push-enabled Live Activity and register it with the backend. Points
- * iOS at the token endpoint (so it POSTs the per-activity token directly, even
- * across launches) and POSTs the trip identity the server needs to re-derive
- * live arrival/delay from GTFS-RT. Returns whether the activity started; a
- * registration network failure is logged but does NOT fail the start (the
- * activity still shows the local countdown, and the boot-time
- * `registerPushActivity` heal retries on the next launch).
- */
-export async function startAndRegisterPushActivity(
-  registration: LiveActivityRegistration,
-  attributes: TripActivityAttributes,
-  content: TripActivityContentState,
-): Promise<{ started: boolean }> {
-  // Configure the token sink BEFORE starting, so the token iOS mints at start
-  // has somewhere to go.
-  await configureLiveActivityTokenEndpoint();
-  const { started } = await startTripActivityWithPush(
-    registration.id,
-    attributes,
-    content,
-  );
-  if (!started) return { started: false };
-  await registerPushActivity(registration);
-  return { started: true };
 }
 
 /**

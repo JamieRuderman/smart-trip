@@ -4,7 +4,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
-import { formatStartedLabel } from "@/lib/timeUtils";
+import { formatStartedLabel, parseDateOrInstant } from "@/lib/timeUtils";
 
 interface ServiceAlertProps {
   /** Live alerts from GTFS-RT — already filtered by `useServiceAlerts`. */
@@ -51,7 +51,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
   return (
     <>
       {visibleAlerts.map((alert) => {
-        const startedAt = alert.startsAt ? Date.parse(alert.startsAt) : NaN;
+        const startedAt = alert.startsAt ? parseDateOrInstant(alert.startsAt) : NaN;
         return (
           <SectionCard
             key={alert.fingerprint}

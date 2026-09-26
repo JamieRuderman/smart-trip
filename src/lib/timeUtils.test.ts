@@ -6,6 +6,7 @@ import {
   formatClockTime,
   formatStartedLabel,
   isTimeInPast,
+  parseDateOrInstant,
   parseServiceDate,
   parseTimeToMinutes,
   serviceDateWeekdayLabel,
@@ -177,5 +178,21 @@ describe("formatStartedLabel", () => {
   it("shows the date when it started on an earlier day", () => {
     const nextDay = new Date(2026, 1, 22, 0, 1).getTime();
     expect(formatStartedLabel(start, nextDay, "12h", "en-US")).toBe("Feb 21");
+  });
+});
+
+describe("parseDateOrInstant", () => {
+  it("reads a date-only value as local midnight, not UTC", () => {
+    expect(parseDateOrInstant("2026-02-21")).toBe(new Date(2026, 1, 21).getTime());
+  });
+
+  it("parses a full ISO instant as-is", () => {
+    expect(parseDateOrInstant("2026-02-22T00:26:40.000Z")).toBe(
+      Date.UTC(2026, 1, 22, 0, 26, 40),
+    );
+  });
+
+  it("returns NaN for an unparseable value", () => {
+    expect(parseDateOrInstant("soon")).toBeNaN();
   });
 });

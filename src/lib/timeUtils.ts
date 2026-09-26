@@ -143,6 +143,17 @@ export function formatClockTime(
 }
 
 /**
+ * Epoch ms for an ISO date or date-time. A date-only "YYYY-MM-DD" is read as
+ * local midnight: `Date.parse` treats it as UTC, which is the previous day in
+ * Pacific time. NaN when unparseable.
+ */
+export function parseDateOrInstant(value: string): number {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? parseServiceDate(value).getTime()
+    : Date.parse(value);
+}
+
+/**
  * When something started: its clock time if that was today, otherwise its date
  * ("Feb 21"), so a days-old alert doesn't read as starting this afternoon.
  */

@@ -52,6 +52,11 @@ export interface LiveActivityRegistration {
    *  stop_time_updates were omitted (511 does that). Optional: absent when
    *  the origin time isn't present in the static timetable. */
   originStartTime?: string;
+  /** GTFS `trip_id` of the run in the static schedule — the server's first,
+   *  exact match against the feed's `trip_id`. Optional: older app builds and
+   *  schedule payloads don't carry it, and it can differ from the id 511 runs
+   *  that day, so the server falls back to `originStartTime` on a miss. */
+  tripId?: string;
   /** Lead minutes of the armed "leave alarm" reminder, when one is set. The
    *  server derives the leave-alarm countdown instant as `liveDeparture - lead`
    *  and feeds it into every pushed content state, so a locked-screen delay
@@ -106,6 +111,7 @@ export function isLiveActivityRegistration(
     r.arrivalEpochMs > r.departureEpochMs &&
     (r.originStartTime === undefined ||
       isBoundedString(r.originStartTime, MAX_TIME_LENGTH)) &&
+    (r.tripId === undefined || isBoundedString(r.tripId, MAX_ID_LENGTH)) &&
     (r.reminderLeadMinutes === undefined ||
       (typeof r.reminderLeadMinutes === "number" &&
         Number.isFinite(r.reminderLeadMinutes) &&

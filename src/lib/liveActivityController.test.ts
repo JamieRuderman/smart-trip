@@ -29,12 +29,16 @@ vi.mock("@/lib/native/liveActivity", async (importOriginal) => ({
 }));
 
 const isLiveActivityPushEnabled = vi.fn(() => false);
+const startAndRegisterPushActivity = vi.fn<
+  (registration: LiveActivityRegistration) => Promise<{ started: boolean }>
+>(async () => ({ started: true }));
 vi.mock("@/lib/native/liveActivityPush", () => ({
   isLiveActivityPushEnabled: () => isLiveActivityPushEnabled(),
   configureLiveActivityTokenEndpoint: async () => {},
   deregisterPushActivity: async () => {},
   registerPushActivity: async () => {},
-  startAndRegisterPushActivity: async () => ({ started: true }),
+  startAndRegisterPushActivity: (registration: LiveActivityRegistration) =>
+    startAndRegisterPushActivity(registration),
 }));
 
 const NOW = new Date(2026, 5, 9, 8, 0, 0, 0).getTime();
@@ -57,6 +61,8 @@ import {
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 import { LIVE_ACTIVITY_LEAD_MS } from "@/lib/liveActivityContent";
+import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
+import { getFilteredTrips } from "@/lib/scheduleUtils";
 import type { FocusedTrip } from "@/lib/focusedTrip";
 
 const FOCUS: FocusedTrip = {
@@ -219,6 +225,20 @@ describe("ensureActivityForFocus revive decision", () => {
     await ensureActivityForFocus(FOCUS);
     expect(saveFocusedTrip).toHaveBeenCalledWith(
       expect.not.objectContaining({ liveActivityDismissed: true }),
+    );
+  });
+});
+
+describe("push registration", () => {
+  it("carries the static schedule's GTFS trip id alongside the origin time", async () => {
+    isLiveActivityPushEnabled.mockReturnValue(true);
+    await ensureActivityForFocus(FOCUS);
+    const trip = getFilteredTrips(FOCUS.fromStation, FOCUS.toStation, FOCUS.scheduleType).find(
+      (t) => t.trip === FOCUS.tripNumber,
+    );
+    expect(trip?.tripId).toBeTruthy();
+    expect(startAndRegisterPushActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ tripId: trip!.tripId, originStartTime: expect.any(String) }),
     );
   });
 });

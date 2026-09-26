@@ -294,6 +294,117 @@ describe("computeLiveTripStatus", () => {
     });
   });
 
+  describe("GTFS trip id matching", () => {
+    const TRIP_ID = "t_6153517_b_86615_tn_0";
+    const regWithId = { ...REG, originStartTime: "08:10", tripId: TRIP_ID };
+    /** The registered run (08:10 origin, service day 2026-06-09) with its
+     *  boarding stop live at `depUnix`. */
+    const run = (overrides: Partial<FeedTripUpdate>, depUnix: number): FeedTripUpdate => ({
+      scheduleRelationship: "SCHEDULED",
+      startTime: "08:10:00",
+      startDate: "20260609",
+      stopTimeUpdates: [{ stopId: FROM_STOP, departureTime: depUnix }],
+      ...overrides,
+    });
+
+    it("matches by trip id even when the feed's start time disagrees with the origin time", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithId,
+        updates: [run({ tripId: TRIP_ID, startTime: "08:11:00" }, SCHED_DEP_MS / 1000 + 4 * 60)],
+        now: SCHED_DEP_MS,
+      });
+      expect(status!.delayMinutes).toBe(4);
+      expect(status!.departureEpochMs).toBe(SCHED_DEP_MS + 4 * 60_000);
+    });
+
+    it("prefers the trip id over an opposite-direction run sharing the origin time", () => {
+      // A southbound run also leaves its origin at 08:10 and is listed first.
+      // The origin time alone picks it, finds no northbound stop, and yields
+      // nothing; the trip id finds the registered run.
+      const updates: FeedTripUpdate[] = [
+        {
+          tripId: "t_southbound",
+          scheduleRelationship: "SCHEDULED",
+          startTime: "08:10:00",
+          startDate: "20260609",
+          stopTimeUpdates: [{ stopId: "71012", arrivalTime: SCHED_ARR_MS / 1000 }],
+        },
+        run({ tripId: TRIP_ID }, SCHED_DEP_MS / 1000 + 6 * 60),
+      ];
+      expect(
+        computeLiveTripStatus({ reg: { ...REG, originStartTime: "08:10" }, updates, now: SCHED_DEP_MS }),
+      ).toBeNull();
+      expect(
+        computeLiveTripStatus({ reg: regWithId, updates, now: SCHED_DEP_MS })!.delayMinutes,
+      ).toBe(6);
+    });
+
+    it("falls back to the origin time when the registration has no trip id (older app builds)", () => {
+      const status = computeLiveTripStatus({
+        reg: { ...REG, originStartTime: "08:10" },
+        updates: [run({ tripId: TRIP_ID }, SCHED_DEP_MS / 1000 + 3 * 60)],
+        now: SCHED_DEP_MS,
+      });
+      expect(status!.delayMinutes).toBe(3);
+    });
+
+    it("falls back to the origin time when the feed update carries no trip id", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithId,
+        updates: [run({}, SCHED_DEP_MS / 1000 + 3 * 60)],
+        now: SCHED_DEP_MS,
+      });
+      expect(status!.delayMinutes).toBe(3);
+    });
+
+    it("falls back to the origin time, not a closer boarding match, when the id is stale", () => {
+      // 511 republished under new ids. An earlier run's boarding departure sits
+      // exactly on the scheduled instant, so a boarding-stop fallback would take
+      // it (delay 0); the origin time finds the registered run (+4).
+      const updates: FeedTripUpdate[] = [
+        run({ tripId: "t_earlier_run", startTime: "07:40:00" }, SCHED_DEP_MS / 1000),
+        run({ tripId: "t_regenerated" }, SCHED_DEP_MS / 1000 + 4 * 60),
+      ];
+      expect(
+        computeLiveTripStatus({ reg: regWithId, updates, now: SCHED_DEP_MS })!.delayMinutes,
+      ).toBe(4);
+    });
+
+    it("does not match the trip id on another service day", () => {
+      const updates: FeedTripUpdate[] = [
+        run(
+          { tripId: TRIP_ID, startDate: "20260608", startTime: "07:40:00" },
+          SCHED_DEP_MS / 1000 + 30 * 60,
+        ),
+        run({ tripId: "t_today" }, SCHED_DEP_MS / 1000 + 3 * 60),
+      ];
+      expect(
+        computeLiveTripStatus({ reg: regWithId, updates, now: SCHED_DEP_MS })!.delayMinutes,
+      ).toBe(3);
+    });
+
+    it("matches the trip id when the feed omits the service day", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithId,
+        updates: [
+          run({ tripId: TRIP_ID, startDate: undefined, startTime: "08:11:00" }, SCHED_DEP_MS / 1000 + 5 * 60),
+        ],
+        now: SCHED_DEP_MS,
+      });
+      expect(status!.delayMinutes).toBe(5);
+    });
+
+    it("flags a run cancelled by trip id after its stops and start time were dropped", () => {
+      const status = computeLiveTripStatus({
+        reg: regWithId,
+        updates: [{ tripId: TRIP_ID, scheduleRelationship: "CANCELED", stopTimeUpdates: [] }],
+        now: SCHED_DEP_MS - 60_000,
+      });
+      expect(status!.isCanceled).toBe(true);
+      expect(status!.departureEpochMs).toBe(SCHED_DEP_MS);
+    });
+  });
+
   describe("cancelled-without-stop-updates fallback", () => {
     const CANCELED_NO_STOPS: FeedTripUpdate[] = [
       { scheduleRelationship: "CANCELED", startTime: "08:10:00", stopTimeUpdates: [] },
@@ -593,5 +704,33 @@ describe("vehicleShortOfDestinationForReg", () => {
         NOW,
       ),
     ).toBe(false); // opposite direction
+  });
+
+  it("matches by trip id when the start time drifted or the registration has no origin time", () => {
+    const drifted = vp({
+      trip: { tripId: "t_A", startTime: "08:31:15", startDate: "20260609", directionId: 1 },
+    });
+    expect(vehicleShortOfDestinationForReg(drifted, { ...regWithOrigin, tripId: "t_A" }, NOW)).toBe(
+      true,
+    );
+    expect(vehicleShortOfDestinationForReg(drifted, { ...REG, tripId: "t_A" }, NOW)).toBe(true);
+  });
+
+  it("falls back to the origin time when the vehicle's trip id differs", () => {
+    const reg = { ...regWithOrigin, tripId: "t_A" };
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { tripId: "t_B", startTime: "08:30:15", startDate: "20260609", directionId: 1 } }),
+        reg,
+        NOW,
+      ),
+    ).toBe(true);
+    expect(
+      vehicleShortOfDestinationForReg(
+        vp({ trip: { tripId: "t_A", startTime: "09:30:15", startDate: "20260608", directionId: 1 } }),
+        reg,
+        NOW,
+      ),
+    ).toBe(false); // same id on another day, different start time
   });
 });

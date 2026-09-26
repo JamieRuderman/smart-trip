@@ -29,10 +29,14 @@ export interface FeedStopTimeUpdate {
   scheduleRelationship?: string;
 }
 export interface FeedTripUpdate {
+  /** GTFS `trip_id` — the first match key against a registration's `tripId`. */
+  tripId?: string;
   scheduleRelationship?: string;
   /** Trip's scheduled origin departure, "HH:MM:SS" — the cancellation
    *  fallback's match key (cancelled runs often lose their stop updates). */
   startTime?: string;
+  /** Service day, "YYYYMMDD" — keeps a trip id from matching another day's run. */
+  startDate?: string;
   stopTimeUpdates: FeedStopTimeUpdate[];
 }
 
@@ -40,6 +44,7 @@ export interface FeedTripUpdate {
  *  `getVehiclePositions` returns / `/api/gtfsrt/vehiclepositions` serves). */
 export interface FeedVehicle {
   trip?: {
+    tripId?: string; // GTFS trip_id; "" when the vehicle report omits it
     startTime: string; // "HH:MM:SS" scheduled origin departure
     startDate: string; // "YYYYMMDD"
     directionId: number; // 0 = southbound, 1 = northbound
@@ -62,6 +67,19 @@ const STATION_INDEX: Record<string, number> = Object.fromEntries(
   STATION_ORDER.map((s, i) => [s, i]),
 );
 
+/** Whether a feed trip is `reg`'s run by GTFS trip id. A trip without a
+ *  `startDate` is accepted; one with it must be the registration's service day. */
+function matchesRegisteredTripId(
+  trip: { tripId?: string; startDate?: string },
+  reg: LiveActivityRegistration,
+): boolean {
+  return (
+    reg.tripId != null &&
+    trip.tripId === reg.tripId &&
+    (!trip.startDate || trip.startDate === reg.serviceDate.replace(/-/g, ""))
+  );
+}
+
 /**
  * Whether the registration's own train is demonstrably still short of the
  * rider's destination per the vehicle-positions feed — the server analog of
@@ -80,7 +98,7 @@ export function vehicleShortOfDestinationForReg(
   reg: LiveActivityRegistration,
   nowMs: number,
 ): boolean {
-  if (!vp || !reg.originStartTime) return false;
+  if (!vp || (!reg.originStartTime && !reg.tripId)) return false;
   const nowSec = Math.floor(nowMs / 1000);
   if (vp.timestamp > 0 && nowSec - vp.timestamp > VEHICLE_FEED_STALE_SECONDS) {
     return false;
@@ -92,9 +110,12 @@ export function vehicleShortOfDestinationForReg(
 
   for (const v of vp.vehicles) {
     if (!v.trip || !v.stopId) continue;
-    if (v.trip.startTime.slice(0, 5) !== reg.originStartTime) continue;
-    if (v.trip.startDate !== startDate) continue;
-    if (v.trip.directionId !== directionId) continue;
+    const sameRun =
+      matchesRegisteredTripId(v.trip, reg) ||
+      (v.trip.startTime.slice(0, 5) === reg.originStartTime &&
+        v.trip.startDate === startDate &&
+        v.trip.directionId === directionId);
+    if (!sameRun) continue;
     if (v.timestamp != null && nowSec - v.timestamp > VEHICLE_STALE_SECONDS) {
       return false;
     }
@@ -163,19 +184,24 @@ function resolveStation(
  * trip can't be located (no live data — the cron leaves the countdown as-is).
  *
  * Match priority:
- *  1. **Origin start time** — the trip-level `startTime` (== `reg.originStartTime`)
- *     uniquely identifies the run and survives stop-pruning, so it is preferred.
- *     A station-based match alone can lock onto a DIFFERENT run that shares the
- *     boarding station within the window — SMART headways put the next train
- *     well inside the 2h window, which would yield a wildly wrong delay. From
- *     the identified run we take the live boarding departure if that stop is
- *     still present (pre-/at-departure), else the destination's live arrival
- *     (en route, after 511 prunes the boarding stop) — the latter is what keeps
- *     the locked-screen countdown correctable once the train has left.
- *  2. **Boarding stop** — only when the registration carries no origin time:
+ *  1. **GTFS trip id** — an exact `trip_id` match on the registration's service
+ *     day. The registration's id comes from the static schedule, which can name
+ *     a different trip than the one 511 runs that day (de-duplicated rows, feed
+ *     republishes), so a miss falls through to the origin time.
+ *  2. **Origin start time** — the trip-level `startTime` (== `reg.originStartTime`)
+ *     identifies the run and survives stop-pruning, so it is preferred over the
+ *     boarding stop. A station-based match alone can lock onto a DIFFERENT run
+ *     that shares the boarding station within the window — SMART headways put
+ *     the next train well inside the 2h window, which would yield a wildly wrong
+ *     delay. From the identified run (by id or origin time) we take the live
+ *     boarding departure if that stop is still present (pre-/at-departure), else
+ *     the destination's live arrival (en route, after 511 prunes the boarding
+ *     stop) — the latter is what keeps the locked-screen countdown correctable
+ *     once the train has left.
+ *  3. **Boarding stop** — only when the registration carries no origin time:
  *     match the live departure at `fromStation` closest to scheduled, in window.
  *
- * When neither locates the run, it has either not appeared yet or — once its
+ * When none locates the run, it has either not appeared yet or — once its
  * scheduled arrival is past — finished and been pruned from the feed. In the
  * latter case a terminal `ended` status is synthesized from the registration so
  * the cron can dismiss the activity instead of leaving the countdown frozen at
@@ -222,7 +248,11 @@ function matchLiveTripStatus(
   updates: FeedTripUpdate[],
   now: number,
 ): LiveTripStatus | null {
-  // 1. Precise identity by origin start time.
+  // 1. Exact identity by GTFS trip id.
+  const byTripId = updates.find((u) => matchesRegisteredTripId(u, reg));
+  if (byTripId) return statusFromTrip(reg, byTripId, now);
+
+  // 2. Precise identity by origin start time.
   if (reg.originStartTime) {
     const match = updates.find(
       (u) => u.startTime?.slice(0, 5) === reg.originStartTime,
@@ -230,7 +260,7 @@ function matchLiveTripStatus(
     return match ? statusFromTrip(reg, match, now) : null;
   }
 
-  // 2. No origin time on the registration: match by the boarding stop's live
+  // 3. No origin time on the registration: match by the boarding stop's live
   //    departure, closest to scheduled within a window.
   let best: { update: FeedTripUpdate; from: FeedStopTimeUpdate; distance: number } | null =
     null;
@@ -249,7 +279,7 @@ function matchLiveTripStatus(
 }
 
 /**
- * Derive status from the run already identified by its origin start time:
+ * Derive status from the run already identified by its trip id or origin start time:
  *  - boarding stop still present → its live departure gives the precise delay
  *    (the pre-/at-departure case);
  *  - boarding pruned but destination present → the destination's live arrival

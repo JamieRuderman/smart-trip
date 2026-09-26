@@ -4,8 +4,8 @@
  * boot/foreground reconcile, and reminder (leave-alarm) scheduling.
  *
  * These are plain module functions (no React) extracted from `useFocusedTrip`
- * so the hook stays a thin state wrapper. The per-activity dedup maps
- * (`lastSentActivityContent`, `lastSentRegistration`) live here and are private
+ * so the hook stays a thin state wrapper. The per-activity dedup state
+ * (`lastSentActivityContent`, `registrationWriter`) lives here and is private
  * to this module, shared by the start/refresh/sync paths.
  */
 import {
@@ -47,6 +47,7 @@ import {
   registerPushActivity,
   startAndRegisterPushActivity,
 } from "@/lib/native/liveActivityPush";
+import { createDedupedWriter } from "@/lib/dedupedWriter";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
@@ -107,32 +108,27 @@ function sameFocusIdentity(
  *  when the sync effect re-fires with unchanged data (RT poll, clock ticks). */
 const lastSentActivityContent = new Map<string, string>();
 
-/** Last registration POSTed per activity id — only refreshed on a confirmed-OK
- *  POST, so a failed attempt isn't cached and re-registration retries on the
- *  next trigger. Keeps the self-healing re-register (below) from spamming the
- *  backend with identical payloads on every drift/delay sync tick. */
-const lastSentRegistration = new Map<string, string>();
+/**
+ * Registration POSTs, deduped + serialized per activity id. Three independent
+ * triggers re-assert the same payload (boot reconcile, the arm path, every
+ * drift/delay content sync), and the backend bakes the armed reminder's lead
+ * into each locked-screen push — so it MUST hold the current lead or a delay
+ * push drops the "Leave in" stage. This is the safety net that re-asserts it
+ * when the arm-time POST was lost (offline) or raced the activity-id commit.
+ *
+ * {@link createDedupedWriter} collapses identical concurrent POSTs into one (a
+ * cold start used to send the same registration twice) and chains a changed
+ * payload behind the in-flight one, so a re-armed lead can't be clobbered by an
+ * older POST landing second.
+ */
+const registrationWriter = createDedupedWriter<LiveActivityRegistration>(
+  (registration) => registerPushActivity(registration),
+);
 
-/** Registration POST still in flight per activity id. A deregistration waits for
- *  it: the backend re-creates a registration whose POST it handles after the DELETE. */
-const pendingRegistration = new Map<string, Promise<boolean>>();
-
-/** (Re-)POST a registration only when it differs from the last one the backend
- *  accepted for this activity. The backend bakes the armed reminder's lead into
- *  every locked-screen push, so it MUST hold the current lead or a delay push
- *  drops the "Leave in" stage — this is the safety net that re-asserts the lead
- *  if the arm-time POST was lost (offline) or raced the activity-id commit. */
 async function postRegistrationDeduped(
   registration: LiveActivityRegistration,
 ): Promise<void> {
-  const { id } = registration;
-  const json = JSON.stringify(registration);
-  if (lastSentRegistration.get(id) === json) return;
-  const post = registerPushActivity(registration);
-  pendingRegistration.set(id, post);
-  const accepted = await post;
-  if (pendingRegistration.get(id) === post) pendingRegistration.delete(id);
-  if (accepted) lastSentRegistration.set(id, json);
+  await registrationWriter.write(registration.id, registration);
 }
 
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
@@ -147,10 +143,10 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
 /** Drop what was last sent to `id` and deregister it from the push backend. */
 async function forgetActivity(id: string): Promise<void> {
   lastSentActivityContent.delete(id);
-  lastSentRegistration.delete(id);
-  if (!isLiveActivityPushEnabled()) return;
-  await pendingRegistration.get(id);
-  await deregisterPushActivity(id);
+  // The backend re-creates a registration whose POST it handles after the DELETE.
+  await registrationWriter.settled(id);
+  registrationWriter.forget(id);
+  if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
 }
 
 /**
@@ -327,7 +323,7 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
 
 /**
  * Hand the focus's Live Activity to iOS with a FUTURE start date, so the OS
- * brings it up an hour before it's time to leave — with the app closed, which is
+ * brings it up half an hour before it's time to leave — with the app closed, which is
  * the normal case for a trip pinned in the morning for an evening train.
  *
  * ActivityKit's scheduled start is iOS 26+; below it `scheduleTripActivity`

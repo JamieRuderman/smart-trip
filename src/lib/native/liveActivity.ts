@@ -301,14 +301,15 @@ export interface TripActivityRecord {
 /** Known activities (with lifecycle state) the OS still tracks — for boot /
  *  foreground reconciliation: end orphans, and tell an `ended` activity (one we
  *  scheduled to auto-dismiss after arrival) apart from a live one. `[]`
- *  off-iOS/error. */
-export async function listTripActivityRecords(): Promise<TripActivityRecord[]> {
+ *  off-iOS; `null` when the plugin call fails, so callers never mistake a failed
+ *  read for "no activities" and replace a healthy one. */
+export async function listTripActivityRecords(): Promise<TripActivityRecord[] | null> {
   if (Capacitor.getPlatform() !== "ios") return [];
   try {
     const { items } = await LiveActivity.listActivities();
     return items.map((i) => ({ id: i.id, state: i.state }));
   } catch (error) {
     logger.warn("LiveActivity.listActivities failed", error);
-    return [];
+    return null;
   }
 }

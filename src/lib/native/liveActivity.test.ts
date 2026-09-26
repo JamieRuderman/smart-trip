@@ -73,6 +73,7 @@ const ATTRS: TripActivityAttributes = {
   toStation: "B",
   routeName: "SMART",
   direction: "southbound",
+  timelineStartEpochMs: NOW,
 };
 
 function content(over: Partial<TripActivityContentState> = {}): TripActivityContentState {
@@ -256,6 +257,7 @@ describe("scheduleTripActivity", () => {
     toStation: "Larkspur",
     routeName: "SMART",
     direction: "southbound",
+    timelineStartEpochMs: NOW,
   };
   const content = buildContentState({
     departureEpochMs: DEP,
@@ -407,6 +409,7 @@ describe("encodeAttributes / encodeContentState", () => {
       toStation: "B",
       routeName: "SMART",
       direction: "southbound",
+      timelineStartEpochMs: String(NOW),
     });
   });
   it("serializes content state, mapping null → empty string", () => {
@@ -592,8 +595,8 @@ describe("listTripActivityRecords", () => {
     await expect(listTripActivityRecords()).resolves.toEqual([]);
     expect(listActivities).not.toHaveBeenCalled();
   });
-  it("returns [] when the plugin throws", async () => {
+  it("returns null when the plugin throws", async () => {
     listActivities.mockRejectedValue(new Error("boom"));
-    await expect(listTripActivityRecords()).resolves.toEqual([]);
+    await expect(listTripActivityRecords()).resolves.toBeNull();
   });
 });

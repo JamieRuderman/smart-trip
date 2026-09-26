@@ -25,6 +25,9 @@ export interface TripActivityAttributes {
   /** Display route/line label, e.g. "SMART". */
   routeName: string;
   direction: "northbound" | "southbound";
+  /** Immutable instant the activity first becomes visible; the widget sizes
+   *  the alarm leg of its progress track from it. */
+  timelineStartEpochMs: number;
 }
 
 /** Before departure the headline counts down to departure; once departed it
@@ -297,6 +300,7 @@ export function encodeAttributes(
     toStation: a.toStation,
     routeName: a.routeName,
     direction: a.direction,
+    timelineStartEpochMs: String(a.timelineStartEpochMs),
   };
 }
 

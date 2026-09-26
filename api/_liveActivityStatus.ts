@@ -67,16 +67,22 @@ const STATION_INDEX: Record<string, number> = Object.fromEntries(
   STATION_ORDER.map((s, i) => [s, i]),
 );
 
-/** Whether a feed trip is `reg`'s run by GTFS trip id. A trip without a
- *  `startDate` is accepted; one with it must be the registration's service day. */
-function matchesRegisteredTripId(
+/** The registration's service day as a GTFS-RT `startDate`, "YYYYMMDD". */
+function gtfsServiceDay(reg: LiveActivityRegistration): string {
+  return reg.serviceDate.replace(/-/g, "");
+}
+
+/** Whether a feed trip is the run with `tripId`. A trip without a `startDate`
+ *  is accepted; one with it must be `serviceDay`. */
+function matchesTripId(
   trip: { tripId?: string; startDate?: string },
-  reg: LiveActivityRegistration,
+  tripId: string | undefined,
+  serviceDay: string,
 ): boolean {
   return (
-    reg.tripId != null &&
-    trip.tripId === reg.tripId &&
-    (!trip.startDate || trip.startDate === reg.serviceDate.replace(/-/g, ""))
+    tripId != null &&
+    trip.tripId === tripId &&
+    (!trip.startDate || trip.startDate === serviceDay)
   );
 }
 
@@ -103,7 +109,7 @@ export function vehicleShortOfDestinationForReg(
   if (vp.timestamp > 0 && nowSec - vp.timestamp > VEHICLE_FEED_STALE_SECONDS) {
     return false;
   }
-  const startDate = reg.serviceDate.replace(/-/g, "");
+  const startDate = gtfsServiceDay(reg);
   const directionId = reg.direction === "southbound" ? 0 : 1;
   const toIdx = STATION_INDEX[reg.toStation];
   if (toIdx == null) return false;
@@ -111,7 +117,7 @@ export function vehicleShortOfDestinationForReg(
   for (const v of vp.vehicles) {
     if (!v.trip || !v.stopId) continue;
     const sameRun =
-      matchesRegisteredTripId(v.trip, reg) ||
+      matchesTripId(v.trip, reg.tripId, startDate) ||
       (v.trip.startTime.slice(0, 5) === reg.originStartTime &&
         v.trip.startDate === startDate &&
         v.trip.directionId === directionId);
@@ -249,7 +255,8 @@ function matchLiveTripStatus(
   now: number,
 ): LiveTripStatus | null {
   // 1. Exact identity by GTFS trip id.
-  const byTripId = updates.find((u) => matchesRegisteredTripId(u, reg));
+  const serviceDay = gtfsServiceDay(reg);
+  const byTripId = updates.find((u) => matchesTripId(u, reg.tripId, serviceDay));
   if (byTripId) return statusFromTrip(reg, byTripId, now);
 
   // 2. Precise identity by origin start time.

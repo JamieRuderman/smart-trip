@@ -62,8 +62,7 @@ import {
 } from "@/lib/liveActivityController";
 import { LIVE_ACTIVITY_LEAD_MS } from "@/lib/liveActivityContent";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
-import type { FocusedTrip } from "@/lib/focusedTrip";
+import { reconstructFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
 
 const FOCUS: FocusedTrip = {
   source: "user",
@@ -233,9 +232,7 @@ describe("push registration", () => {
   it("carries the static schedule's GTFS trip id alongside the origin time", async () => {
     isLiveActivityPushEnabled.mockReturnValue(true);
     await ensureActivityForFocus(FOCUS);
-    const trip = getFilteredTrips(FOCUS.fromStation, FOCUS.toStation, FOCUS.scheduleType).find(
-      (t) => t.trip === FOCUS.tripNumber,
-    );
+    const trip = reconstructFocusedTrip(FOCUS);
     expect(trip?.tripId).toBeTruthy();
     expect(startAndRegisterPushActivity).toHaveBeenCalledWith(
       expect.objectContaining({ tripId: trip!.tripId, originStartTime: expect.any(String) }),

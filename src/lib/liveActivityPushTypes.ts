@@ -52,10 +52,8 @@ export interface LiveActivityRegistration {
    *  stop_time_updates were omitted (511 does that). Optional: absent when
    *  the origin time isn't present in the static timetable. */
   originStartTime?: string;
-  /** GTFS `trip_id` of the run in the static schedule — the server's first,
-   *  exact match against the feed's `trip_id`. Optional: older app builds and
-   *  schedule payloads don't carry it, and it can differ from the id 511 runs
-   *  that day, so the server falls back to `originStartTime` on a miss. */
+  /** GTFS `trip_id` from the static schedule — the server's first match key.
+   *  Optional: absent from older app builds and cached schedule payloads. */
   tripId?: string;
   /** Lead minutes of the armed "leave alarm" reminder, when one is set. The
    *  server derives the leave-alarm countdown instant as `liveDeparture - lead`

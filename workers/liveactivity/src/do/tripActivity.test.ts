@@ -31,20 +31,28 @@ const REG: LiveActivityRegistration = {
 };
 
 /** Pre-/at-departure: boarding stop present at `liveDep` (unix seconds). */
-const boardingFeed = (liveDepUnix: number): FeedTripUpdate[] => [
+const boardingFeed = (
+  liveDepUnix: number,
+  trip: Partial<FeedTripUpdate> = {},
+): FeedTripUpdate[] => [
   {
     scheduleRelationship: "SCHEDULED",
     startTime: "08:10:00",
     stopTimeUpdates: [{ stopId: FROM_STOP, departureTime: liveDepUnix }],
+    ...trip,
   },
 ];
 
 /** En route: boarding pruned, destination present at `liveArr` (unix seconds). */
-const enRouteFeed = (liveArrUnix: number): FeedTripUpdate[] => [
+const enRouteFeed = (
+  liveArrUnix: number,
+  trip: Partial<FeedTripUpdate> = {},
+): FeedTripUpdate[] => [
   {
     scheduleRelationship: "SCHEDULED",
     startTime: "08:10:00",
     stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: liveArrUnix }],
+    ...trip,
   },
 ];
 
@@ -419,32 +427,17 @@ describe("planTick trip id matching", () => {
   const TRIP_ID = "t_6153517_b_86615_tn_0";
   const REG_WITH_ID: LiveActivityRegistration = { ...REG, tripId: TRIP_ID };
   const PRE_DEPARTURE_NOW = SCHED_DEP_MS - 20 * 60_000;
-  /** A run on the registration's service day, live at the boarding stop. */
-  const boardingRun = (
-    tripId: string | undefined,
-    startTime: string,
-    liveDepMs: number,
-  ): FeedTripUpdate => ({
-    ...(tripId ? { tripId } : {}),
-    scheduleRelationship: "SCHEDULED",
-    startTime,
-    startDate: "20260622",
-    stopTimeUpdates: [{ stopId: FROM_STOP, departureTime: liveDepMs / 1000 }],
-  });
+  const SERVICE_DAY = { startDate: "20260622" };
   const tick = (reg: LiveActivityRegistration, updates: FeedTripUpdate[], now: number) =>
     planTick({ reg, token: "tok", lastSent: PRE_DEPARTURE_SENT, updates, now });
 
   it("corrects the en-route arrival of the run matched by trip id when its start time drifted", () => {
     const liveArr = SCHED_ARR_MS + 6 * 60_000;
-    const updates: FeedTripUpdate[] = [
-      {
-        tripId: TRIP_ID,
-        scheduleRelationship: "SCHEDULED",
-        startTime: "08:11:00",
-        startDate: "20260622",
-        stopTimeUpdates: [{ stopId: TO_STOP, arrivalTime: liveArr / 1000 }],
-      },
-    ];
+    const updates = enRouteFeed(liveArr / 1000, {
+      ...SERVICE_DAY,
+      tripId: TRIP_ID,
+      startTime: "08:11:00",
+    });
     const now = SCHED_DEP_MS + 10 * 60_000;
     const plan = tick(REG_WITH_ID, updates, now);
     expect(plan.push?.event).toBe("update");
@@ -458,13 +451,13 @@ describe("planTick trip id matching", () => {
   });
 
   it("falls back to the origin time when either side lacks a trip id", () => {
-    const liveDep = SCHED_DEP_MS + 5 * 60_000;
+    const liveDepUnix = SCHED_DEP_MS / 1000 + 5 * 60;
     expect(
-      tick(REG, [boardingRun(TRIP_ID, "08:10:00", liveDep)], PRE_DEPARTURE_NOW).lastSent
-        ?.delayMinutes,
+      tick(REG, boardingFeed(liveDepUnix, { ...SERVICE_DAY, tripId: TRIP_ID }), PRE_DEPARTURE_NOW)
+        .lastSent?.delayMinutes,
     ).toBe(5);
     expect(
-      tick(REG_WITH_ID, [boardingRun(undefined, "08:10:00", liveDep)], PRE_DEPARTURE_NOW).lastSent
+      tick(REG_WITH_ID, boardingFeed(liveDepUnix, SERVICE_DAY), PRE_DEPARTURE_NOW).lastSent
         ?.delayMinutes,
     ).toBe(5);
   });
@@ -475,8 +468,12 @@ describe("planTick trip id matching", () => {
     const plan = tick(
       REG_WITH_ID,
       [
-        boardingRun("t_earlier_run", "07:40:00", SCHED_DEP_MS),
-        boardingRun("t_regenerated", "08:10:00", SCHED_DEP_MS + 7 * 60_000),
+        ...boardingFeed(SCHED_DEP_MS / 1000, {
+          ...SERVICE_DAY,
+          tripId: "t_earlier_run",
+          startTime: "07:40:00",
+        }),
+        ...boardingFeed(SCHED_DEP_MS / 1000 + 7 * 60, { ...SERVICE_DAY, tripId: "t_regenerated" }),
       ],
       PRE_DEPARTURE_NOW,
     );

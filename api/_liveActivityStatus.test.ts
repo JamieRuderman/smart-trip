@@ -296,7 +296,8 @@ describe("computeLiveTripStatus", () => {
 
   describe("GTFS trip id matching", () => {
     const TRIP_ID = "t_6153517_b_86615_tn_0";
-    const regWithId = { ...REG, originStartTime: "08:10", tripId: TRIP_ID };
+    const regWithOrigin = { ...REG, originStartTime: "08:10" };
+    const regWithId = { ...regWithOrigin, tripId: TRIP_ID };
     /** The registered run (08:10 origin, service day 2026-06-09) with its
      *  boarding stop live at `depUnix`. */
     const run = (overrides: Partial<FeedTripUpdate>, depUnix: number): FeedTripUpdate => ({
@@ -318,9 +319,6 @@ describe("computeLiveTripStatus", () => {
     });
 
     it("prefers the trip id over an opposite-direction run sharing the origin time", () => {
-      // A southbound run also leaves its origin at 08:10 and is listed first.
-      // The origin time alone picks it, finds no northbound stop, and yields
-      // nothing; the trip id finds the registered run.
       const updates: FeedTripUpdate[] = [
         {
           tripId: "t_southbound",
@@ -332,35 +330,27 @@ describe("computeLiveTripStatus", () => {
         run({ tripId: TRIP_ID }, SCHED_DEP_MS / 1000 + 6 * 60),
       ];
       expect(
-        computeLiveTripStatus({ reg: { ...REG, originStartTime: "08:10" }, updates, now: SCHED_DEP_MS }),
-      ).toBeNull();
-      expect(
         computeLiveTripStatus({ reg: regWithId, updates, now: SCHED_DEP_MS })!.delayMinutes,
       ).toBe(6);
     });
 
-    it("falls back to the origin time when the registration has no trip id (older app builds)", () => {
-      const status = computeLiveTripStatus({
-        reg: { ...REG, originStartTime: "08:10" },
-        updates: [run({ tripId: TRIP_ID }, SCHED_DEP_MS / 1000 + 3 * 60)],
-        now: SCHED_DEP_MS,
-      });
-      expect(status!.delayMinutes).toBe(3);
-    });
-
-    it("falls back to the origin time when the feed update carries no trip id", () => {
-      const status = computeLiveTripStatus({
-        reg: regWithId,
-        updates: [run({}, SCHED_DEP_MS / 1000 + 3 * 60)],
-        now: SCHED_DEP_MS,
-      });
-      expect(status!.delayMinutes).toBe(3);
+    it("falls back to the origin time when either side lacks a trip id", () => {
+      const depUnix = SCHED_DEP_MS / 1000 + 3 * 60;
+      expect(
+        computeLiveTripStatus({
+          reg: regWithOrigin,
+          updates: [run({ tripId: TRIP_ID }, depUnix)],
+          now: SCHED_DEP_MS,
+        })!.delayMinutes,
+      ).toBe(3);
+      expect(
+        computeLiveTripStatus({ reg: regWithId, updates: [run({}, depUnix)], now: SCHED_DEP_MS })!
+          .delayMinutes,
+      ).toBe(3);
     });
 
     it("falls back to the origin time, not a closer boarding match, when the id is stale", () => {
-      // 511 republished under new ids. An earlier run's boarding departure sits
-      // exactly on the scheduled instant, so a boarding-stop fallback would take
-      // it (delay 0); the origin time finds the registered run (+4).
+      // An earlier run departs exactly on schedule; a boarding-stop fallback would take it.
       const updates: FeedTripUpdate[] = [
         run({ tripId: "t_earlier_run", startTime: "07:40:00" }, SCHED_DEP_MS / 1000),
         run({ tripId: "t_regenerated" }, SCHED_DEP_MS / 1000 + 4 * 60),

@@ -235,13 +235,14 @@ function buildRegistrationForFocus(
  * only at activity start — but a reminder is armed/cleared/changed AFTER focus,
  * and the server bakes the leave-alarm countdown into every push from the
  * registered lead, so it must be refreshed whenever that lead changes. Idempotent
- * upsert keyed on the activity id; no-op off push builds or before an activity
- * has committed its id (the start path registers with the reminder included).
+ * upsert keyed on the activity id; no-op off push builds, before an activity
+ * has committed its id (the start path registers with the reminder included),
+ * or once the user has dismissed it.
  */
 export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void> {
   if (!isLiveActivityPushEnabled()) return;
   const id = focused.liveActivityId;
-  if (!id) return;
+  if (!id || focused.liveActivityDismissed) return;
   const registration = buildRegistrationForFocus(focused, id);
   if (registration) await postRegistrationDeduped(registration);
 }
@@ -437,7 +438,7 @@ async function sendActivityContent(
   content: TripActivityContentState,
 ): Promise<void> {
   const id = focused.liveActivityId;
-  if (!id) return;
+  if (!id || focused.liveActivityDismissed) return;
   const scheduledFor = focused.liveActivityScheduledFor;
   if (scheduledFor != null && Date.now() < scheduledFor) return;
   const json = JSON.stringify(content);
@@ -477,12 +478,23 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
 
 const COMMITTED_ACTIVITY_GRACE_MS = 2 * 60_000;
 
-/** Remember that the focus's activity was dismissed, so a later reconcile doesn't
- *  respawn it once ActivityKit purges the record. Ignores other activities. */
-function noteActivityDismissed(id: string): void {
-  const focused = loadFocusedTrip();
-  if (focused?.liveActivityId !== id || focused.liveActivityDismissed) return;
-  saveFocusedTrip({ ...focused, liveActivityDismissed: true });
+/** Remember that `records` lists the focus's activity as dismissed, so a later
+ *  reconcile doesn't respawn it once ActivityKit purges the record, and
+ *  deregister it so the backend stops pushing to it. Returns the focus with the
+ *  dismissal applied. */
+async function noteActivityDismissed(
+  focused: FocusedTrip,
+  records: TripActivityRecord[],
+): Promise<FocusedTrip> {
+  const id = focused.liveActivityId;
+  if (id == null || focused.liveActivityDismissed) return focused;
+  if (!records.some((r) => r.id === id && r.state === "dismissed")) return focused;
+  const latest = loadFocusedTrip();
+  if (latest?.liveActivityId === id && !latest.liveActivityDismissed) {
+    saveFocusedTrip({ ...latest, liveActivityDismissed: true });
+    if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
+  }
+  return { ...focused, liveActivityDismissed: true };
 }
 
 /**
@@ -520,7 +532,6 @@ async function startOrReviveActivity(
       await replaceFocusActivity(focused);
       return true;
     }
-    if (kept.state === "dismissed") noteActivityDismissed(keep);
     // Push builds never schedule the local auto-dismiss (the cron ends the
     // activity server-side at live arrival), so there an `ended` activity is a
     // deliberate end — leave it be rather than resurrect it.
@@ -567,8 +578,9 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
   }
   // Revive/start when nothing live covers the focus; otherwise push current
   // content so a just-armed reminder's alarm stage shows immediately.
-  if (!(await startOrReviveActivity(focused, records))) {
-    await refreshActivityContent(focused);
+  const current = await noteActivityDismissed(focused, records);
+  if (!(await startOrReviveActivity(current, records))) {
+    await refreshActivityContent(current);
   }
 }
 
@@ -582,7 +594,7 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * disabled when the trip was focused and enabled since) gets a fresh start —
  * `startActivityForFocus` re-gates internally, so attempting every boot is
  * safe. A user-dismissed activity is NOT respawned: the dismissal is recorded
- * on the focus (`liveActivityDismissed`), which skips the heal. Instant no-op
+ * on the focus (`liveActivityDismissed`), which skips both heals. Instant no-op
  * off-iOS.
  * Call alongside `bootFocusedTrip`.
  */
@@ -628,6 +640,7 @@ export async function reconcileTripActivities(): Promise<void> {
   await Promise.all(
     records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
+  if (focused) focused = await noteActivityDismissed(focused, records);
   // (Re)start or revive the focus's activity if nothing live is on screen for
   // it (never started, frozen by the background auto-dismiss, or gone from the
   // OS inventory).
@@ -638,7 +651,7 @@ export async function reconcileTripActivities(): Promise<void> {
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and
   // refreshes the server-side TTLs), so re-POST on every boot.
-  if (focused && keep && isLiveActivityPushEnabled()) {
+  if (focused && keep && !focused.liveActivityDismissed && isLiveActivityPushEnabled()) {
     const registration = buildRegistrationForFocus(focused, keep);
     if (registration) await postRegistrationDeduped(registration);
   }
@@ -747,7 +760,7 @@ export async function syncFocusedActivityContent(args: {
 }): Promise<void> {
   const current = loadFocusedTrip();
   const id = current?.liveActivityId;
-  if (!current || !id) return;
+  if (!current || !id || current.liveActivityDismissed) return;
   // Self-heal the push registration alongside the content sync: this fires
   // exactly when a leave-in is at risk (delay/phase/reminder change, and the
   // first time the activity id commits), so re-asserting the armed reminder's

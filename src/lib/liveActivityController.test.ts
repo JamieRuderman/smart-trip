@@ -401,6 +401,15 @@ describe("focus switching", () => {
       expect(seen.every((s) => s.focus != null)).toBe(true);
     });
 
+    it("dispatches every teardown call before yielding", async () => {
+      stored = PREV;
+      const replacing = replaceFocus(NEXT);
+      expect(cancelNotification).toHaveBeenCalledWith(505);
+      expect(cancelLeaveAlarm).toHaveBeenCalledWith("alarm-5");
+      expect(endTripActivity).toHaveBeenCalledWith(PREV_ID);
+      await replacing;
+    });
+
     it("starts the new activity only after the previous one is ended", async () => {
       stored = PREV;
       await replaceFocus(NEXT);

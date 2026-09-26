@@ -62,13 +62,17 @@ export function notifyChange(): void {
 
 /** Cancel both channels a reminder might own — the local notification and, if
  *  it was scheduled as a true Leave Alarm, the AlarmKit alarm. Cancelling the
- *  channel that wasn't used is a harmless no-op. */
+ *  channel that wasn't used is a harmless no-op. Both are dispatched before the
+ *  first await: {@link replaceFocus} has already overwritten the only stored
+ *  alarm id, so a suspension mid-teardown must not strand the alarm. */
 export async function cancelReminderChannels(
   reminder: FocusedTripReminder | null,
 ): Promise<void> {
   if (!reminder) return;
-  await cancelNotification(reminder.notificationId);
-  if (reminder.alarmId) await cancelLeaveAlarm(reminder.alarmId);
+  await Promise.all([
+    cancelNotification(reminder.notificationId),
+    reminder.alarmId ? cancelLeaveAlarm(reminder.alarmId) : undefined,
+  ]);
 }
 
 /** Web-fire cleanup: stamp the reminder as fired (keeps the focus + lead so the
@@ -175,8 +179,7 @@ export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   if (prev?.liveActivityId) retiredActivityIds.add(prev.liveActivityId);
   saveFocusedTrip(next);
   notifyChange();
-  await cancelReminderChannels(prev?.reminder ?? null);
-  await endFocusActivity(prev);
+  await Promise.all([cancelReminderChannels(prev?.reminder ?? null), endFocusActivity(prev)]);
   await serializeStart(async () => {
     const latest = loadFocusedTrip();
     if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {

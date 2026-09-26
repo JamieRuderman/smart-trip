@@ -72,6 +72,8 @@ const FOCUS: FocusedTrip = {
   reminder: null,
 };
 const ID = "trip-7-2026-06-09-committed";
+const sync = () =>
+  syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes: 3 });
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -232,8 +234,6 @@ describe("content updates to a scheduled activity", () => {
     liveActivityId: id,
     liveActivityScheduledFor: NOW + 10 * 60_000,
   });
-  const sync = () =>
-    syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes: 3 });
 
   it("skips the drift sync while iOS has not started the activity yet", async () => {
     loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-pending"));
@@ -302,20 +302,18 @@ describe("reconcileTripActivities adoption", () => {
 });
 
 describe("a dismissed activity", () => {
-  const dismissed = (id: string): FocusedTrip => ({
+  const committed = (id = ID): FocusedTrip => ({
     ...FOCUS,
     liveActivityId: id,
-    liveActivityCommittedAt: NOW - 10 * 60_000,
-    liveActivityDismissed: true,
+    liveActivityCommittedAt: NOW,
   });
-  const sync = () =>
-    syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes: 3 });
+  const dismissed = (id = ID): FocusedTrip => ({ ...committed(id), liveActivityDismissed: true });
 
   beforeEach(() => isLiveActivityPushEnabled.mockReturnValue(true));
   afterEach(() => saveFocusedTrip.mockReset());
 
   it("is deregistered when a reconcile first sees it, without re-registering", async () => {
-    loadFocusedTrip.mockReturnValue({ ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW });
+    loadFocusedTrip.mockReturnValue(committed());
     listTripActivityRecords.mockResolvedValue([{ id: ID, state: "dismissed" }]);
     await reconcileTripActivities();
     expect(deregisterPushActivity).toHaveBeenCalledTimes(1);
@@ -325,24 +323,24 @@ describe("a dismissed activity", () => {
 
   it("is not deregistered off push builds", async () => {
     isLiveActivityPushEnabled.mockReturnValue(false);
-    loadFocusedTrip.mockReturnValue({ ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW });
+    loadFocusedTrip.mockReturnValue(committed());
     listTripActivityRecords.mockResolvedValue([{ id: ID, state: "dismissed" }]);
     await reconcileTripActivities();
     expect(deregisterPushActivity).not.toHaveBeenCalled();
   });
 
   it("is deregistered only once when another pass already recorded it", async () => {
-    loadFocusedTrip.mockReturnValue(dismissed(ID));
+    loadFocusedTrip.mockReturnValue(dismissed());
     listTripActivityRecords.mockResolvedValue([{ id: ID, state: "dismissed" }]);
-    await ensureActivityForFocus({ ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW });
+    await ensureActivityForFocus(committed());
     expect(deregisterPushActivity).not.toHaveBeenCalled();
   });
 
   it("gets no content refresh on the pass that notes the dismissal", async () => {
-    const focused = { ...FOCUS, liveActivityId: "trip-7-dismissed-noted", liveActivityCommittedAt: NOW };
-    loadFocusedTrip.mockReturnValue(focused);
-    listTripActivityRecords.mockResolvedValue([{ id: focused.liveActivityId, state: "dismissed" }]);
-    await ensureActivityForFocus(focused);
+    const id = "trip-7-dismissed-noted";
+    loadFocusedTrip.mockReturnValue(committed(id));
+    listTripActivityRecords.mockResolvedValue([{ id, state: "dismissed" }]);
+    await ensureActivityForFocus(committed(id));
     expect(updateTripActivity).not.toHaveBeenCalled();
   });
 
@@ -353,7 +351,7 @@ describe("a dismissed activity", () => {
   });
 
   it("is not re-registered by the launch heal after the OS purges it", async () => {
-    loadFocusedTrip.mockReturnValue(dismissed(ID));
+    loadFocusedTrip.mockReturnValue(dismissed());
     await reconcileTripActivities();
     expect(registerPushActivity).not.toHaveBeenCalled();
     expect(startTripActivity).not.toHaveBeenCalled();
@@ -367,12 +365,12 @@ describe("a dismissed activity", () => {
   });
 
   it("is not re-registered when a reminder changes", async () => {
-    await reRegisterPushForFocus(dismissed(ID));
+    await reRegisterPushForFocus(dismissed());
     expect(registerPushActivity).not.toHaveBeenCalled();
   });
 
   it("does not quiet a new activity for a new focus", async () => {
-    let stored: FocusedTrip | null = { ...FOCUS, liveActivityId: ID, liveActivityCommittedAt: NOW };
+    let stored: FocusedTrip | null = committed();
     loadFocusedTrip.mockImplementation(() => stored);
     saveFocusedTrip.mockImplementation((trip: FocusedTrip | null) => {
       stored = trip;

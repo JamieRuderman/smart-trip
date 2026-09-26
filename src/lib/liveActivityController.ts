@@ -133,12 +133,15 @@ async function postRegistrationDeduped(
  *  push updates are enabled. Safe no-op everywhere else. */
 export async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
-  lastSentActivityContent.delete(focused.liveActivityId);
-  lastSentRegistration.delete(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
-  if (isLiveActivityPushEnabled()) {
-    await deregisterPushActivity(focused.liveActivityId);
-  }
+  await forgetActivity(focused.liveActivityId);
+}
+
+/** Drop what was last sent to `id` and deregister it from the push backend. */
+async function forgetActivity(id: string): Promise<void> {
+  lastSentActivityContent.delete(id);
+  lastSentRegistration.delete(id);
+  if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
 }
 
 /**
@@ -492,7 +495,7 @@ async function noteActivityDismissed(
   const latest = loadFocusedTrip();
   if (latest?.liveActivityId === id && !latest.liveActivityDismissed) {
     saveFocusedTrip({ ...latest, liveActivityDismissed: true });
-    if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
+    await forgetActivity(id);
   }
   return { ...focused, liveActivityDismissed: true };
 }
@@ -640,21 +643,19 @@ export async function reconcileTripActivities(): Promise<void> {
   await Promise.all(
     records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
   );
-  if (focused) focused = await noteActivityDismissed(focused, records);
+  if (!focused) return;
+  focused = await noteActivityDismissed(focused, records);
   // (Re)start or revive the focus's activity if nothing live is on screen for
   // it (never started, frozen by the background auto-dismiss, or gone from the
   // OS inventory).
   // Returns false when a live / user-dismissed / push-ended activity already
   // covers it, in which case we fall through to the push self-heal below.
-  if (focused && (await startOrReviveActivity(focused, records))) return;
+  if (await startOrReviveActivity(focused, records)) return;
   // Push heal: the running activity's registration POST may have failed at
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and
   // refreshes the server-side TTLs), so re-POST on every boot.
-  if (focused && keep && !focused.liveActivityDismissed && isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(focused, keep);
-    if (registration) await postRegistrationDeduped(registration);
-  }
+  await reRegisterPushForFocus(focused);
 }
 
 /**
@@ -759,17 +760,13 @@ export async function syncFocusedActivityContent(args: {
   isCanceled?: boolean;
 }): Promise<void> {
   const current = loadFocusedTrip();
-  const id = current?.liveActivityId;
-  if (!current || !id || current.liveActivityDismissed) return;
+  if (!current?.liveActivityId) return;
   // Self-heal the push registration alongside the content sync: this fires
   // exactly when a leave-in is at risk (delay/phase/reminder change, and the
   // first time the activity id commits), so re-asserting the armed reminder's
   // lead here closes the gap where the arm-time POST was lost or raced the id.
   // Deduped, so unchanged registrations don't re-hit the backend.
-  if (isLiveActivityPushEnabled()) {
-    const registration = buildRegistrationForFocus(current, id);
-    if (registration) void postRegistrationDeduped(registration);
-  }
+  void reRegisterPushForFocus(current);
   const content = buildContentState({
     departureEpochMs: args.departureAt,
     arrivalEpochMs: args.arrivalAt,

@@ -109,6 +109,23 @@ describe("registerPushActivity", () => {
     fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response);
     await expect(registerPushActivity(REG)).resolves.toBe(false);
   });
+
+  it("gives up on a request that never answers", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation((...args: unknown[]) => {
+        const { signal } = args[1] as RequestInit;
+        return new Promise((...executor) => {
+          signal?.addEventListener("abort", () => executor[1](new Error("aborted")));
+        });
+      });
+      const result = registerPushActivity(REG);
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(result).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("deregisterPushActivity", () => {
@@ -116,7 +133,7 @@ describe("deregisterPushActivity", () => {
     await deregisterPushActivity("trip-7-2026-06-09");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://smart.example/api/liveactivity/register?id=trip-7-2026-06-09",
-      { method: "DELETE" },
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

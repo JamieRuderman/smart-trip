@@ -390,6 +390,19 @@ describe("content updates to a scheduled activity", () => {
     );
   });
 
+  it("leaves a focus switched in during its inventory read alone", async () => {
+    const id = "trip-7-refresh-switched";
+    lateStart(id, [{ id, state: "active" }]);
+    const other: FocusedTrip = { ...FOCUS, tripNumber: 9 };
+    listTripActivityRecords.mockImplementationOnce(async () => {
+      loadFocusedTrip.mockReturnValue(other);
+      return [{ id, state: "active" }];
+    });
+    await ensureActivityForFocus(scheduled(id));
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(updateTripActivity).not.toHaveBeenCalled();
+  });
+
   it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {
     await ensureStored({
       ...scheduled("trip-7-refresh-pending"),

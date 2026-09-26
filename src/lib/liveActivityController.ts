@@ -92,7 +92,7 @@ type ArmResult = { ok: true } | { ok: false; reason: "permission" | "schedule-fa
 /** Whether two focused trips are the same run (identity, ignoring the reminder
  *  sub-object). Used to detect a focus change that happened while we awaited a
  *  permission prompt, so we don't clobber it. */
-function sameFocusIdentity(
+export function sameFocusIdentity(
   a: FocusedTrip | null,
   b: FocusedTrip | null,
 ): boolean {
@@ -179,9 +179,9 @@ async function forgetActivity(id: string): Promise<void> {
 const retiredActivityIds = new Set<string>();
 
 /** Tail of the queue that serializes every decision to start an activity. A
- *  start commits its id only after the native start (and, on push builds, the
- *  registration POST), so two concurrent triggers for one focus would each see
- *  no activity and start one, and the later commit would orphan the other. */
+ *  start commits its id only after the native start, so two concurrent triggers
+ *  for one focus would each see no activity and start one, and the later commit
+ *  would orphan the other. Keep network waits out of it: nothing bounds them. */
 let startQueue: Promise<unknown> = Promise.resolve();
 
 function serializeStart(task: () => Promise<void>): Promise<void> {
@@ -713,7 +713,7 @@ async function ensureActivity(focused: FocusedTrip): Promise<void> {
   // Revive/start when nothing live covers the focus; otherwise push current
   // content so a just-armed reminder's alarm stage shows immediately.
   const started = noteStartedFromRecords(focused, records);
-  if (!started) return;
+  if (!started || !sameFocusIdentity(started, focused)) return;
   const current = await noteActivityDismissed(started, records);
   if (!(await startOrReviveActivity(current, records))) {
     await refreshActivityContent(current);

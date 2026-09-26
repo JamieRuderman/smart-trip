@@ -15,6 +15,7 @@ import {
   notifyChange,
   reRegisterPushForFocus,
   replaceFocus,
+  sameFocusIdentity,
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 
@@ -77,7 +78,11 @@ export function useFocusedTrip() {
 
       if (leadMinutes === null) {
         if (current.reminder) await cancelReminderChannels(current.reminder);
-        const cleared: FocusedTrip = { ...current, reminder: null };
+        // Re-read: a focus switch or a start's commit can land during the cancel,
+        // and saving `current` would undo it.
+        const latest = loadFocusedTrip();
+        if (!latest || !sameFocusIdentity(latest, current)) return { ok: true };
+        const cleared: FocusedTrip = { ...latest, reminder: null };
         saveFocusedTrip(cleared);
         notifyChange();
         // Refresh the push registration so the backend stops baking the (now

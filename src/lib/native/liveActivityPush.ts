@@ -14,6 +14,17 @@ import { setLiveActivityTokenEndpoint } from "@/lib/native/liveActivity";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 
 const REGISTER_PATH = "/api/liveactivity/register";
+/** The start queue and teardowns wait on these requests, and `fetch` has no
+ *  timeout of its own. */
+const PUSH_REQUEST_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PUSH_REQUEST_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
 const TOKEN_PATH = "/api/liveactivity/token";
 
 /**
@@ -50,7 +61,7 @@ export async function registerPushActivity(
   registration: LiveActivityRegistration,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
+    const response = await fetchWithTimeout(`${apiBaseUrl}${REGISTER_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registration),
@@ -79,7 +90,7 @@ export async function registerPushActivity(
 export async function deregisterPushActivity(id: string): Promise<boolean> {
   if (Capacitor.getPlatform() !== "ios") return false;
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${apiBaseUrl}${REGISTER_PATH}?id=${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );

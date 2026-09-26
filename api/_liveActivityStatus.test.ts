@@ -704,6 +704,10 @@ describe("vehicleShortOfDestinationForReg", () => {
       true,
     );
     expect(vehicleShortOfDestinationForReg(drifted, { ...REG, tripId: "t_A" }, NOW)).toBe(true);
+    const undated = vp({
+      trip: { tripId: "t_A", startTime: "08:31:15", startDate: "", directionId: 1 },
+    });
+    expect(vehicleShortOfDestinationForReg(undated, { ...REG, tripId: "t_A" }, NOW)).toBe(true);
   });
 
   it("falls back to the origin time when the vehicle's trip id differs", () => {

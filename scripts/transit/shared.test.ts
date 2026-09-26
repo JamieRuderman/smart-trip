@@ -302,4 +302,69 @@ describe("buildTrainSchedules", () => {
     expect(result.weekend.southbound[0].trip).toBe(202);
     expect(result.weekend.southbound[0].tripId).toBe("T2");
   });
+
+  it("keeps the first trip's id when identical runs from two services merge into one row", () => {
+    const stations: StationParent[] = [
+      { stopId: "STA_A", name: "Alpha", lat: 0, lng: 0, zone: 1 },
+      { stopId: "STA_B", name: "Bravo", lat: 0, lng: 0, zone: 2 },
+    ];
+    const stopToStation = new Map<string, string>([
+      ["STA_A", "Alpha"],
+      ["STA_B", "Bravo"],
+    ]);
+    const stopTimes = (tripId: string): GtfsStopTime[] => [
+      {
+        trip_id: tripId,
+        stop_id: "STA_A",
+        stop_sequence: "1",
+        departure_time: "08:00:00",
+        arrival_time: "08:00:00",
+      },
+      {
+        trip_id: tripId,
+        stop_id: "STA_B",
+        stop_sequence: "2",
+        departure_time: "08:30:00",
+        arrival_time: "08:30:00",
+      },
+    ];
+    const feed: GtfsFeed = {
+      schemaVersion: 1,
+      operatorId: "SA",
+      fetchedAt: "2026-06-02T12:00:00Z",
+      sourceUrl: "",
+      agency: [],
+      routes: [],
+      stops: [],
+      stopTimes: [],
+      shapes: null,
+      calendar: [
+        { ...WEEKDAY, service_id: "wk" },
+        { ...WEEKDAY, service_id: "wk_variant" },
+      ],
+      calendarDates: [],
+      trips: [
+        { route_id: "R", service_id: "wk", trip_id: "T1", trip_short_name: "101" },
+        {
+          route_id: "R",
+          service_id: "wk_variant",
+          trip_id: "T1_variant",
+          trip_short_name: "101",
+        },
+      ],
+    };
+
+    const result = buildTrainSchedules(
+      feed,
+      new Map([
+        ["T1", stopTimes("T1")],
+        ["T1_variant", stopTimes("T1_variant")],
+      ]),
+      stations,
+      stopToStation,
+    );
+
+    expect(result.weekday.southbound).toHaveLength(1);
+    expect(result.weekday.southbound[0].tripId).toBe("T1");
+  });
 });

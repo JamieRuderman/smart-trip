@@ -157,4 +157,18 @@ describe("deregisterPushActivity", () => {
     await deregisterPushActivity("x");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("reports success when the backend confirms", async () => {
+    await expect(deregisterPushActivity("x")).resolves.toBe(true);
+  });
+
+  it("reports failure on a non-2xx response", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response);
+    await expect(deregisterPushActivity("x")).resolves.toBe(false);
+  });
+
+  it("reports failure without throwing on a network error", async () => {
+    fetchMock.mockRejectedValue(new Error("network"));
+    await expect(deregisterPushActivity("x")).resolves.toBe(false);
+  });
 });

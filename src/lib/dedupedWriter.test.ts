@@ -112,40 +112,39 @@ describe("createDedupedWriter", () => {
     calls.forEach((c) => c.resolve(true));
   });
 
-  it("settled() waits for the in-flight write and the one chained behind it", async () => {
+  it("close() waits for the in-flight write and drops the one queued behind it", async () => {
+    // Teardown DELETEs the remote record once close() resolves; a queued write
+    // reaching the sink after that would re-create it.
     const { send, calls } = controllableSink();
     const writer = createDedupedWriter(send);
-    const older = writer.write(REG.id, REG);
-    void writer.write(REG.id, { ...REG, lead: 45 });
-    let settled = false;
-    const done = writer.settled(REG.id).then(() => {
-      settled = true;
+    void writer.write(REG.id, REG);
+    const queued = writer.write(REG.id, { ...REG, lead: 45 });
+    let closed = false;
+    const done = writer.close(REG.id).then(() => {
+      closed = true;
     });
+    await Promise.resolve();
+    expect(closed).toBe(false);
 
     calls[0].resolve(true);
-    await older;
-    expect(settled).toBe(false);
-    calls[1].resolve(true);
-    await done;
-    expect(send).toHaveBeenCalledTimes(2);
+    await Promise.all([done, queued]);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("settled() resolves at once when nothing is in flight", async () => {
-    const writer = createDedupedWriter(controllableSink().send);
-    await expect(writer.settled(REG.id)).resolves.toBeUndefined();
+  it("close() refuses later writes, even of a new payload", async () => {
+    const { send } = controllableSink();
+    const writer = createDedupedWriter(send);
+    await writer.close(REG.id);
+    await writer.write(REG.id, { ...REG, lead: 45 });
+    expect(send).not.toHaveBeenCalled();
   });
 
-  it("forget() makes an unchanged payload send again", async () => {
+  it("close() leaves other keys writable", async () => {
     const { send, calls } = controllableSink();
     const writer = createDedupedWriter(send);
-    const first = writer.write(REG.id, REG);
+    await writer.close("trip-1");
+    void writer.write("trip-2", REG);
+    expect(send).toHaveBeenCalledTimes(1);
     calls[0].resolve(true);
-    await first;
-
-    writer.forget(REG.id);
-    const again = writer.write(REG.id, REG);
-    expect(send).toHaveBeenCalledTimes(2);
-    calls[1].resolve(true);
-    await again;
   });
 });

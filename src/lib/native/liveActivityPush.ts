@@ -108,14 +108,24 @@ export async function registerPushActivity(
 }
 
 /** Tell the backend to stop pushing to this activity (on clear / arrival /
- *  focus replace). Best-effort. */
-export async function deregisterPushActivity(id: string): Promise<void> {
-  if (Capacitor.getPlatform() !== "ios") return;
+ *  focus replace / dismissal). Best-effort; never throws. Returns whether the
+ *  backend confirmed it, so a failed attempt can be retried. */
+export async function deregisterPushActivity(id: string): Promise<boolean> {
+  if (Capacitor.getPlatform() !== "ios") return false;
   try {
-    await fetch(`${apiBaseUrl}${REGISTER_PATH}?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `${apiBaseUrl}${REGISTER_PATH}?id=${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      logger.warn(
+        `Live Activity push deregistration rejected (HTTP ${response.status})`,
+      );
+      return false;
+    }
+    return true;
   } catch (error) {
     logger.warn("Live Activity push deregistration failed", error);
+    return false;
   }
 }

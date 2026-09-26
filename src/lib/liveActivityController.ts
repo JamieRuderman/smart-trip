@@ -5,8 +5,9 @@
  *
  * These are plain module functions (no React) extracted from `useFocusedTrip`
  * so the hook stays a thin state wrapper. The per-activity dedup state
- * (`lastSentActivityContent`, `registrationWriter`) lives here and is private
- * to this module, shared by the start/refresh/sync paths.
+ * (`lastSentActivityContent`, the registration and deregistration writers)
+ * lives here and is private to this module, shared by the start/refresh/sync
+ * paths.
  */
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
@@ -125,6 +126,12 @@ const registrationWriter = createDedupedWriter<LiveActivityRegistration>(
   (registration) => registerPushActivity(registration),
 );
 
+/** Push-backend deregistrations, deduped per activity id: one the backend
+ *  confirmed isn't re-sent, and a failed one is retried by the next call. */
+const deregistrationWriter = createDedupedWriter<string>((id) =>
+  deregisterPushActivity(id),
+);
+
 async function postRegistrationDeduped(
   registration: LiveActivityRegistration,
 ): Promise<void> {
@@ -140,13 +147,12 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
   await forgetActivity(focused.liveActivityId);
 }
 
-/** Drop what was last sent to `id` and deregister it from the push backend. */
+/** Stop registering `id` and deregister it from the push backend. */
 async function forgetActivity(id: string): Promise<void> {
   lastSentActivityContent.delete(id);
   // The backend re-creates a registration whose POST it handles after the DELETE.
-  await registrationWriter.settled(id);
-  registrationWriter.forget(id);
-  if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
+  await registrationWriter.close(id);
+  if (isLiveActivityPushEnabled()) await deregistrationWriter.write(id, id);
 }
 
 /**
@@ -487,21 +493,23 @@ async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
 const COMMITTED_ACTIVITY_GRACE_MS = 2 * 60_000;
 
 /** Remember that `records` lists the focus's activity as dismissed, so a later
- *  reconcile doesn't respawn it once ActivityKit purges the record, and
- *  deregister it so the backend stops pushing to it. Returns the focus with the
- *  dismissal applied. */
+ *  reconcile doesn't respawn it once ActivityKit purges the record, and keep it
+ *  deregistered so the backend stops pushing to it (a failed deregistration is
+ *  retried on the next pass). Returns the focus with the dismissal applied. */
 async function noteActivityDismissed(
   focused: FocusedTrip,
   records: TripActivityRecord[],
 ): Promise<FocusedTrip> {
   const id = focused.liveActivityId;
-  if (id == null || focused.liveActivityDismissed) return focused;
-  if (!records.some((r) => r.id === id && r.state === "dismissed")) return focused;
-  const latest = loadFocusedTrip();
-  if (latest?.liveActivityId === id && !latest.liveActivityDismissed) {
-    saveFocusedTrip({ ...latest, liveActivityDismissed: true });
-    await forgetActivity(id);
+  if (id == null) return focused;
+  if (!focused.liveActivityDismissed) {
+    if (!records.some((r) => r.id === id && r.state === "dismissed")) return focused;
+    const latest = loadFocusedTrip();
+    if (latest?.liveActivityId === id && !latest.liveActivityDismissed) {
+      saveFocusedTrip({ ...latest, liveActivityDismissed: true });
+    }
   }
+  await forgetActivity(id);
   return { ...focused, liveActivityDismissed: true };
 }
 

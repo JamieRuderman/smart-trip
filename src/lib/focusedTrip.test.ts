@@ -108,6 +108,28 @@ describe("focusedTrip storage", () => {
     expect(loadFocusedTrip()).toBeNull();
   });
 
+  it("round-trips the activity commit time and dismissal flag", () => {
+    const f = makeFocused({
+      liveActivityId: "trip-activity-1",
+      liveActivityCommittedAt: Date.now(),
+      liveActivityDismissed: true,
+    });
+    saveFocusedTrip(f);
+    expect(loadFocusedTrip()).toEqual(f);
+  });
+
+  it("rejects a malformed activity commit time or dismissal flag", () => {
+    for (const [key, value] of [
+      ["liveActivityCommittedAt", "now"],
+      ["liveActivityDismissed", false],
+    ] as const) {
+      const bad = makeFocused() as unknown as Record<string, unknown>;
+      bad[key] = value;
+      localStorage.setItem(FOCUSED_TRIP_STORAGE_KEY, JSON.stringify(bad));
+      expect(loadFocusedTrip()).toBeNull();
+    }
+  });
+
   it("leaves an armed, still-future reminder untouched", () => {
     const f = makeFocused({
       reminder: {

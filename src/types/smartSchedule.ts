@@ -40,6 +40,9 @@ export type TupleOf<
 
 export interface TrainTrip {
   trip: number;
+  /** GTFS `trip_id`. Absent from schedule payloads fetched and cached before
+   *  the transform emitted it. */
+  tripId?: string;
   times: TupleOf<string, typeof STATION_COUNT>;
 }
 

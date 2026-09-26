@@ -3,6 +3,7 @@ import {
   isLiveActivityRegistration,
   isLiveActivityTokenPayload,
   isRegistrationWithinHorizon,
+  MAX_ID_LENGTH,
   MAX_REGISTRATION_DURATION_MS,
   MAX_REGISTRATION_FUTURE_MS,
   MAX_REGISTRATION_PAST_MS,
@@ -55,6 +56,17 @@ describe("isLiveActivityRegistration", () => {
     ).toBe(true);
     expect(
       isLiveActivityRegistration({ ...VALID_REG, originStartTime: 755 }),
+    ).toBe(false);
+  });
+
+  it("accepts an optional tripId and rejects a non-string, empty, or oversized one", () => {
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, tripId: "t_6153581_b_86615_tn_0" }),
+    ).toBe(true);
+    expect(isLiveActivityRegistration({ ...VALID_REG, tripId: 6153581 })).toBe(false);
+    expect(isLiveActivityRegistration({ ...VALID_REG, tripId: "" })).toBe(false);
+    expect(
+      isLiveActivityRegistration({ ...VALID_REG, tripId: "t".repeat(MAX_ID_LENGTH + 1) }),
     ).toBe(false);
   });
 

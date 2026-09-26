@@ -49,6 +49,7 @@ vi.mock("@/lib/focusedTrip", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/focusedTrip")>()),
   focusedDepartureInstant: () => DEPARTURE,
   focusedArrivalInstant: () => ARRIVAL,
+  reconstructFocusedTrip: () => TRIP,
   loadFocusedTrip: () => loadFocusedTrip(),
   saveFocusedTrip: (trip: unknown) => saveFocusedTrip(trip),
 }));
@@ -61,6 +62,7 @@ import {
 } from "@/lib/liveActivityController";
 import { LIVE_ACTIVITY_LEAD_MS } from "@/lib/liveActivityContent";
 import type { FocusedTrip } from "@/lib/focusedTrip";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
 const FOCUS: FocusedTrip = {
   source: "user",
@@ -70,6 +72,15 @@ const FOCUS: FocusedTrip = {
   scheduleType: "weekday",
   serviceDate: "2026-06-09",
   reminder: null,
+};
+const TRIP: ProcessedTrip = {
+  trip: 7,
+  times: [],
+  departureTime: "08:20",
+  arrivalTime: "09:20",
+  fromStation: "Petaluma Downtown",
+  toStation: "Larkspur",
+  isValid: true,
 };
 const ID = "trip-7-2026-06-09-committed";
 const sync = () =>
@@ -319,6 +330,27 @@ describe("a dismissed activity", () => {
     expect(deregisterPushActivity).toHaveBeenCalledTimes(1);
     expect(deregisterPushActivity).toHaveBeenCalledWith(ID);
     expect(registerPushActivity).not.toHaveBeenCalled();
+  });
+
+  it("is deregistered only after an in-flight registration lands", async () => {
+    const id = "trip-7-dismissed-inflight";
+    let land!: (accepted: boolean) => void;
+    registerPushActivity.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (land = resolve)),
+    );
+    loadFocusedTrip.mockReturnValue(committed(id));
+    await sync();
+    listTripActivityRecords.mockResolvedValue([{ id, state: "dismissed" }]);
+    const reconciled = reconcileTripActivities();
+    await vi.waitFor(() =>
+      expect(saveFocusedTrip).toHaveBeenCalledWith(
+        expect.objectContaining({ liveActivityDismissed: true }),
+      ),
+    );
+    expect(deregisterPushActivity).not.toHaveBeenCalled();
+    land(true);
+    await reconciled;
+    expect(deregisterPushActivity).toHaveBeenCalledWith(id);
   });
 
   it("is not deregistered off push builds", async () => {

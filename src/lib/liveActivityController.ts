@@ -113,6 +113,10 @@ const lastSentActivityContent = new Map<string, string>();
  *  backend with identical payloads on every drift/delay sync tick. */
 const lastSentRegistration = new Map<string, string>();
 
+/** Registration POST still in flight per activity id. A deregistration waits for
+ *  it: the backend re-creates a registration whose POST it handles after the DELETE. */
+const pendingRegistration = new Map<string, Promise<boolean>>();
+
 /** (Re-)POST a registration only when it differs from the last one the backend
  *  accepted for this activity. The backend bakes the armed reminder's lead into
  *  every locked-screen push, so it MUST hold the current lead or a delay push
@@ -121,11 +125,14 @@ const lastSentRegistration = new Map<string, string>();
 async function postRegistrationDeduped(
   registration: LiveActivityRegistration,
 ): Promise<void> {
+  const { id } = registration;
   const json = JSON.stringify(registration);
-  if (lastSentRegistration.get(registration.id) === json) return;
-  if (await registerPushActivity(registration)) {
-    lastSentRegistration.set(registration.id, json);
-  }
+  if (lastSentRegistration.get(id) === json) return;
+  const post = registerPushActivity(registration);
+  pendingRegistration.set(id, post);
+  const accepted = await post;
+  if (pendingRegistration.get(id) === post) pendingRegistration.delete(id);
+  if (accepted) lastSentRegistration.set(id, json);
 }
 
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
@@ -141,7 +148,9 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
 async function forgetActivity(id: string): Promise<void> {
   lastSentActivityContent.delete(id);
   lastSentRegistration.delete(id);
-  if (isLiveActivityPushEnabled()) await deregisterPushActivity(id);
+  if (!isLiveActivityPushEnabled()) return;
+  await pendingRegistration.get(id);
+  await deregisterPushActivity(id);
 }
 
 /**

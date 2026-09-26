@@ -29,4 +29,14 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # The Pods project is regenerated on every install, so Xcode's "update to
+  # recommended settings" prompt and these phase flags must be re-applied here.
+  installer.pods_project.root_object.attributes['LastUpgradeCheck'] = '2700'
+  installer.pods_project.root_object.attributes['LastSwiftUpdateCheck'] = '2700'
+  installer.pods_project.targets.each do |target|
+    target.shell_script_build_phases.each do |phase|
+      phase.always_out_of_date = '1' if Array(phase.output_paths).empty? && Array(phase.output_file_list_paths).empty?
+    end
+  end
 end

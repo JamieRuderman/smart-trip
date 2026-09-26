@@ -62,13 +62,17 @@ export function notifyChange(): void {
 
 /** Cancel both channels a reminder might own — the local notification and, if
  *  it was scheduled as a true Leave Alarm, the AlarmKit alarm. Cancelling the
- *  channel that wasn't used is a harmless no-op. */
+ *  channel that wasn't used is a harmless no-op. Both are dispatched before the
+ *  first await: {@link replaceFocus} has already overwritten the only stored
+ *  alarm id, so a suspension mid-teardown must not strand the alarm. */
 export async function cancelReminderChannels(
   reminder: FocusedTripReminder | null,
 ): Promise<void> {
   if (!reminder) return;
-  await cancelNotification(reminder.notificationId);
-  if (reminder.alarmId) await cancelLeaveAlarm(reminder.alarmId);
+  await Promise.all([
+    cancelNotification(reminder.notificationId),
+    reminder.alarmId ? cancelLeaveAlarm(reminder.alarmId) : undefined,
+  ]);
 }
 
 /** Web-fire cleanup: stamp the reminder as fired (keeps the focus + lead so the
@@ -134,7 +138,7 @@ async function postRegistrationDeduped(
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
  *  Island), if one is running. Also deregisters it from the push backend when
  *  push updates are enabled. Safe no-op everywhere else. */
-export async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
+async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
   registrationWriter.forget(focused.liveActivityId);
@@ -142,6 +146,47 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
   if (isLiveActivityPushEnabled()) {
     await deregisterPushActivity(focused.liveActivityId);
   }
+}
+
+/** Activity ids retired by {@link replaceFocus}. The new focus is saved before
+ *  the old activity ends, and re-focusing the same trip + service date shares
+ *  its id prefix, so the reconcile's adoption must skip these. Ids end in a
+ *  random slug, so an entry never matches a later activity. */
+const retiredActivityIds = new Set<string>();
+
+/** Tail of the queue that serializes every decision to start an activity. A
+ *  start commits its id only after the native start (and, on push builds, the
+ *  registration POST), so two concurrent triggers for one focus would each see
+ *  no activity and start one, and the later commit would orphan the other. */
+let startQueue: Promise<unknown> = Promise.resolve();
+
+function serializeStart(task: () => Promise<void>): Promise<void> {
+  const run = startQueue.then(task);
+  startQueue = run.catch(() => {});
+  return run;
+}
+
+/**
+ * Make `next` the focus, or clear it with null. `next` is saved and announced
+ * synchronously, before the first await, and only then is the previous focus
+ * torn down: on push builds that awaits an untimed deregister request, and UI
+ * opened alongside the switch must not render the old trip meanwhile. The new
+ * activity is skipped if the focus changed again or a reconcile / reminder arm
+ * already committed one.
+ */
+export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
+  const prev = loadFocusedTrip();
+  if (prev?.liveActivityId) retiredActivityIds.add(prev.liveActivityId);
+  saveFocusedTrip(next);
+  notifyChange();
+  await Promise.all([cancelReminderChannels(prev?.reminder ?? null), endFocusActivity(prev)]);
+  await serializeStart(async () => {
+    const latest = loadFocusedTrip();
+    if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
+      return;
+    }
+    await startActivityForFocus(latest);
+  });
 }
 
 /**
@@ -259,7 +304,7 @@ export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void
  * the user switched/cleared trips meanwhile; on commit we persist from the
  * LATEST record so a concurrently armed reminder isn't clobbered.
  */
-export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
+async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
@@ -548,7 +593,18 @@ async function startOrReviveActivity(
  * content is refreshed so a freshly armed reminder's alarm stage lands right
  * away. `startActivityForFocus` self-gates, so this is a no-op while dormant.
  */
-export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
+export function ensureActivityForFocus(requested: FocusedTrip): Promise<void> {
+  return serializeStart(async () => {
+    // Re-read: the caller's copy predates any start this queued behind, and
+    // acting on its missing id would start a duplicate.
+    const focused = loadFocusedTrip();
+    if (focused != null && sameFocusIdentity(focused, requested)) {
+      await ensureActivity(focused);
+    }
+  });
+}
+
+async function ensureActivity(focused: FocusedTrip): Promise<void> {
   const records = await listTripActivityRecords();
   if (records == null) {
     await refreshActivityContent(focused);
@@ -589,10 +645,16 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * off-iOS.
  * Call alongside `bootFocusedTrip`.
  */
-export async function reconcileTripActivities(): Promise<void> {
-  let focused = loadFocusedTrip();
+export function reconcileTripActivities(): Promise<void> {
+  return serializeStart(reconcileActivities);
+}
+
+async function reconcileActivities(): Promise<void> {
   const records = await listTripActivityRecords();
   if (records == null) return;
+  // Read after the await: a focus switch can land during it, and this pass
+  // saves `focused` back, which would clobber the new focus with the old one.
+  let focused = loadFocusedTrip();
   // Adopt a running activity for the SAME trip+service date when the focus's
   // committed `liveActivityId` hasn't landed yet — `startActivityForFocus`
   // commits it asynchronously, so a reconcile racing a just-started activity
@@ -606,7 +668,9 @@ export async function reconcileTripActivities(): Promise<void> {
       !records.some((r) => r.id === focused!.liveActivityId))
   ) {
     const prefix = `trip-${focused.tripNumber}-${focused.serviceDate}-`;
-    const adopted = records.find((r) => r.id.startsWith(prefix));
+    const adopted = records.find(
+      (r) => r.id.startsWith(prefix) && !retiredActivityIds.has(r.id),
+    );
     if (adopted) {
       const scheduledFor =
         adopted.state === "pending" ? focusedActivityStartAt(focused) : null;

@@ -291,6 +291,27 @@ describe("content updates to a scheduled activity", () => {
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
   });
 
+  it("re-reads the inventory when the clock steps back past the last read", async () => {
+    const id = "trip-7-sync-clock";
+    lateStart(id, [{ id, state: "pending" }]);
+    vi.setSystemTime(pastStart + 10 * 60_000);
+    await sync();
+    vi.setSystemTime(pastStart);
+    await sync();
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes a started scheduled activity on ensure and drops its start instant", async () => {
+    const id = "trip-7-refresh-started";
+    lateStart(id, [{ id, state: "active" }]);
+    await ensureActivityForFocus(scheduled(id));
+    expect(startTripActivity).not.toHaveBeenCalled();
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+    expect(saveFocusedTrip).toHaveBeenCalledWith(
+      expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
+  });
+
   it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {
     await ensureActivityForFocus({
       ...scheduled("trip-7-refresh-pending"),

@@ -457,7 +457,8 @@ async function awaitingScheduledStart(focused: FocusedTrip, id: string): Promise
   const now = Date.now();
   if (now < scheduledFor) return true;
   const checkedAt = startCheckedAt.get(id);
-  if (checkedAt != null && now - checkedAt < SCHEDULED_START_RECHECK_MS) return true;
+  const checkedAgo = checkedAt != null ? now - checkedAt : Infinity;
+  if (checkedAgo >= 0 && checkedAgo < SCHEDULED_START_RECHECK_MS) return true;
   startCheckedAt.set(id, now);
   const record = (await listTripActivityRecords())?.find((r) => r.id === id);
   return record == null || record.state === "pending";

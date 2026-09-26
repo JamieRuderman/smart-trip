@@ -50,17 +50,19 @@ export function useFocusedTrip() {
   /** Focus a trip (no reminder). Replaces any existing focus and cancels its
    *  reminder + Live Activity. Caller handles any "switch trains?"
    *  confirmation. */
-  const focusTrip = useCallback(async (input: FocusTripInput) => {
-    await replaceFocus({
-      source: "user",
-      tripNumber: input.tripNumber,
-      fromStation: input.fromStation,
-      toStation: input.toStation,
-      scheduleType: input.scheduleType,
-      serviceDate: input.serviceDate,
-      reminder: null,
-    });
-  }, []);
+  const focusTrip = useCallback(
+    (input: FocusTripInput) =>
+      replaceFocus({
+        source: "user",
+        tripNumber: input.tripNumber,
+        fromStation: input.fromStation,
+        toStation: input.toStation,
+        scheduleType: input.scheduleType,
+        serviceDate: input.serviceDate,
+        reminder: null,
+      }),
+    [],
+  );
 
   /** Arm (number) or disarm (null) the reminder. `departureAt` is the live-
    *  aware departure instant used to compute the fire time. */

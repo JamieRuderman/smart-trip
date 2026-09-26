@@ -78,6 +78,25 @@ describe("createDedupedWriter", () => {
     expect(writer.isAccepted(REG.id, { ...REG, lead: 45 })).toBe(true);
   });
 
+  it("re-sends an accepted payload restored while a different one is in flight", async () => {
+    // A lead changed and changed back mid-flight: the in-flight payload lands
+    // last, so skipping the restore would leave the sink on the intermediate value.
+    const { send, calls } = controllableSink();
+    const writer = createDedupedWriter(send);
+    const first = writer.write(REG.id, REG);
+    calls[0].resolve(true);
+    await first;
+
+    void writer.write(REG.id, { ...REG, lead: 45 });
+    const restored = writer.write(REG.id, REG);
+    calls[1].resolve(true);
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
+    expect(send).toHaveBeenLastCalledWith(REG);
+    calls[2].resolve(true);
+    await restored;
+    expect(writer.isAccepted(REG.id, REG)).toBe(true);
+  });
+
   it("does not remember a REJECTED write, so the next call retries", async () => {
     const { send, calls } = controllableSink();
     const writer = createDedupedWriter(send);

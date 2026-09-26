@@ -49,10 +49,12 @@ export function createDedupedWriter<T>(
 
   async function write(key: string, value: T): Promise<void> {
     const json = serialize(value);
-    if (accepted.get(key) === json) return;
     const current = inFlight.get(key);
     // Same payload already on the wire — join it rather than duplicate it.
     if (current?.json === json) return current.promise;
+    // A different payload in flight will overwrite the accepted one, so a match
+    // against `accepted` only counts when nothing is.
+    if (!current && accepted.get(key) === json) return;
 
     const promise = (async () => {
       // A different payload is in flight: let it settle so the sink sees these

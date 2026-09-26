@@ -38,6 +38,18 @@ const queryClient = new QueryClient({
  *  the fallback. Lives inside BrowserRouter so it can read `useLocation`. */
 const RoutedApp = () => {
   const location = useLocation();
+
+  // The prerendered SEO sitelinks footer (#seo-sitelinks, injected into
+  // dist/index.html by scripts/seo/prerender.ts and living OUTSIDE #root, so
+  // React can't unmount it) belongs to the homepage. On the full-bleed map
+  // routes it just dangles below the map. Toggle a body class the footer's own
+  // scoped <style> keys off — crawlers fetch the homepage HTML and never
+  // navigate, so their crawl path into the station/route pages is untouched.
+  useEffect(() => {
+    const onMapRoute = location.pathname.startsWith("/map");
+    document.body.classList.toggle("seo-sitelinks-hidden", onMapRoute);
+  }, [location.pathname]);
+
   return (
     <ErrorBoundary resetKeys={[location.pathname]}>
       <StationSelectionProvider>

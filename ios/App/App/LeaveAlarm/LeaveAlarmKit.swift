@@ -4,47 +4,6 @@ import Foundation
 import AlarmKit
 import AppIntents
 import SwiftUI
-
-/// AlarmKit needs a metadata type; the leave alarm carries no extra state —
-/// the alert title and buttons are all presentation.
-@available(iOS 26.0, *)
-struct LeaveAlarmMetadata: AlarmMetadata {}
-
-/// Runs when the alarm's secondary ("View trip") button is tapped: stops the
-/// ringing alarm, then foregrounds the app, which lands on the focused-trip
-/// card. Not user-discoverable — it exists only as the alarm button's action.
-///
-/// Stopping is our responsibility here: AlarmKit's `.custom` secondary behavior
-/// runs this intent but, unlike the stop button, does NOT silence the alarm. If
-/// we only opened the app the alert would be dismissed while the alarm kept
-/// ringing — and with its UI gone the user would have no way to stop it. So we
-/// stop the alarm by id (baked in at schedule time) before returning, matching
-/// Android's "View trip" which also dismisses the alarm.
-@available(iOS 26.0, *)
-struct OpenSmartTripIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Open SMART Trip"
-    static let description = IntentDescription("Opens SMART Trip to your focused trip.")
-    static let isDiscoverable: Bool = false
-    static let openAppWhenRun: Bool = true
-
-    /// The alarm to silence — set when the alarm is scheduled so the button
-    /// knows which alert it belongs to.
-    @Parameter(title: "Alarm ID")
-    var alarmID: String
-
-    init() {}
-
-    init(alarmID: String) {
-        self.alarmID = alarmID
-    }
-
-    func perform() async throws -> some IntentResult {
-        if let uuid = UUID(uuidString: alarmID) {
-            try? AlarmManager.shared.stop(id: uuid)
-        }
-        return .result()
-    }
-}
 #endif
 
 /// All AlarmKit access for the local LeaveAlarm plugin. Mirrors the shape of
@@ -149,7 +108,7 @@ enum LeaveAlarmKit {
                     )
                     let attributes = AlarmAttributes<LeaveAlarmMetadata>(
                         presentation: AlarmPresentation(alert: alert),
-                        metadata: LeaveAlarmMetadata(),
+                        metadata: LeaveAlarmMetadata(stopButtonTitle: stopButtonTitle),
                         tintColor: brandTint
                     )
                     let configuration = AlarmManager.AlarmConfiguration<LeaveAlarmMetadata>.alarm(

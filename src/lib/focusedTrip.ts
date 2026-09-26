@@ -20,6 +20,12 @@ export interface FocusedTripReminder {
    *  local notification. Absent on the notification path (web, alarm
    *  unavailable/denied, or scheduling failure). */
   alarmId?: string;
+  /** Epoch ms the reminder actually fired. Set once `reminderAt` passes — the
+   *  OS delivered the alert (native) or the web timer ran — instead of dropping
+   *  the reminder sub-object, so the card can show a "time to go" indicator
+   *  through the fire → departure window. Absent while the reminder is still
+   *  armed and ahead of us; the trip record is cleared wholesale after arrival. */
+  firedAt?: number;
 }
 
 export interface FocusedTrip {
@@ -39,6 +45,13 @@ export interface FocusedTrip {
    *  OS keeps the activity alive independently of the webview. Mirrors how
    *  `reminder.alarmId` tracks an out-of-process alert. */
   liveActivityId?: string;
+  /** Epoch ms the activity under `liveActivityId` is SCHEDULED to appear, when
+   *  it was armed via ActivityKit's future-start API (iOS 26+) rather than
+   *  started immediately. Absent once it's running (or when it never was
+   *  scheduled). ActivityKit can't move a pending activity's start date, so this
+   *  is what tells us a re-armed reminder needs the pending one ended and a
+   *  fresh one scheduled. */
+  liveActivityScheduledFor?: number;
 }
 
 export const FOCUSED_TRIP_STORAGE_KEY = "smart-train-focused-trip";
@@ -87,9 +100,15 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
       typeof (r.reminder as Record<string, unknown>).title === "string" &&
       typeof (r.reminder as Record<string, unknown>).body === "string" &&
       ((r.reminder as Record<string, unknown>).alarmId === undefined ||
-        typeof (r.reminder as Record<string, unknown>).alarmId === "string"));
+        typeof (r.reminder as Record<string, unknown>).alarmId === "string") &&
+      ((r.reminder as Record<string, unknown>).firedAt === undefined ||
+        typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
+  const liveActivityScheduledForOk =
+    r.liveActivityScheduledFor === undefined ||
+    (typeof r.liveActivityScheduledFor === "number" &&
+      Number.isFinite(r.liveActivityScheduledFor));
   return (
     r.source === "user" &&
     typeof r.tripNumber === "number" &&
@@ -99,7 +118,8 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
-    liveActivityIdOk
+    liveActivityIdOk &&
+    liveActivityScheduledForOk
   );
 }
 
@@ -204,6 +224,10 @@ export function anchorLiveTime(staticInstant: number, liveHHMM: string): number 
 /**
  * The instant at/after which a focused trip should auto-clear: its live-aware
  * arrival plus `graceMs`. Delay-aware so a late train isn't dropped early:
+ *   • vehicle position shows the train still short of the destination → null:
+ *     the train demonstrably hasn't arrived (a heavily delayed run can lose its
+ *     arrival prediction in the trip updates feed entirely — the positions feed
+ *     is then the only evidence it's still running), so never clear yet;
  *   • live arrival known → max(scheduled, live) + grace (never before scheduled,
  *     so an early train still lingers the grace window);
  *   • feed loaded but no live arrival (train passed the stop / on time, the feed
@@ -217,13 +241,20 @@ export function focusedTripClearInstant({
   liveArrivalAt,
   feedLoaded,
   graceMs,
+  vehicleShortOfDestination = false,
 }: {
   scheduledArrivalAt: number | null;
   liveArrivalAt: number | null;
   feedLoaded: boolean;
   graceMs: number;
+  /** Fresh vehicle-position evidence that the train hasn't reached the rider's
+   *  destination yet (see {@link isVehicleShortOfDestination}). Vetoes the
+   *  time-based clear; goes false once the train arrives, passes the stop, or
+   *  the position goes stale, letting the normal rules resume. */
+  vehicleShortOfDestination?: boolean;
 }): number | null {
   if (scheduledArrivalAt == null) return null;
+  if (vehicleShortOfDestination) return null;
   if (liveArrivalAt != null) {
     return Math.max(scheduledArrivalAt, liveArrivalAt) + graceMs;
   }
@@ -260,15 +291,24 @@ export function loadFocusedTrip(): FocusedTrip | null {
       localStorage.removeItem(FOCUSED_TRIP_STORAGE_KEY);
       return null;
     }
-    // The reminder has already fired — drop the sub-object so the "active
-    // reminder" pill doesn't linger. On native the OS delivered the alert at
-    // fire time but there's no JS callback (bootFocusedTrip skips the timer
-    // re-arm on native); on web a closed-tab miss has no way to deliver late
-    // anyway. Either way, "reminderAt is in the past" means we're done.
-    if (parsed.reminder && parsed.reminder.reminderAt <= Date.now()) {
-      const cleaned: FocusedTrip = { ...parsed, reminder: null };
-      saveFocusedTrip(cleaned);
-      return cleaned;
+    // The reminder has already fired — stamp `firedAt` (once) so the card can
+    // swap the "edit reminder" pill for a "time to go" indicator, rather than
+    // dropping the sub-object and reverting to a bare "Add reminder" that hides
+    // that the alarm went off. On native the OS delivered the alert at fire time
+    // but there's no JS callback (bootFocusedTrip skips the timer re-arm on
+    // native); on web a closed-tab miss has no way to deliver late anyway.
+    // Either way, "reminderAt is in the past" means it fired.
+    if (
+      parsed.reminder &&
+      parsed.reminder.firedAt == null &&
+      parsed.reminder.reminderAt <= Date.now()
+    ) {
+      const fired: FocusedTrip = {
+        ...parsed,
+        reminder: { ...parsed.reminder, firedAt: Date.now() },
+      };
+      saveFocusedTrip(fired);
+      return fired;
     }
     return parsed;
   } catch {
@@ -394,7 +434,12 @@ export function bootFocusedTrip(): void {
     },
     () => {
       const after = loadFocusedTrip();
-      if (after) saveFocusedTrip({ ...after, reminder: null });
+      if (after?.reminder) {
+        saveFocusedTrip({
+          ...after,
+          reminder: { ...after.reminder, firedAt: Date.now() },
+        });
+      }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
       }

@@ -47,6 +47,19 @@
     <meta name="twitter:description" content="Community-built SMART train schedule, live departures, and interactive map for Sonoma-Marin Area Rail Transit." />
     <meta name="twitter:image" content="https://smarttraintrip.com/og/default.png" />
     <meta name="twitter:image:alt" content="SMART Train trip planner showing schedules and a live map" />
+
+    <!-- Critical boot styles: applied before the hashed app stylesheet so the
+         very first paint is app-coloured with a full-height #root. Prevents the
+         crawlable SEO sitelinks footer (injected after #root at build time)
+         from flashing at the top of the viewport while React boots on a cold
+         load. Background values mirror --background in src/index.css. -->
+    <style>
+      html { background-color: hsl(0 0% 98%); }
+      @media (prefers-color-scheme: dark) {
+        html { background-color: hsl(220 13% 9%); }
+      }
+      #root { min-height: 100vh; min-height: 100dvh; }
+    </style>
   </head>
 
   <body>

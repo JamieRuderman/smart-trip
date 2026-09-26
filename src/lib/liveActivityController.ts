@@ -4,8 +4,8 @@
  * boot/foreground reconcile, and reminder (leave-alarm) scheduling.
  *
  * These are plain module functions (no React) extracted from `useFocusedTrip`
- * so the hook stays a thin state wrapper. The per-activity dedup maps
- * (`lastSentActivityContent`, `lastSentRegistration`) live here and are private
+ * so the hook stays a thin state wrapper. The per-activity dedup state
+ * (`lastSentActivityContent`, `registrationWriter`) lives here and is private
  * to this module, shared by the start/refresh/sync paths.
  */
 import {
@@ -28,19 +28,25 @@ import {
   buildContentState,
   endTripActivity,
   listTripActivityRecords,
+  scheduleTripActivity,
   startTripActivity,
   tripActivityId,
   updateTripActivity,
   type TripActivityAttributes,
   type TripActivityRecord,
 } from "@/lib/native/liveActivity";
-import { shouldShowLiveActivity } from "@/lib/liveActivityContent";
 import {
+  liveActivityStartAt,
+  shouldShowLiveActivity,
+} from "@/lib/liveActivityContent";
+import {
+  configureLiveActivityTokenEndpoint,
   deregisterPushActivity,
   isLiveActivityPushEnabled,
   registerPushActivity,
   startAndRegisterPushActivity,
 } from "@/lib/native/liveActivityPush";
+import { createDedupedWriter } from "@/lib/dedupedWriter";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
@@ -64,10 +70,16 @@ export async function cancelReminderChannels(
   if (reminder.alarmId) await cancelLeaveAlarm(reminder.alarmId);
 }
 
-/** Web-fire cleanup: drop only the reminder sub-object, keep the focus. */
+/** Web-fire cleanup: stamp the reminder as fired (keeps the focus + lead so the
+ *  card can show a "time to go" indicator), rather than dropping it. */
 function onReminderFired(): void {
   const after = loadFocusedTrip();
-  if (after) saveFocusedTrip({ ...after, reminder: null });
+  if (after?.reminder) {
+    saveFocusedTrip({
+      ...after,
+      reminder: { ...after.reminder, firedAt: Date.now() },
+    });
+  }
   notifyChange();
 }
 
@@ -95,25 +107,27 @@ function sameFocusIdentity(
  *  when the sync effect re-fires with unchanged data (RT poll, clock ticks). */
 const lastSentActivityContent = new Map<string, string>();
 
-/** Last registration POSTed per activity id — only refreshed on a confirmed-OK
- *  POST, so a failed attempt isn't cached and re-registration retries on the
- *  next trigger. Keeps the self-healing re-register (below) from spamming the
- *  backend with identical payloads on every drift/delay sync tick. */
-const lastSentRegistration = new Map<string, string>();
+/**
+ * Registration POSTs, deduped + serialized per activity id. Three independent
+ * triggers re-assert the same payload (boot reconcile, the arm path, every
+ * drift/delay content sync), and the backend bakes the armed reminder's lead
+ * into each locked-screen push — so it MUST hold the current lead or a delay
+ * push drops the "Leave in" stage. This is the safety net that re-asserts it
+ * when the arm-time POST was lost (offline) or raced the activity-id commit.
+ *
+ * {@link createDedupedWriter} collapses identical concurrent POSTs into one (a
+ * cold start used to send the same registration twice) and chains a changed
+ * payload behind the in-flight one, so a re-armed lead can't be clobbered by an
+ * older POST landing second.
+ */
+const registrationWriter = createDedupedWriter<LiveActivityRegistration>(
+  (registration) => registerPushActivity(registration),
+);
 
-/** (Re-)POST a registration only when it differs from the last one the backend
- *  accepted for this activity. The backend bakes the armed reminder's lead into
- *  every locked-screen push, so it MUST hold the current lead or a delay push
- *  drops the "Leave in" stage — this is the safety net that re-asserts the lead
- *  if the arm-time POST was lost (offline) or raced the activity-id commit. */
 async function postRegistrationDeduped(
   registration: LiveActivityRegistration,
 ): Promise<void> {
-  const json = JSON.stringify(registration);
-  if (lastSentRegistration.get(registration.id) === json) return;
-  if (await registerPushActivity(registration)) {
-    lastSentRegistration.set(registration.id, json);
-  }
+  await registrationWriter.write(registration.id, registration);
 }
 
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
@@ -122,7 +136,7 @@ async function postRegistrationDeduped(
 export async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
-  lastSentRegistration.delete(focused.liveActivityId);
+  registrationWriter.forget(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
   if (isLiveActivityPushEnabled()) {
     await deregisterPushActivity(focused.liveActivityId);
@@ -146,12 +160,46 @@ function originStartTimeFor(
   return cleaned && cleaned !== "--" ? cleaned : undefined;
 }
 
+/** Immutable widget attributes for a focus — identical on the start and the
+ *  scheduled-start paths. */
+function attributesFor(saved: FocusedTrip): TripActivityAttributes {
+  return {
+    tripNumber: saved.tripNumber,
+    fromStation: saved.fromStation,
+    toStation: saved.toStation,
+    routeName: "SMART",
+    direction: isSouthbound(saved.fromStation, saved.toStation)
+      ? "southbound"
+      : "northbound",
+  };
+}
+
+/**
+ * When this focus's Live Activity should appear on screen — one lead-time ahead
+ * of the armed leave alarm, or of departure when no reminder is set. Null when
+ * the departure instant can't be resolved. The scheduled start is pinned to
+ * this, so it's also how {@link ensureActivityForFocus} detects that a re-armed
+ * reminder moved the instant and the pending activity needs replacing.
+ */
+export function focusedActivityStartAt(focused: FocusedTrip): number | null {
+  const departureAt = focusedDepartureInstant(focused);
+  if (departureAt == null) return null;
+  return liveActivityStartAt({
+    reminderEpochMs: focused.reminder?.reminderAt ?? null,
+    departureEpochMs: departureAt,
+  });
+}
+
 /** The push-backend registration for a focus under activity id `id`, or null
  *  when the trip can't be reconstructed. Shared by the start path and the
- *  boot-time re-registration heal. */
+ *  boot-time re-registration heal. `activityStartEpochMs` marks a registration
+ *  filed ahead of a scheduled activity, so the backend sleeps until it; it
+ *  defaults to the focus's own pinned instant so the re-register/heal paths
+ *  can't silently drop it and wake the backend into a dormant poll loop. */
 function buildRegistrationForFocus(
   saved: FocusedTrip,
   id: string,
+  activityStartEpochMs: number | undefined = saved.liveActivityScheduledFor,
 ): LiveActivityRegistration | null {
   const trip = reconstructFocusedTrip(saved);
   const departureAt = focusedDepartureInstant(saved);
@@ -175,6 +223,7 @@ function buildRegistrationForFocus(
     // countdown alive across its locked-screen delay pushes (otherwise every
     // push would drop the "Leave in" stage back to "Departs in").
     ...(saved.reminder ? { reminderLeadMinutes: saved.reminder.leadMinutes } : {}),
+    ...(activityStartEpochMs != null ? { activityStartEpochMs } : {}),
   };
 }
 
@@ -209,29 +258,22 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
-  // Only show within the departure window / when a reminder is armed / en route
-  // — a far-ahead focus stays dormant rather than parking a Live Activity on the
-  // lock screen for hours. Re-evaluated by reconcile + the reminder-arm path.
+  // Not showtime yet — a focus pinned hours out shouldn't park a countdown on
+  // the lock screen all day. Hand the start to iOS instead of dropping it: the
+  // OS brings the activity up at the right instant with the app closed.
   if (
     !shouldShowLiveActivity({
-      hasReminder: saved.reminder != null,
+      reminderEpochMs: saved.reminder?.reminderAt ?? null,
       departureEpochMs: departureAt,
       arrivalEpochMs: arrivalAt,
       now: Date.now(),
     })
   ) {
+    await scheduleActivityForFocus(saved, departureAt, arrivalAt);
     return;
   }
   const id = tripActivityId(saved.tripNumber, saved.serviceDate);
-  const attributes: TripActivityAttributes = {
-    tripNumber: saved.tripNumber,
-    fromStation: saved.fromStation,
-    toStation: saved.toStation,
-    routeName: "SMART",
-    direction: isSouthbound(saved.fromStation, saved.toStation)
-      ? "southbound"
-      : "northbound",
-  };
+  const attributes = attributesFor(saved);
   const content = buildContentState({
     departureEpochMs: departureAt,
     arrivalEpochMs: arrivalAt,
@@ -264,8 +306,94 @@ export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     await endTripActivity(id);
     return;
   }
-  saveFocusedTrip({ ...latest, liveActivityId: id });
+  // Drop `liveActivityScheduledFor`: this activity is running NOW, not pending,
+  // so there's no future start instant left to compare against — leaving a stale
+  // one would make `ensureActivityForFocus` think it still had a pending slot.
+  const committed: FocusedTrip = { ...latest, liveActivityId: id };
+  delete committed.liveActivityScheduledFor;
+  saveFocusedTrip(committed);
   notifyChange();
+}
+
+/**
+ * Hand the focus's Live Activity to iOS with a FUTURE start date, so the OS
+ * brings it up half an hour before it's time to leave — with the app closed, which is
+ * the normal case for a trip pinned in the morning for an evening train.
+ *
+ * ActivityKit's scheduled start is iOS 26+; below it `scheduleTripActivity`
+ * no-ops and the activity simply starts the next time the app runs inside the
+ * window (the leave alarm / reminder notification still fires on time either
+ * way, since that's a separate AlarmKit/notification channel).
+ *
+ * The content state is built for the START instant, not for now — it's what
+ * renders the moment the activity appears. Registration follows the same commit
+ * discipline as {@link startActivityForFocus}: re-read the focus and roll the
+ * pending activity back if the user switched trips while we awaited.
+ */
+async function scheduleActivityForFocus(
+  saved: FocusedTrip,
+  departureAt: number,
+  arrivalAt: number,
+): Promise<void> {
+  const startAt = liveActivityStartAt({
+    reminderEpochMs: saved.reminder?.reminderAt ?? null,
+    departureEpochMs: departureAt,
+  });
+  const id = tripActivityId(saved.tripNumber, saved.serviceDate);
+  const content = buildContentState({
+    departureEpochMs: departureAt,
+    arrivalEpochMs: arrivalAt,
+    delayMinutes: null,
+    nextStop: null,
+    remainingStops: null,
+    isCanceled: false,
+    isEnded: false,
+    reminderSet: saved.reminder != null,
+    reminderEpochMs: saved.reminder?.reminderAt ?? null,
+    now: startAt,
+  });
+  const enablePush = isLiveActivityPushEnabled();
+  // Point iOS at the token endpoint BEFORE handing it the activity: the token
+  // is minted only when the OS starts it — likely with the app closed — and the
+  // endpoint is persisted natively, so configuring it now is what lets that
+  // future token reach the backend. (The immediate path does the same inside
+  // startAndRegisterPushActivity.)
+  if (enablePush) await configureLiveActivityTokenEndpoint();
+  const { scheduled } = await scheduleTripActivity({
+    id,
+    attributes: attributesFor(saved),
+    content,
+    startAtEpochMs: startAt,
+    // ActivityKit REQUIRES an alert for a scheduled start — iOS banners it when
+    // the activity appears. Module code, so the global i18n instance (same as
+    // armAndPersistReminder's alarm button labels).
+    alert: {
+      title: i18n.t("focusedTrip.activityStartTitle", { station: saved.fromStation }),
+      body: i18n.t("focusedTrip.activityStartBody", { trip: saved.tripNumber }),
+    },
+    enablePush,
+  });
+  if (!scheduled) return;
+  const latest = loadFocusedTrip();
+  if (latest == null || !sameFocusIdentity(latest, saved)) {
+    await endTripActivity(id);
+    return;
+  }
+  saveFocusedTrip({
+    ...latest,
+    liveActivityId: id,
+    liveActivityScheduledFor: startAt,
+  });
+  notifyChange();
+  // Register now rather than at start: once the OS brings the activity up the
+  // app may never run again before departure, so this is our only chance to set
+  // up locked-screen delay correction. The backend sleeps until `startAt`
+  // instead of polling through the dormant hours, and iOS POSTs the per-activity
+  // token to the (natively persisted) token endpoint when the activity starts.
+  if (enablePush) {
+    const registration = buildRegistrationForFocus(saved, id, startAt);
+    if (registration) await postRegistrationDeduped(registration);
+  }
 }
 
 /**
@@ -347,6 +475,25 @@ async function startOrReviveActivity(
  */
 export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
   const records = await listTripActivityRecords();
+  const pending =
+    focused.liveActivityId != null &&
+    records.some((r) => r.id === focused.liveActivityId && r.state === "pending");
+  // A scheduled activity hasn't started yet, so `updateActivity` can't reach it
+  // — and ActivityKit can't move a pending activity's start date. Arming or
+  // re-arming a reminder moves that date (the activity leads the leave alarm,
+  // not departure), so end the pending one and schedule a fresh one. Unchanged
+  // start instant → leave it alone rather than churn the OS slot.
+  if (pending) {
+    const wanted = focusedActivityStartAt(focused);
+    if (wanted == null || wanted === focused.liveActivityScheduledFor) return;
+    await endFocusActivity(focused);
+    await startActivityForFocus({
+      ...focused,
+      liveActivityId: undefined,
+      liveActivityScheduledFor: undefined,
+    });
+    return;
+  }
   // Revive/start when nothing live covers the focus; otherwise push current
   // content so a just-armed reminder's alarm stage shows immediately.
   if (!(await startOrReviveActivity(focused, records))) {
@@ -389,6 +536,20 @@ export async function reconcileTripActivities(): Promise<void> {
       saveFocusedTrip(focused);
       notifyChange();
     }
+  }
+  // The OS started a scheduled activity while we weren't running: it's live now,
+  // so drop the pinned start instant. Otherwise `ensureActivityForFocus` keeps
+  // comparing against a spent instant, and every re-registration would still
+  // tell the backend to sleep until it.
+  if (
+    focused?.liveActivityScheduledFor != null &&
+    records.some((r) => r.id === focused!.liveActivityId && r.state !== "pending")
+  ) {
+    const running: FocusedTrip = { ...focused };
+    delete running.liveActivityScheduledFor;
+    focused = running;
+    saveFocusedTrip(focused);
+    notifyChange();
   }
   const keep = focused?.liveActivityId;
   await Promise.all(

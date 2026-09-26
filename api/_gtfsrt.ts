@@ -36,8 +36,8 @@ export class UpstreamGtfsRtError extends Error {
 
 /**
  * Fetch the raw GTFS-RT protobuf bytes for a feed from 511. Kept separate from
- * decoding so the shared cache (see _feedCache.ts) can store and serve the
- * exact upstream bytes.
+ * decoding so the shared cache (see workers/web/src/lib/gtfsrt.ts, which uses
+ * the Workers edge Cache API) can store and serve the exact upstream bytes.
  */
 export async function fetchGtfsRtBytes(
   feed: "servicealerts" | "vehiclepositions" | "tripupdates"

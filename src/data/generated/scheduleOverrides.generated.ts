@@ -10,6 +10,13 @@ export type ScheduleType = "weekday" | "weekend";
  * "weekend"). Dates not in this map fall back to the natural day-of-week
  * classification.
  */
-export const scheduleOverrides: Record<string, ScheduleType> = {};
+export const scheduleOverrides: Record<string, ScheduleType> = {
+  "2026-09-07": "weekend",
+  "2026-11-26": "weekend",
+  "2026-11-27": "weekend",
+  "2026-12-24": "weekend",
+  "2026-12-25": "weekend",
+  "2026-12-31": "weekend"
+};
 
 export default scheduleOverrides;

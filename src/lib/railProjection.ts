@@ -12,7 +12,16 @@
 import stations, { STATION_COORDINATES } from "@/data/stations";
 import { SMART_RAIL_COORDINATES } from "@/data/generated/railGeometry.generated";
 import { haversineKm } from "@/lib/stationUtils";
-import { KM_PER_DEG_LAT } from "@/lib/trainGpsProgress";
+
+/** Earth's radius in km (haversine + arc-length scaling). Defined HERE, in
+ *  the leaf geometry module, deliberately: this file uses the derived
+ *  constant at module top level, so importing it from a module that imports
+ *  back from this one (as trainGpsProgress once did) creates an import cycle
+ *  whose evaluation order the bundler is free to flip — and the losing order
+ *  is a ReferenceError (TDZ) that takes the whole map page down. */
+export const EARTH_RADIUS_KM = 6371;
+/** km per degree of latitude (~constant). */
+export const KM_PER_DEG_LAT = (Math.PI * EARTH_RADIUS_KM) / 180;
 
 // Equirectangular projection scaled by cos(meanLat). Error <15 m at SMART
 // corridor scale, plenty good for a "which segment is closest" snap.

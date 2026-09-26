@@ -59,6 +59,12 @@ export interface LiveActivityRegistration {
    *  countdown and reverting to "Departs in". Absent when no reminder is armed;
    *  the client re-registers whenever the reminder is armed or cleared. */
   reminderLeadMinutes?: number;
+  /** Epoch ms the Live Activity is SCHEDULED to appear, when it was registered
+   *  ahead of time (ActivityKit's future-start, iOS 26+). Until then no activity
+   *  exists and iOS has minted no token, so the server has nothing to push to —
+   *  it sleeps until this instant rather than burning a poll tick every 90s for
+   *  the hours in between. Absent when the activity is already running. */
+  activityStartEpochMs?: number;
 }
 
 /** The per-activity APNs token payload iOS POSTs to the token endpoint (the
@@ -103,7 +109,14 @@ export function isLiveActivityRegistration(
     (r.reminderLeadMinutes === undefined ||
       (typeof r.reminderLeadMinutes === "number" &&
         Number.isFinite(r.reminderLeadMinutes) &&
-        r.reminderLeadMinutes >= 0))
+        r.reminderLeadMinutes >= 0)) &&
+    // Must precede departure: it's when the activity appears, and the DO sleeps
+    // until it. A value at/after departure would park the alarm past the
+    // departure→arrival flip the activity exists to show.
+    (r.activityStartEpochMs === undefined ||
+      (typeof r.activityStartEpochMs === "number" &&
+        Number.isFinite(r.activityStartEpochMs) &&
+        r.activityStartEpochMs < (r.departureEpochMs as number)))
   );
 }
 

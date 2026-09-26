@@ -322,6 +322,7 @@ function buildSiteLinksFooter(): string {
         #seo-sitelinks .sep{opacity:.4}
         #seo-sitelinks a{color:hsl(var(--foreground));text-decoration:none;text-underline-offset:2px}
         #seo-sitelinks a:hover{color:hsl(var(--foreground));text-decoration:underline}
+        body.seo-sitelinks-hidden #seo-sitelinks{display:none}
       </style>
       <nav>
         <p><span class="label">Stations:</span> ${stationLinks}</p>

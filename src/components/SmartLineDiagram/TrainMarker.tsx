@@ -16,13 +16,9 @@ interface TrainMarkerProps {
    *  `getTotalLength` layout read. */
   pathLength: number;
   selected: boolean;
-  /** True when this is the train the user is currently riding. */
-  userRiding?: boolean;
-  /** When set, project these coords onto the rail instead of the train's
-   *  own GTFS-RT position. Used for the rider's latched train so the
-   *  marker tracks the phone (which leads the feed by ~15-30 s). */
-  overrideLat?: number | null;
-  overrideLng?: number | null;
+  /** True when this is the user's focused ("Go") trip — painted with the blue
+   *  "my trip" treatment. */
+  isMyTrain?: boolean;
   now: Date;
   onClick?: (train: MapTrain) => void;
 }
@@ -33,9 +29,7 @@ function TrainMarkerImpl({
   stationArcs,
   pathLength,
   selected,
-  userRiding = false,
-  overrideLat = null,
-  overrideLng = null,
+  isMyTrain = false,
   onClick,
   now,
 }: TrainMarkerProps) {
@@ -43,11 +37,7 @@ function TrainMarkerImpl({
   // doesn't give us a usable lat/lng — otherwise the schedule's
   // multi-station error would tug the marker off where the train
   // actually is.
-  const gpsTrain =
-    overrideLat != null && overrideLng != null
-      ? { ...train, latitude: overrideLat, longitude: overrideLng }
-      : train;
-  const gps = gpsStationProgress(gpsTrain);
+  const gps = gpsStationProgress(train);
   const resolved =
     gps ?? scheduledProgress(train, now) ?? trainStationProgress(train);
 
@@ -64,13 +54,13 @@ function TrainMarkerImpl({
 
   const isDelayed = isTrainDelayed(train);
 
-  // Riding swaps the on-time accent for blue; delayed/canceled win so the
+  // "My trip" swaps the on-time accent for blue; delayed/canceled win so the
   // status signal isn't lost.
   const accent = train.isCanceled
     ? TRAIN_COLORS.canceled
     : isDelayed
       ? TRAIN_COLORS.delayed
-      : userRiding
+      : isMyTrain
         ? TOKEN.myTrip
         : TRAIN_COLORS.onTime;
 
@@ -134,9 +124,9 @@ function TrainMarkerImpl({
           strokeDasharray={TOKEN.trainSelectedDash}
         />
       )}
-      {userRiding && accent !== TOKEN.myTrip && (
+      {isMyTrain && accent !== TOKEN.myTrip && (
         // Small blue badge in the lower-right of the marker — used when the
-        // accent stays gold/gray (delayed/canceled) so the riding signal is
+        // accent stays gold/gray (delayed/canceled) so the "my trip" signal is
         // still visible. Skipped when the whole marker is already blue.
         <circle
           cx={TOKEN.trainInnerR * 0.7}

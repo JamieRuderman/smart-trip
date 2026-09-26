@@ -12,6 +12,7 @@ import { Device } from "@capacitor/device";
 import { LiveActivity } from "capacitor-live-activity";
 import { logger } from "../logger";
 import {
+  canScheduleActivity,
   canStartActivity,
   encodeAttributes,
   encodeContentState,
@@ -31,6 +32,18 @@ function parseIosVersion(osVersion: string): { major: number; minor: number } {
     major: Number.isFinite(major) ? major : 0,
     minor: Number.isFinite(minor) ? minor : 0,
   };
+}
+
+/** Parsed iOS major/minor, or null when the device info can't be read — callers
+ *  treat null as "don't start", so the version gate fails closed. */
+async function iosVersion(): Promise<{ major: number; minor: number } | null> {
+  try {
+    const info = await Device.getInfo();
+    return parseIosVersion(info.osVersion);
+  } catch (error) {
+    logger.warn("Device.getInfo failed", error);
+    return null;
+  }
 }
 
 /** The countdown the activity currently shows — used as the start/version gate
@@ -67,20 +80,13 @@ export async function startTripActivity(
   content: TripActivityContentState,
 ): Promise<{ started: boolean }> {
   if (Capacitor.getPlatform() !== "ios") return { started: false };
-  let iosMajor = 0;
-  let iosMinor = 0;
-  try {
-    const info = await Device.getInfo();
-    ({ major: iosMajor, minor: iosMinor } = parseIosVersion(info.osVersion));
-  } catch (error) {
-    logger.warn("Device.getInfo failed", error);
-    return { started: false };
-  }
+  const version = await iosVersion();
   if (
+    version == null ||
     !canStartActivity({
       platform: "ios",
-      iosMajor,
-      iosMinor,
+      iosMajor: version.major,
+      iosMinor: version.minor,
       targetEpochMs: activeTarget(content),
       now: Date.now(),
     })
@@ -116,20 +122,13 @@ export async function startTripActivityWithPush(
   content: TripActivityContentState,
 ): Promise<{ started: boolean; activityId?: string }> {
   if (Capacitor.getPlatform() !== "ios") return { started: false };
-  let iosMajor = 0;
-  let iosMinor = 0;
-  try {
-    const info = await Device.getInfo();
-    ({ major: iosMajor, minor: iosMinor } = parseIosVersion(info.osVersion));
-  } catch (error) {
-    logger.warn("Device.getInfo failed", error);
-    return { started: false };
-  }
+  const version = await iosVersion();
   if (
+    version == null ||
     !canStartActivity({
       platform: "ios",
-      iosMajor,
-      iosMinor,
+      iosMajor: version.major,
+      iosMinor: version.minor,
       targetEpochMs: activeTarget(content),
       now: Date.now(),
     })
@@ -148,6 +147,71 @@ export async function startTripActivityWithPush(
   } catch (error) {
     logger.warn("LiveActivity.startActivityWithPush failed", error);
     return { started: false };
+  }
+}
+
+/**
+ * Ask iOS to bring the activity up **at a future instant** rather than now
+ * (ActivityKit `Activity.request(start:)`, iOS 26+). The OS starts it at
+ * `startAtEpochMs` even if the app has been closed since — which is the whole
+ * point: a trip focused six hours out shouldn't park a countdown on the lock
+ * screen all day, but the app can't be relied on to be running an hour before
+ * it's time to leave.
+ *
+ * The activity lands in ActivityKit's `pending` state until then, so it shows up
+ * in `listTripActivityRecords` immediately (and the reconcile/dedup paths treat
+ * it as "already covered"). `alert` is REQUIRED by ActivityKit for a scheduled
+ * start — iOS shows it as a banner when the activity appears.
+ *
+ * `contentState` should be built for `startAtEpochMs`, not for now: it's what
+ * renders the moment the activity appears.
+ *
+ * No-op `{ scheduled: false }` off-iOS, below iOS 26, on a past start instant,
+ * when Live Activities are disabled, or on plugin error — callers fall back to
+ * starting the activity the next time the app runs inside the window.
+ */
+export async function scheduleTripActivity(args: {
+  id: string;
+  attributes: TripActivityAttributes;
+  content: TripActivityContentState;
+  startAtEpochMs: number;
+  alert: { title: string; body: string };
+  /** Mint a per-activity APNs token so the push backend can correct the
+   *  countdown for delays once it starts. */
+  enablePush: boolean;
+}): Promise<{ scheduled: boolean }> {
+  if (Capacitor.getPlatform() !== "ios") return { scheduled: false };
+  const version = await iosVersion();
+  if (
+    version == null ||
+    !canScheduleActivity({
+      platform: "ios",
+      iosMajor: version.major,
+      startAtEpochMs: args.startAtEpochMs,
+      targetEpochMs: activeTarget(args.content),
+      now: Date.now(),
+    })
+  ) {
+    return { scheduled: false };
+  }
+  try {
+    const { value } = await LiveActivity.isAvailable();
+    if (!value) return { scheduled: false };
+    await LiveActivity.startActivityScheduled({
+      id: args.id,
+      attributes: encodeAttributes(args.attributes),
+      contentState: encodeContentState(args.content),
+      // The plugin feeds this to `Date(timeIntervalSince1970:)` — UNIX seconds,
+      // like `endActivity`'s `dismissalDate`.
+      startDate: Math.floor(args.startAtEpochMs / 1000),
+      alertConfiguration: { title: args.alert.title, body: args.alert.body },
+      enablePushToUpdate: args.enablePush,
+    });
+    return { scheduled: true };
+  } catch (error) {
+    // Includes the pre-iOS-26 rejection when the version parse was optimistic.
+    logger.warn("LiveActivity.startActivityScheduled failed", error);
+    return { scheduled: false };
   }
 }
 

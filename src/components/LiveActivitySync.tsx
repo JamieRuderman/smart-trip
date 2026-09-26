@@ -9,6 +9,7 @@ import {
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
+import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import { derivePhase } from "@/lib/native/liveActivity";
 
 /**
@@ -58,7 +59,9 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     staticArrivalAt != null && live?.liveArrivalTime
       ? anchorLiveTime(staticArrivalAt, live.liveArrivalTime)
       : staticArrivalAt;
-  const delayMinutes = live?.delayMinutes ?? null;
+  // Shared departure-else-arrival precedence, so the lock-screen pill flips
+  // to "Delayed" for an en-route slip exactly when the in-app card does.
+  const delayMinutes = effectiveDelayMinutes(live) ?? null;
   // A skipped boarding stop is a cancellation as far as this user's leg is
   // concerned — mirror useTripStatus's isCanceledOrSkipped.
   const isCanceled = (live?.isCanceled ?? false) || (live?.isOriginSkipped ?? false);

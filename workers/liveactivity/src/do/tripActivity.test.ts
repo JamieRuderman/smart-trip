@@ -94,6 +94,18 @@ describe("nextWake", () => {
     const t = LEAVE_MS + 60_000; // past the leave instant, still pre-departure
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS)).toBe(t + POLL_MS);
   });
+  it("sleeps straight through to a scheduled activity's start instant", () => {
+    // Registered ahead of an iOS 26 future-start activity: nothing exists to
+    // push to yet, so don't burn a 90s poll for the hours in between.
+    const startAt = SCHED_DEP_MS - 75 * 60_000;
+    const t = startAt - 6 * 60 * 60_000;
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, LEAVE_MS, startAt)).toBe(startAt);
+  });
+  it("resumes normal polling once the scheduled start has passed", () => {
+    const startAt = SCHED_DEP_MS - 75 * 60_000;
+    const t = startAt + 1_000;
+    expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t, null, startAt)).toBe(t + POLL_MS);
+  });
   it("targets the arrival boundary within an end-game poll of it", () => {
     const t = SCHED_ARR_MS - 20_000; // < ENDGAME_POLL_MS from arrival
     expect(nextWake(SCHED_DEP_MS, SCHED_ARR_MS, t)).toBe(SCHED_ARR_MS);
@@ -188,6 +200,41 @@ describe("planTick", () => {
     expect(plan.stop).toBe(true);
     const aps = (plan.push!.payload as { aps: Record<string, unknown> }).aps;
     expect(aps["dismissal-date"]).toBe(Math.floor(displayedArr / 1000));
+  });
+
+  it("defers the terminal fallbacks while the vehicle is still short of the destination", () => {
+    const displayedArr = SCHED_ARR_MS + 4 * 60_000;
+    const lastSent = {
+      delayMinutes: 4,
+      phase: "en-route" as const,
+      isEnded: false,
+      isCanceled: false,
+      arrivalEpochMs: displayedArr,
+    };
+    // Feed read failed AND the positions feed shows the train en route:
+    // no synthesized end — keep polling instead of dismissing mid-ride.
+    const noFeed = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent,
+      updates: null,
+      now: displayedArr + 60_000,
+      vehicleShortOfDestination: true,
+    });
+    expect(noFeed.push).toBeNull();
+    expect(noFeed.stop).toBe(false);
+    // Feed present but the run is unlocatable (pruned): same veto applies
+    // through computeLiveTripStatus.
+    const unlocatable = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent,
+      updates: [],
+      now: displayedArr + 60_000,
+      vehicleShortOfDestination: true,
+    });
+    expect(unlocatable.push).toBeNull();
+    expect(unlocatable.stop).toBe(false);
   });
 
   it("is silent when nothing changed since the last send", () => {

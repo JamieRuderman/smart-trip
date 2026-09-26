@@ -35,6 +35,17 @@ export function isLiveActivityPushEnabled(): boolean {
 }
 
 /**
+ * Point iOS at the backend endpoint it POSTs per-activity update tokens to.
+ * Persisted natively across launches, so it must be configured before ANY
+ * push-enabled activity request — immediate or scheduled. A SCHEDULED activity
+ * mints its token only when the OS starts it, possibly hours after JS last ran,
+ * so schedule time is the last chance to give that token somewhere to go.
+ */
+export async function configureLiveActivityTokenEndpoint(): Promise<void> {
+  await setLiveActivityTokenEndpoint(`${apiBaseUrl}${TOKEN_PATH}`);
+}
+
+/**
  * Start a push-enabled Live Activity and register it with the backend. Points
  * iOS at the token endpoint (so it POSTs the per-activity token directly, even
  * across launches) and POSTs the trip identity the server needs to re-derive
@@ -50,7 +61,7 @@ export async function startAndRegisterPushActivity(
 ): Promise<{ started: boolean }> {
   // Configure the token sink BEFORE starting, so the token iOS mints at start
   // has somewhere to go.
-  await setLiveActivityTokenEndpoint(`${apiBaseUrl}${TOKEN_PATH}`);
+  await configureLiveActivityTokenEndpoint();
   const { started } = await startTripActivityWithPush(
     registration.id,
     attributes,

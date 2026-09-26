@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useNow } from "@/hooks/useNow";
 import { fetchGtfsRtJson } from "@/lib/gtfsRtFetch";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import type {
@@ -11,8 +12,10 @@ const VEHICLE_POSITIONS_POLL_INTERVAL = 15 * 1000; // 15 seconds
 const FEED_STALE_THRESHOLD_SECONDS = 90;  // feed header age
 const VEHICLE_STALE_THRESHOLD_SECONDS = 60; // individual vehicle age
 
-/** Raw vehicle positions feed, polled every 15 seconds. */
-export function useVehiclePositions() {
+/** Raw vehicle positions feed, polled every 15 seconds. Pass `enabled: false`
+ *  to keep the hook mounted without fetching/polling (the query key is shared,
+ *  so a disabled consumer still sees data another consumer fetched). */
+export function useVehiclePositions(enabled = true) {
   return useQuery({
     queryKey: ["gtfsrt", "vehiclepositions"],
     queryFn: () =>
@@ -22,6 +25,7 @@ export function useVehiclePositions() {
     refetchInterval: VEHICLE_POSITIONS_POLL_INTERVAL,
     staleTime: 10 * 1000,
     retry: 2,
+    enabled,
   });
 }
 
@@ -40,20 +44,28 @@ export function useVehiclePositions() {
  * @param startTime - "HH:MM" origin departure time from the static schedule
  * @param startDate - "YYYYMMDD" service date
  * @param directionId - 0 = southbound, 1 = northbound
+ * @param enabled - set false to stop fetching/polling while keeping the hook
+ *   mounted (returns null, or a match from data another consumer fetched)
  */
 export function useVehiclePositionForTrip(
   startTime: string | undefined,
   startDate: string | undefined,
-  directionId: number | undefined
+  directionId: number | undefined,
+  enabled = true,
 ): VehiclePositionMatch | null {
-  const { data } = useVehiclePositions();
+  const { data } = useVehiclePositions(enabled);
+  // Freshness clock as a real dependency, NOT Date.now() read inside the
+  // memo: when the feed stops delivering (offline, repeated fetch errors)
+  // `data` keeps its last identity and a Date.now()-only check would never
+  // re-run — the last match would stay "fresh" forever. That matters because
+  // consumers use this match to veto trip-ended / focused-trip auto-clear;
+  // the veto must lapse once the data genuinely goes stale.
+  const nowSeconds = useNow(15_000, enabled);
 
   return useMemo((): VehiclePositionMatch | null => {
     if (!data || startTime == null || startDate == null || directionId == null) {
       return null;
     }
-
-    const nowSeconds = Math.floor(Date.now() / 1000);
 
     // Check feed header freshness
     if (data.timestamp > 0 && nowSeconds - data.timestamp > FEED_STALE_THRESHOLD_SECONDS) {
@@ -93,5 +105,5 @@ export function useVehiclePositionForTrip(
     }
 
     return null;
-  }, [data, startTime, startDate, directionId]);
+  }, [data, startTime, startDate, directionId, nowSeconds]);
 }

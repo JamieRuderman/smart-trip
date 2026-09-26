@@ -632,9 +632,9 @@ describe("focus switching", () => {
     liveActivityId: SAME_RUN_ID,
   };
 
-  function deferred() {
-    let resolve!: () => void;
-    const promise = new Promise<void>((r) => (resolve = r));
+  function deferred<T = void>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
     return { promise, resolve };
   }
   const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -671,7 +671,7 @@ describe("focus switching", () => {
   describe("replaceFocus", () => {
     it("announces the new focus before tearing down the previous one", async () => {
       isLiveActivityPushEnabled.mockReturnValue(true);
-      const deregister = deferred();
+      const deregister = deferred<boolean>();
       deregisterPushActivity.mockReturnValue(deregister.promise);
       stored = PREV;
       const seen: { focus: FocusedTrip | null; tornDown: boolean }[] = [];
@@ -693,7 +693,7 @@ describe("focus switching", () => {
       expect(deregisterPushActivity).toHaveBeenCalledWith(PREV_ID);
       expect(stored).toBe(NEXT);
 
-      deregister.resolve();
+      deregister.resolve(true);
       await replacing;
       expect(stored).toMatchObject({ tripNumber: 7, liveActivityId: expect.stringMatching(/^trip-7-/) });
       expect(seen.every((s) => s.focus != null)).toBe(true);

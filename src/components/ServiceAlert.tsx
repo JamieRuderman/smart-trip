@@ -4,6 +4,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
+import { formatClockTime } from "@/lib/timeUtils";
 
 interface ServiceAlertProps {
   /** Live alerts from GTFS-RT — already filtered by `useServiceAlerts`. */
@@ -11,7 +12,7 @@ interface ServiceAlertProps {
 }
 
 export function ServiceAlert({ alerts }: ServiceAlertProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isDismissed, dismissAlert, restoreAll, dismissedCountForActive, pruneExpired } =
     useDismissedAlerts();
 
@@ -54,37 +55,32 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
           key={alert.fingerprint}
           className="overflow-hidden bg-smart-gold/5 md:border-smart-gold/30"
         >
-          <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between gap-3">
+          <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between gap-3 text-smart-gold-foreground">
             <div className="flex items-start gap-2.5 flex-1 min-w-0">
-              <AlertTriangle className="h-5 w-5 text-smart-gold-dark flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm text-smart-gold-dark break-words">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 break-words">
+                <div className="font-semibold text-sm">
                   {alert.title ?? t("serviceAlert.sectionTitle")}
                 </div>
                 {alert.message && (
-                  <p className="text-xs text-smart-gold-dark mt-1 max-h-32 overflow-y-auto overscroll-contain pr-1 break-words">
+                  <p className="text-xs mt-1 max-h-32 overflow-y-auto overscroll-contain pr-1">
                     {alert.message}
                   </p>
                 )}
               </div>
             </div>
-            {/* X + timestamp share a right-hand column so the time sits tucked
-                under the close button, right-aligned and clear of the text flow. */}
-            <div className="flex flex-col items-end gap-0.5 shrink-0 -mr-2 -mt-2">
+            <div className="flex flex-col items-end shrink-0 -mr-2 -mt-2">
               <button
                 type="button"
                 aria-label={t("serviceAlert.dismiss")}
                 onClick={() => dismissAlert(alert)}
-                className="p-3 rounded-lg text-smart-gold-dark hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
+                className="p-3 rounded-lg hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
               {alert.startsAt && (
-                <p className="text-xs text-smart-gold-dark pr-3 -mt-1">
-                  {new Date(alert.startsAt).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                <p className="text-xs pr-3 -mt-0.5">
+                  {formatClockTime(Date.parse(alert.startsAt), "12h", i18n.language)}
                 </p>
               )}
             </div>

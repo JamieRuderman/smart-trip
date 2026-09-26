@@ -143,6 +143,35 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
   }
 }
 
+/** Activity ids retired by {@link replaceFocus}. The new focus is saved before
+ *  the old activity ends, and re-focusing the same trip + service date shares
+ *  its id prefix, so the reconcile's adoption must skip these. Ids end in a
+ *  random slug, so an entry never matches a later activity. */
+const retiredActivityIds = new Set<string>();
+
+/**
+ * Make `next` the focus, replacing any previous one. `next` is saved and
+ * announced BEFORE the previous focus's reminder channels and Live Activity are
+ * torn down, so a surface opened alongside the switch (the reminder dialog "Take
+ * this train" pops) never renders the old trip meanwhile — on push builds the
+ * teardown awaits an untimed deregister request. The new activity starts last,
+ * from the re-read focus, and only if it's still `next` and nothing else (a
+ * reconcile, a reminder arm) committed one in the meantime.
+ */
+export async function replaceFocus(next: FocusedTrip): Promise<void> {
+  const prev = loadFocusedTrip();
+  if (prev?.liveActivityId) retiredActivityIds.add(prev.liveActivityId);
+  saveFocusedTrip(next);
+  notifyChange();
+  if (prev?.reminder) await cancelReminderChannels(prev.reminder);
+  await endFocusActivity(prev);
+  const latest = loadFocusedTrip();
+  if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
+    return;
+  }
+  await startActivityForFocus(latest);
+}
+
 /**
  * Origin-terminal scheduled departure ("HH:MM", markers stripped) — matches
  * the GTFS-RT feed's `startTime`, which is how the backend recognizes a
@@ -515,8 +544,10 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * Call alongside `bootFocusedTrip`.
  */
 export async function reconcileTripActivities(): Promise<void> {
-  let focused = loadFocusedTrip();
   const records = await listTripActivityRecords();
+  // Read after the await: a focus switch can land during it, and this pass
+  // saves `focused` back, which would clobber the new focus with the old one.
+  let focused = loadFocusedTrip();
   // Adopt a running activity for the SAME trip+service date when the focus's
   // committed `liveActivityId` hasn't landed yet — `startActivityForFocus`
   // commits it asynchronously, so a reconcile racing a just-started activity
@@ -530,7 +561,9 @@ export async function reconcileTripActivities(): Promise<void> {
       !records.some((r) => r.id === focused!.liveActivityId))
   ) {
     const prefix = `trip-${focused.tripNumber}-${focused.serviceDate}-`;
-    const adopted = records.find((r) => r.id.startsWith(prefix));
+    const adopted = records.find(
+      (r) => r.id.startsWith(prefix) && !retiredActivityIds.has(r.id),
+    );
     if (adopted) {
       focused = { ...focused, liveActivityId: adopted.id };
       saveFocusedTrip(focused);

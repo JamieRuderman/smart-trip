@@ -15,7 +15,7 @@ import {
   ensureActivityForFocus,
   notifyChange,
   reRegisterPushForFocus,
-  startActivityForFocus,
+  replaceFocus,
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 
@@ -52,10 +52,7 @@ export function useFocusedTrip() {
    *  reminder + Live Activity. Caller handles any "switch trains?"
    *  confirmation. */
   const focusTrip = useCallback(async (input: FocusTripInput) => {
-    const prev = loadFocusedTrip();
-    if (prev?.reminder) await cancelReminderChannels(prev.reminder);
-    await endFocusActivity(prev);
-    const next: FocusedTrip = {
+    await replaceFocus({
       source: "user",
       tripNumber: input.tripNumber,
       fromStation: input.fromStation,
@@ -63,12 +60,7 @@ export function useFocusedTrip() {
       scheduleType: input.scheduleType,
       serviceDate: input.serviceDate,
       reminder: null,
-    };
-    saveFocusedTrip(next);
-    notifyChange();
-    // After the focus is visible — the activity is an enhancement, so its
-    // (async, gated) start must not delay the card/picker appearing.
-    await startActivityForFocus(next);
+    });
   }, []);
 
   /** Arm (number) or disarm (null) the reminder. `departureAt` is the live-

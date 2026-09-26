@@ -268,6 +268,38 @@ describe("push registration", () => {
   });
 });
 
+describe("teardown", () => {
+  afterEach(() => saveFocusedTrip.mockReset());
+
+  it("deregisters a start the focus changed under, without registering it", async () => {
+    isLiveActivityPushEnabled.mockReturnValue(true);
+    let stored: FocusedTrip | null = { ...FOCUS };
+    loadFocusedTrip.mockImplementation(() => stored);
+    saveFocusedTrip.mockImplementation((trip: FocusedTrip | null) => {
+      stored = trip;
+    });
+    startTripActivityWithPush.mockImplementationOnce(async () => {
+      stored = { ...FOCUS, tripNumber: 9 };
+      return { started: true };
+    });
+    await ensureActivityForFocus(FOCUS);
+    const id = startTripActivityWithPush.mock.calls[0][0];
+    expect(endTripActivity).toHaveBeenCalledWith(id);
+    expect(registerPushActivity).not.toHaveBeenCalled();
+    expect(deregisterPushActivity).toHaveBeenCalledWith(id);
+  });
+
+  it("deregisters an orphan the reconcile ends on a push build", async () => {
+    isLiveActivityPushEnabled.mockReturnValue(true);
+    loadFocusedTrip.mockReturnValue(null);
+    const orphan = "trip-3-2026-06-08-orphan";
+    listTripActivityRecords.mockResolvedValue([{ id: orphan, state: "active" }]);
+    await reconcileTripActivities();
+    expect(endTripActivity).toHaveBeenCalledWith(orphan);
+    expect(deregisterPushActivity).toHaveBeenCalledWith(orphan);
+  });
+});
+
 describe("content updates to a scheduled activity", () => {
   const scheduled = (id: string): FocusedTrip => ({
     ...FOCUS,
@@ -350,6 +382,7 @@ describe("content updates to a scheduled activity", () => {
     const id = "trip-7-refresh-started";
     lateStart(id, [{ id, state: "active" }]);
     await ensureActivityForFocus(scheduled(id));
+    expect(listTripActivityRecords).toHaveBeenCalledTimes(1);
     expect(startTripActivity).not.toHaveBeenCalled();
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
     expect(saveFocusedTrip).toHaveBeenCalledWith(
@@ -508,10 +541,8 @@ describe("a dismissed activity", () => {
     id = startTripActivityWithPush.mock.calls[0][0];
 
     listedDismissed();
-    // Queued behind the in-flight start, so nothing is recorded or deregistered yet.
     const reconciled = reconcileTripActivities();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(stored).not.toMatchObject({ liveActivityDismissed: true });
+    await vi.waitFor(() => expect(stored).toMatchObject({ liveActivityDismissed: true }));
     expect(deregisterPushActivity).not.toHaveBeenCalled();
     land(true);
     await Promise.all([starting, reconciled]);

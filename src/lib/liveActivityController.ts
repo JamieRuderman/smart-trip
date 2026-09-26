@@ -4,10 +4,8 @@
  * boot/foreground reconcile, and reminder (leave-alarm) scheduling.
  *
  * These are plain module functions (no React) extracted from `useFocusedTrip`
- * so the hook stays a thin state wrapper. The per-activity dedup state
- * (`lastSentActivityContent`, the registration and deregistration writers)
- * lives here and is private to this module, shared by the start/refresh/sync
- * paths.
+ * so the hook stays a thin state wrapper. The per-activity state (dedup maps,
+ * the push writers, the start queue) is private to this module.
  */
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
@@ -153,9 +151,16 @@ async function postRegistrationDeduped(
  *  Island), if one is running. Also deregisters it from the push backend when
  *  push updates are enabled. Safe no-op everywhere else. */
 async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
-  if (!focused?.liveActivityId) return;
-  await endTripActivity(focused.liveActivityId);
-  await forgetActivity(focused.liveActivityId);
+  if (focused?.liveActivityId) await endActivity(focused.liveActivityId);
+}
+
+/** End activity `id` for good: retire it (synchronously, before the first await,
+ *  so a reconcile can't adopt it mid-teardown), end it natively, and stop pushing
+ *  to it. Every site that ends an activity goes through here. */
+async function endActivity(id: string): Promise<void> {
+  retiredActivityIds.add(id);
+  await endTripActivity(id);
+  await forgetActivity(id);
 }
 
 /** Stop registering `id` and deregister it from the push backend. */
@@ -167,10 +172,10 @@ async function forgetActivity(id: string): Promise<void> {
   if (isLiveActivityPushEnabled()) await deregistrationWriter.write(id, id);
 }
 
-/** Activity ids retired by {@link replaceFocus}. The new focus is saved before
- *  the old activity ends, and re-focusing the same trip + service date shares
- *  its id prefix, so the reconcile's adoption must skip these. Ids end in a
- *  random slug, so an entry never matches a later activity. */
+/** Activity ids ended through {@link endActivity}. {@link replaceFocus} saves the
+ *  new focus before the old activity ends, and re-focusing the same trip +
+ *  service date shares its id prefix, so the reconcile's adoption must skip
+ *  these. Ids end in a random slug, so an entry never matches a later activity. */
 const retiredActivityIds = new Set<string>();
 
 /** Tail of the queue that serializes every decision to start an activity. A
@@ -195,7 +200,6 @@ function serializeStart(task: () => Promise<void>): Promise<void> {
  */
 export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   const prev = loadFocusedTrip();
-  if (prev?.liveActivityId) retiredActivityIds.add(prev.liveActivityId);
   saveFocusedTrip(next);
   notifyChange();
   await Promise.all([cancelReminderChannels(prev?.reminder ?? null), endFocusActivity(prev)]);
@@ -374,16 +378,16 @@ async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
     started = (await startTripActivity(id, attributes, content)).started;
   }
   if (!started) return;
-  // Through the writer, so a teardown racing this start waits for the POST.
-  if (registration) await postRegistrationDeduped(registration);
-  lastSentActivityContent.set(id, JSON.stringify(content));
   const latest = loadFocusedTrip();
   if (latest == null || !sameFocusIdentity(latest, saved)) {
-    lastSentActivityContent.delete(id);
-    await endTripActivity(id);
+    await endActivity(id);
     return;
   }
+  lastSentActivityContent.set(id, JSON.stringify(content));
   commitActivity(latest, id);
+  // Not awaited, so the start queue doesn't wait on the network: the writer marks
+  // the POST in flight synchronously, and a later teardown waits for it.
+  if (registration) void postRegistrationDeduped(registration);
 }
 
 /**
@@ -447,7 +451,7 @@ async function scheduleActivityForFocus(
   if (!scheduled) return;
   const latest = loadFocusedTrip();
   if (latest == null || !sameFocusIdentity(latest, saved)) {
-    await endTripActivity(id);
+    await endActivity(id);
     return;
   }
   commitActivity(latest, id, startAt);
@@ -458,16 +462,14 @@ async function scheduleActivityForFocus(
   // token to the (natively persisted) token endpoint when the activity starts.
   if (enablePush) {
     const registration = buildRegistrationForFocus(saved, id, startAt);
-    if (registration) await postRegistrationDeduped(registration);
+    if (registration) void postRegistrationDeduped(registration);
   }
 }
 
 /** Point the focus at a started, scheduled or adopted activity, rewriting every
  *  bookkeeping field so none carries over from the activity it replaces. A running
- *  activity drops `liveActivityScheduledFor`: a stale start instant would make
- *  `ensureActivityForFocus` think it still had a pending slot. Re-committing the
- *  same id keeps its dismissal: a start can land after a reconcile adopted and
- *  flagged it. */
+ *  activity drops `liveActivityScheduledFor`: a stale start instant would hold its
+ *  content sends and tell the push backend to sleep until it. */
 function commitActivity(latest: FocusedTrip, id: string, scheduledFor?: number | null): FocusedTrip {
   const committed: FocusedTrip = {
     ...latest,
@@ -476,7 +478,7 @@ function commitActivity(latest: FocusedTrip, id: string, scheduledFor?: number |
   };
   if (scheduledFor != null) committed.liveActivityScheduledFor = scheduledFor;
   else delete committed.liveActivityScheduledFor;
-  if (latest.liveActivityId !== id) delete committed.liveActivityDismissed;
+  delete committed.liveActivityDismissed;
   saveFocusedTrip(committed);
   notifyChange();
   return committed;
@@ -512,6 +514,18 @@ function noteScheduledActivityStarted(id: string): FocusedTrip | null {
   saveFocusedTrip(running);
   notifyChange();
   return running;
+}
+
+/** {@link noteScheduledActivityStarted} when `records` shows the focus's scheduled
+ *  activity past `pending`, so the pass doesn't read the inventory again to learn
+ *  it. Returns the latest focus. */
+function noteStartedFromRecords(
+  focused: FocusedTrip,
+  records: TripActivityRecord[],
+): FocusedTrip | null {
+  const id = focused.liveActivityScheduledFor != null ? focused.liveActivityId : undefined;
+  if (!id || !records.some((r) => r.id === id && r.state !== "pending")) return focused;
+  return noteScheduledActivityStarted(id);
 }
 
 /**
@@ -647,7 +661,7 @@ async function startOrReviveActivity(
     if (kept.state !== "ended" || isLiveActivityPushEnabled()) return false;
     // End the frozen one first so its pending auto-dismissal can't remove the
     // freshly started activity.
-    await endTripActivity(keep);
+    await endActivity(keep);
   }
   await startActivityForFocus(focused);
   return true;
@@ -698,7 +712,9 @@ async function ensureActivity(focused: FocusedTrip): Promise<void> {
   }
   // Revive/start when nothing live covers the focus; otherwise push current
   // content so a just-armed reminder's alarm stage shows immediately.
-  const current = await noteActivityDismissed(focused, records);
+  const started = noteStartedFromRecords(focused, records);
+  if (!started) return;
+  const current = await noteActivityDismissed(started, records);
   if (!(await startOrReviveActivity(current, records))) {
     await refreshActivityContent(current);
   }
@@ -750,18 +766,9 @@ async function reconcileActivities(): Promise<void> {
       focused = commitActivity(focused, adopted.id, scheduledFor);
     }
   }
-  // The OS started a scheduled activity while we weren't running: it's live now,
-  // so drop the pinned start instant. Otherwise `ensureActivityForFocus` keeps
-  // comparing against a spent instant, and every re-registration would still
-  // tell the backend to sleep until it.
-  const scheduledId = focused?.liveActivityScheduledFor != null ? focused.liveActivityId : undefined;
-  if (scheduledId && records.some((r) => r.id === scheduledId && r.state !== "pending")) {
-    focused = noteScheduledActivityStarted(scheduledId);
-  }
+  if (focused) focused = noteStartedFromRecords(focused, records);
   const keep = focused?.liveActivityId;
-  await Promise.all(
-    records.filter((r) => r.id !== keep).map((r) => endTripActivity(r.id)),
-  );
+  await Promise.all(records.filter((r) => r.id !== keep).map((r) => endActivity(r.id)));
   if (!focused) return;
   focused = await noteActivityDismissed(focused, records);
   // (Re)start or revive the focus's activity if nothing live is on screen for
@@ -773,8 +780,9 @@ async function reconcileActivities(): Promise<void> {
   // Push heal: the running activity's registration POST may have failed at
   // focus time (offline), silently degrading locked-screen corrections.
   // Re-registering is an idempotent upsert keyed on the activity id (and
-  // refreshes the server-side TTLs), so re-POST on every boot.
-  await reRegisterPushForFocus(focused);
+  // refreshes the server-side TTLs), so re-POST on every boot. Not awaited, so the
+  // start queue doesn't wait on the network.
+  void reRegisterPushForFocus(focused);
 }
 
 /**

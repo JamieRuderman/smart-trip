@@ -232,6 +232,11 @@ describe("content updates to a scheduled activity", () => {
   const sync = (delayMinutes = 3) =>
     syncFocusedActivityContent({ departureAt: DEPARTURE, arrivalAt: ARRIVAL, delayMinutes });
   const pastStart = NOW + 11 * 60_000;
+  const lateStart = (id: string, records: { id: string; state: string }[] | null) => {
+    loadFocusedTrip.mockReturnValue(scheduled(id));
+    listTripActivityRecords.mockResolvedValue(records);
+    vi.setSystemTime(pastStart);
+  };
 
   it("skips the drift sync while iOS has not started the activity yet", async () => {
     loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-pending"));
@@ -240,15 +245,16 @@ describe("content updates to a scheduled activity", () => {
     expect(listTripActivityRecords).not.toHaveBeenCalled();
   });
 
-  it("syncs and drops the start instant once the inventory shows the activity running", async () => {
+  it("syncs, then drops the start instant, once the inventory shows the activity running", async () => {
     const id = "trip-7-sync-started";
-    loadFocusedTrip.mockReturnValue(scheduled(id));
-    listTripActivityRecords.mockResolvedValue([{ id, state: "active" }]);
-    vi.setSystemTime(pastStart);
+    lateStart(id, [{ id, state: "active" }]);
     await sync();
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
     expect(saveFocusedTrip).toHaveBeenCalledWith(
       expect.not.objectContaining({ liveActivityScheduledFor: expect.anything() }),
+    );
+    expect(updateTripActivity.mock.invocationCallOrder[0]).toBeLessThan(
+      saveFocusedTrip.mock.invocationCallOrder[0],
     );
 
     loadFocusedTrip.mockReturnValue(saveFocusedTrip.mock.lastCall![0] as FocusedTrip);
@@ -258,11 +264,13 @@ describe("content updates to a scheduled activity", () => {
     expect(listTripActivityRecords).toHaveBeenCalledTimes(1);
   });
 
-  it("holds content while iOS still lists the activity as pending past its start instant", async () => {
-    const id = "trip-7-sync-late";
-    loadFocusedTrip.mockReturnValue(scheduled(id));
-    listTripActivityRecords.mockResolvedValue([{ id, state: "pending" }]);
-    vi.setSystemTime(pastStart);
+  it.each([
+    ["lists it as pending", (id: string) => [{ id, state: "pending" }]],
+    ["does not list it", () => []],
+    ["cannot be read", () => null],
+  ])("holds content past the start instant while the inventory %s", async (label, records) => {
+    const id = `trip-7-sync-held-${label}`;
+    lateStart(id, records(id));
     await sync();
     expect(updateTripActivity).not.toHaveBeenCalled();
     expect(saveFocusedTrip).not.toHaveBeenCalled();
@@ -270,9 +278,7 @@ describe("content updates to a scheduled activity", () => {
 
   it("reads the inventory at most once a minute while the start is late", async () => {
     const id = "trip-7-sync-backoff";
-    loadFocusedTrip.mockReturnValue(scheduled(id));
-    listTripActivityRecords.mockResolvedValue([{ id, state: "pending" }]);
-    vi.setSystemTime(pastStart);
+    lateStart(id, [{ id, state: "pending" }]);
     await sync();
     vi.setSystemTime(pastStart + 30_000);
     await sync();
@@ -283,15 +289,6 @@ describe("content updates to a scheduled activity", () => {
     await sync();
     expect(listTripActivityRecords).toHaveBeenCalledTimes(2);
     expect(updateTripActivity).toHaveBeenCalledTimes(1);
-  });
-
-  it("falls back to the stored instant when the inventory read fails", async () => {
-    loadFocusedTrip.mockReturnValue(scheduled("trip-7-sync-unread"));
-    listTripActivityRecords.mockResolvedValue(null);
-    vi.setSystemTime(pastStart);
-    await sync();
-    expect(updateTripActivity).toHaveBeenCalledTimes(1);
-    expect(saveFocusedTrip).not.toHaveBeenCalled();
   });
 
   it("skips the reminder refresh when the inventory has not listed the pending activity", async () => {

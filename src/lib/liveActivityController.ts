@@ -115,10 +115,10 @@ const lastSentRegistration = new Map<string, string>();
 
 const SCHEDULED_START_RECHECK_MS = 60_000;
 
-/** When the inventory last listed each scheduled activity as still pending past
- *  its start instant, so a late start costs one inventory read per
+/** When each scheduled activity's inventory record was last read past its start
+ *  instant, so a late start costs one read per
  *  {@link SCHEDULED_START_RECHECK_MS} rather than one per sync. */
-const pendingSeenAt = new Map<string, number>();
+const startCheckedAt = new Map<string, number>();
 
 /** (Re-)POST a registration only when it differs from the last one the backend
  *  accepted for this activity. The backend bakes the armed reminder's lead into
@@ -142,7 +142,7 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
   lastSentRegistration.delete(focused.liveActivityId);
-  pendingSeenAt.delete(focused.liveActivityId);
+  startCheckedAt.delete(focused.liveActivityId);
   await endTripActivity(focused.liveActivityId);
   if (isLiveActivityPushEnabled()) {
     await deregisterPushActivity(focused.liveActivityId);
@@ -448,25 +448,19 @@ function noteScheduledActivityStarted(id: string): FocusedTrip | null {
 
 /**
  * Whether the focus's scheduled activity hasn't started yet. Certain before its
- * stored start instant; after it iOS can start the activity late, so the
- * inventory decides. A running record drops the instant, so later sends skip the
- * read. A missing record or failed read falls back to the stored instant.
+ * stored start instant; after it iOS can start the activity late, so only an
+ * inventory record past `pending` counts as started.
  */
 async function awaitingScheduledStart(focused: FocusedTrip, id: string): Promise<boolean> {
   const scheduledFor = focused.liveActivityScheduledFor;
   if (scheduledFor == null) return false;
   const now = Date.now();
   if (now < scheduledFor) return true;
-  const seenAt = pendingSeenAt.get(id);
-  if (seenAt != null && now - seenAt < SCHEDULED_START_RECHECK_MS) return true;
+  const checkedAt = startCheckedAt.get(id);
+  if (checkedAt != null && now - checkedAt < SCHEDULED_START_RECHECK_MS) return true;
+  startCheckedAt.set(id, now);
   const record = (await listTripActivityRecords())?.find((r) => r.id === id);
-  if (record?.state === "pending") {
-    pendingSeenAt.set(id, now);
-    return true;
-  }
-  pendingSeenAt.delete(id);
-  if (record != null) noteScheduledActivityStarted(id);
-  return false;
+  return record == null || record.state === "pending";
 }
 
 /**
@@ -486,6 +480,9 @@ async function sendActivityContent(
   if (await awaitingScheduledStart(focused, id)) return;
   const { updated } = await updateTripActivity(id, content);
   if (updated) lastSentActivityContent.set(id, json);
+  // Only once the send is cached: dropping the instant re-fires the sync effect,
+  // which would otherwise send the same content again.
+  if (focused.liveActivityScheduledFor != null) noteScheduledActivityStarted(id);
 }
 
 /**
@@ -656,11 +653,9 @@ export async function reconcileTripActivities(): Promise<void> {
   // so drop the pinned start instant. Otherwise `ensureActivityForFocus` keeps
   // comparing against a spent instant, and every re-registration would still
   // tell the backend to sleep until it.
-  if (
-    focused?.liveActivityScheduledFor != null &&
-    records.some((r) => r.id === focused!.liveActivityId && r.state !== "pending")
-  ) {
-    focused = noteScheduledActivityStarted(focused.liveActivityId!);
+  const scheduledId = focused?.liveActivityScheduledFor != null ? focused.liveActivityId : undefined;
+  if (scheduledId && records.some((r) => r.id === scheduledId && r.state !== "pending")) {
+    focused = noteScheduledActivityStarted(scheduledId);
   }
   const keep = focused?.liveActivityId;
   await Promise.all(

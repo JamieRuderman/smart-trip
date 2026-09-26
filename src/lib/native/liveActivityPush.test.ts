@@ -16,28 +16,17 @@ vi.mock("@/lib/env", () => ({
 const setLiveActivityTokenEndpoint = vi.fn(async (url: string) => {
   void url;
 });
-const startTripActivityWithPush = vi.fn(
-  async (): Promise<{ started: boolean; activityId?: string }> => ({
-    started: true,
-    activityId: "sys-1",
-  }),
-);
 vi.mock("@/lib/native/liveActivity", () => ({
   setLiveActivityTokenEndpoint: (url: string) => setLiveActivityTokenEndpoint(url),
-  startTripActivityWithPush: () => startTripActivityWithPush(),
 }));
 
 import {
+  configureLiveActivityTokenEndpoint,
   deregisterPushActivity,
   isLiveActivityPushEnabled,
   registerPushActivity,
-  startAndRegisterPushActivity,
 } from "./liveActivityPush";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
-import type {
-  TripActivityAttributes,
-  TripActivityContentState,
-} from "@/lib/liveActivityContent";
 
 const REG: LiveActivityRegistration = {
   id: "trip-7-2026-06-09",
@@ -51,8 +40,6 @@ const REG: LiveActivityRegistration = {
   departureEpochMs: 1_780_000_000_000,
   arrivalEpochMs: 1_780_001_200_000,
 };
-const ATTRS = {} as TripActivityAttributes;
-const CONTENT = {} as TripActivityContentState;
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -61,7 +48,6 @@ beforeEach(() => {
   readOptionalEnvString.mockImplementation((v: unknown) =>
     typeof v === "string" && v.length > 0 ? v : undefined,
   );
-  startTripActivityWithPush.mockResolvedValue({ started: true, activityId: "sys-1" });
   fetchMock = vi.fn(async () => ({ ok: true }) as Response);
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -92,30 +78,12 @@ describe("isLiveActivityPushEnabled", () => {
   });
 });
 
-describe("startAndRegisterPushActivity", () => {
-  it("configures the token endpoint, starts with push, and POSTs the registration", async () => {
-    const result = await startAndRegisterPushActivity(REG, ATTRS, CONTENT);
-    expect(result).toEqual({ started: true });
+describe("configureLiveActivityTokenEndpoint", () => {
+  it("points iOS at the backend's token endpoint", async () => {
+    await configureLiveActivityTokenEndpoint();
     expect(setLiveActivityTokenEndpoint).toHaveBeenCalledWith(
       "https://smart.example/api/liveactivity/token",
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://smart.example/api/liveactivity/register",
-      expect.objectContaining({ method: "POST", body: JSON.stringify(REG) }),
-    );
-  });
-
-  it("does not register when the activity didn't start", async () => {
-    startTripActivityWithPush.mockResolvedValue({ started: false });
-    const result = await startAndRegisterPushActivity(REG, ATTRS, CONTENT);
-    expect(result).toEqual({ started: false });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("still reports started when registration POST fails", async () => {
-    fetchMock.mockRejectedValue(new Error("network"));
-    const result = await startAndRegisterPushActivity(REG, ATTRS, CONTENT);
-    expect(result).toEqual({ started: true });
   });
 });
 
@@ -156,5 +124,19 @@ describe("deregisterPushActivity", () => {
     getPlatform.mockReturnValue("web");
     await deregisterPushActivity("x");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports success when the backend confirms", async () => {
+    await expect(deregisterPushActivity("x")).resolves.toBe(true);
+  });
+
+  it("reports failure on a non-2xx response", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response);
+    await expect(deregisterPushActivity("x")).resolves.toBe(false);
+  });
+
+  it("reports failure without throwing on a network error", async () => {
+    fetchMock.mockRejectedValue(new Error("network"));
+    await expect(deregisterPushActivity("x")).resolves.toBe(false);
   });
 });

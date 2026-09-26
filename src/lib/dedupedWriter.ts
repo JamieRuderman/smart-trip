@@ -14,7 +14,8 @@
  * - a *different* payload is chained behind whatever is in flight, so writes
  *   reach the sink in request order (the sink is a last-write-wins upsert, so
  *   an older payload landing second would clobber newer state);
- * - a write the sink REJECTS is not remembered, so the next trigger retries it.
+ * - a write the sink REJECTS is not remembered, so the next trigger retries it;
+ * - once the key is **closed**, nothing more reaches the sink for it.
  */
 
 /** Sink for a write. Returns whether the sink accepted it — a false (or thrown)
@@ -26,10 +27,11 @@ export interface DedupedWriter<T> {
    *  in flight. Resolves once this value's write (or the one it joined) has
    *  settled. Never rejects. */
   write(key: string, value: T): Promise<void>;
-  /** Forget the last-accepted payload for `key`, so the next `write` re-sends
-   *  even if the payload is unchanged. For teardown, when the remote record is
-   *  known to be gone. */
-  forget(key: string): void;
+  /** Stop writing `key` for good: later writes and any queued behind the one in
+   *  flight are dropped. Resolves once that in-flight write has settled. For
+   *  teardown, when a write reaching the sink after the remote record is deleted
+   *  would re-create it. Never rejects. */
+  close(key: string): Promise<void>;
   /** Whether an identical payload is currently remembered as accepted. Test +
    *  diagnostic seam; callers shouldn't branch on this. */
   isAccepted(key: string, value: T): boolean;
@@ -43,13 +45,16 @@ export function createDedupedWriter<T>(
   const accepted = new Map<string, string>();
   /** The write currently on the wire, per key, with the payload it carries. */
   const inFlight = new Map<string, { json: string; promise: Promise<void> }>();
+  const closed = new Set<string>();
 
   async function write(key: string, value: T): Promise<void> {
     const json = serialize(value);
-    if (accepted.get(key) === json) return;
     const current = inFlight.get(key);
     // Same payload already on the wire — join it rather than duplicate it.
     if (current?.json === json) return current.promise;
+    // A different payload in flight will overwrite the accepted one, so a match
+    // against `accepted` only counts when nothing is.
+    if (!current && accepted.get(key) === json) return;
 
     const promise = (async () => {
       // A different payload is in flight: let it settle so the sink sees these
@@ -58,7 +63,7 @@ export function createDedupedWriter<T>(
       if (current) await current.promise;
       // Re-check after the wait — the write we queued behind may have carried
       // this very payload (several callers arriving during one in-flight write).
-      if (accepted.get(key) === json) return;
+      if (closed.has(key) || accepted.get(key) === json) return;
       let ok = false;
       try {
         ok = await send(value);
@@ -83,7 +88,11 @@ export function createDedupedWriter<T>(
 
   return {
     write,
-    forget: (key) => void accepted.delete(key),
+    close: async (key) => {
+      closed.add(key);
+      await inFlight.get(key)?.promise;
+      accepted.delete(key);
+    },
     isAccepted: (key, value) => accepted.get(key) === serialize(value),
   };
 }

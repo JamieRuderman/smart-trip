@@ -133,7 +133,7 @@ async function postRegistrationDeduped(
 /** Best-effort end of the focused trip's Live Activity (lock screen / Dynamic
  *  Island), if one is running. Also deregisters it from the push backend when
  *  push updates are enabled. Safe no-op everywhere else. */
-export async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
+async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
   if (!focused?.liveActivityId) return;
   lastSentActivityContent.delete(focused.liveActivityId);
   registrationWriter.forget(focused.liveActivityId);
@@ -150,20 +150,19 @@ export async function endFocusActivity(focused: FocusedTrip | null): Promise<voi
 const retiredActivityIds = new Set<string>();
 
 /**
- * Make `next` the focus, replacing any previous one. `next` is saved and
- * announced BEFORE the previous focus's reminder channels and Live Activity are
- * torn down, so a surface opened alongside the switch (the reminder dialog "Take
- * this train" pops) never renders the old trip meanwhile — on push builds the
- * teardown awaits an untimed deregister request. The new activity starts last,
- * from the re-read focus, and only if it's still `next` and nothing else (a
- * reconcile, a reminder arm) committed one in the meantime.
+ * Make `next` the focus, or clear it with null. `next` is saved and announced
+ * synchronously, before the first await, and only then is the previous focus
+ * torn down: on push builds that awaits an untimed deregister request, and UI
+ * opened alongside the switch must not render the old trip meanwhile. The new
+ * activity is skipped if the focus changed again or a reconcile / reminder arm
+ * already committed one, so the two don't double-start.
  */
-export async function replaceFocus(next: FocusedTrip): Promise<void> {
+export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   const prev = loadFocusedTrip();
   if (prev?.liveActivityId) retiredActivityIds.add(prev.liveActivityId);
   saveFocusedTrip(next);
   notifyChange();
-  if (prev?.reminder) await cancelReminderChannels(prev.reminder);
+  await cancelReminderChannels(prev?.reminder ?? null);
   await endFocusActivity(prev);
   const latest = loadFocusedTrip();
   if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
@@ -283,7 +282,7 @@ export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void
  * the user switched/cleared trips meanwhile; on commit we persist from the
  * LATEST record so a concurrently armed reminder isn't clobbered.
  */
-export async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
+async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;

@@ -11,7 +11,6 @@ import { reminderIdFor } from "@/lib/notificationId";
 import {
   armAndPersistReminder,
   cancelReminderChannels,
-  endFocusActivity,
   ensureActivityForFocus,
   notifyChange,
   reRegisterPushForFocus,
@@ -185,13 +184,7 @@ export function useFocusedTrip() {
     [],
   );
 
-  const clearFocusedTrip = useCallback(async () => {
-    const current = loadFocusedTrip();
-    if (current?.reminder) await cancelReminderChannels(current.reminder);
-    await endFocusActivity(current);
-    saveFocusedTrip(null);
-    notifyChange();
-  }, []);
+  const clearFocusedTrip = useCallback(() => replaceFocus(null), []);
 
   return {
     focusedTrip,

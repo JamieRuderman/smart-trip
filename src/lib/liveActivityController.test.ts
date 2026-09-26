@@ -24,13 +24,11 @@ const startTripActivity = vi.fn<(...args: unknown[]) => Promise<{ started: boole
   async () => ({ started: true }),
 );
 const endTripActivity = vi.fn<(id: string) => Promise<void>>(async () => {});
-const updateTripActivity = vi.fn(async () => ({ updated: true }));
 vi.mock("@/lib/native/liveActivity", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/native/liveActivity")>()),
   listTripActivityRecords: () => listTripActivityRecords(),
   startTripActivity: (...args: unknown[]) => startTripActivity(...args),
   endTripActivity: (id: string) => endTripActivity(id),
-  updateTripActivity: () => updateTripActivity(),
 }));
 
 const isLiveActivityPushEnabled = vi.fn(() => false);
@@ -88,8 +86,6 @@ const PREV: FocusedTrip = {
     body: "",
   },
 };
-// Re-focusing the same run with only the stations changed: the old activity's
-// id shares the new focus's adoption prefix.
 const SAME_RUN_ID = "trip-7-2026-06-09-previous";
 const SAME_RUN_PREV: FocusedTrip = {
   ...NEXT,
@@ -104,6 +100,13 @@ function deferred() {
 }
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+function holdTeardownOf(prev: FocusedTrip) {
+  stored = prev;
+  const end = deferred();
+  endTripActivity.mockReturnValueOnce(end.promise);
+  return end;
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -113,11 +116,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  vi.clearAllMocks();
-  listTripActivityRecords.mockReset().mockResolvedValue([]);
-  endTripActivity.mockReset().mockResolvedValue(undefined);
-  deregisterPushActivity.mockReset().mockResolvedValue(undefined);
-  isLiveActivityPushEnabled.mockReset().mockReturnValue(false);
+  vi.resetAllMocks();
 });
 
 describe("replaceFocus", () => {
@@ -147,9 +146,7 @@ describe("replaceFocus", () => {
 
     deregister.resolve();
     await replacing;
-    expect(stored).toEqual(
-      expect.objectContaining({ tripNumber: 7, liveActivityId: expect.stringMatching(/^trip-7-/) }),
-    );
+    expect(stored).toMatchObject({ tripNumber: 7, liveActivityId: expect.stringMatching(/^trip-7-/) });
     expect(seen.every((s) => s.focus != null)).toBe(true);
   });
 
@@ -163,9 +160,7 @@ describe("replaceFocus", () => {
   });
 
   it("starts from the re-read focus so a reminder armed meanwhile is included", async () => {
-    const end = deferred();
-    endTripActivity.mockReturnValueOnce(end.promise);
-    stored = PREV;
+    const end = holdTeardownOf(PREV);
     const replacing = replaceFocus(NEXT);
     const reminder = { ...PREV.reminder!, notificationId: 707, reminderAt: NOW + 12 * 60_000 };
     stored = { ...NEXT, reminder };
@@ -176,31 +171,37 @@ describe("replaceFocus", () => {
       expect.anything(),
       expect.objectContaining({ reminderSet: true, reminderEpochMs: reminder.reminderAt }),
     );
-    expect(stored).toEqual(expect.objectContaining({ reminder }));
+    expect(stored).toMatchObject({ reminder });
   });
 
   it("does not start an activity for a focus replaced during the teardown", async () => {
-    const end = deferred();
-    endTripActivity.mockReturnValueOnce(end.promise);
-    stored = PREV;
+    const end = holdTeardownOf(PREV);
     const first = replaceFocus(NEXT);
-    const other: FocusedTrip = { ...NEXT, tripNumber: 9 };
-    await replaceFocus(other);
+    await replaceFocus({ ...NEXT, tripNumber: 9 });
     end.resolve();
     await first;
     expect(startTripActivity).toHaveBeenCalledTimes(1);
-    expect(stored).toEqual(
-      expect.objectContaining({ tripNumber: 9, liveActivityId: expect.stringMatching(/^trip-9-/) }),
-    );
+    expect(stored).toMatchObject({ tripNumber: 9, liveActivityId: expect.stringMatching(/^trip-9-/) });
+  });
+
+  it("clears before tearing down, and a clear still tearing down keeps a newer focus", async () => {
+    const end = holdTeardownOf(PREV);
+    const clearing = replaceFocus(null);
+    expect(stored).toBeNull();
+
+    await replaceFocus(NEXT);
+    end.resolve();
+    await clearing;
+    expect(cancelNotification).toHaveBeenCalledWith(505);
+    expect(endTripActivity).toHaveBeenCalledWith(PREV_ID);
+    expect(stored).toMatchObject({ tripNumber: 7, liveActivityId: expect.stringMatching(/^trip-7-/) });
   });
 });
 
 describe("reconcile during a focus switch", () => {
   it("does not adopt the old activity of a same-run re-focus", async () => {
-    const end = deferred();
-    endTripActivity.mockReturnValueOnce(end.promise);
+    const end = holdTeardownOf(SAME_RUN_PREV);
     listTripActivityRecords.mockResolvedValue([{ id: SAME_RUN_ID, state: "active" }]);
-    stored = SAME_RUN_PREV;
     const replacing = replaceFocus(NEXT);
     await flush();
 
@@ -218,10 +219,8 @@ describe("reconcile during a focus switch", () => {
   });
 
   it("does not start a second activity when the reconcile already started one", async () => {
-    const end = deferred();
-    endTripActivity.mockReturnValueOnce(end.promise);
+    const end = holdTeardownOf(PREV);
     listTripActivityRecords.mockResolvedValue([{ id: PREV_ID, state: "active" }]);
-    stored = PREV;
     const replacing = replaceFocus(NEXT);
     await flush();
     expect(endTripActivity).toHaveBeenCalledWith(PREV_ID);

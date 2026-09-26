@@ -4,6 +4,7 @@ import {
   agencyWallTimeToEpochSeconds,
   computeMinutesUntil,
   formatClockTime,
+  formatStartedLabel,
   isTimeInPast,
   parseServiceDate,
   parseTimeToMinutes,
@@ -162,5 +163,19 @@ describe("formatClockTime", () => {
 
   it("uses 24-hour format when timeFormat is 24h", () => {
     expect(formatClockTime(epoch, "24h", "en-US")).toBe("14:05");
+  });
+});
+
+describe("formatStartedLabel", () => {
+  const start = new Date(2026, 1, 21, 16, 26).getTime();
+
+  it("shows the clock time when it started today", () => {
+    const laterToday = new Date(2026, 1, 21, 23, 59).getTime();
+    expect(formatStartedLabel(start, laterToday, "12h", "en-US")).toBe("4:26 PM");
+  });
+
+  it("shows the date when it started on an earlier day", () => {
+    const nextDay = new Date(2026, 1, 22, 0, 1).getTime();
+    expect(formatStartedLabel(start, nextDay, "12h", "en-US")).toBe("Feb 21");
   });
 });

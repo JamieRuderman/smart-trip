@@ -142,6 +142,23 @@ export function formatClockTime(
   });
 }
 
+/**
+ * When something started: its clock time if that was today, otherwise its date
+ * ("Feb 21"), so a days-old alert doesn't read as starting this afternoon.
+ */
+export function formatStartedLabel(
+  epoch: number,
+  now: number,
+  timeFormat: "12h" | "24h",
+  locale: string
+): string {
+  const start = new Date(epoch);
+  if (toLocalDateKey(start) === toLocalDateKey(new Date(now))) {
+    return formatClockTime(epoch, timeFormat, locale);
+  }
+  return start.toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
 /** SMART operates in this zone; the GTFS static timetable is in its wall time. */
 export const AGENCY_TIME_ZONE = "America/Los_Angeles";
 

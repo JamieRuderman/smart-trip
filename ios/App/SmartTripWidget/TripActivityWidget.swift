@@ -613,27 +613,13 @@ private struct DigitalTimer: View {
 /// missing; callers handle the cancelled/arrived states.
 private struct RelativeCountdown: View {
     let model: TripActivityModel
-    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     var body: some View {
         let now = Date()
         if let target = countdownTarget(model) {
             if target > now {
-                if #available(iOS 18.0, *), isLuminanceReduced {
-                    // The Always-On lock screen refreshes once a minute and draws a
-                    // timer's seconds as "--"; a minute-precision timer still clamps at 0.
-                    Text(
-                        .currentDate,
-                        format: .timer(
-                            countingDownIn: now..<target,
-                            showsHours: false,
-                            maxPrecision: .seconds(60)
-                        )
-                    )
-                } else {
-                    Text(timerInterval: now...target, countsDown: true)
-                        .monospacedDigit()
-                }
+                Text(timerInterval: now...target, countsDown: true)
+                    .monospacedDigit()
             } else {
                 // Target already elapsed with no re-render to flip the parent to
                 // its "Arrived" terminal word yet — hold at zero, never count up.
@@ -668,6 +654,7 @@ private struct JourneyProgressAndTiming: View {
 private struct ActiveEventTimingRow: View {
     let model: TripActivityModel
     let secondaryColor: Color
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
@@ -678,13 +665,13 @@ private struct ActiveEventTimingRow: View {
                     Text("Arrived")
                 } else {
                     HStack(spacing: 4) {
-                        Text("\(activeEventLabel) in")
+                        Text(showsRelativeWords ? activeEventLabel : "\(activeEventLabel) in")
                             .foregroundStyle(secondaryColor)
                             .layoutPriority(1)
                         // Timer text takes whatever width it's offered. fixedSize asked for its
                         // unbounded ideal width, which overflowed the row and crashed the widget.
-                        RelativeCountdown(model: model)
-                            .frame(maxWidth: 100, alignment: .leading)
+                        countdown
+                            .frame(maxWidth: showsRelativeWords ? 140 : 100, alignment: .leading)
                     }
                 }
             }
@@ -703,6 +690,23 @@ private struct ActiveEventTimingRow: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+    }
+
+    /// The dimmed Always-On lock screen, where the countdown reads in words.
+    private var showsRelativeWords: Bool {
+        guard #available(iOS 18.0, *) else { return false }
+        return isLuminanceReduced && countdownTarget(model) != nil
+    }
+
+    @ViewBuilder
+    private var countdown: some View {
+        if #available(iOS 18.0, *), showsRelativeWords, let target = countdownTarget(model) {
+            // Always-On redraws once a minute and draws a timer's seconds as "--". This reads
+            // "in 5 minutes", then "now", then keeps counting ("2 minutes ago") until a redraw.
+            Text(.currentDate, format: .reference(to: target, allowedFields: [.minute]))
+        } else {
+            RelativeCountdown(model: model)
+        }
     }
 
     private var activeEventLabel: String {

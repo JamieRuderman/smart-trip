@@ -24,11 +24,13 @@ const startTripActivity = vi.fn<(...args: unknown[]) => Promise<{ started: boole
   async () => ({ started: true }),
 );
 const endTripActivity = vi.fn<(id: string) => Promise<void>>(async () => {});
+const updateTripActivity = vi.fn(async () => ({ updated: true }));
 vi.mock("@/lib/native/liveActivity", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/native/liveActivity")>()),
   listTripActivityRecords: () => listTripActivityRecords(),
   startTripActivity: (...args: unknown[]) => startTripActivity(...args),
   endTripActivity: (id: string) => endTripActivity(id),
+  updateTripActivity: () => updateTripActivity(),
 }));
 
 const isLiveActivityPushEnabled = vi.fn(() => false);
@@ -58,6 +60,7 @@ vi.mock("@/lib/focusedTrip", async (importOriginal) => ({
 }));
 
 import {
+  ensureActivityForFocus,
   reconcileTripActivities,
   replaceFocus,
 } from "@/lib/liveActivityController";
@@ -105,6 +108,12 @@ function holdTeardownOf(prev: FocusedTrip) {
   const end = deferred();
   endTripActivity.mockReturnValueOnce(end.promise);
   return end;
+}
+
+function holdNextStart() {
+  const start = deferred();
+  startTripActivity.mockReturnValueOnce(start.promise.then(() => ({ started: true })));
+  return start;
 }
 
 beforeEach(() => {
@@ -198,7 +207,59 @@ describe("replaceFocus", () => {
   });
 });
 
+describe("concurrent activity starts", () => {
+  it("joins a reminder-arm start still in flight when the teardown finishes", async () => {
+    const end = holdTeardownOf(PREV);
+    const replacing = replaceFocus(NEXT);
+    const start = holdNextStart();
+    const ensuring = ensureActivityForFocus(NEXT);
+    await flush();
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+
+    end.resolve();
+    await flush();
+    start.resolve();
+    await Promise.all([replacing, ensuring]);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(stored?.liveActivityId).toMatch(/^trip-7-/);
+  });
+
+  it("refreshes rather than restarts when a reminder armed mid-start queues behind it", async () => {
+    listTripActivityRecords.mockImplementation(async () =>
+      stored?.liveActivityId ? [{ id: stored.liveActivityId, state: "active" }] : [],
+    );
+    const start = holdNextStart();
+    const replacing = replaceFocus(NEXT);
+    await flush();
+    stored = { ...NEXT, reminder: PREV.reminder };
+    const ensuring = ensureActivityForFocus(stored);
+    await flush();
+
+    start.resolve();
+    await Promise.all([replacing, ensuring]);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(updateTripActivity).toHaveBeenCalledTimes(1);
+    expect(stored).toMatchObject({ reminder: PREV.reminder, liveActivityId: expect.stringMatching(/^trip-7-/) });
+  });
+});
+
 describe("reconcile during a focus switch", () => {
+  it("queues behind the switch's start instead of starting its own", async () => {
+    listTripActivityRecords.mockImplementation(async () =>
+      stored?.liveActivityId ? [{ id: stored.liveActivityId, state: "active" }] : [],
+    );
+    const start = holdNextStart();
+    const replacing = replaceFocus(NEXT);
+    await flush();
+    const reconciling = reconcileTripActivities();
+    await flush();
+
+    start.resolve();
+    await Promise.all([replacing, reconciling]);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
+    expect(endTripActivity).not.toHaveBeenCalled();
+  });
+
   it("does not adopt the old activity of a same-run re-focus", async () => {
     const end = holdTeardownOf(SAME_RUN_PREV);
     listTripActivityRecords.mockResolvedValue([{ id: SAME_RUN_ID, state: "active" }]);
@@ -257,6 +318,7 @@ describe("reconcile during a focus switch", () => {
     list.resolve();
     await Promise.all([reconciling, replacing]);
     expect(stored?.tripNumber).toBe(7);
+    expect(startTripActivity).toHaveBeenCalledTimes(1);
     expect(saveFocusedTrip).not.toHaveBeenCalledWith(
       expect.objectContaining({ tripNumber: 5 }),
     );

@@ -149,13 +149,25 @@ async function endFocusActivity(focused: FocusedTrip | null): Promise<void> {
  *  random slug, so an entry never matches a later activity. */
 const retiredActivityIds = new Set<string>();
 
+/** Tail of the queue that serializes every decision to start an activity. A
+ *  start commits its id only after the native start (and, on push builds, the
+ *  registration POST), so two concurrent triggers for one focus would each see
+ *  no activity and start one, and the later commit would orphan the other. */
+let startQueue: Promise<unknown> = Promise.resolve();
+
+function serializeStart(task: () => Promise<void>): Promise<void> {
+  const run = startQueue.then(task);
+  startQueue = run.catch(() => {});
+  return run;
+}
+
 /**
  * Make `next` the focus, or clear it with null. `next` is saved and announced
  * synchronously, before the first await, and only then is the previous focus
  * torn down: on push builds that awaits an untimed deregister request, and UI
  * opened alongside the switch must not render the old trip meanwhile. The new
  * activity is skipped if the focus changed again or a reconcile / reminder arm
- * already committed one, so the two don't double-start.
+ * already committed one.
  */
 export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   const prev = loadFocusedTrip();
@@ -164,11 +176,13 @@ export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   notifyChange();
   await cancelReminderChannels(prev?.reminder ?? null);
   await endFocusActivity(prev);
-  const latest = loadFocusedTrip();
-  if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
-    return;
-  }
-  await startActivityForFocus(latest);
+  await serializeStart(async () => {
+    const latest = loadFocusedTrip();
+    if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
+      return;
+    }
+    await startActivityForFocus(latest);
+  });
 }
 
 /**
@@ -501,7 +515,18 @@ async function startOrReviveActivity(
  * content is refreshed so a freshly armed reminder's alarm stage lands right
  * away. `startActivityForFocus` self-gates, so this is a no-op while dormant.
  */
-export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void> {
+export function ensureActivityForFocus(requested: FocusedTrip): Promise<void> {
+  return serializeStart(async () => {
+    // Re-read: the caller's copy predates any start this queued behind, and
+    // acting on its missing id would start a duplicate.
+    const focused = loadFocusedTrip();
+    if (focused != null && sameFocusIdentity(focused, requested)) {
+      await ensureActivity(focused);
+    }
+  });
+}
+
+async function ensureActivity(focused: FocusedTrip): Promise<void> {
   const records = await listTripActivityRecords();
   const pending =
     focused.liveActivityId != null &&
@@ -542,7 +567,11 @@ export async function ensureActivityForFocus(focused: FocusedTrip): Promise<void
  * `liveActivityId` committed, which skips the heal. Instant no-op off-iOS.
  * Call alongside `bootFocusedTrip`.
  */
-export async function reconcileTripActivities(): Promise<void> {
+export function reconcileTripActivities(): Promise<void> {
+  return serializeStart(reconcileActivities);
+}
+
+async function reconcileActivities(): Promise<void> {
   const records = await listTripActivityRecords();
   // Read after the await: a focus switch can land during it, and this pass
   // saves `focused` back, which would clobber the new focus with the old one.

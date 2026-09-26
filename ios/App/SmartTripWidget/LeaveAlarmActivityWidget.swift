@@ -8,11 +8,8 @@ import WidgetKit
 private typealias LeaveAlarmContext = ActivityViewContext<AlarmAttributes<LeaveAlarmMetadata>>
 
 /**
- * The ringing leave alarm's Live Activity. AlarmKit starts it when the alarm
- * fires and SpringBoard asks this extension to render it, so without this
- * configuration the island is an empty pill with no way to stop the alarm.
- * Button wiring follows Apple's "Scheduling an alarm with AlarmKit" sample:
- * each button runs a `LiveActivityIntent` carrying the alarm's id.
+ * The ringing leave alarm's Live Activity. Without it SpringBoard draws the
+ * alarm as an empty island pill with no Stop button.
  */
 @available(iOS 26.0, *)
 struct LeaveAlarmActivityWidget: Widget {
@@ -100,7 +97,7 @@ private struct AlarmTime: View {
            let date = Calendar.current.date(
                bySettingHour: alert.time.hour, minute: alert.time.minute, second: 0, of: .now
            ) {
-            Text(date, style: .time)
+            Text(date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
                 .lineLimit(1)
         }
     }

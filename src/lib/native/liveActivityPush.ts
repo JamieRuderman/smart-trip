@@ -10,17 +10,21 @@
 import { Capacitor } from "@capacitor/core";
 import { apiBaseUrl, readOptionalEnvString } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import {
-  setLiveActivityTokenEndpoint,
-  startTripActivityWithPush,
-} from "@/lib/native/liveActivity";
-import type {
-  TripActivityAttributes,
-  TripActivityContentState,
-} from "@/lib/liveActivityContent";
+import { setLiveActivityTokenEndpoint } from "@/lib/native/liveActivity";
 import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 
 const REGISTER_PATH = "/api/liveactivity/register";
+/** The start queue and teardowns wait on these requests, and `fetch` has no
+ *  timeout of its own. */
+const PUSH_REQUEST_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PUSH_REQUEST_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
 const TOKEN_PATH = "/api/liveactivity/token";
 
 /**
@@ -46,33 +50,6 @@ export async function configureLiveActivityTokenEndpoint(): Promise<void> {
 }
 
 /**
- * Start a push-enabled Live Activity and register it with the backend. Points
- * iOS at the token endpoint (so it POSTs the per-activity token directly, even
- * across launches) and POSTs the trip identity the server needs to re-derive
- * live arrival/delay from GTFS-RT. Returns whether the activity started; a
- * registration network failure is logged but does NOT fail the start (the
- * activity still shows the local countdown, and the boot-time
- * `registerPushActivity` heal retries on the next launch).
- */
-export async function startAndRegisterPushActivity(
-  registration: LiveActivityRegistration,
-  attributes: TripActivityAttributes,
-  content: TripActivityContentState,
-): Promise<{ started: boolean }> {
-  // Configure the token sink BEFORE starting, so the token iOS mints at start
-  // has somewhere to go.
-  await configureLiveActivityTokenEndpoint();
-  const { started } = await startTripActivityWithPush(
-    registration.id,
-    attributes,
-    content,
-  );
-  if (!started) return { started: false };
-  await registerPushActivity(registration);
-  return { started: true };
-}
-
-/**
  * (Re-)POST a registration to the backend. Idempotent upsert keyed on the
  * activity id, so it doubles as the boot-time heal for a start whose original
  * registration POST failed (offline at focus time) — and refreshes the
@@ -84,7 +61,7 @@ export async function registerPushActivity(
   registration: LiveActivityRegistration,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${apiBaseUrl}${REGISTER_PATH}`, {
+    const response = await fetchWithTimeout(`${apiBaseUrl}${REGISTER_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registration),
@@ -108,14 +85,24 @@ export async function registerPushActivity(
 }
 
 /** Tell the backend to stop pushing to this activity (on clear / arrival /
- *  focus replace). Best-effort. */
-export async function deregisterPushActivity(id: string): Promise<void> {
-  if (Capacitor.getPlatform() !== "ios") return;
+ *  focus replace / dismissal). Best-effort; never throws. Returns whether the
+ *  backend confirmed it, so a failed attempt can be retried. */
+export async function deregisterPushActivity(id: string): Promise<boolean> {
+  if (Capacitor.getPlatform() !== "ios") return false;
   try {
-    await fetch(`${apiBaseUrl}${REGISTER_PATH}?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}${REGISTER_PATH}?id=${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      logger.warn(
+        `Live Activity push deregistration rejected (HTTP ${response.status})`,
+      );
+      return false;
+    }
+    return true;
   } catch (error) {
     logger.warn("Live Activity push deregistration failed", error);
+    return false;
   }
 }

@@ -17,6 +17,9 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */; };
+		BDBB01D8315C01657C0646FE /* LeaveAlarmShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F2E00811E4BCC6829265418 /* LeaveAlarmShared.swift */; };
+		1A0BB04D9A770D245A6624E8 /* LeaveAlarmShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F2E00811E4BCC6829265418 /* LeaveAlarmShared.swift */; };
+		798B1F86AF4C4345D3F94FC4 /* LeaveAlarmActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD70D153675A75259146457 /* LeaveAlarmActivityWidget.swift */; };
 		5EF9B69B4CACA407E3E5E8A8 /* SmartTripWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8845A6772E51344B8D7262F /* SmartTripWidgetBundle.swift */; };
 		658954374CB32357CF5A3CC1 /* SmartTripWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */; };
@@ -68,6 +71,8 @@
 		6170A6D91E2BD5FAE4CCFD26 /* SceneDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		7D958A492FE7504A00B68A62 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmKit.swift; sourceTree = "<group>"; };
+		1F2E00811E4BCC6829265418 /* LeaveAlarmShared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmShared.swift; sourceTree = "<group>"; };
+		1BD70D153675A75259146457 /* LeaveAlarmActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmActivityWidget.swift; sourceTree = "<group>"; };
 		92272C7F001ADC198FF7C125 /* SmartTripWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SmartTripWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LeaveAlarmPlugin.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -170,6 +175,7 @@
 				10BECD21E46085A195BE3149 /* GenericAttributes.swift */,
 				382FE64EA322CDB67EB332FA /* TripActivityModel.swift */,
 				10EE8B4ACAC11A09E709CA84 /* TripActivityWidget.swift */,
+				1BD70D153675A75259146457 /* LeaveAlarmActivityWidget.swift */,
 				DA117BF44531AFC1784F1499 /* Info.plist */,
 			);
 			path = SmartTripWidget;
@@ -180,6 +186,7 @@
 			children = (
 				9B0B4F1C0BF59BB0A83DAB67 /* LeaveAlarmPlugin.swift */,
 				88B327F522B1DC6A826361EC /* LeaveAlarmKit.swift */,
+				1F2E00811E4BCC6829265418 /* LeaveAlarmShared.swift */,
 			);
 			path = LeaveAlarm;
 			sourceTree = "<group>";
@@ -332,6 +339,7 @@
 				BA1DC9F6D7EF3AB2F5E585CB /* MainViewController.swift in Sources */,
 				82DEF7075F14FE35189C9204 /* LeaveAlarmPlugin.swift in Sources */,
 				51C8992896C2F12631B0A89A /* LeaveAlarmKit.swift in Sources */,
+				BDBB01D8315C01657C0646FE /* LeaveAlarmShared.swift in Sources */,
 				34E78BDF66D8685FAB06A1CB /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -344,6 +352,8 @@
 				90C66BC2E0C3A22C56EBF4D1 /* GenericAttributes.swift in Sources */,
 				989714CA4D3D58CA0B855398 /* TripActivityModel.swift in Sources */,
 				4585AB0B988AD24734CAD3BB /* TripActivityWidget.swift in Sources */,
+				798B1F86AF4C4345D3F94FC4 /* LeaveAlarmActivityWidget.swift in Sources */,
+				1A0BB04D9A770D245A6624E8 /* LeaveAlarmShared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

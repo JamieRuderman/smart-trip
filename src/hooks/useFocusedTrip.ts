@@ -11,11 +11,11 @@ import { reminderIdFor } from "@/lib/notificationId";
 import {
   armAndPersistReminder,
   cancelReminderChannels,
-  endFocusActivity,
   ensureActivityForFocus,
   notifyChange,
   reRegisterPushForFocus,
-  startActivityForFocus,
+  replaceFocus,
+  sameFocusIdentity,
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 
@@ -51,25 +51,19 @@ export function useFocusedTrip() {
   /** Focus a trip (no reminder). Replaces any existing focus and cancels its
    *  reminder + Live Activity. Caller handles any "switch trains?"
    *  confirmation. */
-  const focusTrip = useCallback(async (input: FocusTripInput) => {
-    const prev = loadFocusedTrip();
-    if (prev?.reminder) await cancelReminderChannels(prev.reminder);
-    await endFocusActivity(prev);
-    const next: FocusedTrip = {
-      source: "user",
-      tripNumber: input.tripNumber,
-      fromStation: input.fromStation,
-      toStation: input.toStation,
-      scheduleType: input.scheduleType,
-      serviceDate: input.serviceDate,
-      reminder: null,
-    };
-    saveFocusedTrip(next);
-    notifyChange();
-    // After the focus is visible — the activity is an enhancement, so its
-    // (async, gated) start must not delay the card/picker appearing.
-    await startActivityForFocus(next);
-  }, []);
+  const focusTrip = useCallback(
+    (input: FocusTripInput) =>
+      replaceFocus({
+        source: "user",
+        tripNumber: input.tripNumber,
+        fromStation: input.fromStation,
+        toStation: input.toStation,
+        scheduleType: input.scheduleType,
+        serviceDate: input.serviceDate,
+        reminder: null,
+      }),
+    [],
+  );
 
   /** Arm (number) or disarm (null) the reminder. `departureAt` is the live-
    *  aware departure instant used to compute the fire time. */
@@ -84,7 +78,11 @@ export function useFocusedTrip() {
 
       if (leadMinutes === null) {
         if (current.reminder) await cancelReminderChannels(current.reminder);
-        const cleared: FocusedTrip = { ...current, reminder: null };
+        // Re-read: a focus switch or a start's commit can land during the cancel,
+        // and saving `current` would undo it.
+        const latest = loadFocusedTrip();
+        if (!latest || !sameFocusIdentity(latest, current)) return { ok: true };
+        const cleared: FocusedTrip = { ...latest, reminder: null };
         saveFocusedTrip(cleared);
         notifyChange();
         // Refresh the push registration so the backend stops baking the (now
@@ -193,13 +191,7 @@ export function useFocusedTrip() {
     [],
   );
 
-  const clearFocusedTrip = useCallback(async () => {
-    const current = loadFocusedTrip();
-    if (current?.reminder) await cancelReminderChannels(current.reminder);
-    await endFocusActivity(current);
-    saveFocusedTrip(null);
-    notifyChange();
-  }, []);
+  const clearFocusedTrip = useCallback(() => replaceFocus(null), []);
 
   return {
     focusedTrip,

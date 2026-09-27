@@ -9,6 +9,7 @@ import {
 import { useLocation, useSearchParams } from "react-router-dom";
 import type { Station } from "@/types/smartSchedule";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
+import { toLocalDateKey } from "@/lib/timeUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { useFocusedTrip } from "@/hooks/useFocusedTrip";
 import { endTripActivity } from "@/lib/native/liveActivity";
@@ -92,6 +93,7 @@ interface ProviderState {
   fromStation: Station | "";
   toStation: Station | "";
   scheduleType: "weekday" | "weekend";
+  scheduleCheckedOn: string;
   selectedTripNumber: number | null;
 }
 
@@ -142,6 +144,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
         isSharedLinkOnMount && initialUrlType
           ? initialUrlType
           : todayScheduleType(),
+      scheduleCheckedOn: toLocalDateKey(new Date()),
       selectedTripNumber: !isNaN(initialUrlTripNumber)
         ? initialUrlTripNumber
         : persisted
@@ -233,7 +236,17 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const setScheduleType = useCallback((type: "weekday" | "weekend") => {
-    setState((prev) => ({ ...prev, scheduleType: type }));
+    setState((prev) => ({
+      ...prev,
+      scheduleType: type,
+      scheduleCheckedOn: toLocalDateKey(new Date()),
+    }));
+  }, []);
+
+  const confirmScheduleCheckedOn = useCallback((date: string) => {
+    setState((prev) =>
+      prev.scheduleCheckedOn === date ? prev : { ...prev, scheduleCheckedOn: date },
+    );
   }, []);
 
   const setSelectedTrip = useCallback((tripNumber: number | null) => {
@@ -245,9 +258,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       return {
         ...prev,
         selectedTripNumber: tripNumber,
-        scheduleType: exitingSharedLink
-          ? todayScheduleType()
-          : prev.scheduleType,
+        ...(exitingSharedLink
+          ? {
+              scheduleType: todayScheduleType(),
+              scheduleCheckedOn: toLocalDateKey(new Date()),
+            }
+          : {}),
       };
     });
   }, []);
@@ -311,6 +327,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       fromStation: state.fromStation,
       toStation: state.toStation,
       scheduleType: state.scheduleType,
+      scheduleCheckedOn: state.scheduleCheckedOn,
+      confirmScheduleCheckedOn,
       selectedTripNumber: state.selectedTripNumber,
       setFromStation,
       setToStation,
@@ -331,6 +349,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       state.fromStation,
       state.toStation,
       state.scheduleType,
+      state.scheduleCheckedOn,
+      confirmScheduleCheckedOn,
       state.selectedTripNumber,
       setFromStation,
       setToStation,

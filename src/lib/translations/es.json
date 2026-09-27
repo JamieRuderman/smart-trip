@@ -24,6 +24,14 @@
     "nearYou": "Cerca de ti",
     "useMyLocation": "Usar mi ubicación"
   },
+  "scheduleDaySwitch": {
+    "titleWeekend": "¿Cambiar al horario de fin de semana?",
+    "titleWeekday": "¿Cambiar al horario de día laboral?",
+    "bodyWeekend": "Hoy rige el horario de fin de semana y festivos. Estás viendo los trenes de día laboral.",
+    "bodyWeekday": "Hoy rige el horario de día laboral. Estás viendo los trenes de fin de semana.",
+    "switch": "Cambiar",
+    "keep": "Ahora no"
+  },
   "emptyState": {
     "selectYourRoute": "Selecciona Tu Ruta",
     "chooseStations": "Elige tus estaciones de salida y destino arriba para ver los horarios de trenes disponibles."

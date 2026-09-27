@@ -332,6 +332,17 @@ export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
   return day === 0 || day === 6 ? "weekend" : "weekday";
 }
 
+/** Today's schedule type when the shown one differs and the schedule wasn't already
+ *  picked or confirmed today (`checkedOn`, "YYYY-MM-DD"); otherwise null. */
+export function scheduleSwitchOffer(
+  shown: ScheduleType,
+  checkedOn: string,
+  now: Date,
+): ScheduleType | null {
+  const today = getTodayScheduleType(now);
+  return shown !== today && checkedOn !== localDateKey(now) ? today : null;
+}
+
 /**
  * The next calendar date ("YYYY-MM-DD"), starting from `from`, whose schedule
  * type matches `scheduleType` (honoring calendar overrides). Lets a trip browsed

@@ -24,6 +24,14 @@
     "nearYou": "Near you",
     "useMyLocation": "Use my location"
   },
+  "scheduleDaySwitch": {
+    "titleWeekend": "Switch to the weekend schedule?",
+    "titleWeekday": "Switch to the weekday schedule?",
+    "bodyWeekend": "Today runs on the weekend and holiday schedule. You're viewing weekday trains.",
+    "bodyWeekday": "Today runs on the weekday schedule. You're viewing weekend trains.",
+    "switch": "Switch",
+    "keep": "Not now"
+  },
   "emptyState": {
     "selectYourRoute": "Select Your Route",
     "chooseStations": "Choose your departure and destination stations above to see available train schedules."

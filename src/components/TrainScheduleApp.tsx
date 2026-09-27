@@ -29,6 +29,7 @@ import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
 import { TripModeHeader } from "./TripModeHeader";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
+import { ScheduleDaySwitchPrompt } from "./ScheduleDaySwitchPrompt";
 import { getDevFixture } from "@/lib/devFixtures";
 
 export function TrainScheduleApp() {
@@ -316,6 +317,8 @@ export function TrainScheduleApp() {
           vehiclePositionOverride={devFixture.vehiclePosition}
         />
       )}
+
+      <ScheduleDaySwitchPrompt currentTime={currentTime} />
     </div>
   );
 }

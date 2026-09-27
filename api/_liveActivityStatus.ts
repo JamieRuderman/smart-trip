@@ -1,6 +1,7 @@
 import { GTFS_STOP_ID_TO_PLATFORM } from "../src/data/generated/stationPlatforms.generated.js";
 import { STATION_ORDER } from "../src/data/generated/stations.generated.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
+import { findRun, type RunKey } from "../src/lib/runMatch.js";
 import {
   delayMinutesFromSeconds,
   effectiveDelayMinutes,
@@ -67,23 +68,14 @@ const STATION_INDEX: Record<string, number> = Object.fromEntries(
   STATION_ORDER.map((s, i) => [s, i]),
 );
 
-/** The registration's service day as a GTFS-RT `startDate`, "YYYYMMDD". */
-function gtfsServiceDay(reg: LiveActivityRegistration): string {
-  return reg.serviceDate.replace(/-/g, "");
-}
-
-/** Whether a feed trip is the run with `tripId`. A trip without a `startDate`
- *  is accepted; one with it must be `serviceDay`. */
-function matchesTripId(
-  trip: { tripId?: string; startDate?: string },
-  tripId: string | undefined,
-  serviceDay: string,
-): boolean {
-  return (
-    tripId != null &&
-    trip.tripId === tripId &&
-    (!trip.startDate || trip.startDate === serviceDay)
-  );
+/** The registration's run, keyed for {@link findRun}. */
+function runKeyForReg(reg: LiveActivityRegistration): RunKey {
+  return {
+    tripId: reg.tripId,
+    originStartTime: reg.originStartTime,
+    serviceDay: reg.serviceDate.replace(/-/g, ""),
+    directionId: reg.direction === "southbound" ? 0 : 1,
+  };
 }
 
 /**
@@ -109,31 +101,25 @@ export function vehicleShortOfDestinationForReg(
   if (vp.timestamp > 0 && nowSec - vp.timestamp > VEHICLE_FEED_STALE_SECONDS) {
     return false;
   }
-  const startDate = gtfsServiceDay(reg);
-  const directionId = reg.direction === "southbound" ? 0 : 1;
   const toIdx = STATION_INDEX[reg.toStation];
   if (toIdx == null) return false;
 
-  for (const v of vp.vehicles) {
-    if (!v.trip || !v.stopId) continue;
-    const sameRun =
-      matchesTripId(v.trip, reg.tripId, startDate) ||
-      (v.trip.startTime.slice(0, 5) === reg.originStartTime &&
-        v.trip.startDate === startDate &&
-        v.trip.directionId === directionId);
-    if (!sameRun) continue;
-    if (v.timestamp != null && nowSec - v.timestamp > VEHICLE_STALE_SECONDS) {
-      return false;
-    }
-    const platform = GTFS_STOP_ID_TO_PLATFORM[v.stopId];
-    if (!platform) return false;
-    const stationIdx = STATION_INDEX[platform.station];
-    if (stationIdx == null) return false;
-    if (stationIdx === toIdx) return v.currentStatus !== "STOPPED_AT";
-    // Southbound travels toward higher station indexes, northbound lower.
-    return reg.direction === "southbound" ? stationIdx < toIdx : stationIdx > toIdx;
+  const v = findRun(
+    vp.vehicles.filter((vehicle) => vehicle.stopId),
+    runKeyForReg(reg),
+    (vehicle) => vehicle.trip,
+  );
+  if (!v?.stopId) return false;
+  if (v.timestamp != null && nowSec - v.timestamp > VEHICLE_STALE_SECONDS) {
+    return false;
   }
-  return false;
+  const platform = GTFS_STOP_ID_TO_PLATFORM[v.stopId];
+  if (!platform) return false;
+  const stationIdx = STATION_INDEX[platform.station];
+  if (stationIdx == null) return false;
+  if (stationIdx === toIdx) return v.currentStatus !== "STOPPED_AT";
+  // Southbound travels toward higher station indexes, northbound lower.
+  return reg.direction === "southbound" ? stationIdx < toIdx : stationIdx > toIdx;
 }
 
 export interface LiveTripStatus {
@@ -254,20 +240,11 @@ function matchLiveTripStatus(
   updates: FeedTripUpdate[],
   now: number,
 ): LiveTripStatus | null {
-  // 1. Exact identity by GTFS trip id.
-  const serviceDay = gtfsServiceDay(reg);
-  const byTripId = updates.find((u) => matchesTripId(u, reg.tripId, serviceDay));
-  if (byTripId) return statusFromTrip(reg, byTripId, now);
+  const match = findRun(updates, runKeyForReg(reg), (u) => u);
+  if (match) return statusFromTrip(reg, match, now);
+  if (reg.originStartTime) return null;
 
-  // 2. Precise identity by origin start time.
-  if (reg.originStartTime) {
-    const match = updates.find(
-      (u) => u.startTime?.slice(0, 5) === reg.originStartTime,
-    );
-    return match ? statusFromTrip(reg, match, now) : null;
-  }
-
-  // 3. No origin time on the registration: match by the boarding stop's live
+  // No origin time on the registration: match by the boarding stop's live
   //    departure, closest to scheduled within a window.
   let best: { update: FeedTripUpdate; from: FeedStopTimeUpdate; distance: number } | null =
     null;

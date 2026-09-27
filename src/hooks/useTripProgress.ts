@@ -67,14 +67,12 @@ export function useTripProgress({
   // ── Vehicle position matching ─────────────────────────────────────────────
   const southbound = isSouthbound(fromStation, toStation);
   const originStartTime = tripOriginStartTime(trip.times, southbound);
-  const tripDirectionId = southbound ? 0 : 1;
-  const todayYYYYMMDD = formatDateYYYYMMDD(currentTime);
 
   const liveVehiclePosition = useVehiclePositionForTrip({
     tripId: trip.tripId,
     originStartTime,
-    serviceDay: todayYYYYMMDD,
-    directionId: tripDirectionId,
+    serviceDay: formatDateYYYYMMDD(currentTime),
+    directionId: southbound ? 0 : 1,
   });
   const vehiclePosition =
     vehiclePositionOverride !== undefined

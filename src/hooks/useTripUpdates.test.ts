@@ -154,10 +154,15 @@ describe("matchUpdatesToTrips", () => {
     stopTimeUpdates: [],
   });
 
-  it("pairs by trip id even when the feed's start time drifted", () => {
-    const own = feed("t16", "09:46:15");
-    const t = trip("t16", "09:44");
-    expect(matchUpdatesToTrips([own], [t], false).get(own)).toBe(t);
+  it("leaves an opposite-direction run sharing the origin minute unpaired", () => {
+    const opposite = { ...feed("t_sb", "09:44:15"), directionId: 0 };
+    expect(matchUpdatesToTrips([opposite], [trip("t16", "09:44")], false).size).toBe(0);
+  });
+
+  it("leaves another service day's run unpaired when the day is known", () => {
+    const tomorrow = { ...feed("t16", "09:44:15"), startDate: "20260716" };
+    expect(matchUpdatesToTrips([tomorrow], [trip("t16", "09:44")], false, DATE).size).toBe(0);
+    expect(matchUpdatesToTrips([tomorrow], [trip("t16", "09:44")], false).size).toBe(1);
   });
 
   it("leaves a same-minute run from another trip unpaired when the trip's own update is present", () => {
@@ -166,10 +171,5 @@ describe("matchUpdatesToTrips", () => {
     const paired = matchUpdatesToTrips([opposite, own], [trip("t16", "09:44")], false);
     expect(paired.has(opposite)).toBe(false);
     expect(paired.has(own)).toBe(true);
-  });
-
-  it("falls back to the origin time for a trip without an id", () => {
-    const own = feed("t16", "09:44:15");
-    expect(matchUpdatesToTrips([own], [trip(undefined, "09:44")], false).has(own)).toBe(true);
   });
 });

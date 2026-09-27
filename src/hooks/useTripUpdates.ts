@@ -423,20 +423,25 @@ export interface TripRealtimeStatusMaps {
 
 /**
  * Pair each feed update with its static trip, matched from the trip's side
- * with the shared {@link findRun} (trip id first, then origin time). An update
- * no trip claims stays unpaired, so an opposite-direction run sharing a trip's
- * origin minute can't take over a trip whose own update is in the feed.
+ * with {@link findRun}. `serviceDay` ("YYYYMMDD"), when known, keeps another
+ * day's run from pairing.
  */
 export function matchUpdatesToTrips<T extends { tripId?: string; times: string[] }>(
   updates: readonly GtfsRtTripUpdate[],
   trips: readonly T[],
   southbound: boolean,
+  serviceDay?: string,
 ): Map<GtfsRtTripUpdate, T> {
   const paired = new Map<GtfsRtTripUpdate, T>();
   for (const trip of trips) {
     const update = findRun(
       updates,
-      { tripId: trip.tripId, originStartTime: tripOriginStartTime(trip.times, southbound) },
+      {
+        tripId: trip.tripId,
+        originStartTime: tripOriginStartTime(trip.times, southbound),
+        serviceDay,
+        directionId: southbound ? 0 : 1,
+      },
       (u) => u,
     );
     if (update) paired.set(update, trip);
@@ -456,7 +461,8 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
 export function useTripRealtimeStatusMap(
   fromStation: Station | "",
   toStation: Station | "",
-  trips: ProcessedTrip[]
+  trips: ProcessedTrip[],
+  serviceDay?: string,
 ): TripRealtimeStatusMaps {
   const { data, error } = useTripUpdates();
   const isUpstreamDown = isUpstreamFeedDown(error);
@@ -469,7 +475,12 @@ export function useTripRealtimeStatusMap(
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
-    const staticByUpdate = matchUpdatesToTrips(data.updates, trips, direction === "southbound");
+    const staticByUpdate = matchUpdatesToTrips(
+      data.updates,
+      trips,
+      direction === "southbound",
+      serviceDay,
+    );
 
     const statusMap = new Map<string, TripRealtimeStatus>();
     const canceledByStartTime = new Map<string, TripRealtimeStatus>();
@@ -507,5 +518,5 @@ export function useTripRealtimeStatusMap(
       }
     }
     return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
-  }, [data, fromStation, toStation, trips, isUpstreamDown, feedUnavailable]);
+  }, [data, fromStation, toStation, trips, serviceDay, isUpstreamDown, feedUnavailable]);
 }

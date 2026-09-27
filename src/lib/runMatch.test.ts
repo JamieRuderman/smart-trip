@@ -22,6 +22,12 @@ describe("findRun", () => {
     expect(find([other, own])).toBe(own);
   });
 
+  it("prefers the id match whose origin time also matches when a duplicated run shares the id", () => {
+    const duplicate = { tripId: "t_A", startTime: "08:55:00", startDate: "20260609", directionId: 1 };
+    const own = { tripId: "t_A", startTime: "08:30:15", startDate: "20260609", directionId: 1 };
+    expect(find([duplicate, own])).toBe(own);
+  });
+
   it("ignores a trip id from another service day", () => {
     const yesterday = { tripId: "t_A", startTime: "09:00:00", startDate: "20260608" };
     expect(find([yesterday])).toBeUndefined();

@@ -1,7 +1,7 @@
 import { GTFS_STOP_ID_TO_PLATFORM } from "../src/data/generated/stationPlatforms.generated.js";
 import { STATION_ORDER } from "../src/data/generated/stations.generated.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
-import { findRun, type RunKey } from "../src/lib/runMatch.js";
+import { findRun, findVehicleRun, type RunKey } from "../src/lib/runMatch.js";
 import {
   delayMinutesFromSeconds,
   effectiveDelayMinutes,
@@ -38,6 +38,7 @@ export interface FeedTripUpdate {
   startTime?: string;
   /** Service day, "YYYYMMDD" — keeps a trip id from matching another day's run. */
   startDate?: string;
+  directionId?: number;
   stopTimeUpdates: FeedStopTimeUpdate[];
 }
 
@@ -68,7 +69,6 @@ const STATION_INDEX: Record<string, number> = Object.fromEntries(
   STATION_ORDER.map((s, i) => [s, i]),
 );
 
-/** The registration's run, keyed for {@link findRun}. */
 function runKeyForReg(reg: LiveActivityRegistration): RunKey {
   return {
     tripId: reg.tripId,
@@ -104,11 +104,7 @@ export function vehicleShortOfDestinationForReg(
   const toIdx = STATION_INDEX[reg.toStation];
   if (toIdx == null) return false;
 
-  const v = findRun(
-    vp.vehicles.filter((vehicle) => vehicle.stopId),
-    runKeyForReg(reg),
-    (vehicle) => vehicle.trip,
-  );
+  const v = findVehicleRun(vp.vehicles, runKeyForReg(reg));
   if (!v?.stopId) return false;
   if (v.timestamp != null && nowSec - v.timestamp > VEHICLE_STALE_SECONDS) {
     return false;
@@ -245,7 +241,7 @@ function matchLiveTripStatus(
   if (reg.originStartTime) return null;
 
   // No origin time on the registration: match by the boarding stop's live
-  //    departure, closest to scheduled within a window.
+  // departure, closest to scheduled within a window.
   let best: { update: FeedTripUpdate; from: FeedStopTimeUpdate; distance: number } | null =
     null;
   for (const update of updates) {

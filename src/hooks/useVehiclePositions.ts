@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useNow } from "@/hooks/useNow";
 import { fetchGtfsRtJson } from "@/lib/gtfsRtFetch";
-import { findRun, type RunKey } from "@/lib/runMatch";
+import { findVehicleRun, type RunKey } from "@/lib/runMatch";
 import { GTFS_STOP_ID_TO_STATION } from "@/lib/stationUtils";
 import type {
   GtfsRtVehiclePositionsResponse,
@@ -31,15 +31,11 @@ export function useVehiclePositions(enabled = true) {
 }
 
 /**
- * Match a specific trip to a vehicle in the positions feed, via the shared
- * {@link findRun}: by GTFS trip id, else by origin time, service day and
- * direction. Vehicles with coordinates but no stopId are excluded.
+ * Match a specific trip to a vehicle in the positions feed ({@link findVehicleRun}).
  *
  * Freshness policy: returns null if EITHER the feed header is >90s old OR the
  * individual vehicle timestamp is >60s old. Both must be fresh.
  *
- * @param run - the trip's id, origin "HH:MM", service day "YYYYMMDD" and
- *   direction (0 = southbound, 1 = northbound)
  * @param enabled - set false to stop fetching/polling while keeping the hook
  *   mounted (returns null, or a match from data another consumer fetched)
  */
@@ -58,18 +54,19 @@ export function useVehiclePositionForTrip(
   const { tripId, originStartTime, serviceDay, directionId } = run;
 
   return useMemo((): VehiclePositionMatch | null => {
-    if (!data || serviceDay == null || directionId == null) return null;
+    if (!data) return null;
 
     // Check feed header freshness
     if (data.timestamp > 0 && nowSeconds - data.timestamp > FEED_STALE_THRESHOLD_SECONDS) {
       return null;
     }
 
-    const vehicle = findRun(
-      (data.vehicles ?? []).filter((v) => v.stopId),
-      { tripId, originStartTime, serviceDay, directionId },
-      (v) => v.trip,
-    );
+    const vehicle = findVehicleRun(data.vehicles ?? [], {
+      tripId,
+      originStartTime,
+      serviceDay,
+      directionId,
+    });
     if (!vehicle?.stopId) return null;
 
     // Check individual vehicle timestamp freshness

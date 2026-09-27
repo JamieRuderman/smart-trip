@@ -6,7 +6,6 @@
 
 /** What identifies a scheduled run, from the static timetable. */
 export interface RunKey {
-  /** GTFS `trip_id`. */
   tripId?: string;
   /** Origin departure, "HH:MM". */
   originStartTime?: string;
@@ -30,11 +29,11 @@ function agrees(a: string | number | undefined, b: string | number | undefined):
   return a == null || a === "" || b == null || b === "" || a === b;
 }
 
-export function isRunById(feed: FeedRun, run: RunKey): boolean {
+function isRunById(feed: FeedRun, run: RunKey): boolean {
   return !!run.tripId && feed.tripId === run.tripId && agrees(feed.startDate, run.serviceDay);
 }
 
-export function isRunByOriginTime(feed: FeedRun, run: RunKey): boolean {
+function isRunByOriginTime(feed: FeedRun, run: RunKey): boolean {
   return (
     !!run.originStartTime &&
     feed.startTime?.slice(0, 5) === run.originStartTime &&
@@ -47,20 +46,30 @@ export function isRunByOriginTime(feed: FeedRun, run: RunKey): boolean {
  * The entry for `run`: by trip id first, then by origin time. 511's static and
  * realtime origin times can drift apart while the ids stay put, and an
  * opposite-direction run can share the origin minute. A stale static id still
- * falls back to the origin time.
+ * falls back to the origin time. A DUPLICATED run's vehicle keeps the original
+ * trip id, so an id match that also has the origin time wins.
  */
 export function findRun<T>(
   entries: readonly T[],
   run: RunKey,
   runOf: (entry: T) => FeedRun | undefined,
 ): T | undefined {
-  const byId = entries.find((e) => {
-    const feed = runOf(e);
-    return feed != null && isRunById(feed, run);
-  });
-  if (byId !== undefined) return byId;
-  return entries.find((e) => {
-    const feed = runOf(e);
-    return feed != null && isRunByOriginTime(feed, run);
-  });
+  const find = (isRun: (feed: FeedRun, run: RunKey) => boolean) =>
+    entries.find((e) => {
+      const feed = runOf(e);
+      return feed != null && isRun(feed, run);
+    });
+  return (
+    find((feed, key) => isRunById(feed, key) && isRunByOriginTime(feed, key)) ??
+    find(isRunById) ??
+    find(isRunByOriginTime)
+  );
+}
+
+/** The vehicle running `run`. One without a stop is skipped: it can't place the train. */
+export function findVehicleRun<V extends { stopId?: string; trip?: FeedRun }>(
+  vehicles: readonly V[],
+  run: RunKey,
+): V | undefined {
+  return findRun(vehicles, run, (v) => (v.stopId ? v.trip : undefined));
 }

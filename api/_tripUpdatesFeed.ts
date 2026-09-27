@@ -28,6 +28,7 @@ export interface NormalizedTripUpdate {
   routeId?: string;
   startDate?: string;
   startTime?: string;
+  directionId?: number;
   scheduleRelationship: string;
   duplicatedTripRef?: string;
   stopTimeUpdates: NormalizedStopTimeUpdate[];
@@ -99,6 +100,9 @@ export function normalizeTripUpdates(feed: FeedMessage): {
         routeId: trip.routeId ?? undefined,
         startDate: trip.startDate ?? undefined,
         startTime: trip.startTime ?? undefined,
+        // A decoded message reads an absent field as its prototype default (0 =
+        // southbound), so only an explicit direction is carried.
+        directionId: Object.hasOwn(trip, "directionId") ? (trip.directionId ?? undefined) : undefined,
         scheduleRelationship: schedRelStr,
         duplicatedTripRef: schedRelStr === "DUPLICATED" ? baseTripId : undefined,
         stopTimeUpdates,

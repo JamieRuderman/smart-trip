@@ -62,9 +62,9 @@ function FocusedTripAutoClearInner({
 
   // Live vehicle position for the focused run (the same match the detail
   // sheet uses). A heavily delayed train can drop its arrival prediction from
-  // the trip updates feed entirely; the positions feed is then the only
-  // proof it's still en route, and it must veto the
-  // time-based clear below so the rider's active trip isn't stopped mid-ride.
+  // the trip updates feed entirely; the positions feed is then the only proof
+  // it's still en route, and it must veto the time-based clear below so the
+  // rider's active trip isn't stopped mid-ride.
   // Polling only starts shortly before the scheduled arrival — the clear can't
   // fire earlier, so a trip focused hours ahead doesn't pay for an all-day feed.
   const southbound = isSouthbound(focusedTrip.fromStation, focusedTrip.toStation);

@@ -50,6 +50,8 @@ export interface GtfsRtTripUpdate {
   routeId?: string;
   startDate?: string;
   startTime?: string;
+  /** 0 = southbound, 1 = northbound; absent when the feed omits it. */
+  directionId?: number;
   scheduleRelationship: ScheduleRelationship;
   duplicatedTripRef?: string;
   stopTimeUpdates: GtfsRtStopTimeUpdate[];

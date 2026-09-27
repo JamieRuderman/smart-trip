@@ -41,6 +41,7 @@ export function useFocusedTripLive(
       focusedTrip.fromStation,
       focusedTrip.toStation,
       trips,
+      focusedTrip.serviceDate.replace(/-/g, ""),
     );
 
   const realtimeStatus = useMemo(() => {

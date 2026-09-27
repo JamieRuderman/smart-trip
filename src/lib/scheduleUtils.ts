@@ -332,6 +332,16 @@ export function getTodayScheduleType(now: Date = new Date()): ScheduleType {
   return day === 0 || day === 6 ? "weekend" : "weekday";
 }
 
+/** The schedule type to offer when today's type moved from `previousToday` to
+ *  `today`, or null when the shown schedule already matches (or nothing moved). */
+export function scheduleSwitchOffer(
+  previousToday: ScheduleType,
+  today: ScheduleType,
+  shown: ScheduleType,
+): ScheduleType | null {
+  return today !== previousToday && shown !== today ? today : null;
+}
+
 /**
  * The next calendar date ("YYYY-MM-DD"), starting from `from`, whose schedule
  * type matches `scheduleType` (honoring calendar overrides). Lets a trip browsed

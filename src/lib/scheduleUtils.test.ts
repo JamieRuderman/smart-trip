@@ -5,6 +5,7 @@ import {
   getNextTripIndex,
   getScheduleMeta,
   getTodayScheduleType,
+  scheduleSwitchOffer,
   setScheduleData,
   type ProcessedTrip,
 } from "@/lib/scheduleUtils";
@@ -248,5 +249,26 @@ describe("tripServesLeg", () => {
     expect(
       tripServesLeg(999999, stations[0], stations[stations.length - 1], "weekday"),
     ).toBe(false);
+  });
+});
+
+describe("scheduleSwitchOffer", () => {
+  const SAT = new Date(2099, 4, 23, 8, 0);
+  const MON = new Date(2099, 4, 25, 8, 0);
+
+  it("offers today's schedule on a new day when the shown one differs", () => {
+    expect(scheduleSwitchOffer("weekday", "2099-05-22", SAT)).toBe("weekend");
+  });
+
+  it("stays quiet once the schedule was picked or confirmed today", () => {
+    expect(scheduleSwitchOffer("weekday", "2099-05-23", SAT)).toBeNull();
+  });
+
+  it("stays quiet when the shown schedule already matches today", () => {
+    expect(scheduleSwitchOffer("weekend", "2099-05-22", SAT)).toBeNull();
+  });
+
+  it("still asks on Monday after a weekend the shown schedule matched", () => {
+    expect(scheduleSwitchOffer("weekend", "2099-05-22", MON)).toBe("weekday");
   });
 });

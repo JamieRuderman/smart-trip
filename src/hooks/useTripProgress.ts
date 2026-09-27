@@ -70,11 +70,12 @@ export function useTripProgress({
   const tripDirectionId = southbound ? 0 : 1;
   const todayYYYYMMDD = formatDateYYYYMMDD(currentTime);
 
-  const liveVehiclePosition = useVehiclePositionForTrip(
+  const liveVehiclePosition = useVehiclePositionForTrip({
+    tripId: trip.tripId,
     originStartTime,
-    todayYYYYMMDD,
-    tripDirectionId,
-  );
+    serviceDay: todayYYYYMMDD,
+    directionId: tripDirectionId,
+  });
   const vehiclePosition =
     vehiclePositionOverride !== undefined
       ? vehiclePositionOverride

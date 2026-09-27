@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveStatus } from "@/hooks/useTripUpdates";
+import { deriveStatus, matchUpdatesToTrips } from "@/hooks/useTripUpdates";
 import { GTFS_STOP_ID_TO_PLATFORM } from "@/lib/stationUtils";
 import { agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 import type { GtfsRtTripUpdate } from "@/types/gtfsRt";
@@ -138,5 +138,38 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     expect(result.status.delayMinutes).toBe(3);
     expect(result.status.liveDepartureTime).toBe("09:47");
     expect(result.status.liveArrivalTime).toBe("11:08");
+  });
+});
+
+describe("matchUpdatesToTrips", () => {
+  const trip = (tripId: string | undefined, origin: string) => ({
+    tripId,
+    times: ["07:00", "07:10", origin],
+  });
+  const feed = (tripId: string, startTime: string): GtfsRtTripUpdate => ({
+    tripId,
+    startDate: DATE,
+    startTime,
+    scheduleRelationship: "SCHEDULED",
+    stopTimeUpdates: [],
+  });
+
+  it("pairs by trip id even when the feed's start time drifted", () => {
+    const own = feed("t16", "09:46:15");
+    const t = trip("t16", "09:44");
+    expect(matchUpdatesToTrips([own], [t], false).get(own)).toBe(t);
+  });
+
+  it("leaves a same-minute run from another trip unpaired when the trip's own update is present", () => {
+    const opposite = feed("t_sb", "09:44:15");
+    const own = feed("t16", "09:44:15");
+    const paired = matchUpdatesToTrips([opposite, own], [trip("t16", "09:44")], false);
+    expect(paired.has(opposite)).toBe(false);
+    expect(paired.has(own)).toBe(true);
+  });
+
+  it("falls back to the origin time for a trip without an id", () => {
+    const own = feed("t16", "09:44:15");
+    expect(matchUpdatesToTrips([own], [trip(undefined, "09:44")], false).has(own)).toBe(true);
   });
 });

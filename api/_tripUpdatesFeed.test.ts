@@ -58,6 +58,19 @@ describe("normalizeTripUpdates", () => {
     });
   });
 
+  it("carries a trip's direction only when the feed sets it", () => {
+    const bytes = transit_realtime.FeedMessage.encode({
+      header: { gtfsRealtimeVersion: "2.0", timestamp: 1 },
+      entity: [
+        { id: "n", tripUpdate: { trip: { tripId: "t_n", directionId: 1 }, stopTimeUpdate: [] } },
+        { id: "s", tripUpdate: { trip: { tripId: "t_s", directionId: 0 }, stopTimeUpdate: [] } },
+        { id: "u", tripUpdate: { trip: { tripId: "t_u" }, stopTimeUpdate: [] } },
+      ],
+    }).finish();
+    const out = normalizeTripUpdates(transit_realtime.FeedMessage.decode(bytes));
+    expect(out.updates.map((u) => u.directionId)).toEqual([1, 0, undefined]);
+  });
+
   it("maps a CANCELED trip relationship", () => {
     const out = normalizeTripUpdates(
       feed([

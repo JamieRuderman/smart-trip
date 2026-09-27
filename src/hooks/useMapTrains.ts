@@ -45,15 +45,21 @@ interface TripIndexEntry {
   times: string[];
 }
 
+interface TripIndex {
+  byTripId: Map<string, TripIndexEntry>;
+  byOrigin: Map<string, TripIndexEntry>;
+}
+
 /**
- * Build a lookup map from "directionId|startTime" to the trip's human
- * number and static per-station times for today's active schedule (weekday
- * or weekend). Vehicles in the GTFS-RT feed are always running today, so
- * biasing to today avoids the collision case where weekday and weekend share
+ * Build lookups from GTFS trip id and from "directionId|startTime" to the
+ * trip's human number and static per-station times for today's active schedule
+ * (weekday or weekend). Vehicles in the GTFS-RT feed are always running today,
+ * so biasing to today avoids the collision case where weekday and weekend share
  * an origin time and would otherwise overwrite each other.
  */
-function buildTripIndex(): Map<string, TripIndexEntry> {
-  const index = new Map<string, TripIndexEntry>();
+function buildTripIndex(): TripIndex {
+  const byTripId = new Map<string, TripIndexEntry>();
+  const byOrigin = new Map<string, TripIndexEntry>();
   const north = stations[0];
   const south = stations[stations.length - 1];
   const lastIdx = stations.length - 1;
@@ -64,16 +70,13 @@ function buildTripIndex(): Map<string, TripIndexEntry> {
     const originIdx = sb ? 0 : lastIdx;
     const dirId = sb ? 0 : 1;
     for (const trip of getFilteredTrips(from, to, scheduleType)) {
+      const entry = { tripNumber: trip.trip, times: trip.times };
+      if (trip.tripId) byTripId.set(trip.tripId, entry);
       const origin = trip.times[originIdx];
-      if (origin) {
-        index.set(tripNumberKey(dirId, origin), {
-          tripNumber: trip.trip,
-          times: trip.times,
-        });
-      }
+      if (origin) byOrigin.set(tripNumberKey(dirId, origin), entry);
     }
   }
-  return index;
+  return { byTripId, byOrigin };
 }
 
 export function useMapTrains(): {
@@ -129,10 +132,9 @@ export function useMapTrains(): {
     const delayForVehicle = (
       update: GtfsRtTripUpdate,
       directionId: number,
-      startTime: string,
+      entry: TripIndexEntry | undefined,
     ): number | null => {
       const direction = directionId === 0 ? "southbound" : "northbound";
-      const entry = tripIndex.get(tripNumberKey(directionId, startTime));
       let nextStu: (typeof update.stopTimeUpdates)[number] | null = null;
       let nextStation: Station | null = null;
       for (const stu of update.stopTimeUpdates) {
@@ -172,9 +174,14 @@ export function useMapTrains(): {
         : null;
       const startTime = vehicle.trip.startTime?.slice(0, 5) ?? null;
       const directionId = vehicle.trip.directionId ?? null;
+      const entry =
+        tripIndex.byTripId.get(vehicle.trip.tripId) ??
+        (startTime != null && directionId != null
+          ? tripIndex.byOrigin.get(tripNumberKey(directionId, startTime))
+          : undefined);
       const delayMinutes =
-        update != null && !isCanceled && directionId != null && startTime != null
-          ? delayForVehicle(update, directionId, startTime)
+        update != null && !isCanceled && directionId != null
+          ? delayForVehicle(update, directionId, entry)
           : null;
 
       trains.push({
@@ -186,11 +193,7 @@ export function useMapTrains(): {
         speed: vehicle.position.speed ?? null,
         directionId,
         tripLabel: vehicle.trip.tripId ?? null,
-        tripNumber:
-          startTime != null && directionId != null
-            ? (tripIndex.get(tripNumberKey(directionId, startTime))
-                ?.tripNumber ?? null)
-            : null,
+        tripNumber: entry?.tripNumber ?? null,
         nextStation,
         currentStatus: vehicle.currentStatus ?? null,
         delayMinutes,

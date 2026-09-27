@@ -349,6 +349,16 @@ describe("computeLiveTripStatus", () => {
       ).toBe(3);
     });
 
+    it("ignores a run from another service day on the origin-time fallback", () => {
+      const depUnix = SCHED_DEP_MS / 1000 + 3 * 60;
+      const status = computeLiveTripStatus({
+        reg: regWithOrigin,
+        updates: [run({ startDate: "20260610" }, depUnix)],
+        now: SCHED_DEP_MS,
+      });
+      expect(status).toBeNull();
+    });
+
     it("falls back to the origin time, not a closer boarding match, when the id is stale", () => {
       // An earlier run departs exactly on schedule; a boarding-stop fallback would take it.
       const updates: FeedTripUpdate[] = [

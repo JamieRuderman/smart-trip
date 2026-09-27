@@ -20,7 +20,9 @@ import type {
 } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { findRun } from "@/lib/runMatch";
 import { agencyClockHHMM, agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
+import { tripOriginStartTime } from "@/lib/tripProgress";
 
 const TRIP_UPDATES_POLL_INTERVAL = 30 * 1000; // 30 seconds
 
@@ -419,32 +421,50 @@ export interface TripRealtimeStatusMaps {
   isFeedUnavailable: boolean;
 }
 
+/** Pair each feed update with its static trip via {@link findRun}; a trip-id pairing
+ *  isn't taken over by another trip's origin-time fallback. */
+export function matchUpdatesToTrips<T extends { tripId?: string; times: string[] }>(
+  updates: readonly GtfsRtTripUpdate[],
+  trips: readonly T[],
+  southbound: boolean,
+  serviceDay?: string,
+): Map<GtfsRtTripUpdate, T> {
+  const paired = new Map<GtfsRtTripUpdate, T>();
+  const pairedById = new Set<GtfsRtTripUpdate>();
+  for (const trip of trips) {
+    const update = findRun(
+      updates,
+      {
+        tripId: trip.tripId,
+        originStartTime: tripOriginStartTime(trip.times, southbound),
+        serviceDay,
+        directionId: southbound ? 0 : 1,
+      },
+      (u) => u,
+    );
+    if (!update) continue;
+    const byId = !!trip.tripId && update.tripId === trip.tripId;
+    if (!byId && pairedById.has(update)) continue;
+    paired.set(update, trip);
+    if (byId) pairedById.add(update);
+  }
+  return paired;
+}
+
 /**
  * Builds maps from departure times to TripRealtimeStatus.
  * Primary map is keyed by the SCHEDULED departure time at fromStation (from the
  * static timetable), so it aligns with trip.departureTime in ScheduleResults.
  *
  * Delay detection: 511 always sends departureDelay: 0 and only shifts departure.time,
- * so we match each RT update to a static trip via startTime and compute the delay
- * by diffing the live departure.time against the static scheduled time.
- *
- * TODO(trip-matching): clean this up soon. We currently match RT→static by
- * origin departure time ("HH:MM") only. The canonical GTFS-RT approach (and
- * what 511's regional feed supports — verified: realtime trip_update.trip.trip_id
- * matches static trips.txt trip_id, see scripts/transit/captureRealtime.ts) is:
- *   1. direct match on trip_id,
- *   2. verify the service day via start_date against calendar/calendar_dates,
- *   3. anchor with the stop_time_update stop_id sequence + scheduled times,
- *   4. fall back to route_id + direction_id + start_date + start_time,
- *   5. never key app state on trip_id alone (frequency/duplicated trips need
- *      date/time context).
- * Requires threading trip_id (and start_date) through the generated timetable.
- * Departure-time-only matching is fragile around duplicate/overnight times.
+ * so we match each RT update to its static trip ({@link matchUpdatesToTrips}) and
+ * compute the delay by diffing the live departure.time against the static scheduled time.
  */
 export function useTripRealtimeStatusMap(
   fromStation: Station | "",
   toStation: Station | "",
-  trips: ProcessedTrip[]
+  trips: ProcessedTrip[],
+  serviceDay?: string,
 ): TripRealtimeStatusMaps {
   const { data, error } = useTripUpdates();
   const isUpstreamDown = isUpstreamFeedDown(error);
@@ -457,28 +477,18 @@ export function useTripRealtimeStatusMap(
     if (!data || !fromStation || !toStation) return empty;
 
     const direction = getTripDirection(fromStation as Station, toStation as Station);
-    const southbound = direction === "southbound";
-
-    // Build a lookup from a trip's origin departure time ("HH:MM") to the scheduled
-    // departure and arrival times at fromStation/toStation ("HH:MM"). Southbound trips
-    // originate at the northernmost station (times[0]); northbound at the southernmost (times[last]).
-    const scheduledByOrigin = new Map<string, { departureTime: string; arrivalTime: string; times: string[] }>();
-    for (const trip of trips) {
-      const originTime = southbound
-        ? trip.times[0]
-        : trip.times[trip.times.length - 1];
-      if (originTime) {
-        scheduledByOrigin.set(originTime, { departureTime: trip.departureTime, arrivalTime: trip.arrivalTime, times: trip.times });
-      }
-    }
+    const staticByUpdate = matchUpdatesToTrips(
+      data.updates,
+      trips,
+      direction === "southbound",
+      serviceDay,
+    );
 
     const statusMap = new Map<string, TripRealtimeStatus>();
     const canceledByStartTime = new Map<string, TripRealtimeStatus>();
 
     for (const update of data.updates) {
-      // Match this RT update to a static trip via its scheduled origin startTime.
-      const originHHMM = update.startTime?.slice(0, 5) ?? null;
-      const staticTrip = originHHMM ? (scheduledByOrigin.get(originHHMM) ?? null) : null;
+      const staticTrip = staticByUpdate.get(update) ?? null;
       const scheduledDepartureParam = staticTrip?.departureTime ?? null;
       const scheduledArrivalParam = staticTrip?.arrivalTime ?? null;
 
@@ -510,5 +520,5 @@ export function useTripRealtimeStatusMap(
       }
     }
     return { statusMap, canceledByStartTime, lastUpdated, isUpstreamDown, isFeedUnavailable: feedUnavailable };
-  }, [data, fromStation, toStation, trips, isUpstreamDown, feedUnavailable]);
+  }, [data, fromStation, toStation, trips, serviceDay, isUpstreamDown, feedUnavailable]);
 }

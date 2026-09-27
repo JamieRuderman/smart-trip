@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveStatus } from "@/hooks/useTripUpdates";
+import { deriveStatus, matchUpdatesToTrips } from "@/hooks/useTripUpdates";
 import { GTFS_STOP_ID_TO_PLATFORM } from "@/lib/stationUtils";
 import { agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
 import type { GtfsRtTripUpdate } from "@/types/gtfsRt";
@@ -138,5 +138,46 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     expect(result.status.delayMinutes).toBe(3);
     expect(result.status.liveDepartureTime).toBe("09:47");
     expect(result.status.liveArrivalTime).toBe("11:08");
+  });
+});
+
+describe("matchUpdatesToTrips", () => {
+  const trip = (tripId: string | undefined, origin: string) => ({
+    tripId,
+    times: ["07:00", "07:10", origin],
+  });
+  const feed = (tripId: string, startTime: string): GtfsRtTripUpdate => ({
+    tripId,
+    startDate: DATE,
+    startTime,
+    scheduleRelationship: "SCHEDULED",
+    stopTimeUpdates: [],
+  });
+
+  it("leaves an opposite-direction run sharing the origin minute unpaired", () => {
+    const opposite = { ...feed("t_sb", "09:44:15"), directionId: 0 };
+    expect(matchUpdatesToTrips([opposite], [trip("t16", "09:44")], false).size).toBe(0);
+  });
+
+  it("leaves another service day's run unpaired when the day is known", () => {
+    const tomorrow = { ...feed("t16", "09:44:15"), startDate: "20260716" };
+    expect(matchUpdatesToTrips([tomorrow], [trip("t16", "09:44")], false, DATE).size).toBe(0);
+    expect(matchUpdatesToTrips([tomorrow], [trip("t16", "09:44")], false).size).toBe(1);
+  });
+
+  it("keeps a trip-id pairing when another trip shares the origin minute", () => {
+    const own = feed("t_weekday", "09:44:15");
+    const weekday = trip("t_weekday", "09:44");
+    const weekend = trip("t_weekend", "09:44");
+    const paired = matchUpdatesToTrips([own], [weekday, weekend], false);
+    expect(paired.get(own)).toBe(weekday);
+  });
+
+  it("leaves a same-minute run from another trip unpaired when the trip's own update is present", () => {
+    const opposite = feed("t_sb", "09:44:15");
+    const own = feed("t16", "09:44:15");
+    const paired = matchUpdatesToTrips([opposite, own], [trip("t16", "09:44")], false);
+    expect(paired.has(opposite)).toBe(false);
+    expect(paired.has(own)).toBe(true);
   });
 });

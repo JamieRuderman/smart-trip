@@ -165,6 +165,14 @@ describe("matchUpdatesToTrips", () => {
     expect(matchUpdatesToTrips([tomorrow], [trip("t16", "09:44")], false).size).toBe(1);
   });
 
+  it("keeps a trip-id pairing when another trip shares the origin minute", () => {
+    const own = feed("t_weekday", "09:44:15");
+    const weekday = trip("t_weekday", "09:44");
+    const weekend = trip("t_weekend", "09:44");
+    const paired = matchUpdatesToTrips([own], [weekday, weekend], false);
+    expect(paired.get(own)).toBe(weekday);
+  });
+
   it("leaves a same-minute run from another trip unpaired when the trip's own update is present", () => {
     const opposite = feed("t_sb", "09:44:15");
     const own = feed("t16", "09:44:15");

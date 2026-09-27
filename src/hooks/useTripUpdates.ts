@@ -421,11 +421,8 @@ export interface TripRealtimeStatusMaps {
   isFeedUnavailable: boolean;
 }
 
-/**
- * Pair each feed update with its static trip, matched from the trip's side
- * with {@link findRun}. `serviceDay` ("YYYYMMDD"), when known, keeps another
- * day's run from pairing.
- */
+/** Pair each feed update with its static trip via {@link findRun}; a trip-id pairing
+ *  isn't taken over by another trip's origin-time fallback. */
 export function matchUpdatesToTrips<T extends { tripId?: string; times: string[] }>(
   updates: readonly GtfsRtTripUpdate[],
   trips: readonly T[],
@@ -433,6 +430,7 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
   serviceDay?: string,
 ): Map<GtfsRtTripUpdate, T> {
   const paired = new Map<GtfsRtTripUpdate, T>();
+  const pairedById = new Set<GtfsRtTripUpdate>();
   for (const trip of trips) {
     const update = findRun(
       updates,
@@ -444,7 +442,11 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
       },
       (u) => u,
     );
-    if (update) paired.set(update, trip);
+    if (!update) continue;
+    const byId = !!trip.tripId && update.tripId === trip.tripId;
+    if (!byId && pairedById.has(update)) continue;
+    paired.set(update, trip);
+    if (byId) pairedById.add(update);
   }
   return paired;
 }

@@ -356,7 +356,7 @@ describe("computeLiveTripStatus", () => {
         updates: [run({ startDate: "20260610" }, depUnix)],
         now: SCHED_DEP_MS,
       });
-      expect(status?.delayMinutes ?? 0).toBe(0);
+      expect(status).toBeNull();
     });
 
     it("falls back to the origin time, not a closer boarding match, when the id is stale", () => {

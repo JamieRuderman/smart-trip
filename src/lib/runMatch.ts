@@ -1,8 +1,5 @@
-/**
- * Which GTFS-RT entry is a given scheduled run. Shared by the app's realtime
- * hooks and the Live Activity push backend, so the in-app status and the lock
- * screen always pick the same train. Pure; no app imports (the Worker bundles it).
- */
+/** Which GTFS-RT entry is a given scheduled run, shared by the app and the push
+ *  backend so both pick the same train. No app imports: the Worker bundles it. */
 
 /** What identifies a scheduled run, from the static timetable. */
 export interface RunKey {
@@ -42,13 +39,8 @@ function isRunByOriginTime(feed: FeedRun, run: RunKey): boolean {
   );
 }
 
-/**
- * The entry for `run`: by trip id first, then by origin time. 511's static and
- * realtime origin times can drift apart while the ids stay put, and an
- * opposite-direction run can share the origin minute. A stale static id still
- * falls back to the origin time. A DUPLICATED run's vehicle keeps the original
- * trip id, so an id match that also has the origin time wins.
- */
+/** The entry for `run`: by trip id (511's origin times drift while ids hold; a DUPLICATED
+ *  run's vehicle keeps the id, so one that also matches the origin wins), then origin time. */
 export function findRun<T>(
   entries: readonly T[],
   run: RunKey,

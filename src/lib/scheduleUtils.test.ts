@@ -5,7 +5,6 @@ import {
   getNextTripIndex,
   getScheduleMeta,
   getTodayScheduleType,
-  scheduleSwitchOffer,
   setScheduleData,
   type ProcessedTrip,
 } from "@/lib/scheduleUtils";
@@ -249,20 +248,5 @@ describe("tripServesLeg", () => {
     expect(
       tripServesLeg(999999, stations[0], stations[stations.length - 1], "weekday"),
     ).toBe(false);
-  });
-});
-
-describe("scheduleSwitchOffer", () => {
-  it("offers the new day's schedule when the shown one no longer matches", () => {
-    expect(scheduleSwitchOffer("weekday", "weekend", "weekday")).toBe("weekend");
-    expect(scheduleSwitchOffer("weekend", "weekday", "weekend")).toBe("weekday");
-  });
-
-  it("stays quiet when the shown schedule already matches the new day", () => {
-    expect(scheduleSwitchOffer("weekday", "weekend", "weekend")).toBeNull();
-  });
-
-  it("stays quiet when the day's schedule type did not change", () => {
-    expect(scheduleSwitchOffer("weekend", "weekend", "weekday")).toBeNull();
   });
 });

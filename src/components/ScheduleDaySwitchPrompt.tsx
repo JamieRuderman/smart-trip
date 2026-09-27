@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,39 +8,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { ScheduleType } from "@/data/trainSchedules";
-import { getTodayScheduleType, scheduleSwitchOffer } from "@/lib/scheduleUtils";
+import { useStationSelection } from "@/contexts/stationSelection";
+import { getTodayScheduleType } from "@/lib/scheduleUtils";
 
-/**
- * Offers to switch schedules when today's type changes while the app is open.
- * A fresh load already starts on today's schedule, but a resumed app keeps
- * the one it opened with: Friday's weekday trains on Saturday morning.
- */
-export function ScheduleDaySwitchPrompt({
-  currentTime,
-  scheduleType,
-  onSwitch,
-}: {
-  currentTime: Date;
-  scheduleType: ScheduleType;
-  onSwitch: (type: ScheduleType) => void;
-}) {
+/** Offers today's schedule when the day's type changes while the app stays open;
+ *  only a fresh load picks it automatically. */
+export function ScheduleDaySwitchPrompt({ currentTime }: { currentTime: Date }) {
   const { t } = useTranslation();
+  const { scheduleType, scheduleDay, setScheduleType, acknowledgeScheduleDay } =
+    useStationSelection();
   const today = getTodayScheduleType(currentTime);
-  const [seenToday, setSeenToday] = useState(today);
-  const [offer, setOffer] = useState<ScheduleType | null>(null);
-  if (today !== seenToday) {
-    setSeenToday(today);
-    setOffer(scheduleSwitchOffer(seenToday, today, scheduleType));
-  }
-  if (offer == null || offer === scheduleType) return null;
+  if (today === scheduleDay || scheduleType === today) return null;
 
-  const weekend = offer === "weekend";
+  const weekend = today === "weekend";
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) setOffer(null);
+        if (!open) acknowledgeScheduleDay(today);
       }}
     >
       <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
@@ -54,13 +38,13 @@ export function ScheduleDaySwitchPrompt({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={() => setOffer(null)}>
+          <Button variant="outline" onClick={() => acknowledgeScheduleDay(today)}>
             {t("scheduleDaySwitch.keep")}
           </Button>
           <Button
             onClick={() => {
-              setOffer(null);
-              onSwitch(offer);
+              setScheduleType(today);
+              acknowledgeScheduleDay(today);
             }}
           >
             {t("scheduleDaySwitch.switch")}

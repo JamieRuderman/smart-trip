@@ -318,11 +318,7 @@ export function TrainScheduleApp() {
         />
       )}
 
-      <ScheduleDaySwitchPrompt
-        currentTime={currentTime}
-        scheduleType={scheduleType}
-        onSwitch={setScheduleType}
-      />
+      <ScheduleDaySwitchPrompt currentTime={currentTime} />
     </div>
   );
 }

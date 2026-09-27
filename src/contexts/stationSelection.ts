@@ -11,6 +11,11 @@ export interface StationSelection {
   fromStation: Station | "";
   toStation: Station | "";
   scheduleType: "weekday" | "weekend";
+  /** Today's schedule type as of the last automatic pick, manual choice or
+   *  switch prompt. A newer day's type differing from it means the day turned
+   *  over while the app stayed open. */
+  scheduleDay: "weekday" | "weekend";
+  acknowledgeScheduleDay: (day: "weekday" | "weekend") => void;
   selectedTripNumber: number | null;
   setFromStation: (station: Station | "") => void;
   setToStation: (station: Station | "") => void;

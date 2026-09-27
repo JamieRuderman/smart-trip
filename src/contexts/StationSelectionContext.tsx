@@ -92,6 +92,7 @@ interface ProviderState {
   fromStation: Station | "";
   toStation: Station | "";
   scheduleType: "weekday" | "weekend";
+  scheduleDay: "weekday" | "weekend";
   selectedTripNumber: number | null;
 }
 
@@ -142,6 +143,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
         isSharedLinkOnMount && initialUrlType
           ? initialUrlType
           : todayScheduleType(),
+      scheduleDay: todayScheduleType(),
       selectedTripNumber: !isNaN(initialUrlTripNumber)
         ? initialUrlTripNumber
         : persisted
@@ -233,7 +235,15 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const setScheduleType = useCallback((type: "weekday" | "weekend") => {
-    setState((prev) => ({ ...prev, scheduleType: type }));
+    setState((prev) => ({
+      ...prev,
+      scheduleType: type,
+      scheduleDay: todayScheduleType(),
+    }));
+  }, []);
+
+  const acknowledgeScheduleDay = useCallback((day: "weekday" | "weekend") => {
+    setState((prev) => (prev.scheduleDay === day ? prev : { ...prev, scheduleDay: day }));
   }, []);
 
   const setSelectedTrip = useCallback((tripNumber: number | null) => {
@@ -245,9 +255,9 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       return {
         ...prev,
         selectedTripNumber: tripNumber,
-        scheduleType: exitingSharedLink
-          ? todayScheduleType()
-          : prev.scheduleType,
+        ...(exitingSharedLink
+          ? { scheduleType: todayScheduleType(), scheduleDay: todayScheduleType() }
+          : {}),
       };
     });
   }, []);
@@ -311,6 +321,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       fromStation: state.fromStation,
       toStation: state.toStation,
       scheduleType: state.scheduleType,
+      scheduleDay: state.scheduleDay,
+      acknowledgeScheduleDay,
       selectedTripNumber: state.selectedTripNumber,
       setFromStation,
       setToStation,
@@ -331,6 +343,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       state.fromStation,
       state.toStation,
       state.scheduleType,
+      state.scheduleDay,
+      acknowledgeScheduleDay,
       state.selectedTripNumber,
       setFromStation,
       setToStation,

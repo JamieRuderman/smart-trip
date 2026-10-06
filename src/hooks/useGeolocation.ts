@@ -130,25 +130,33 @@ function fetchWebLocation(
   });
 }
 
-/** Whether location access is already granted, checked without prompting. */
-async function isLocationGranted(): Promise<boolean> {
+/**
+ * Location access already granted, checked without prompting: "precise",
+ * "coarse" (Android's approximate-only grant), or null when not granted.
+ */
+async function grantedLocationAccess(): Promise<"precise" | "coarse" | null> {
   if (Capacitor.isNativePlatform()) {
     const { Geolocation } = await import("@capacitor/geolocation");
     const { location, coarseLocation } = await Geolocation.checkPermissions();
-    return location === "granted" || coarseLocation === "granted";
+    if (location === "granted") return "precise";
+    return coarseLocation === "granted" ? "coarse" : null;
   }
-  if (!("permissions" in navigator)) return false;
+  if (!("permissions" in navigator)) return null;
   const { state } = await navigator.permissions.query({ name: "geolocation" });
-  return state === "granted";
+  return state === "granted" ? "precise" : null;
 }
 
-/** The app's latest fix from any source (one-shot or watch), and when it
- *  arrived, so one-off checks can reuse it instead of waking the GPS again. */
-let latestFix: { fix: Coordinates; receivedAt: number } | null = null;
+/** The app's latest fix from any source (one-shot or watch), and when it was
+ *  taken, so one-off checks can reuse it instead of waking the GPS again. */
+let latestFix: { fix: Coordinates; takenAt: number } | null = null;
 let pendingFix: Promise<Coordinates | null> | null = null;
 
 function rememberFix(fix: Coordinates): Coordinates {
-  latestFix = { fix, receivedAt: Date.now() };
+  // Age from the position's own timestamp — a cached position can arrive
+  // already old — clamped to now in case the device clock runs ahead. Never
+  // let an older reading (e.g. a slow one-shot) replace a newer one.
+  const takenAt = Math.min(Date.now(), fix.timestampMs);
+  if (!latestFix || takenAt >= latestFix.takenAt) latestFix = { fix, takenAt };
   return fix;
 }
 
@@ -162,15 +170,23 @@ const RECENT_FIX_MS = 60_000;
  * isn't granted or the fix fails. Concurrent callers share one request.
  */
 export function getRecentLocationFix(): Promise<Coordinates | null> {
-  if (latestFix && Date.now() - latestFix.receivedAt <= RECENT_FIX_MS) {
+  if (latestFix && Date.now() - latestFix.takenAt <= RECENT_FIX_MS) {
     return Promise.resolve(latestFix.fix);
   }
   if (!pendingFix) {
     pendingFix = (async () => {
       try {
-        if (!(await isLocationGranted())) return null;
+        const access = await grantedLocationAccess();
+        if (!access) return null;
         // Accept a recent cached position and don't wait long on a cold GPS.
-        const options = { enableHighAccuracy: true, timeout: 8000, maximumAge: RECENT_FIX_MS };
+        // Only ask for high accuracy with precise access: on Android 12+ a
+        // high-accuracy request under an approximate-only grant prompts the
+        // rider to upgrade to precise location.
+        const options = {
+          enableHighAccuracy: access === "precise",
+          timeout: 8000,
+          maximumAge: RECENT_FIX_MS,
+        };
         return rememberFix(
           Capacitor.isNativePlatform()
             ? await fetchNativeLocation(options, { prompt: false })
@@ -221,9 +237,9 @@ export function useGeolocation({
     }
     // Web: only auto-request if permission is already granted (no prompt shown).
     if (autoRequestOnWeb) {
-      isLocationGranted()
-        .then((granted) => {
-          if (granted) void requestLocation();
+      grantedLocationAccess()
+        .then((access) => {
+          if (access) void requestLocation();
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }

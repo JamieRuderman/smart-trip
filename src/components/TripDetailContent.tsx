@@ -535,6 +535,7 @@ export function TripDetailContent({
             currentTime={currentTime}
             timeFormat={timeFormat}
             scheduleType={scheduleType}
+            onClose={onClose}
           />
         </div>
       )}

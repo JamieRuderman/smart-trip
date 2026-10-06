@@ -34,7 +34,7 @@ export function useBoardingLocationCheck({
   departureAt,
   now,
 }: BoardingLocationCheckInput) {
-  const { swapStations, setFromStation, setSelectedTrip } = useStationSelection();
+  const { swapStations, setFromStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
   const [warning, setWarning] = useState<BoardingLocationWarning | null>(null);
   const enabled =
@@ -63,30 +63,35 @@ export function useBoardingLocationCheck({
     }
     if (checking) return;
     setChecking(true);
+    let found: BoardingLocationWarning | null = null;
     let timer = 0;
-    const fix = await Promise.race([
-      getRecentLocationFix(),
-      new Promise<null>((resolve) => {
-        timer = window.setTimeout(() => resolve(null), MAX_WAIT_MS);
-      }),
-    ]);
-    window.clearTimeout(timer);
+    try {
+      const fix = await Promise.race([
+        getRecentLocationFix(),
+        new Promise<null>((resolve) => {
+          timer = window.setTimeout(() => resolve(null), MAX_WAIT_MS);
+        }),
+      ]);
+      found = fix && checkBoardingLocation(fix, from, to);
+    } catch {
+      // A failed check never blocks the tap — go ahead unchecked.
+    } finally {
+      window.clearTimeout(timer);
+    }
     // The sheet may have been closed while we waited; don't act behind it.
     if (!mountedRef.current) return;
     setChecking(false);
-    const found = fix && checkBoardingLocation(fix, from, to);
     if (found) setWarning(found);
     else proceed();
   };
 
   /** Correct the trip instead of taking this train — it runs the wrong way
-   *  (or from the wrong station) — then close the sheet so the rider picks
-   *  from the corrected schedule. */
+   *  (or from the wrong station). The caller then closes its sheet so the
+   *  rider picks from the corrected schedule. */
   const fixTrip = () => {
     if (warning?.kind === "nearDestination") swapStations();
     else if (warning) setFromStation(warning.station);
     setWarning(null);
-    setSelectedTrip(null);
   };
 
   return { checking, warning, guard, fixTrip, dismiss: () => setWarning(null) };

@@ -45,6 +45,9 @@ interface DepartureReminderProps {
    *  from "today" here: train numbers repeat across weekday/weekend, so an
    *  inferred type would focus/recognize the wrong run. */
   scheduleType: "weekday" | "weekend";
+  /** Close the detail sheet this control sits in. The sheet's own close —
+   *  the line map's sheets aren't driven by the selected trip. */
+  onClose: () => void;
 }
 
 /** Hours of past-ness before we assume a HH:MM refers to tomorrow's run. */
@@ -81,6 +84,7 @@ export function DepartureReminder({
   currentTime,
   timeFormat,
   scheduleType,
+  onClose,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
 
@@ -337,7 +341,10 @@ export function DepartureReminder({
           warning={boardingCheck.warning}
           fromStation={focusRun.fromStation}
           toStation={focusRun.toStation}
-          onFix={boardingCheck.fixTrip}
+          onFix={() => {
+            boardingCheck.fixTrip();
+            onClose();
+          }}
           onContinue={() => {
             boardingCheck.dismiss();
             proceedWithGo();

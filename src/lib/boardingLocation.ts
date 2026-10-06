@@ -48,9 +48,10 @@ export function shouldCheckBoardingLocation(
 
 /**
  * Compare a location fix against the leg the rider is about to focus, returning
- * a warning when they don't appear to be leaving from `from`. Deliberately
- * silent when they're simply away from every station (e.g. at home before
- * walking over) — only a position that points at a different station warns.
+ * a warning when they don't appear to be leaving from `from`: when they're
+ * clearly nearer `to` than `from` (wherever they are — no station proximity is
+ * required), or standing at another station. Otherwise silent, e.g. at home a
+ * walk or drive from the origin.
  */
 export function checkBoardingLocation(
   fix: BoardingFix,

@@ -241,6 +241,15 @@
     "activityStartTitle": "Trip from {{station}} coming up",
     "activityStartBody": "Train {{trip}} — tracking it on your lock screen."
   },
+  "boardingCheck": {
+    "reversedTitle": "Heading the other way?",
+    "reversedBody": "You're closer to {{to}} than to {{from}}, where this train leaves from. Did you mean to ride from {{to}} to {{from}}?",
+    "swap": "Swap stations",
+    "otherStationTitle": "Not at {{from}}?",
+    "otherStationBody": "You appear to be at {{station}}, but this train leaves from {{from}}.",
+    "leaveFrom": "Leave from {{station}}",
+    "takeAnyway": "Take it anyway"
+  },
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Departs in {{minutes}} min",

@@ -25,7 +25,7 @@ interface UseGeolocationOptions {
   autoRequestOnWeb?: boolean;
 }
 
-interface Coordinates {
+export interface Coordinates {
   lat: number;
   lng: number;
   accuracy: number | null;
@@ -127,6 +127,86 @@ function fetchWebLocation(): Promise<Coordinates> {
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   });
+}
+
+/** Options for a background fix: accept a recent cached position so it's
+ *  usually instant, and don't hang around waiting on a cold GPS. */
+const BACKGROUND_FIX_OPTIONS = {
+  enableHighAccuracy: true,
+  timeout: 8000,
+  maximumAge: 60_000,
+};
+
+/**
+ * One-shot fix that never shows a permission prompt: resolves null unless the
+ * user already granted location access, or if the fix fails or times out. For
+ * checks the user didn't explicitly ask for, where a prompt would be out of
+ * place.
+ */
+export async function getLocationFixIfGranted(): Promise<Coordinates | null> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Geolocation } = await import("@capacitor/geolocation");
+      const { location, coarseLocation } = await Geolocation.checkPermissions();
+      if (location !== "granted" && coarseLocation !== "granted") return null;
+      const pos = await Geolocation.getCurrentPosition(BACKGROUND_FIX_OPTIONS);
+      return normalizeCoordinates(pos, null);
+    }
+    if (!("geolocation" in navigator) || !("permissions" in navigator)) {
+      return null;
+    }
+    const { state } = await navigator.permissions.query({ name: "geolocation" });
+    if (state !== "granted") return null;
+    return await new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(normalizeCoordinates(pos, null)),
+        () => resolve(null),
+        BACKGROUND_FIX_OPTIONS,
+      );
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** A prefetched fix started longer ago than this is refetched, not reused. */
+const PREFETCH_STALE_MS = 2 * 60 * 1000;
+
+/**
+ * Warm a no-prompt fix (see `getLocationFixIfGranted`) while `enabled`, and
+ * return a getter for it — so a check on a later tap usually resolves
+ * instantly. The getter refetches a stale fix and gives up with null after
+ * `maxWaitMs`, so a slow GPS never holds the caller up for long.
+ */
+export function usePrefetchedLocationFix(
+  enabled: boolean,
+  maxWaitMs = 3000,
+): () => Promise<Coordinates | null> {
+  const pendingRef = useRef<{
+    startedAt: number;
+    fix: Promise<Coordinates | null>;
+  } | null>(null);
+
+  const start = useCallback(() => {
+    const pending = { startedAt: Date.now(), fix: getLocationFixIfGranted() };
+    pendingRef.current = pending;
+    return pending;
+  }, []);
+
+  useEffect(() => {
+    if (enabled) start();
+  }, [enabled, start]);
+
+  return useCallback(() => {
+    let pending = pendingRef.current;
+    if (!pending || Date.now() - pending.startedAt > PREFETCH_STALE_MS) {
+      pending = start();
+    }
+    return Promise.race([
+      pending.fix,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), maxWaitMs)),
+    ]);
+  }, [start, maxWaitMs]);
 }
 
 export function useGeolocation({

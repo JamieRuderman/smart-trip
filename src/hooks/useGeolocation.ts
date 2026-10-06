@@ -25,7 +25,7 @@ interface UseGeolocationOptions {
   autoRequestOnWeb?: boolean;
 }
 
-export interface Coordinates {
+interface Coordinates {
   lat: number;
   lng: number;
   accuracy: number | null;
@@ -104,18 +104,19 @@ function normalizeCoordinates(
   };
 }
 
-async function fetchNativeLocation(): Promise<Coordinates> {
+async function fetchNativeLocation(
+  options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+  { prompt = true } = {},
+): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
-  await Geolocation.requestPermissions();
-  const pos = await Geolocation.getCurrentPosition({
-    enableHighAccuracy: true,
-    timeout: 10000,
-    maximumAge: 0,
-  });
+  if (prompt) await Geolocation.requestPermissions();
+  const pos = await Geolocation.getCurrentPosition(options);
   return normalizeCoordinates(pos, null);
 }
 
-function fetchWebLocation(): Promise<Coordinates> {
+function fetchWebLocation(
+  options: PositionOptions = { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("Geolocation not supported"));
@@ -124,89 +125,65 @@ function fetchWebLocation(): Promise<Coordinates> {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve(normalizeCoordinates(pos, null)),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      options
     );
   });
 }
 
-/** Options for a background fix: accept a recent cached position so it's
- *  usually instant, and don't hang around waiting on a cold GPS. */
-const BACKGROUND_FIX_OPTIONS = {
-  enableHighAccuracy: true,
-  timeout: 8000,
-  maximumAge: 60_000,
-};
-
-/**
- * One-shot fix that never shows a permission prompt: resolves null unless the
- * user already granted location access, or if the fix fails or times out. For
- * checks the user didn't explicitly ask for, where a prompt would be out of
- * place.
- */
-export async function getLocationFixIfGranted(): Promise<Coordinates | null> {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      const { Geolocation } = await import("@capacitor/geolocation");
-      const { location, coarseLocation } = await Geolocation.checkPermissions();
-      if (location !== "granted" && coarseLocation !== "granted") return null;
-      const pos = await Geolocation.getCurrentPosition(BACKGROUND_FIX_OPTIONS);
-      return normalizeCoordinates(pos, null);
-    }
-    if (!("geolocation" in navigator) || !("permissions" in navigator)) {
-      return null;
-    }
-    const { state } = await navigator.permissions.query({ name: "geolocation" });
-    if (state !== "granted") return null;
-    return await new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve(normalizeCoordinates(pos, null)),
-        () => resolve(null),
-        BACKGROUND_FIX_OPTIONS,
-      );
-    });
-  } catch {
-    return null;
+/** Whether location access is already granted, checked without prompting. */
+async function isLocationGranted(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const { location, coarseLocation } = await Geolocation.checkPermissions();
+    return location === "granted" || coarseLocation === "granted";
   }
+  if (!("permissions" in navigator)) return false;
+  const { state } = await navigator.permissions.query({ name: "geolocation" });
+  return state === "granted";
 }
 
-/** A prefetched fix started longer ago than this is refetched, not reused. */
-const PREFETCH_STALE_MS = 2 * 60 * 1000;
+/** The app's latest fix from any source (one-shot or watch), and when it
+ *  arrived, so one-off checks can reuse it instead of waking the GPS again. */
+let latestFix: { fix: Coordinates; receivedAt: number } | null = null;
+let pendingFix: Promise<Coordinates | null> | null = null;
+
+function rememberFix(fix: Coordinates): Coordinates {
+  latestFix = { fix, receivedAt: Date.now() };
+  return fix;
+}
+
+/** How old the latest fix can be and still count as where the rider is now. */
+const RECENT_FIX_MS = 60_000;
 
 /**
- * Warm a no-prompt fix (see `getLocationFixIfGranted`) while `enabled`, and
- * return a getter for it — so a check on a later tap usually resolves
- * instantly. The getter refetches a stale fix and gives up with null after
- * `maxWaitMs`, so a slow GPS never holds the caller up for long.
+ * Where the rider is right now, without ever prompting for permission: the
+ * app's latest fix if it's under a minute old (e.g. from the map's live
+ * watch), else a one-shot fix if access was already granted. Null when access
+ * isn't granted or the fix fails. Concurrent callers share one request.
  */
-export function usePrefetchedLocationFix(
-  enabled: boolean,
-  maxWaitMs = 3000,
-): () => Promise<Coordinates | null> {
-  const pendingRef = useRef<{
-    startedAt: number;
-    fix: Promise<Coordinates | null>;
-  } | null>(null);
-
-  const start = useCallback(() => {
-    const pending = { startedAt: Date.now(), fix: getLocationFixIfGranted() };
-    pendingRef.current = pending;
-    return pending;
-  }, []);
-
-  useEffect(() => {
-    if (enabled) start();
-  }, [enabled, start]);
-
-  return useCallback(() => {
-    let pending = pendingRef.current;
-    if (!pending || Date.now() - pending.startedAt > PREFETCH_STALE_MS) {
-      pending = start();
-    }
-    return Promise.race([
-      pending.fix,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), maxWaitMs)),
-    ]);
-  }, [start, maxWaitMs]);
+export function getRecentLocationFix(): Promise<Coordinates | null> {
+  if (latestFix && Date.now() - latestFix.receivedAt <= RECENT_FIX_MS) {
+    return Promise.resolve(latestFix.fix);
+  }
+  if (!pendingFix) {
+    pendingFix = (async () => {
+      try {
+        if (!(await isLocationGranted())) return null;
+        // Accept a recent cached position and don't wait long on a cold GPS.
+        const options = { enableHighAccuracy: true, timeout: 8000, maximumAge: RECENT_FIX_MS };
+        return rememberFix(
+          Capacitor.isNativePlatform()
+            ? await fetchNativeLocation(options, { prompt: false })
+            : await fetchWebLocation(options),
+        );
+      } catch {
+        return null;
+      } finally {
+        pendingFix = null;
+      }
+    })();
+  }
+  return pendingFix;
 }
 
 export function useGeolocation({
@@ -229,7 +206,7 @@ export function useGeolocation({
         ? await fetchNativeLocation()
         : await fetchWebLocation();
       lastCoordsRef.current = result;
-      setCoords(result);
+      setCoords(rememberFix(result));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Location unavailable");
     } finally {
@@ -243,11 +220,10 @@ export function useGeolocation({
       return;
     }
     // Web: only auto-request if permission is already granted (no prompt shown).
-    if (autoRequestOnWeb && "permissions" in navigator) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then((result) => {
-          if (result.state === "granted") void requestLocation();
+    if (autoRequestOnWeb) {
+      isLocationGranted()
+        .then((granted) => {
+          if (granted) void requestLocation();
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }
@@ -297,7 +273,7 @@ export function useGeolocation({
                 lastCoordsRef.current,
               );
               lastCoordsRef.current = normalized;
-              setCoords(normalized);
+              setCoords(rememberFix(normalized));
               setError(null);
             }
           }
@@ -316,7 +292,7 @@ export function useGeolocation({
           if (cancelled) return;
           const normalized = normalizeCoordinates(position, lastCoordsRef.current);
           lastCoordsRef.current = normalized;
-          setCoords(normalized);
+          setCoords(rememberFix(normalized));
           setError(null);
         },
         (watchError) => {

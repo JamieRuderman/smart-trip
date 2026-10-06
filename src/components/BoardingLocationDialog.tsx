@@ -1,12 +1,4 @@
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { BoardingLocationWarning } from "@/lib/boardingLocation";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
@@ -38,48 +30,34 @@ export function BoardingLocationDialog({
   onCancel,
 }: BoardingLocationDialogProps) {
   const { t } = useTranslation();
-  const reversed = warning.kind === "nearDestination";
+  const copy =
+    warning.kind === "nearDestination"
+      ? {
+          title: t("boardingCheck.reversedTitle"),
+          description: t("boardingCheck.reversedBody", {
+            from: fromStation,
+            to: toStation,
+          }),
+          fix: t("boardingCheck.swap"),
+        }
+      : {
+          title: t("boardingCheck.otherStationTitle", { from: fromStation }),
+          description: t("boardingCheck.otherStationBody", {
+            from: fromStation,
+            station: warning.station,
+          }),
+          fix: t("boardingCheck.leaveFrom", { station: warning.station }),
+        };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onCancel();
-      }}
-    >
-      <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
-        <DialogHeader>
-          <DialogTitle>
-            {reversed
-              ? t("boardingCheck.reversedTitle")
-              : t("boardingCheck.otherStationTitle", { from: fromStation })}
-          </DialogTitle>
-          <DialogDescription>
-            {reversed
-              ? t("boardingCheck.reversedBody", {
-                  from: fromStation,
-                  to: toStation,
-                })
-              : t("boardingCheck.otherStationBody", {
-                  from: fromStation,
-                  station: warning.station,
-                })}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={onContinue}>
-            {t("boardingCheck.takeAnyway")}
-          </Button>
-          <Button
-            onClick={onFix}
-            className="bg-my-trip-background text-white hover:bg-my-trip-background/90"
-          >
-            {reversed
-              ? t("boardingCheck.swap")
-              : t("boardingCheck.leaveFrom", { station: warning.station })}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      title={copy.title}
+      description={copy.description}
+      secondaryLabel={t("boardingCheck.takeAnyway")}
+      onSecondary={onContinue}
+      primaryLabel={copy.fix}
+      onPrimary={onFix}
+      onDismiss={onCancel}
+    />
   );
 }

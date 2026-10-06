@@ -1,8 +1,7 @@
 import type { Station } from "@/types/smartSchedule";
 import {
-  getClosestStationWithMargin,
+  getClosestStationWithDistance,
   getDistanceToStationKm,
-  isClosestStationConfident,
 } from "@/lib/stationUtils";
 
 /**
@@ -16,7 +15,7 @@ export type BoardingLocationWarning =
   | { kind: "nearDestination" }
   | { kind: "atOtherStation"; station: Station };
 
-export interface BoardingFix {
+interface BoardingFix {
   lat: number;
   lng: number;
   /** Accuracy radius in meters; null when the platform omitted it. */
@@ -72,12 +71,13 @@ export function checkBoardingLocation(
     return { kind: "nearDestination" };
   }
 
-  const closest = getClosestStationWithMargin(lat, lng);
+  // Stations sit ≥1.6 km apart, so a fix this close and this tight can't
+  // belong to a neighbor instead.
+  const closest = getClosestStationWithDistance(lat, lng);
   if (
     closest.station !== from &&
     closest.distanceKm * 1000 <= AT_STATION_RADIUS_M &&
-    (accuracy == null || accuracy <= AT_STATION_RADIUS_M) &&
-    isClosestStationConfident(closest.marginKm, accuracy)
+    (accuracy == null || accuracy <= AT_STATION_RADIUS_M)
   ) {
     return { kind: "atOtherStation", station: closest.station };
   }

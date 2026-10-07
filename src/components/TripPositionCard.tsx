@@ -1,17 +1,15 @@
-import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, GitCommitVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/useNow";
-import { importMapDiagram } from "@/pages/lazyPages";
-import {
-  resolveLegPosition,
-  scheduleStationIndex,
-  vehicleDistanceToStationMi,
-} from "@/lib/legProgress";
+import { warmMapDiagram } from "@/pages/lazyPages";
+import { resolveLegPosition, type LegPosition } from "@/lib/legProgress";
 import { isSouthbound } from "@/lib/stationUtils";
+import { minutesOfDay } from "@/lib/timeUtils";
+import { scheduledStationIndex } from "@/lib/trainMotion";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
+import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
 import { SectionCard } from "@/components/ui/section-card";
 import { TripIcon } from "./icons/TripIcon";
 import { TimeDisplay } from "./TimeDisplay";
@@ -26,7 +24,44 @@ import type { Station } from "@/types/smartSchedule";
 const LEAD_IN_PCT = 14;
 /** Stops upstream that the lead-in spans; a train farther out sits at its tip. */
 const LEAD_IN_STOPS = 3;
+const LEG_SPAN_PCT = 100 - LEAD_IN_PCT;
 const MILES_PRECISION = 1;
+
+/** Where the train marker sits, as % of the track width (null: not drawn). */
+function markerPctFor(position: LegPosition): number | null {
+  switch (position.phase) {
+    case "arrived":
+      return 100;
+    case "enRoute":
+      return LEAD_IN_PCT + LEG_SPAN_PCT * position.fraction;
+    case "atOrigin":
+      return LEAD_IN_PCT;
+    case "approaching":
+      return (
+        LEAD_IN_PCT *
+        (1 - Math.min(position.stopsAway, LEAD_IN_STOPS) / LEAD_IN_STOPS)
+      );
+    case "waiting":
+      return null;
+  }
+}
+
+/** "Live · 12s ago" — its own component so the 5s tick re-renders only this
+ *  label, not the whole card. */
+function LiveAgo({ timestamp }: { timestamp: number }) {
+  const { t } = useTranslation();
+  const nowSec = useNow(5_000);
+  const ageSec = Math.max(0, nowSec - Math.floor(timestamp));
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-smart-train-green">
+      <span
+        className="inline-flex h-2 w-2 rounded-full bg-smart-train-green"
+        aria-hidden="true"
+      />
+      {ageSec >= 5 ? t("myTrip.liveAgo", { seconds: ageSec }) : t("myTrip.live")}
+    </span>
+  );
+}
 
 interface TripPositionCardProps {
   trip: ProcessedTrip;
@@ -66,55 +101,33 @@ export function TripPositionCard({
 
   const vehicle = progress.vehiclePosition;
   const { displayStops, hasStarted } = progress.stopInference;
-  const southbound = isSouthbound(fromStation, toStation);
-
-  const scheduleIndex = useMemo(
-    () =>
-      scheduleStationIndex(
-        trip.times,
-        southbound,
-        clockTime.getHours() * 60 + clockTime.getMinutes(),
-        effectiveDelayMinutes(realtimeStatus) ?? 0,
-      ),
-    [trip.times, southbound, clockTime, realtimeStatus],
-  );
 
   const position = resolveLegPosition({
     fromStation,
     toStation,
     vehicle,
-    scheduleIndex,
+    scheduleIndex: scheduledStationIndex(
+      trip,
+      isSouthbound(fromStation, toStation) ? "S" : "N",
+      minutesOfDay(clockTime),
+      effectiveDelayMinutes(realtimeStatus) ?? 0,
+    ),
     departed: hasStarted,
     arrived: progress.isEnded || model.isAtDestination,
   });
 
-  // Seconds since the vehicle's last report, ticking while we show live data.
-  const nowSec = useNow(5_000, vehicle != null);
-  const fixAgeSec =
-    vehicle != null ? Math.max(0, nowSec - Math.floor(vehicle.timestamp)) : null;
-
-  // ── Marker placement (% of the track width) ────────────────────────────────
-  const legSpan = 100 - LEAD_IN_PCT;
-  const markerPct =
-    position.phase === "arrived"
-      ? 100
-      : position.phase === "enRoute"
-        ? LEAD_IN_PCT + legSpan * position.fraction
-        : position.phase === "atOrigin"
-          ? LEAD_IN_PCT
-          : position.phase === "approaching"
-            ? LEAD_IN_PCT *
-              (1 - Math.min(position.stopsAway, LEAD_IN_STOPS) / LEAD_IN_STOPS)
-            : null;
+  const markerPct = markerPctFor(position);
   const filledPct =
     markerPct == null ? 0 : Math.max(0, markerPct - LEAD_IN_PCT);
-  const isEstimate = position.phase === "enRoute" && position.source === "schedule";
+  const isEstimate =
+    position.phase === "enRoute" && position.source === "schedule";
+  const showLive = vehicle != null && position.phase !== "arrived";
 
   // ── Copy ──────────────────────────────────────────────────────────────────
-  const atStop =
-    progress.distanceToNextStopMi != null && progress.distanceToNextStopMi < 0.05;
+  const miles = (mi: number) =>
+    t("myTrip.miles", { distance: mi.toFixed(MILES_PRECISION) });
   let headline: string;
-  let detail: string | null = null;
+  let details: string[] = [];
   switch (position.phase) {
     case "arrived":
       headline = t("myTrip.arrivedAt", { station: toStation });
@@ -122,51 +135,34 @@ export function TripPositionCard({
     case "atOrigin":
       headline = t("myTrip.trainAt", { station: fromStation });
       break;
-    case "approaching": {
-      headline =
-        vehicle?.currentStatus === "STOPPED_AT"
-          ? t("myTrip.trainAt", { station: vehicle.currentStation })
-          : t("myTrip.trainHeadingTo", { station: vehicle?.currentStation });
-      const parts = [t("myTrip.stopsAway", { count: position.stopsAway })];
-      if (vehicle) {
-        parts.push(
-          t("myTrip.miles", {
-            distance: vehicleDistanceToStationMi(vehicle, fromStation).toFixed(
-              MILES_PRECISION,
-            ),
-          }),
-        );
-      }
-      detail = parts.join(" · ");
+    case "approaching":
+      headline = position.stopped
+        ? t("myTrip.trainAt", { station: position.station })
+        : t("myTrip.trainHeadingTo", { station: position.station });
+      details = [
+        t("myTrip.stopsAway", { count: position.stopsAway }),
+        miles(position.distanceMi),
+      ];
       break;
-    }
     case "enRoute": {
       const stop = progress.nextStop;
-      headline = stop
-        ? atStop
+      const distanceMi = progress.distanceToNextStopMi;
+      const atStop = distanceMi != null && distanceMi < AT_STOP_THRESHOLD_MI;
+      headline = !stop
+        ? t("tracker.onTheWay")
+        : atStop
           ? t("tracker.atStop", { stop })
-          : t("myTrip.nextStop", { station: stop })
-        : t("tracker.onTheWay");
-      const parts: string[] = [];
-      if (!atStop && progress.distanceToNextStopMi != null) {
-        parts.push(
-          t("myTrip.miles", {
-            distance: progress.distanceToNextStopMi.toFixed(MILES_PRECISION),
-          }),
-        );
-      }
+          : t("myTrip.nextStop", { station: stop });
+      if (!atStop && distanceMi != null) details.push(miles(distanceMi));
       if (model.speedMph != null) {
-        parts.push(t("tracker.speedMph", { speed: model.speedMph }));
+        details.push(t("tracker.speedMph", { speed: model.speedMph }));
       }
-      detail = parts.length > 0 ? parts.join(" · ") : null;
       break;
     }
     case "waiting":
       headline = t("myTrip.positionWaiting");
       break;
   }
-
-  const showLive = vehicle != null && position.phase !== "arrived";
 
   return (
     <SectionCard
@@ -178,15 +174,7 @@ export function TripPositionCard({
           {t("myTrip.positionTitle")}
         </h2>
         {showLive ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-smart-train-green">
-            <span className="relative flex h-2 w-2" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-smart-train-green opacity-60 animate-ping motion-reduce:animate-none" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-smart-train-green" />
-            </span>
-            {fixAgeSec != null && fixAgeSec >= 5
-              ? t("myTrip.liveAgo", { seconds: fixAgeSec })
-              : t("myTrip.live")}
-          </span>
+          <LiveAgo timestamp={vehicle.timestamp} />
         ) : isEstimate ? (
           <span className="text-xs text-muted-foreground">
             {t("myTrip.estimated")}
@@ -195,8 +183,8 @@ export function TripPositionCard({
       </div>
 
       <p className="mt-2 text-lg font-semibold leading-snug">{headline}</p>
-      {detail && (
-        <p className="text-sm text-muted-foreground">{detail}</p>
+      {details.length > 0 && (
+        <p className="text-sm text-muted-foreground">{details.join(" · ")}</p>
       )}
 
       {/* The track. Stops are evenly spaced in station-index space — the same
@@ -227,7 +215,9 @@ export function TripPositionCard({
           {displayStops.map((station, i) => {
             const pct =
               LEAD_IN_PCT +
-              (displayStops.length > 1 ? (legSpan * i) / (displayStops.length - 1) : 0);
+              (displayStops.length > 1
+                ? (LEG_SPAN_PCT * i) / (displayStops.length - 1)
+                : 0);
             const isEndpoint = i === 0 || i === displayStops.length - 1;
             const passed = markerPct != null && pct <= markerPct + 0.01;
             return (
@@ -254,12 +244,17 @@ export function TripPositionCard({
               style={{ left: `${markerPct}%` }}
               aria-hidden="true"
             >
+              {/* A brief pulse on each fresh GPS fix (re-keyed per report),
+                  rather than an endless animation on a screen left open for
+                  the whole ride. */}
               {showLive && (
                 <span
+                  key={vehicle.timestamp}
                   className={cn(
                     "absolute inset-0 rounded-full opacity-40 animate-ping motion-reduce:animate-none",
                     accentBg,
                   )}
+                  style={{ animationIterationCount: 2 }}
                 />
               )}
               <span
@@ -306,8 +301,8 @@ export function TripPositionCard({
         onClick={() =>
           navigate({ pathname: "/map-diagram", search: location.search })
         }
-        onPointerEnter={() => void importMapDiagram().catch(() => {})}
-        onFocus={() => void importMapDiagram().catch(() => {})}
+        onPointerEnter={warmMapDiagram}
+        onFocus={warmMapDiagram}
         className="mt-4 -mx-2 flex w-[calc(100%+1rem)] items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-medium text-smart-train-green transition-colors hover:bg-smart-train-green/10"
       >
         <span className="flex items-center gap-2">

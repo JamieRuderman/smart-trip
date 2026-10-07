@@ -10,6 +10,7 @@ import {
 import {
   computeMinutesUntil,
   formatDateYYYYMMDD,
+  kmToMi,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
@@ -49,6 +50,7 @@ export function useTripProgress({
   realtimeStatus,
   isNextTrip,
   isFocused = false,
+  trackVehicle = true,
   vehiclePositionOverride,
 }: {
   trip: ProcessedTrip;
@@ -61,6 +63,10 @@ export function useTripProgress({
    *  band turns blue to match the blue card style, overriding the semantic
    *  state colour (green/gold/red) — blue == "the train I'm taking". */
   isFocused?: boolean;
+  /** Match (and poll for) this run's live vehicle. Turn off for a run on a
+   *  later day: the vehicle feed only carries today's runs, so any match would
+   *  be today's same-numbered train. */
+  trackVehicle?: boolean;
   /** Dev-only: override the live vehicle position hook result. */
   vehiclePositionOverride?: VehiclePositionMatch | null;
 }): TripProgressResult {
@@ -73,11 +79,15 @@ export function useTripProgress({
     originStartTime,
     serviceDay: formatDateYYYYMMDD(currentTime),
     directionId: southbound ? 0 : 1,
-  });
+  }, trackVehicle);
+  // With tracking off the hook stops polling but can still match cached data
+  // another consumer fetched, so drop the result too.
   const vehiclePosition =
     vehiclePositionOverride !== undefined
       ? vehiclePositionOverride
-      : liveVehiclePosition;
+      : trackVehicle
+        ? liveVehiclePosition
+        : null;
 
   // ── Trip ended detection ──────────────────────────────────────────────────
   // Time-based: past the (live-aware) arrival plus a short grace. A fresh
@@ -140,11 +150,13 @@ export function useTripProgress({
   // Distance-to-next-stop from the live train position (GTFS-RT vehicle feed).
   const distanceToNextStopMi =
     nextStop != null && vehiclePosition != null
-      ? getDistanceToStationKm(
-          vehiclePosition.position.latitude,
-          vehiclePosition.position.longitude,
-          nextStop,
-        ) * 0.621371
+      ? kmToMi(
+          getDistanceToStationKm(
+            vehiclePosition.position.latitude,
+            vehiclePosition.position.longitude,
+            nextStop,
+          ),
+        )
       : null;
 
   // ── Remaining trip stats ──────────────────────────────────────────────────

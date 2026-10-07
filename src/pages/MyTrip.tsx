@@ -1,20 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import {
-  AlertTriangle,
-  Calendar,
-  ChevronLeft,
-  Clock,
-  MapPin,
-  Ticket,
-} from "lucide-react";
-import { Trans, useTranslation } from "react-i18next";
+import { Calendar, ChevronLeft, Clock, MapPin, Ticket } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
-import { useLeaveTripView } from "@/hooks/useLeaveTripView";
+import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
-import { useMyTripState } from "@/hooks/useMyTrip";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import type { MyTripState } from "@/hooks/useMyTrip";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   AlarmStatusIcon,
@@ -22,12 +13,11 @@ import {
 } from "@/components/AlarmStatusLabel";
 import { FerryConnection } from "@/components/FerryConnection";
 import { FocusedTripReminderRow } from "@/components/FocusedTripReminderRow";
+import { LiveTimePair } from "@/components/LiveTimePair";
+import { MyTripGate } from "@/components/MyTripGate";
+import { QuickConnectionWarning } from "@/components/QuickConnectionWarning";
 import { StopTimeline } from "@/components/StopTimeline";
-import { TimePair } from "@/components/TimePair";
 import { TripPositionCard } from "@/components/TripPositionCard";
-import type { FocusedTrip } from "@/lib/focusedTrip";
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const TIME_FORMAT = "12h" as const;
 
@@ -45,6 +35,7 @@ const TIME_FORMAT = "12h" as const;
 export default function MyTrip() {
   const { focusedTrip } = useStationSelection();
   const leaveTripView = useLeaveTripView();
+  const currentTime = useMinuteClock();
 
   // Open at the top — an in-app navigation otherwise keeps the scroll offset
   // of the page we came from (e.g. a trip card far down the schedule).
@@ -61,61 +52,25 @@ export default function MyTrip() {
 
   if (!focusedTrip) return null;
   return (
-    <MyTripLoaded
-      // A different trip is a different page: reset per-trip state (the alarm
-      // status's sticky post-departure latch) rather than carry it over.
-      key={`${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}-${focusedTrip.toStation}`}
-      focusedTrip={focusedTrip}
-      onBack={leaveTripView}
-    />
-  );
-}
-
-function MyTripLoaded({
-  focusedTrip,
-  onBack,
-}: {
-  focusedTrip: FocusedTrip;
-  onBack: () => void;
-}) {
-  const currentTime = useMinuteClock();
-  const { trip, live, lastUpdated } = useFocusedTripLive(
-    focusedTrip,
-    currentTime.getTime(),
-  );
-  // A focus whose trip left the timetable is cleared by the provider's tick,
-  // which then sends us back (see MyTrip).
-  if (!trip) return null;
-  return (
-    <MyTripView
-      focusedTrip={focusedTrip}
-      trip={trip}
-      live={live}
-      lastUpdated={lastUpdated}
-      currentTime={currentTime}
-      onBack={onBack}
-    />
+    <MyTripGate focusedTrip={focusedTrip} currentTime={currentTime}>
+      {(state) => <MyTripView state={state} onBack={leaveTripView} />}
+    </MyTripGate>
   );
 }
 
 function MyTripView({
-  focusedTrip,
-  trip,
-  live,
-  lastUpdated,
-  currentTime,
+  state,
   onBack,
 }: {
-  focusedTrip: FocusedTrip;
-  trip: ProcessedTrip;
-  live: TripRealtimeStatus | null;
-  lastUpdated: Date | null;
-  currentTime: Date;
+  state: MyTripState;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const { clearFocusedTrip } = useStationSelection();
   const {
+    focusedTrip,
+    trip,
+    live,
     isFutureService,
     serviceDayLabel,
     clockTime,
@@ -123,12 +78,8 @@ function MyTripView({
     progress,
     model,
     accentBg,
-  } = useMyTripState({ focusedTrip, trip, live, lastUpdated, currentTime });
-
+  } = state;
   const { fromStation, toStation } = focusedTrip;
-  const showInboundFerry =
-    trip.inboundFerry != null &&
-    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION;
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -181,26 +132,12 @@ function MyTripView({
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <TimePair
-                departure={model.departureTime}
-                arrival={model.arrivalTime}
+              <LiveTimePair
+                trip={trip}
+                realtimeStatus={live}
+                canceled={model.isCanceledOrSkipped}
                 format={TIME_FORMAT}
-                strikethrough={model.isCanceledOrSkipped}
-                className="text-2xl font-semibold text-white"
               />
-              {/* Struck-through scheduled comparison — only the column(s)
-                  that actually have a live value. */}
-              {(model.hasLiveDepartureTime || model.hasLiveArrivalTime) && (
-                <TimePair
-                  departure={trip.departureTime}
-                  arrival={trip.arrivalTime}
-                  format={TIME_FORMAT}
-                  className="mt-0.5 text-xs text-white/50"
-                  strikethrough
-                  showDeparture={model.hasLiveDepartureTime}
-                  showArrival={model.hasLiveArrivalTime}
-                />
-              )}
               <p className="mt-1 truncate text-xs font-medium text-white/80">
                 {model.headerStatusLabel}
                 <span className="text-white/50"> · </span>
@@ -298,7 +235,7 @@ function MyTripView({
         {/* Every stop on the leg, with the train's current stop highlighted. */}
         <SectionCard className="p-4 md:p-5">
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t("myTrip.stopsTitle")}
+            {t("myTrip.stops")}
           </h2>
           <StopTimeline
             trip={trip}
@@ -313,26 +250,10 @@ function MyTripView({
           />
         </SectionCard>
 
-        {((showFerry && trip.outboundFerry) || showInboundFerry) && (
+        {((showFerry && trip.outboundFerry) || model.showInboundFerry) && (
           <SectionCard className="p-4 md:p-5">
             {model.hasQuickConnection && !model.isCanceledOrSkipped && (
-              <div className="mb-3 flex items-start gap-2 rounded-lg border border-smart-gold/40 bg-smart-gold/10 p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-smart-gold" />
-                <div>
-                  <p className="text-sm font-medium text-smart-gold">
-                    {t("quickConnection.quickTransferWarning")}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <Trans
-                      i18nKey="quickConnection.message"
-                      values={{ trainOption: model.trainOption }}
-                      components={{
-                        strong: <strong className="text-foreground" />,
-                      }}
-                    />
-                  </p>
-                </div>
-              </div>
+              <QuickConnectionWarning trainOption={model.trainOption} />
             )}
             {showFerry && trip.outboundFerry && (
               <FerryConnection
@@ -342,7 +263,7 @@ function MyTripView({
                 fullLeg
               />
             )}
-            {showInboundFerry && trip.inboundFerry && (
+            {model.showInboundFerry && trip.inboundFerry && (
               <FerryConnection
                 ferry={trip.inboundFerry}
                 trainDepartureTime={model.departureTime}

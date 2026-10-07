@@ -8,18 +8,13 @@ import { STATION_COORDINATES } from "@/data/stations";
 import { isSouthbound, stationIndexMap } from "@/lib/stationUtils";
 import {
   corridorDistanceKm,
+  MAX_ALONG_TRACK_RESIDUAL_KM,
   railArcToStationIndex,
   snapToRail,
 } from "@/lib/railProjection";
-import { interpolateStationProgress } from "@/lib/trainMotion";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { kmToMi } from "@/lib/timeUtils";
 import type { VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
-
-/** A GPS fix farther than this from the rail polyline isn't trusted to place
- *  the train (bad fix, yard move); fall back to the feed's stop + status. */
-const MAX_RAIL_RESIDUAL_KM = 1.5;
-const KM_TO_MI = 0.621371;
 
 type VehicleFix = Pick<
   VehiclePositionMatch,
@@ -30,7 +25,8 @@ type VehicleFix = Pick<
  * Fractional station index of a live vehicle. The feed's stop + status pins the
  * segment (STOPPED_AT → exactly that stop; in transit → between the previous
  * stop and the next one), and the GPS fix, snapped to the rail, places the
- * train within it. Without a usable fix an in-transit train sits mid-segment.
+ * train within it. A fix too far off the rail (bad fix, yard move) isn't
+ * trusted; then an in-transit train sits mid-segment.
  * Null when the feed names no known stop.
  */
 export function vehicleStationIndex(
@@ -47,32 +43,11 @@ export function vehicleStationIndex(
   const lo = Math.min(prevIdx, nextIdx);
   const hi = Math.max(prevIdx, nextIdx);
   const snap = snapToRail(vehicle.position.latitude, vehicle.position.longitude);
-  if (snap && snap.residualKm <= MAX_RAIL_RESIDUAL_KM) {
+  if (snap && snap.residualKm <= MAX_ALONG_TRACK_RESIDUAL_KM) {
     const gpsIdx = railArcToStationIndex(snap.arcKm);
     return Math.min(hi, Math.max(lo, gpsIdx));
   }
   return (prevIdx + nextIdx) / 2;
-}
-
-/**
- * Fractional station index the timetable puts the train at, shifted by the
- * current delay. Used when there's no live vehicle fix. `times` is the trip's
- * full per-station "HH:MM" array (canonical order, "~~" where it doesn't stop).
- */
-export function scheduleStationIndex(
-  times: readonly string[],
-  southbound: boolean,
-  nowMinutes: number,
-  delayMinutes: number,
-): number | null {
-  const base = times.map((time) => {
-    if (!time || time.includes("~~")) return null;
-    const minutes = parseTimeToMinutes(time);
-    return Number.isFinite(minutes) ? minutes : null;
-  });
-  const order = [...times.keys()];
-  if (!southbound) order.reverse();
-  return interpolateStationProgress(base, order, nowMinutes, delayMinutes);
 }
 
 /**
@@ -115,13 +90,13 @@ export function vehicleDistanceToStationMi(
   station: Station,
 ): number {
   const { lat, lng } = STATION_COORDINATES[station];
-  return (
+  return kmToMi(
     corridorDistanceKm(
       vehicle.position.latitude,
       vehicle.position.longitude,
       lat,
       lng,
-    ) * KM_TO_MI
+    ),
   );
 }
 
@@ -129,8 +104,15 @@ export function vehicleDistanceToStationMi(
 export type LegPosition =
   /** No live fix and the train hasn't reached the origin by the timetable. */
   | { phase: "waiting" }
-  /** Live: still upstream of the rider's origin. */
-  | { phase: "approaching"; stopsAway: number }
+  /** Live: still upstream of the rider's origin — at (`stopped`) or heading
+   *  to `station`, `stopsAway` stops and `distanceMi` along the line out. */
+  | {
+      phase: "approaching";
+      station: Station;
+      stopped: boolean;
+      stopsAway: number;
+      distanceMi: number;
+    }
   /** Live: stopped at the rider's origin. */
   | { phase: "atOrigin" }
   /** On the leg. `fraction` is 0 at the origin, 1 at the destination. */
@@ -154,7 +136,8 @@ export function resolveLegPosition({
   fromStation: Station;
   toStation: Station;
   vehicle: VehicleFix | null;
-  /** {@link scheduleStationIndex} for now, or null when unknown. */
+  /** Timetable estimate for now (trainMotion's `scheduledStationIndex`), or
+   *  null when unknown. */
   scheduleIndex: number | null;
   /** The train has left the rider's origin by the (live-aware) timetable. */
   departed: boolean;
@@ -165,7 +148,9 @@ export function resolveLegPosition({
   const southbound = isSouthbound(fromStation, toStation);
 
   const liveIdx = vehicle ? vehicleStationIndex(vehicle, southbound) : null;
-  if (vehicle && liveIdx != null) {
+  // A live index implies the feed named the vehicle's stop.
+  const station = vehicle?.currentStation;
+  if (vehicle && station && liveIdx != null) {
     const fraction = legFraction(liveIdx, fromStation, toStation);
     if (fraction > 0 || (fraction === 0 && vehicle.currentStatus !== "STOPPED_AT")) {
       return { phase: "enRoute", source: "live", fraction: Math.min(1, fraction) };
@@ -173,7 +158,10 @@ export function resolveLegPosition({
     if (fraction === 0) return { phase: "atOrigin" };
     return {
       phase: "approaching",
+      station,
+      stopped: vehicle.currentStatus === "STOPPED_AT",
       stopsAway: stopsUntilOrigin(liveIdx, fromStation, southbound),
+      distanceMi: vehicleDistanceToStationMi(vehicle, fromStation),
     };
   }
 

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 /** Countdown to when the user should head out — i.e. their armed leave
- *  reminder/alarm. The first of the three pinned-trip stages (leave → departs →
+ *  reminder/alarm. The first of the three My Trip stages (leave → departs →
  *  arrives), mirroring the Live Activity. */
 export function LeaveLabel({ minutesUntilLeave }: { minutesUntilLeave: number }) {
   const { t } = useTranslation();

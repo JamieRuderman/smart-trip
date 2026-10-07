@@ -92,6 +92,19 @@ export function focusedTripMatchesSchedule(
   );
 }
 
+/**
+ * Stable identity of a focused run — train, service day and leg. Use as a React
+ * `key` so per-trip state (refs, latches) resets when the user switches trips.
+ */
+export function focusedTripKey(focused: FocusedTrip): string {
+  return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
+}
+
+/** Whether the focused run's service day is `now`'s local calendar day. */
+export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
+  return focused.serviceDate === toLocalDateKey(now);
+}
+
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isFocusedTrip(value: unknown): value is FocusedTrip {
@@ -176,7 +189,8 @@ function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
 
 /**
  * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
- * so My Trip can render regardless of the home screen's current from/to. Null if the trip no longer exists in that schedule.
+ * so My Trip can render regardless of the home screen's current from/to. Null
+ * if the trip no longer exists in that schedule.
  */
 export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | null {
   const trips = getFilteredTrips(

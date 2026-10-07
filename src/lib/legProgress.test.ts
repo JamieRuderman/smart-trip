@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   legFraction,
   resolveLegPosition,
-  scheduleStationIndex,
   stopsUntilOrigin,
   vehicleDistanceToStationMi,
   vehicleStationIndex,
@@ -94,37 +93,6 @@ describe("vehicleStationIndex", () => {
   });
 });
 
-describe("scheduleStationIndex", () => {
-  // Windsor 08:00, then a stop every 5 minutes; Larkspur doesn't stop ("~~").
-  const times = [...stations.keys()].map((i) =>
-    i === stations.length - 1
-      ? "~~"
-      : `08:${String(i * 5).padStart(2, "0")}`,
-  );
-
-  it("interpolates southbound by clock time", () => {
-    // 08:07:30 is halfway between stop 1 (08:05) and stop 2 (08:10).
-    expect(scheduleStationIndex(times, true, 8 * 60 + 7.5, 0)).toBeCloseTo(1.5);
-  });
-
-  it("shifts by the live delay", () => {
-    expect(scheduleStationIndex(times, true, 8 * 60 + 10, 5)).toBeCloseTo(1);
-  });
-
-  it("walks northbound in reverse station order", () => {
-    // Northbound timetable: the southern terminus (last index) departs first,
-    // then a stop every 4 minutes heading north.
-    const nbTimes = [...stations.keys()].map((i) =>
-      `09:${String((stations.length - 1 - i) * 4).padStart(2, "0")}`,
-    );
-    // 09:02 is halfway between the southern terminus (09:00) and the next
-    // stop north (09:04).
-    expect(scheduleStationIndex(nbTimes, false, 9 * 60 + 2, 0)).toBeCloseTo(
-      stations.length - 1.5,
-    );
-  });
-});
-
 describe("legFraction", () => {
   it("is 0 at the origin and 1 at the destination, either direction", () => {
     expect(legFraction(idx("Cotati"), "Cotati", "San Rafael")).toBe(0);
@@ -207,7 +175,12 @@ describe("resolveLegPosition", () => {
         departed: false,
         arrived: false,
       }),
-    ).toEqual({ phase: "approaching", stopsAway: 2 });
+    ).toMatchObject({
+      phase: "approaching",
+      station: "Rohnert Park",
+      stopped: true,
+      stopsAway: 2,
+    });
   });
 
   it("is atOrigin when the live train is stopped at the rider's station", () => {

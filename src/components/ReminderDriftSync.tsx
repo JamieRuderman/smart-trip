@@ -4,6 +4,7 @@ import { useStationSelection } from "@/contexts/stationSelection";
 import {
   anchorLiveTime,
   focusedDepartureInstant,
+  focusedTripKey,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
@@ -32,7 +33,7 @@ import { formatClockTime } from "@/lib/timeUtils";
 export function ReminderDriftSync() {
   const { focusedTrip } = useStationSelection();
   if (!focusedTrip?.reminder) return null;
-  const key = `${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}-${focusedTrip.toStation}`;
+  const key = focusedTripKey(focusedTrip);
   return <ReminderDriftSyncInner key={key} focusedTrip={focusedTrip} />;
 }
 

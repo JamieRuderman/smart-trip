@@ -247,12 +247,10 @@ export function TrainScheduleApp() {
         {/* Bottom bar */}
         <BottomInfoBar />
 
-        {/* Keep the end of the page clear of the floating trip bar. */}
-        {focusedTrip && <div className="h-20 shrink-0" aria-hidden="true" />}
+        {/* The way back to the full-page My Trip view while a trip is
+            focused (floating; reserves its own space at the page's end). */}
+        <ActiveTripBar currentTime={currentTime} />
       </main>
-
-      {/* The way back to the full-page My Trip view while a trip is focused. */}
-      <ActiveTripBar currentTime={currentTime} />
 
       {/* Dev fixture sheet — only rendered in dev mode via ?devTrip=<scenario> */}
       {devFixture && (

@@ -109,7 +109,7 @@ export const STATION_RAIL_ARC_KM: readonly number[] = stations.map((station) => 
  * many destinations in a tick (user vs every train) — saves re-snapping
  * the source on each call.
  */
-const MAX_ALONG_TRACK_RESIDUAL_KM = 1.5;
+export const MAX_ALONG_TRACK_RESIDUAL_KM = 1.5;
 export function corridorDistanceKm(
   fromLat: number,
   fromLng: number,

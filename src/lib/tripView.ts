@@ -1,5 +1,8 @@
-import { loadFocusedTrip, type FocusedTrip } from "@/lib/focusedTrip";
-import { toLocalDateKey } from "@/lib/timeUtils";
+import {
+  isFocusedTripToday,
+  loadFocusedTrip,
+  type FocusedTrip,
+} from "@/lib/focusedTrip";
 
 /** Route of the full-page My Trip view. */
 export const TRIP_VIEW_PATH = "/trip";
@@ -17,7 +20,7 @@ export function shouldOpenTripViewOnLaunch(
   now: Date,
 ): boolean {
   if (!focused) return false;
-  if (focused.serviceDate !== toLocalDateKey(now)) return false;
+  if (!isFocusedTripToday(focused, now)) return false;
   const params = new URLSearchParams(search);
   return !params.has("trip") && !params.has("devTrip");
 }

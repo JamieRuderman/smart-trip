@@ -158,6 +158,11 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   // params predate edits made on another route; we re-assert state onto it.
   // Unmanaged params (e.g. debugTime, debugDate, devTrip) are preserved as-is.
   //
+  // Caveat: this resolves "?…" against the pathname captured at render, so a
+  // navigation fired from a child's mount effect in the same commit (e.g. a
+  // <Navigate> on first render) gets replaced by it. Decide launch-time routes
+  // before the router mounts instead (see openTripViewOnLaunch).
+  //
   // `searchParams` is read via a ref so we always merge against the latest
   // URL without making this effect depend on it (which would loop, since
   // `setSearchParams` triggers a new `searchParams` identity).

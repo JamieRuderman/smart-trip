@@ -6,16 +6,26 @@ import {
   type TripDetailModel,
 } from "@/hooks/useTripDetailModel";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
-import {
-  parseServiceDate,
-  serviceDateWeekdayLabel,
-  toLocalDateKey,
-} from "@/lib/timeUtils";
-import type { FocusedTrip } from "@/lib/focusedTrip";
+import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
+import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
+import { stateBg } from "@/lib/tripTheme";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
+export interface MyTripInput {
+  focusedTrip: FocusedTrip;
+  /** The focused trip reconstructed from the schedule. */
+  trip: ProcessedTrip;
+  /** Its realtime status (null for a run on a later day). */
+  live: TripRealtimeStatus | null;
+  lastUpdated: Date | null;
+  currentTime: Date;
+}
+
 export interface MyTripState {
+  focusedTrip: FocusedTrip;
+  trip: ProcessedTrip;
+  live: TripRealtimeStatus | null;
   /** The run is on a later calendar day than today (e.g. a weekend train
    *  picked on a weekday) — its live countdowns and position don't apply yet. */
   isFutureService: boolean;
@@ -36,7 +46,7 @@ export interface MyTripState {
  * Everything the My Trip surfaces (the full-page view and the schedule page's
  * in-progress bar) derive from the focused trip, so both always agree. Takes
  * the trip already reconstructed + its live status from
- * {@link useFocusedTripLive}.
+ * {@link useFocusedTripLive} — see {@link MyTripGate}, which does both.
  */
 export function useMyTripState({
   focusedTrip,
@@ -44,16 +54,9 @@ export function useMyTripState({
   live,
   lastUpdated,
   currentTime,
-}: {
-  focusedTrip: FocusedTrip;
-  trip: ProcessedTrip;
-  live: TripRealtimeStatus | null;
-  lastUpdated: Date | null;
-  currentTime: Date;
-}): MyTripState {
+}: MyTripInput): MyTripState {
   const { i18n } = useTranslation();
-  const isFutureService =
-    focusedTrip.serviceDate !== toLocalDateKey(currentTime);
+  const isFutureService = !isFocusedTripToday(focusedTrip, currentTime);
   const serviceDayLabel = isFutureService
     ? serviceDateWeekdayLabel(focusedTrip.serviceDate, i18n.language)
     : null;
@@ -79,9 +82,7 @@ export function useMyTripState({
     realtimeStatus: live,
     isNextTrip: false,
     isFocused: true,
-    // The vehicle feed only carries today's runs — never pin a future-service
-    // trip to today's same-numbered train.
-    vehiclePositionOverride: isFutureService ? null : undefined,
+    trackVehicle: !isFutureService,
   });
 
   const model = useTripDetailModel({
@@ -97,14 +98,17 @@ export function useMyTripState({
   });
 
   const accentBg = progress.isEnded
-    ? "bg-smart-neutral"
+    ? stateBg.past
     : model.isCanceledOrSkipped
-      ? "bg-destructive"
+      ? stateBg.canceled
       : model.isDelayed
-        ? "bg-smart-gold"
+        ? stateBg.delayed
         : "bg-my-trip-background";
 
   return {
+    focusedTrip,
+    trip,
+    live,
     isFutureService,
     serviceDayLabel,
     clockTime,

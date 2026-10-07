@@ -4,6 +4,7 @@ import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedTripClearInstant,
+  focusedTripKey,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
@@ -38,7 +39,7 @@ export function FocusedTripAutoClear() {
   if (!focusedTrip) return null;
   // Key by trip identity so the "last seen live arrival" ref below resets when
   // the user switches trips (the inner component would otherwise persist it).
-  const key = `${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}-${focusedTrip.toStation}`;
+  const key = focusedTripKey(focusedTrip);
   return <FocusedTripAutoClearInner key={key} focusedTrip={focusedTrip} />;
 }
 

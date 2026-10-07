@@ -2,7 +2,6 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   X,
-  AlertTriangle,
   Calendar,
   Clock,
   MapPin,
@@ -12,20 +11,21 @@ import {
   Train,
 } from "lucide-react";
 import { mpsToMph, serviceDateWeekdayLabel } from "@/lib/timeUtils";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
 import { getTodayScheduleType, nextServiceDate } from "@/lib/scheduleUtils";
 import { useNow } from "@/hooks/useNow";
 import { useTripDetailModel } from "@/hooks/useTripDetailModel";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
-import { TimePair } from "./TimePair";
+import { LiveTimePair } from "./LiveTimePair";
+import { QuickConnectionWarning } from "./QuickConnectionWarning";
 import { AlarmStatusIcon, AlarmStatusLabel } from "./AlarmStatusLabel";
 import { DepartureReminder } from "./DepartureReminder";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import type { TripProgressResult } from "@/hooks/useTripProgress";
 
 export interface TripDetailContentProps {
@@ -105,8 +105,6 @@ export function TripDetailContent({
 
   const {
     isCanceledOrSkipped,
-    hasLiveDepartureTime,
-    hasLiveArrivalTime,
     departureTime,
     arrivalTime,
     headerStatusLabel,
@@ -118,6 +116,7 @@ export function TripDetailContent({
     speedMph,
     hasQuickConnection,
     trainOption,
+    showInboundFerry,
     alarmStatus,
     isAtDestination,
   } = useTripDetailModel({
@@ -163,27 +162,12 @@ export function TripDetailContent({
             <span className="text-white/60"> · </span>
             {directionLabel}
           </p>
-          <TimePair
-            departure={departureTime}
-            arrival={arrivalTime}
+          <LiveTimePair
+            trip={trip}
+            realtimeStatus={realtimeStatus}
+            canceled={isCanceledOrSkipped}
             format={timeFormat}
-            strikethrough={isCanceledOrSkipped}
-            className="text-2xl font-semibold text-white"
           />
-          {/* Struck-through scheduled comparison — only the column(s) that
-              actually have a live value, so an arrival-only delay doesn't
-              show an unchanged departure struck through beside it. */}
-          {(hasLiveDepartureTime || hasLiveArrivalTime) && (
-            <TimePair
-              departure={trip.departureTime}
-              arrival={trip.arrivalTime}
-              format={timeFormat}
-              className="text-xs mt-0.5 text-white/50"
-              strikethrough
-              showDeparture={hasLiveDepartureTime}
-              showArrival={hasLiveArrivalTime}
-            />
-          )}
         </div>
 
         {showCloseButton && (
@@ -289,7 +273,7 @@ export function TripDetailContent({
                 aria-hidden="true"
               />
               <span>
-                {distanceToNextStopMi < 0.05
+                {distanceToNextStopMi < AT_STOP_THRESHOLD_MI
                   ? t("tracker.atStop", { stop: nextStop })
                   : t("tracker.distanceMiToStop", {
                       distance: distanceToNextStopMi.toFixed(1),
@@ -408,23 +392,7 @@ export function TripDetailContent({
           <div className="mt-3 pt-3 border-t border-border">
             {/* Quick connection warning — sits between the divider and ferry times */}
             {hasQuickConnection && !isCanceledOrSkipped && (
-              <div className="mb-3 p-3 rounded-lg bg-smart-gold/10 border border-smart-gold/40 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-smart-gold mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-smart-gold">
-                    {t("quickConnection.quickTransferWarning")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    <Trans
-                      i18nKey="quickConnection.message"
-                      values={{ trainOption }}
-                      components={{
-                        strong: <strong className="text-foreground" />,
-                      }}
-                    />
-                  </p>
-                </div>
-              </div>
+              <QuickConnectionWarning trainOption={trainOption} />
             )}
             <FerryConnection
               ferry={trip.outboundFerry}
@@ -434,18 +402,17 @@ export function TripDetailContent({
             />
           </div>
         )}
-        {trip.inboundFerry &&
-          trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={departureTime}
-                timeFormat={timeFormat}
-                inbound
-                fullLeg
-              />
-            </div>
-          )}
+        {showInboundFerry && trip.inboundFerry && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <FerryConnection
+              ferry={trip.inboundFerry}
+              trainDepartureTime={departureTime}
+              timeFormat={timeFormat}
+              inbound
+              fullLeg
+            />
+          </div>
+        )}
       </div>
     </div>
   );

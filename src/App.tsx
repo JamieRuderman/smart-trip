@@ -43,16 +43,16 @@ const RoutedApp = () => {
 
   // The prerendered SEO sitelinks footer (#seo-sitelinks, injected into
   // dist/index.html by scripts/seo/prerender.ts and living OUTSIDE #root, so
-  // React can't unmount it) belongs to the homepage. On the full-bleed map
-  // routes and the My Trip view it just dangles below the page. Toggle a body
+  // React can't unmount it) belongs to the homepage; on every other route (the
+  // full-bleed maps, My Trip) it just dangles below the page. Toggle a body
   // class the footer's own scoped <style> keys off — crawlers fetch the
   // homepage HTML and never navigate, so their crawl path into the
   // station/route pages is untouched.
   useEffect(() => {
-    const onAppOnlyRoute =
-      location.pathname.startsWith("/map") ||
-      location.pathname === TRIP_VIEW_PATH;
-    document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);
+    document.body.classList.toggle(
+      "seo-sitelinks-hidden",
+      location.pathname !== "/",
+    );
   }, [location.pathname]);
 
   return (

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { interpolateStationProgress } from "./trainMotion";
+import stations from "@/data/stations";
+import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import {
+  interpolateStationProgress,
+  scheduledStationIndex,
+} from "./trainMotion";
 
 // A 4-station southbound corridor (indices 0..3) departing at 08:00, 08:10,
 // 08:30, 08:40 (minutes-of-day). `order` ascends for southbound travel.
@@ -49,5 +54,38 @@ describe("interpolateStationProgress", () => {
     const nbBase = [520, 510, 490, 480]; // station 3 first (08:00) ... station 0 (08:40)
     // 08:20 brackets station 2 (08:10) → station 1 (08:30) → 2 + (1-2)*0.5 = 1.5
     expect(interpolateStationProgress(nbBase, nbOrder, 500, 0)).toBeCloseTo(1.5);
+  });
+});
+
+describe("scheduledStationIndex", () => {
+  const tripWith = (times: string[]) => ({ times }) as unknown as ProcessedTrip;
+  // Windsor 08:00, then a stop every 5 minutes; Larkspur doesn't stop ("~~").
+  const sb = tripWith(
+    [...stations.keys()].map((i) =>
+      i === stations.length - 1 ? "~~" : `08:${String(i * 5).padStart(2, "0")}`,
+    ),
+  );
+
+  it("interpolates southbound by clock time", () => {
+    // 08:07:30 is halfway between stop 1 (08:05) and stop 2 (08:10).
+    expect(scheduledStationIndex(sb, "S", 8 * 60 + 7.5, 0)).toBeCloseTo(1.5);
+  });
+
+  it("shifts by the live delay", () => {
+    expect(scheduledStationIndex(sb, "S", 8 * 60 + 10, 5)).toBeCloseTo(1);
+  });
+
+  it("walks northbound in reverse station order", () => {
+    // The southern terminus (last index) departs first, then a stop every 4
+    // minutes heading north.
+    const nb = tripWith(
+      [...stations.keys()].map(
+        (i) => `09:${String((stations.length - 1 - i) * 4).padStart(2, "0")}`,
+      ),
+    );
+    // 09:02 is halfway between the terminus (09:00) and the next stop north.
+    expect(scheduledStationIndex(nb, "N", 9 * 60 + 2, 0)).toBeCloseTo(
+      stations.length - 1.5,
+    );
   });
 });

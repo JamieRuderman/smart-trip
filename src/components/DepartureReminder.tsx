@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { useOpenTripView } from "@/hooks/useTripViewNavigation";
 import { isReminderSupported } from "@/lib/notificationScheduler";
 import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
@@ -20,7 +20,6 @@ import {
   focusedTripMatchesSchedule,
 } from "@/lib/focusedTrip";
 import { reminderLeadRange } from "@/lib/reminderLead";
-import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import {
   formatClockTime,
   parseTimeToMinutes,
@@ -89,8 +88,7 @@ export function DepartureReminder({
   scheduleType,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const openTripView = useOpenTripView();
 
   const effectiveTime = liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
@@ -212,7 +210,7 @@ export function DepartureReminder({
     // view. (focusTrip commits the new focus synchronously, so the view
     // renders the new trip, not the previous one.)
     setSelectedTrip(null);
-    navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
+    openTripView();
     // Then pop the reminder modal (hosted at the app root, so it survives this
     // sheet unmounting and the route change). Skip where notifications aren't
     // supported, or when there's too little lead left to schedule a useful
@@ -231,8 +229,7 @@ export function DepartureReminder({
     homeToStation,
     tooLateToScheduleReminder,
     setSelectedTrip,
-    navigate,
-    location.search,
+    openTripView,
     openReminderDialog,
   ]);
 
@@ -329,7 +326,7 @@ export function DepartureReminder({
         <Button
           onClick={() => {
             setSelectedTrip(null);
-            navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
+            openTripView();
           }}
           className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip-background text-white shadow-sm hover:bg-my-trip-background/90 active:bg-my-trip-background/90"
         >

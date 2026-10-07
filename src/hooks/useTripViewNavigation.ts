@@ -1,6 +1,16 @@
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { hasInAppHistory } from "@/lib/tripView";
+import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
+
+/** Open the full-page My Trip view, keeping the current query params (the
+ *  selected leg) like the other in-app links. */
+export function useOpenTripView(): () => void {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return useCallback(() => {
+    navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
+  }, [navigate, location.search]);
+}
 
 /**
  * Leave the My Trip view: back to wherever the user came from (the schedule,

@@ -35,11 +35,8 @@ export interface TripDetailModelInput {
 }
 
 export interface TripDetailModel {
-  isCanceled: boolean;
   isCanceledOrSkipped: boolean;
   isDelayed: boolean;
-  hasLiveDepartureTime: boolean;
-  hasLiveArrivalTime: boolean;
   /** Live-aware departure/arrival "HH:MM". */
   departureTime: string;
   arrivalTime: string;
@@ -57,6 +54,8 @@ export interface TripDetailModel {
   hasQuickConnection: boolean;
   /** "earlier"/"later train" wording for the quick-connection warning. */
   trainOption: string;
+  /** The trip starts at the ferry terminal with an inbound ferry to show. */
+  showInboundFerry: boolean;
   alarmStatus: AlarmStatusSelection;
   /** The rider has reached their destination — "approaching" cues stop. */
   isAtDestination: boolean;
@@ -112,8 +111,6 @@ export function useTripDetailModel({
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
     useTripStatus(realtimeStatus);
 
-  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
-  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
@@ -162,9 +159,12 @@ export function useTripDetailModel({
     isQuickConnection(
       calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
     );
+  const showInboundFerry =
+    trip.inboundFerry != null &&
+    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION;
   const hasInboundQuickConnection =
-    trip.inboundFerry &&
-    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION &&
+    showInboundFerry &&
+    trip.inboundFerry != null &&
     isQuickConnection(
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
@@ -245,11 +245,8 @@ export function useTripDetailModel({
   const isAtDestination = alarmStatus.phase === "AT_DESTINATION";
 
   return {
-    isCanceled,
     isCanceledOrSkipped,
     isDelayed,
-    hasLiveDepartureTime,
-    hasLiveArrivalTime,
     departureTime,
     arrivalTime,
     minutesUntil,
@@ -262,6 +259,7 @@ export function useTripDetailModel({
     speedMph,
     hasQuickConnection,
     trainOption,
+    showInboundFerry,
     alarmStatus,
     isAtDestination,
   };

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import {
+  isFocusedTripToday,
   reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
-import { toLocalDateKey } from "@/lib/timeUtils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
@@ -58,10 +58,9 @@ export function useFocusedTripLive(
     return null;
   }, [statusMap, canceledByStartTime, trip]);
 
-  const live =
-    focusedTrip.serviceDate === toLocalDateKey(new Date(now))
-      ? realtimeStatus
-      : null;
+  const live = isFocusedTripToday(focusedTrip, new Date(now))
+    ? realtimeStatus
+    : null;
 
   return { trip, live, lastUpdated };
 }

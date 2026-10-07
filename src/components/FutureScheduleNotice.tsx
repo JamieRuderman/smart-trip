@@ -18,7 +18,7 @@ export function FutureScheduleNotice({
   const { t, i18n } = useTranslation();
 
   return (
-    <Alert aria-live="polite" className="mb-3 bg-muted">
+    <Alert role="status" className="mb-3 bg-muted">
       <CalendarClock className="h-4 w-4" />
       <AlertTitle>{t("futureSchedule.title")}</AlertTitle>
       <AlertDescription className="text-muted-foreground">

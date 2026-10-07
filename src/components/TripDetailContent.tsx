@@ -270,8 +270,11 @@ export function TripDetailContent({
 
   // Once the rider has reached their destination the "approaching" cues stop
   // making sense: the distance-to-stop grows as a through train pulls away, and
-  // the final stop shouldn't stay highlighted as the current stop.
-  const isAtDestination = alarmStatus.phase === "AT_DESTINATION";
+  // the final stop shouldn't stay highlighted as the current stop. Never on
+  // another day's run: the alarm reads today's clock, so a Saturday train whose
+  // arrival time already passed today would grey out its whole timeline.
+  const isAtDestination =
+    !isOtherDay && alarmStatus.phase === "AT_DESTINATION";
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

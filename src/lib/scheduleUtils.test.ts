@@ -287,4 +287,21 @@ describe("futureServiceDate", () => {
     expect(futureServiceDate(WED, "weekend")).toBe("2099-05-23");
     expect(futureServiceDate(SAT, "weekday")).toBe("2099-05-25");
   });
+
+  describe("with a holiday override", () => {
+    afterEach(() => {
+      setScheduleData(bundledSchedulePayload);
+    });
+
+    it("skips a holiday that runs the other schedule", () => {
+      // Memorial-Day-style Monday runs the weekend schedule.
+      setScheduleData({
+        ...bundledSchedulePayload,
+        scheduleOverrides: { "2099-05-25": "weekend" },
+      });
+      expect(futureServiceDate(SAT, "weekday")).toBe("2099-05-26");
+      // Browsing the weekend schedule on that Monday is today's schedule.
+      expect(futureServiceDate(new Date(2099, 4, 25, 9, 0), "weekend")).toBeNull();
+    });
+  });
 });

@@ -60,6 +60,10 @@ export function TripDetailSheet({
   const progressTime = serviceDate
     ? parseServiceDate(serviceDate)
     : rest.currentTime;
+  // Today's live feed and train positions belong to today's runs: a host that
+  // matched them by origin time (the pinned card) must not paint today's delay,
+  // cancellation or GPS onto a later day's run.
+  const realtimeStatus = serviceDate ? null : rest.realtimeStatus;
 
   // Single hook for all trip progress logic: vehicle matching, stop inference,
   // distance calculations, and derived state.
@@ -68,10 +72,10 @@ export function TripDetailSheet({
     fromStation: rest.fromStation,
     toStation: rest.toStation,
     currentTime: progressTime,
-    realtimeStatus: rest.realtimeStatus,
+    realtimeStatus,
     isNextTrip: rest.isNextTrip,
     isFocused,
-    vehiclePositionOverride: rest.vehiclePositionOverride,
+    vehiclePositionOverride: serviceDate ? null : rest.vehiclePositionOverride,
   });
 
   const ariaLabel = t("tracker.tripDetailsAria", { trip: rest.trip.trip });
@@ -96,6 +100,7 @@ export function TripDetailSheet({
     >
       <TripDetailContent
         {...rest}
+        realtimeStatus={realtimeStatus}
         isOpen={isOpen}
         onClose={onClose}
         progress={progress}

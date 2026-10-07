@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useBoardingLocationCheck } from "@/hooks/useBoardingLocationCheck";
 import { isReminderSupported } from "@/lib/notificationScheduler";
-import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
+import {
+  futureServiceDate,
+  getTodayScheduleType,
+  tripServesLeg,
+} from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import {
   focusedDepartureInstant,
@@ -15,6 +19,7 @@ import {
 import { reminderLeadRange } from "@/lib/reminderLead";
 import {
   formatClockTime,
+  parseServiceDate,
   parseTimeToMinutes,
   toLocalDateKey,
 } from "@/lib/timeUtils";
@@ -92,10 +97,20 @@ export function DepartureReminder({
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
 
+  // A schedule other than today's runs on a later day: anchor its clock times
+  // to that day, or a train whose time just passed today reads as finished
+  // (hiding "Take this train") and too late for a reminder.
+  const otherDayServiceDate = futureServiceDate(currentTime, scheduleType);
+  const anchorTime = useMemo(
+    () =>
+      otherDayServiceDate ? parseServiceDate(otherDayServiceDate) : currentTime,
+    [otherDayServiceDate, currentTime],
+  );
+
   const effectiveTime = liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
-    () => buildDepartureTimestamp(currentTime, effectiveTime),
-    [currentTime, effectiveTime]
+    () => buildDepartureTimestamp(anchorTime, effectiveTime),
+    [anchorTime, effectiveTime]
   );
 
   const {
@@ -133,25 +148,21 @@ export function DepartureReminder({
 
   const isOtherTripFocused = focusedTrip != null && !isThisTripFocused;
 
-  const serviceDate = useMemo(() => {
-    // When the displayed schedule is today's service, anchor to the
-    // (rollover-aware) displayed departure date. When it's a different service
-    // (e.g. a weekend train chosen on a weekday), anchor to the next date that
-    // actually runs that service so the trip is correctly "this coming weekend".
-    if (scheduleType === getTodayScheduleType(currentTime)) {
-      return toLocalDateKey(new Date(departureAt));
-    }
-    return nextServiceDate(currentTime, scheduleType);
-  }, [departureAt, scheduleType, currentTime]);
+  // When the displayed schedule is today's service, anchor to the
+  // (rollover-aware) displayed departure date. When it's a different service
+  // (e.g. a weekend train chosen on a weekday), anchor to the next date that
+  // actually runs that service so the trip is correctly "this coming weekend".
+  const serviceDate =
+    otherDayServiceDate ?? toLocalDateKey(new Date(departureAt));
 
   // Arrival instant for THIS displayed leg — used only to stop offering "Go"
   // once the trip has actually finished (focusing is otherwise allowed right
   // up to/through departure, unlike setting a reminder which needs lead time).
   const effectiveArrival = realtimeArrivalTime ?? arrivalTime;
   const arrivalAt = useMemo(() => {
-    const a = buildDepartureTimestamp(currentTime, effectiveArrival);
+    const a = buildDepartureTimestamp(anchorTime, effectiveArrival);
     return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
-  }, [currentTime, effectiveArrival, departureAt]);
+  }, [anchorTime, effectiveArrival, departureAt]);
 
   // Departure used for ALL reminder math (lead range, fire time, drift). Use
   // this view's live departureAt ONLY for the focused leg on today's service —

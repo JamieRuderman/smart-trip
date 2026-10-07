@@ -259,6 +259,15 @@
     "fare": "Tarifa",
     "cancelTrip": "Cancelar viaje"
   },
+  "boardingCheck": {
+    "reversedTitle": "¿Vas en sentido contrario?",
+    "reversedBody": "Estás más cerca de {{to}}, a donde va este tren. ¿Querías viajar de {{to}} a {{from}}?",
+    "swap": "Intercambiar estaciones",
+    "otherStationTitle": "¿No estás en {{from}}?",
+    "otherStationBody": "Estás más cerca de {{station}}, pero este tren sale de {{from}}.",
+    "leaveFrom": "Salir de {{station}}",
+    "takeAnyway": "Tomarlo de todos modos"
+  },
   "tracker": {
     "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Sale en {{minutes}} min",

@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { useBoardingLocationCheck } from "@/hooks/useBoardingLocationCheck";
 import { useOpenTripView } from "@/hooks/useTripViewNavigation";
 import { isReminderSupported } from "@/lib/notificationScheduler";
 import { getTodayScheduleType, nextServiceDate, tripServesLeg } from "@/lib/scheduleUtils";
@@ -18,6 +11,7 @@ import { isSouthbound } from "@/lib/stationUtils";
 import {
   focusedDepartureInstant,
   focusedTripMatchesSchedule,
+  type FocusedRun,
 } from "@/lib/focusedTrip";
 import { reminderLeadRange } from "@/lib/reminderLead";
 import {
@@ -28,6 +22,8 @@ import {
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
+import { BoardingLocationDialog } from "./BoardingLocationDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface DepartureReminderProps {
   tripNumber: number;
@@ -50,6 +46,12 @@ interface DepartureReminderProps {
    *  repeat across weekday/weekend, so an inferred type would focus/recognize
    *  the wrong run. */
   scheduleType: "weekday" | "weekend";
+  /** Whether the detail sheet this control sits in is open — false while it
+   *  animates closed. */
+  sheetOpen: boolean;
+  /** Close the detail sheet this control sits in. The sheet's own close —
+   *  the line map's sheets aren't driven by the selected trip. */
+  onClose: () => void;
 }
 
 /** Hours of past-ness before we assume a HH:MM refers to tomorrow's run. */
@@ -86,6 +88,8 @@ export function DepartureReminder({
   currentTime,
   timeFormat,
   scheduleType,
+  sheetOpen,
+  onClose,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
   const openTripView = useOpenTripView();
@@ -182,30 +186,47 @@ export function DepartureReminder({
 
   const [confirmSwitch, setConfirmSwitch] = useState(false);
 
-  const doFocus = useCallback(() => {
-    // The Go control can be opened from the line map, where the displayed trip
-    // runs origin→terminus. When the user has a home-screen leg selected and
-    // this train actually serves it, focus THAT leg so My Trip shows the
-    // user's destination (and matches the schedule row) rather than the full
-    // corridor.
-    let legFrom: Station = fromStation;
-    let legTo: Station = toStation;
+  // The run "Take this train" focuses. The Go control can be opened from the
+  // line map, where the displayed trip runs origin→terminus. When the user has
+  // a home-screen leg selected and this train actually serves it, focus THAT
+  // leg so My Trip shows the user's destination (and matches the schedule
+  // row) rather than the full corridor.
+  const focusRun = useMemo((): FocusedRun => {
+    const run = { tripNumber, scheduleType, serviceDate };
     if (
       homeFromStation &&
       homeToStation &&
       (homeFromStation !== fromStation || homeToStation !== toStation) &&
       tripServesLeg(tripNumber, homeFromStation, homeToStation, scheduleType)
     ) {
-      legFrom = homeFromStation;
-      legTo = homeToStation;
+      return { ...run, fromStation: homeFromStation, toStation: homeToStation };
     }
-    void focusTrip({
-      tripNumber,
-      fromStation: legFrom,
-      toStation: legTo,
-      scheduleType,
-      serviceDate,
-    });
+    return { ...run, fromStation, toStation };
+  }, [homeFromStation, homeToStation, fromStation, toStation, tripNumber, scheduleType, serviceDate]);
+
+  // Check the rider's location against the boarding station before focusing —
+  // only for their own journey (the line map's corridor view starts at a
+  // terminus most riders don't board at). Departure: this view's live time
+  // when it starts at the boarding station on today's service, else the run's
+  // scheduled one on its service date.
+  const isHomeLeg =
+    focusRun.fromStation === homeFromStation && focusRun.toStation === homeToStation;
+  const boardingCheck = useBoardingLocationCheck({
+    from: focusRun.fromStation,
+    to: focusRun.toStation,
+    departureAt:
+      !isHomeLeg || isThisTripFocused
+        ? null
+        : focusRun.fromStation === fromStation &&
+            scheduleType === getTodayScheduleType(currentTime)
+          ? departureAt
+          : focusedDepartureInstant(focusRun),
+    now: currentTime.getTime(),
+    active: sheetOpen,
+  });
+
+  const doFocus = useCallback(() => {
+    void focusTrip(focusRun);
     // Close the detail sheet we're inside and land on the full-page My Trip
     // view. (focusTrip commits the new focus synchronously, so the view
     // renders the new trip, not the previous one.)
@@ -220,20 +241,14 @@ export function DepartureReminder({
     }
   }, [
     focusTrip,
-    fromStation,
-    toStation,
-    tripNumber,
-    serviceDate,
-    scheduleType,
-    homeFromStation,
-    homeToStation,
+    focusRun,
     tooLateToScheduleReminder,
     setSelectedTrip,
     openTripView,
     openReminderDialog,
   ]);
 
-  const handleGoClick = useCallback(() => {
+  const proceedWithGo = useCallback(() => {
     if (isOtherTripFocused) setConfirmSwitch(true);
     else doFocus();
   }, [doFocus, isOtherTripFocused]);
@@ -282,38 +297,21 @@ export function DepartureReminder({
   // ever sets confirmSwitch, but rendering it unconditionally keeps it mounted
   // across the brief states the user can't trigger it from).
   const switchDialog = confirmSwitch ? (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) setConfirmSwitch(false);
+    <ConfirmDialog
+      title={t("focusedTrip.switchTitle")}
+      description={t("focusedTrip.switchBody", {
+        current: focusedTrip?.tripNumber,
+        next: tripNumber,
+      })}
+      secondaryLabel={t("focusedTrip.switchCancel")}
+      onSecondary={() => setConfirmSwitch(false)}
+      primaryLabel={t("focusedTrip.switchConfirm")}
+      onPrimary={() => {
+        setConfirmSwitch(false);
+        doFocus();
       }}
-    >
-      <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
-        <DialogHeader>
-          <DialogTitle>{t("focusedTrip.switchTitle")}</DialogTitle>
-          <DialogDescription>
-            {t("focusedTrip.switchBody", {
-              current: focusedTrip?.tripNumber,
-              next: tripNumber,
-            })}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={() => setConfirmSwitch(false)}>
-            {t("focusedTrip.switchCancel")}
-          </Button>
-          <Button
-            onClick={() => {
-              setConfirmSwitch(false);
-              doFocus();
-            }}
-            className="bg-my-trip-background text-white hover:bg-my-trip-background/90"
-          >
-            {t("focusedTrip.switchConfirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      onDismiss={() => setConfirmSwitch(false)}
+    />
   ) : null;
 
   // A focused trip's status — the reminder countdown, Add-reminder, and
@@ -350,14 +348,35 @@ export function DepartureReminder({
   return (
     <GutterRow>
       <Button
-        onClick={handleGoClick}
+        onClick={() => void boardingCheck.guard(proceedWithGo)}
         aria-label={t("focusedTrip.go")}
+        aria-busy={boardingCheck.checking}
         className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-[hsl(220_13%_18%)] text-white shadow-sm hover:bg-[hsl(220_13%_18%)]/90 active:bg-[hsl(220_13%_18%)]/90"
       >
-        <TripIcon className="h-5 w-5" aria-hidden="true" />
+        {boardingCheck.checking ? (
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <TripIcon className="h-5 w-5" aria-hidden="true" />
+        )}
         <span>{t("focusedTrip.go")}</span>
       </Button>
       {switchDialog}
+      {boardingCheck.warning && (
+        <BoardingLocationDialog
+          warning={boardingCheck.warning}
+          fromStation={focusRun.fromStation}
+          toStation={focusRun.toStation}
+          onFix={() => {
+            boardingCheck.fixTrip();
+            onClose();
+          }}
+          onContinue={() => {
+            boardingCheck.dismiss();
+            proceedWithGo();
+          }}
+          onCancel={boardingCheck.dismiss}
+        />
+      )}
     </GutterRow>
   );
 }

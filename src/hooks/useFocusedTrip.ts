@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Station } from "@/types/smartSchedule";
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
   loadFocusedTrip,
   saveFocusedTrip,
+  type FocusedRun,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { cancelNotification } from "@/lib/notificationScheduler";
@@ -19,14 +19,8 @@ import {
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 
-export interface FocusTripInput {
-  tripNumber: number;
-  fromStation: Station;
-  toStation: Station;
-  scheduleType: "weekday" | "weekend";
-  /** "YYYY-MM-DD" service day of the run. */
-  serviceDate: string;
-}
+/** The run and leg to focus. */
+export type FocusTripInput = FocusedRun;
 
 export type SetReminderResult =
   | { ok: true }

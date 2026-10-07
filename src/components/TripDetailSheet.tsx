@@ -85,6 +85,7 @@ export function TripDetailSheet({
     >
       <TripDetailContent
         {...rest}
+        isOpen={isOpen}
         onClose={onClose}
         progress={progress}
         showCloseButton={!isMobile}

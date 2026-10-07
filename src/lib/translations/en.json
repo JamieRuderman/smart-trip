@@ -259,6 +259,15 @@
     "fare": "Fare",
     "cancelTrip": "Cancel trip"
   },
+  "boardingCheck": {
+    "reversedTitle": "Heading the other way?",
+    "reversedBody": "You're closest to {{to}}, where this train is going. Did you mean to ride from {{to}} to {{from}}?",
+    "swap": "Swap stations",
+    "otherStationTitle": "Not at {{from}}?",
+    "otherStationBody": "You're closest to {{station}}, but this train leaves from {{from}}.",
+    "leaveFrom": "Leave from {{station}}",
+    "takeAnyway": "Take it anyway"
+  },
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Departs in {{minutes}} min",

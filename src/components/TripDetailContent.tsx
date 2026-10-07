@@ -38,6 +38,8 @@ export interface TripDetailContentProps {
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
   showFerry: boolean;
+  /** Whether the hosting sheet is open — false while it animates closed. */
+  isOpen: boolean;
   onClose: () => void;
   /** All trip progress state, computed once in TripDetailSheet. */
   progress: TripProgressResult;
@@ -65,6 +67,7 @@ export function TripDetailContent({
   realtimeStatus,
   timeFormat,
   showFerry,
+  isOpen,
   onClose,
   progress,
   showCloseButton = true,
@@ -363,6 +366,8 @@ export function TripDetailContent({
             currentTime={currentTime}
             timeFormat={timeFormat}
             scheduleType={scheduleType}
+            sheetOpen={isOpen}
+            onClose={onClose}
           />
         </div>
       )}

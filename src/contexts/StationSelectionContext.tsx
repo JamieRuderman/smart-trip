@@ -137,7 +137,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       // persistence: a leg saved on a weekday must not force the weekday
       // schedule when reopened on a weekend (and vice-versa). Restoring it
       // desynced the schedule list from "today", which — because train numbers
-      // repeat across weekday/weekend — made the pinned trip reconstruct a
+      // repeat across weekday/weekend — made the focused trip reconstruct a
       // different run than the one shown in the list. Shared links still honor
       // their explicit ?type so the recipient sees the sender's day.
       scheduleType:
@@ -270,7 +270,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
 
   // Lead-time reminder modal open state. Lives here (not in the picker) so the
   // in-sheet "Take this train" control can open it as it closes its own sheet,
-  // and the modal (rendered by the home FocusedTripCard) survives that unmount.
+  // and the modal (hosted at the app root by ReminderDialogHost) survives that
+  // unmount and the route change to My Trip.
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const openReminderDialog = useCallback(() => setReminderDialogOpen(true), []);
   const closeReminderDialog = useCallback(
@@ -290,7 +291,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   // Clear the focused trip once the train has arrived AND reconcile a
   // past-fire reminder. loadFocusedTrip() drops the trip record on arrival and
   // stamps the reminder `firedAt` once reminderAt has passed; this tick just
-  // notices and dispatches so the pinned card / reminder pill re-renders. On
+  // notices and dispatches so My Trip / the reminder pill re-renders. On
   // native there's no JS callback when the OS-scheduled alarm fires, so this
   // tick is the only thing that catches up the UI within ~30s. A 30s cadence
   // is prompt without busy-work.

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +20,7 @@ import {
   focusedTripMatchesSchedule,
 } from "@/lib/focusedTrip";
 import { reminderLeadRange } from "@/lib/reminderLead";
+import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import {
   formatClockTime,
   parseTimeToMinutes,
@@ -44,9 +47,9 @@ interface DepartureReminderProps {
   timeFormat: "12h" | "24h";
   /** The schedule (weekday/weekend) the displayed trip belongs to — passed in
    *  from whatever surface rendered it (home list = the user's selected type,
-   *  pinned card = the focused trip's type, line map = today). NEVER inferred
-   *  from "today" here: train numbers repeat across weekday/weekend, so an
-   *  inferred type would focus/recognize the wrong run. */
+   *  line map = today). NEVER inferred from "today" here: train numbers
+   *  repeat across weekday/weekend, so an inferred type would focus/recognize
+   *  the wrong run. */
   scheduleType: "weekday" | "weekend";
 }
 
@@ -86,6 +89,8 @@ export function DepartureReminder({
   scheduleType,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const effectiveTime = liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
@@ -182,9 +187,9 @@ export function DepartureReminder({
   const doFocus = useCallback(() => {
     // The Go control can be opened from the line map, where the displayed trip
     // runs origin→terminus. When the user has a home-screen leg selected and
-    // this train actually serves it, focus THAT leg so the pinned card shows
-    // the user's destination (and dedupes against the schedule row) rather
-    // than the full corridor.
+    // this train actually serves it, focus THAT leg so My Trip shows the
+    // user's destination (and matches the schedule row) rather than the full
+    // corridor.
     let legFrom: Station = fromStation;
     let legTo: Station = toStation;
     if (
@@ -203,13 +208,15 @@ export function DepartureReminder({
       scheduleType,
       serviceDate,
     });
-    // Close the detail sheet we're inside so the user lands back on the home
-    // screen with the pinned trip card — no manual sheet-dismiss afterward.
+    // Close the detail sheet we're inside and land on the full-page My Trip
+    // view. (focusTrip commits the new focus synchronously, so the view
+    // renders the new trip, not the previous one.)
     setSelectedTrip(null);
-    // Then pop the reminder modal (rendered by the home card, so it survives
-    // this sheet unmounting). Skip where notifications aren't supported, or
-    // when there's too little lead left to schedule a useful reminder — there's
-    // nothing worth configuring in either case, and the user just lands home.
+    navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
+    // Then pop the reminder modal (hosted at the app root, so it survives this
+    // sheet unmounting and the route change). Skip where notifications aren't
+    // supported, or when there's too little lead left to schedule a useful
+    // reminder — there's nothing worth configuring in either case.
     if (isReminderSupported() && !tooLateToScheduleReminder) {
       openReminderDialog();
     }
@@ -224,6 +231,8 @@ export function DepartureReminder({
     homeToStation,
     tooLateToScheduleReminder,
     setSelectedTrip,
+    navigate,
+    location.search,
     openReminderDialog,
   ]);
 
@@ -310,12 +319,27 @@ export function DepartureReminder({
     </Dialog>
   ) : null;
 
-  // A focused trip's status — "Going", the reminder countdown, Add-reminder,
-  // and Cancel — all live on the home "My Trip" card. Repeating them in the
-  // detail sheet is redundant, so once focused the sheet shows nothing here.
-  // (The live-drift reschedule effect above still runs while the sheet is
-  // open.) Not focused → the "Go" button below.
-  if (isThisTripFocused) return null;
+  // A focused trip's status — the reminder countdown, Add-reminder, and
+  // Cancel — all live on the full-page My Trip view, so the sheet just links
+  // there. (The live-drift reschedule effect above still runs while the sheet
+  // is open.) Not focused → the "Go" button below.
+  if (isThisTripFocused) {
+    return (
+      <GutterRow>
+        <Button
+          onClick={() => {
+            setSelectedTrip(null);
+            navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
+          }}
+          className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip-background text-white shadow-sm hover:bg-my-trip-background/90 active:bg-my-trip-background/90"
+        >
+          <TripIcon className="h-5 w-5" aria-hidden="true" />
+          <span className="flex-1 text-left">{t("myTrip.view")}</span>
+          <ChevronRight className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      </GutterRow>
+    );
+  }
 
   // "Going" means going somewhere — require a selected journey (origin +
   // destination). Without one (e.g. tapping a train on the line map before

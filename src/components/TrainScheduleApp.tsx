@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useScheduleData } from "@/hooks/useScheduleData";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
-import { parseDebugTimeFromUrl } from "@/lib/debugTime";
+import { useMinuteClock } from "@/hooks/useMinuteClock";
 import { useServiceAlerts } from "@/hooks/useServiceAlerts";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
@@ -26,7 +26,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
-import { TripModeHeader } from "./TripModeHeader";
+import { ActiveTripBar } from "./ActiveTripBar";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { ScheduleDaySwitchPrompt } from "./ScheduleDaySwitchPrompt";
@@ -41,9 +41,6 @@ export function TrainScheduleApp() {
     headerHeights.logo === HEADER_HEIGHTS.logo.large
       ? HEADER_MAX_HEIGHTS.large
       : HEADER_MAX_HEIGHTS.small;
-  // In trip mode the planner header is replaced by the pinned trip card, whose
-  // (expanded) height is measured so the page reserves matching top padding.
-  const [tripHeaderHeight, setTripHeaderHeight] = useState(0);
   const {
     fromStation,
     toStation,
@@ -57,43 +54,7 @@ export function TrainScheduleApp() {
     focusedTrip,
   } = useStationSelection();
 
-  const debugCurrentTime = useMemo(() => parseDebugTimeFromUrl(), []);
-  const [currentTime, setCurrentTime] = useState<Date>(
-    () => debugCurrentTime ?? new Date(),
-  );
-  useEffect(() => {
-    if (debugCurrentTime) return;
-    let timeoutId = 0;
-    let intervalId = 0;
-    const tick = () => setCurrentTime(new Date());
-    // Align the tick to the wall-clock minute boundary so the displayed minute
-    // flips exactly when the clock rolls over, not up to ~59s late.
-    const startAligned = () => {
-      timeoutId = window.setTimeout(() => {
-        tick();
-        intervalId = window.setInterval(tick, 60_000);
-      }, 60_000 - (Date.now() % 60_000));
-    };
-    startAligned();
-    // JS timers are suspended while the app is backgrounded, so `currentTime`
-    // — and every countdown derived from it — is stale on return. Resync the
-    // instant we become visible/focused again, then realign the interval.
-    const resync = () => {
-      if (document.visibilityState !== "visible") return;
-      window.clearTimeout(timeoutId);
-      window.clearInterval(intervalId);
-      tick();
-      startAligned();
-    };
-    document.addEventListener("visibilitychange", resync);
-    window.addEventListener("focus", resync);
-    return () => {
-      window.clearTimeout(timeoutId);
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", resync);
-      window.removeEventListener("focus", resync);
-    };
-  }, [debugCurrentTime]);
+  const currentTime = useMinuteClock();
 
   const [showAllTrips, setShowAllTrips] = useState(false);
   const toggleShowAllTrips = useCallback(() => {
@@ -200,8 +161,8 @@ export function TrainScheduleApp() {
   // the displayed schedule's direction (same shared predicate as the station
   // sheet and detail sheet), not only when the home leg exactly equals the
   // focused leg — otherwise the same train reads as focused in the sheets but
-  // not in the list. The row stays in the list (it also appears pinned above);
-  // the duplication is intentional.
+  // not in the list. The row stays in the list (the trip bar below also links
+  // to it); the duplication is intentional.
   const focusedTripNumber =
     fromStation &&
     toStation &&
@@ -218,27 +179,19 @@ export function TrainScheduleApp() {
       className="min-h-[100dvh] bg-card md:bg-background relative"
       ref={headerContainerRef}
     >
-      {focusedTrip ? (
-        <TripModeHeader
-          currentTime={currentTime}
-          timeFormat="12h"
-          onHeightChange={setTripHeaderHeight}
-        />
-      ) : (
-        <StickyHeader
-          fromStation={fromStation}
-          toStation={toStation}
-          scheduleType={scheduleType}
-          headerHeights={headerHeights}
-          onFromStationChange={setFromStation}
-          onToStationChange={setToStation}
-          onScheduleTypeChange={setScheduleType}
-          onSwapStations={swapStations}
-          closestStation={closestStation}
-          locationLoading={locationLoading}
-          onRequestLocation={handleRequestLocation}
-        />
-      )}
+      <StickyHeader
+        fromStation={fromStation}
+        toStation={toStation}
+        scheduleType={scheduleType}
+        headerHeights={headerHeights}
+        onFromStationChange={setFromStation}
+        onToStationChange={setToStation}
+        onScheduleTypeChange={setScheduleType}
+        onSwapStations={swapStations}
+        closestStation={closestStation}
+        locationLoading={locationLoading}
+        onRequestLocation={handleRequestLocation}
+      />
 
       <main
         className="flex flex-col min-h-[100vh] container mx-auto px-4 pb-4 md:pb-6 space-y-4"
@@ -246,11 +199,7 @@ export function TrainScheduleApp() {
         aria-label="Train schedule planning interface"
         style={{
           overflowAnchor: "none",
-          // Trip mode: reserve the measured pinned-card height (already includes
-          // the safe-area inset). Planner: the constant header height + inset.
-          paddingTop: focusedTrip
-            ? `${tripHeaderHeight || maxHeaderHeight}px`
-            : `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
+          paddingTop: `calc(${maxHeaderHeight}px + var(--safe-area-top))`,
         }}
       >
         {/* Connectivity banner — only renders when offline */}
@@ -297,7 +246,13 @@ export function TrainScheduleApp() {
 
         {/* Bottom bar */}
         <BottomInfoBar />
+
+        {/* Keep the end of the page clear of the floating trip bar. */}
+        {focusedTrip && <div className="h-20 shrink-0" aria-hidden="true" />}
       </main>
+
+      {/* The way back to the full-page My Trip view while a trip is focused. */}
+      <ActiveTripBar currentTime={currentTime} />
 
       {/* Dev fixture sheet — only rendered in dev mode via ?devTrip=<scenario> */}
       {devFixture && (

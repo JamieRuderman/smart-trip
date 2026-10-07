@@ -25,8 +25,8 @@ const VEHICLE_VETO_LEAD_MS = 5 * 60_000;
  * Invisible app-level worker that clears the focused trip a short grace after it
  * arrives — delay-aware, so a late train isn't dropped while it's still en
  * route. Lives at the root (like {@link LiveActivitySync}) so it tracks the
- * focus on any surface, and runs on every platform (the pinned "My Trip" card
- * exists on web/Android too, where there's no Live Activity to piggyback on).
+ * focus on any surface, and runs on every platform (the My Trip view exists on
+ * web/Android too, where there's no Live Activity to piggyback on).
  *
  * The clock is the live arrival (GTFS-RT), falling back to the schedule; the
  * exact rule lives in {@link focusedTripClearInstant}. `loadFocusedTrip`'s

@@ -43,7 +43,7 @@ function ReminderDriftSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const nowSeconds = useNow(30_000);
   const now = nowSeconds * 1000;
 
-  // Shared focused-trip realtime derivation (same lookup as the pinned card
+  // Shared focused-trip realtime derivation (same lookup as My Trip
   // and LiveActivitySync, so all surfaces track the same live departure).
   const { live } = useFocusedTripLive(focusedTrip, now);
 

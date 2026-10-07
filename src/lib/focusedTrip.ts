@@ -176,8 +176,7 @@ function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
 
 /**
  * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
- * so the pinned card can render regardless of the home screen's current
- * from/to. Null if the trip no longer exists in that schedule.
+ * so My Trip can render regardless of the home screen's current from/to. Null if the trip no longer exists in that schedule.
  */
 export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | null {
   const trips = getFilteredTrips(
@@ -426,9 +425,9 @@ export function bootFocusedTrip(): void {
   const migrated = migrateLegacyReminders();
   // The context's focusedTrip state initializes during render — before this
   // boot effect runs — so a record written by migration here isn't visible (no
-  // pinned card, no Stop/cancel control) until something nudges consumers to
+  // trip bar, no Stop/cancel control) until something nudges consumers to
   // re-read. Dispatch the change event so the migrated trip surfaces on first
-  // load instead of waiting for a reload. Runs on native too (the card still
+  // load instead of waiting for a reload. Runs on native too (the trip still
   // needs to appear, even though the OS owns the notification).
   if (migrated && typeof window !== "undefined") {
     window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));

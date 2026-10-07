@@ -160,7 +160,7 @@ export function selectAlarmStatus(
   }
 
   // Lead with the "leave in" countdown while the armed reminder is still ahead,
-  // before the departure countdown — matching the home card + Live Activity.
+  // before the departure countdown — matching My Trip + Live Activity.
   if (minutesUntilLeave != null && minutesUntilLeave >= 0) {
     return {
       phase: "LEAVE",

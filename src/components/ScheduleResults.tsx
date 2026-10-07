@@ -30,7 +30,7 @@ interface ScheduleResultsProps {
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
   /** The user's focused ("Go") trip number when it belongs to the displayed
-   *  leg — that row is highlighted blue (it also appears pinned above; we
+   *  leg — that row is highlighted blue (the trip bar also links to it; we
    *  intentionally keep it in the list rather than hiding it). */
   focusedTripNumber?: number | null;
 }
@@ -147,9 +147,10 @@ export function ScheduleResults({
             const showFerry =
               !!trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 
-            // The focused trip stays in the list (also pinned above) and is
-            // highlighted blue. focusedTripNumber is only set when the focus
-            // is on this displayed leg, so a number match is sufficient.
+            // The focused trip stays in the list (the trip bar also links to
+            // it) and is highlighted blue. focusedTripNumber is only set when
+            // the focus is on this displayed leg, so a number match is
+            // sufficient.
             const isFocused =
               focusedTripNumber != null && trip.trip === focusedTripNumber;
             return (

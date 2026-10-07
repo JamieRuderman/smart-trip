@@ -20,8 +20,9 @@ export interface FocusedTripLive {
 }
 
 /**
- * Shared focused-trip realtime derivation used by the app-root workers that
- * track the pinned trip ({@link LiveActivitySync}, {@link ReminderDialogHost},
+ * Shared focused-trip realtime derivation used by the My Trip view, the
+ * schedule's trip bar, and the app-root workers that track the focused trip
+ * ({@link LiveActivitySync}, {@link ReminderDialogHost},
  * {@link FocusedTripAutoClear}). Reconstructs the trip, looks up its realtime
  * status (primary by departure time, cancelled-fallback by origin start time),
  * and gates that status to the focus's own service date — the RT feed describes

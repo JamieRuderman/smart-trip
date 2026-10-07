@@ -12,6 +12,7 @@ This project is not affiliated with Sonoma-Marin Area Rail Transit.
 - Ferry connections for Larkspur trips
 - Closest-station selection using device location
 - Trip detail sheets with GPS-assisted distance-to-stop messaging and better in-motion progress inference
+- A full-page My Trip view for the train you're taking: live position along your leg, leave/departs/arrives countdowns, reminders, and every stop — opened by "Take this train" and on launch, with an in-progress bar on the schedule to get back to it
 - English and Spanish UI
 - Light, dark, and system theme support
 - Fare lookup for supported rider categories

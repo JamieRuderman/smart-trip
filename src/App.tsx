@@ -16,7 +16,9 @@ import { ReminderDriftSync } from "@/components/ReminderDriftSync";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
+import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import Index from "./pages/Index";
+import MyTrip from "./pages/MyTrip";
 import NotFound from "./pages/NotFound";
 // Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
 // schedule-only users never pay that cost. The home screen preloads these
@@ -42,12 +44,15 @@ const RoutedApp = () => {
   // The prerendered SEO sitelinks footer (#seo-sitelinks, injected into
   // dist/index.html by scripts/seo/prerender.ts and living OUTSIDE #root, so
   // React can't unmount it) belongs to the homepage. On the full-bleed map
-  // routes it just dangles below the map. Toggle a body class the footer's own
-  // scoped <style> keys off — crawlers fetch the homepage HTML and never
-  // navigate, so their crawl path into the station/route pages is untouched.
+  // routes and the My Trip view it just dangles below the page. Toggle a body
+  // class the footer's own scoped <style> keys off — crawlers fetch the
+  // homepage HTML and never navigate, so their crawl path into the
+  // station/route pages is untouched.
   useEffect(() => {
-    const onMapRoute = location.pathname.startsWith("/map");
-    document.body.classList.toggle("seo-sitelinks-hidden", onMapRoute);
+    const onAppOnlyRoute =
+      location.pathname.startsWith("/map") ||
+      location.pathname === TRIP_VIEW_PATH;
+    document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);
   }, [location.pathname]);
 
   return (
@@ -58,7 +63,7 @@ const RoutedApp = () => {
             focused train regardless of view. */}
         <LiveActivitySync />
         {/* Platform-independent auto-clear of the focused trip a short grace
-            after (live-aware) arrival — the pinned "My Trip" card exists on
+            after (live-aware) arrival — the My Trip view exists on
             web/Android too, where LiveActivitySync doesn't run. */}
         <FocusedTripAutoClear />
         {/* App-level reminder modal host — lives here (like LiveActivitySync)
@@ -72,6 +77,10 @@ const RoutedApp = () => {
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
+            {/* Full-page view of the focused ("Take this train") trip. In the
+                main bundle (no heavy deps) so "Take this train" and a launch
+                into it render without a loading flash. */}
+            <Route path={TRIP_VIEW_PATH} element={<MyTrip />} />
             <Route path="/map" element={<Map />} />
             {/* Per-route fallback: the line-diagram frame (green bar + blank
                 container) renders instantly while the code chunk loads, so the

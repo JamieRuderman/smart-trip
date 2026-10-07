@@ -11,7 +11,7 @@ import { ReminderDialog } from "./ReminderDialog";
 
 /**
  * App-level host for the departure-reminder modal. Lives at the root — NOT in a
- * trip view — so "Take this train" (or the home card's "Add reminder") can open
+ * trip view — so "Take this train" (or My Trip's "Add reminder") can open
  * it from any surface, and it survives the triggering sheet unmounting and route
  * changes. Mirrors {@link LiveActivitySync}'s focused-trip + realtime derivation
  * so the lead-time math anchors to the live boarding departure on the trip's own
@@ -44,7 +44,7 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
   const now = nowSeconds * 1000;
   const currentTime = useMemo(() => new Date(now), [now]);
 
-  // Shared focused-trip realtime derivation (same lookup as the pinned card).
+  // Shared focused-trip realtime derivation (same lookup as My Trip).
   const { live } = useFocusedTripLive(focusedTrip, now);
 
   // Live-anchored boarding departure on the focused trip's own service date.

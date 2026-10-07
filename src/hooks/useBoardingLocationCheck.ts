@@ -34,7 +34,7 @@ export function useBoardingLocationCheck({
   departureAt,
   now,
 }: BoardingLocationCheckInput) {
-  const { swapStations, setFromStation } = useStationSelection();
+  const { setFromStation, setToStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
   const [warning, setWarning] = useState<BoardingLocationWarning | null>(null);
   const enabled =
@@ -85,12 +85,14 @@ export function useBoardingLocationCheck({
     else proceed();
   };
 
-  /** Correct the trip instead of taking this train — it runs the wrong way
-   *  (or from the wrong station). The caller then closes its sheet so the
-   *  rider picks from the corrected schedule. */
+  /** Switch to the suggested leg instead of taking this train — it runs the
+   *  wrong way (or from the wrong station). The caller then closes its sheet
+   *  so the rider picks from the corrected schedule. */
   const fixTrip = () => {
-    if (warning?.kind === "nearDestination") swapStations();
-    else if (warning) setFromStation(warning.station);
+    if (warning) {
+      setFromStation(warning.suggested.from);
+      setToStation(warning.suggested.to);
+    }
     setWarning(null);
   };
 

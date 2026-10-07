@@ -244,6 +244,7 @@
   "boardingCheck": {
     "reversedTitle": "Heading the other way?",
     "reversedBody": "You're closer to {{to}} than to {{from}}, where this train leaves from. Did you mean to ride from {{to}} to {{from}}?",
+    "reversedAtStationBody": "You appear to be at {{station}}, but this train leaves from {{from}}. Did you mean to ride from {{station}} to {{from}}?",
     "swap": "Swap stations",
     "otherStationTitle": "Not at {{from}}?",
     "otherStationBody": "You appear to be at {{station}}, but this train leaves from {{from}}.",

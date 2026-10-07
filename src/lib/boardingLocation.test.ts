@@ -7,6 +7,11 @@ import {
 import { STATION_COORDINATES } from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 
+const swapped = (from: Station, to: Station) => ({
+  reversed: true,
+  suggested: { from: to, to: from },
+});
+
 /** A tight GPS fix standing at `station`. */
 function at(station: Station, accuracy: number | null = 15) {
   return { ...STATION_COORDINATES[station], accuracy };
@@ -17,7 +22,18 @@ describe("checkBoardingLocation", () => {
     // At San Rafael after work, but the trip still reads Petaluma → San Rafael.
     expect(
       checkBoardingLocation(at("San Rafael"), "Petaluma Downtown", "San Rafael"),
-    ).toEqual({ kind: "nearDestination" });
+    ).toEqual(swapped("Petaluma Downtown", "San Rafael"));
+  });
+
+  it("suggests riding back from a station past the destination", () => {
+    // At Larkspur with Petaluma → San Rafael selected: a swap would still
+    // leave from a station they aren't at, so suggest Larkspur → Petaluma.
+    expect(
+      checkBoardingLocation(at("Larkspur"), "Petaluma Downtown", "San Rafael"),
+    ).toEqual({
+      reversed: true,
+      suggested: { from: "Larkspur", to: "Petaluma Downtown" },
+    });
   });
 
   it("flags a reversed trip from a short way off the platform", () => {
@@ -25,7 +41,7 @@ describe("checkBoardingLocation", () => {
     const office = { lat: 37.972, lng: -122.5227 + 0.017, accuracy: 30 };
     expect(
       checkBoardingLocation(office, "Petaluma Downtown", "San Rafael"),
-    ).toEqual({ kind: "nearDestination" });
+    ).toEqual(swapped("Petaluma Downtown", "San Rafael"));
   });
 
   it("flags a reversed trip between adjacent stations", () => {
@@ -35,7 +51,7 @@ describe("checkBoardingLocation", () => {
         "Santa Rosa North",
         "Santa Rosa Downtown",
       ),
-    ).toEqual({ kind: "nearDestination" });
+    ).toEqual(swapped("Santa Rosa North", "Santa Rosa Downtown"));
   });
 
   it("stays quiet at the departure station", () => {
@@ -59,10 +75,13 @@ describe("checkBoardingLocation", () => {
     ).toBeNull();
   });
 
-  it("names the station the rider is standing at when it isn't the origin", () => {
+  it("suggests the same trip from the station the rider is standing at", () => {
     expect(
       checkBoardingLocation(at("Petaluma North"), "Petaluma Downtown", "Larkspur"),
-    ).toEqual({ kind: "atOtherStation", station: "Petaluma North" });
+    ).toEqual({
+      reversed: false,
+      suggested: { from: "Petaluma North", to: "Larkspur" },
+    });
   });
 
   it("ignores a coarse fix that can't tell two close stations apart", () => {
@@ -81,7 +100,7 @@ describe("checkBoardingLocation", () => {
         "Petaluma Downtown",
         "Santa Rosa Downtown",
       ),
-    ).toEqual({ kind: "nearDestination" });
+    ).toEqual(swapped("Petaluma Downtown", "Santa Rosa Downtown"));
   });
 
   it("doesn't claim the rider is at another station on a coarse fix", () => {
@@ -97,7 +116,7 @@ describe("checkBoardingLocation", () => {
   it("treats an unknown accuracy as a usable fix", () => {
     expect(
       checkBoardingLocation(at("San Rafael", null), "Petaluma Downtown", "San Rafael"),
-    ).toEqual({ kind: "nearDestination" });
+    ).toEqual(swapped("Petaluma Downtown", "San Rafael"));
   });
 
   it("ignores non-finite coordinates", () => {

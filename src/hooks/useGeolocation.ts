@@ -160,17 +160,19 @@ function rememberFix(fix: Coordinates): Coordinates {
   return fix;
 }
 
-/** How old the latest fix can be and still count as where the rider is now. */
-const RECENT_FIX_MS = 60_000;
+/** How old the latest fix can be and still count as where the rider is now —
+ *  long enough that a sheet left open a while doesn't make a tap wait on the
+ *  GPS again, short enough that it's still roughly where they are. */
+const REUSE_FIX_MS = 5 * 60_000;
 
 /**
  * Where the rider is right now, without ever prompting for permission: the
- * app's latest fix if it's under a minute old (e.g. from the map's live
+ * app's latest fix if it's under five minutes old (e.g. from the map's live
  * watch), else a one-shot fix if access was already granted. Null when access
  * isn't granted or the fix fails. Concurrent callers share one request.
  */
 export function getRecentLocationFix(): Promise<Coordinates | null> {
-  if (latestFix && Date.now() - latestFix.takenAt <= RECENT_FIX_MS) {
+  if (latestFix && Date.now() - latestFix.takenAt <= REUSE_FIX_MS) {
     return Promise.resolve(latestFix.fix);
   }
   if (!pendingFix) {
@@ -178,14 +180,15 @@ export function getRecentLocationFix(): Promise<Coordinates | null> {
       try {
         const access = await grantedLocationAccess();
         if (!access) return null;
-        // Accept a recent cached position and don't wait long on a cold GPS.
+        // Accept a position the OS cached in the last minute, and don't wait
+        // long on a cold GPS.
         // Only ask for high accuracy with precise access: on Android 12+ a
         // high-accuracy request under an approximate-only grant prompts the
         // rider to upgrade to precise location.
         const options = {
           enableHighAccuracy: access === "precise",
           timeout: 8000,
-          maximumAge: RECENT_FIX_MS,
+          maximumAge: 60_000,
         };
         return rememberFix(
           Capacitor.isNativePlatform()

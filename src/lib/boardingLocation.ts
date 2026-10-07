@@ -5,15 +5,19 @@ import {
 } from "@/lib/stationUtils";
 
 /**
- * Why a "Take this train" tap looks like it leaves from the wrong place:
- *  - `nearDestination`: the rider is closer to where the train is going than to
- *    where it leaves from — the classic "forgot to swap stations for the ride
- *    home" mistake.
- *  - `atOtherStation`: the rider is standing at a different SMART station.
+ * Why a "Take this train" tap looks like it leaves from the wrong place, with
+ * the leg to offer instead (always leaving from the station the rider is at,
+ * when they're at one).
  */
-export type BoardingLocationWarning =
-  | { kind: "nearDestination" }
-  | { kind: "atOtherStation"; station: Station };
+export interface BoardingLocationWarning {
+  /** The rider is clearly nearer where the train is going than where it
+   *  leaves from — the classic "forgot to swap stations for the ride home"
+   *  mistake — so the suggestion heads back to the origin. Otherwise they're
+   *  standing at a different station, and the suggestion keeps the
+   *  destination. */
+  reversed: boolean;
+  suggested: { from: Station; to: Station };
+}
 
 interface BoardingFix {
   lat: number;
@@ -61,6 +65,15 @@ export function checkBoardingLocation(
   const { lat, lng, accuracy } = fix;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
+  // The station the rider is standing at, if any. Stations sit ≥1.6 km apart,
+  // so a fix this close and this tight can't belong to a neighbor instead.
+  const closest = getClosestStationWithDistance(lat, lng);
+  const station =
+    closest.distanceKm * 1000 <= AT_STATION_RADIUS_M &&
+    (accuracy == null || accuracy <= AT_STATION_RADIUS_M)
+      ? closest.station
+      : null;
+
   // An `accuracy`-sized error can swing the origin/destination difference by
   // up to twice that, so the margin has to clear 2× the radius to be trusted.
   const toOriginM = getDistanceToStationKm(lat, lng, from) * 1000;
@@ -69,18 +82,13 @@ export function checkBoardingLocation(
     toOriginM - toDestinationM >=
     Math.max(MIN_REVERSED_MARGIN_M, 2 * (accuracy ?? 0))
   ) {
-    return { kind: "nearDestination" };
+    // Back to the origin — from the station they're at (the destination, or
+    // one past it), else from the destination: a plain swap.
+    return { reversed: true, suggested: { from: station ?? to, to: from } };
   }
 
-  // Stations sit ≥1.6 km apart, so a fix this close and this tight can't
-  // belong to a neighbor instead.
-  const closest = getClosestStationWithDistance(lat, lng);
-  if (
-    closest.station !== from &&
-    closest.distanceKm * 1000 <= AT_STATION_RADIUS_M &&
-    (accuracy == null || accuracy <= AT_STATION_RADIUS_M)
-  ) {
-    return { kind: "atOtherStation", station: closest.station };
+  if (station && station !== from) {
+    return { reversed: false, suggested: { from: station, to } };
   }
 
   return null;

@@ -69,9 +69,9 @@ describe("getRecentLocationFix (native)", () => {
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
   });
 
-  it("doesn't reuse a position that was already over a minute old when it arrived", async () => {
+  it("doesn't reuse a position that was already over five minutes old when it arrived", async () => {
     geo.checkPermissions.mockResolvedValue({ location: "granted", coarseLocation: "granted" });
-    geo.getCurrentPosition.mockResolvedValue(position(Date.now() - 90_000));
+    geo.getCurrentPosition.mockResolvedValue(position(Date.now() - 6 * 60_000));
     const getRecentLocationFix = await load();
     await getRecentLocationFix();
     await getRecentLocationFix();

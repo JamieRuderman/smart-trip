@@ -84,20 +84,20 @@ export function stopsUntilOrigin(
   return Math.max(0, Math.ceil(remaining - 1e-6));
 }
 
-/** Along-track distance (miles) from a vehicle fix to a station. */
+/**
+ * Along-track distance (miles) from a vehicle fix to a station, or null when
+ * the fix isn't on the rail — the feed briefly reports (0, 0) at times, which
+ * a straight-line fallback would turn into thousands of miles.
+ */
 export function vehicleDistanceToStationMi(
   vehicle: Pick<VehiclePositionMatch, "position">,
   station: Station,
-): number {
+): number | null {
+  const { latitude, longitude } = vehicle.position;
+  const snap = snapToRail(latitude, longitude);
+  if (!snap || snap.residualKm > MAX_ALONG_TRACK_RESIDUAL_KM) return null;
   const { lat, lng } = STATION_COORDINATES[station];
-  return kmToMi(
-    corridorDistanceKm(
-      vehicle.position.latitude,
-      vehicle.position.longitude,
-      lat,
-      lng,
-    ),
-  );
+  return kmToMi(corridorDistanceKm(latitude, longitude, lat, lng, snap));
 }
 
 /** Where the train is relative to the rider's leg, for the position track. */
@@ -105,13 +105,14 @@ export type LegPosition =
   /** No live fix and the train hasn't reached the origin by the timetable. */
   | { phase: "waiting" }
   /** Live: still upstream of the rider's origin — at (`stopped`) or heading
-   *  to `station`, `stopsAway` stops and `distanceMi` along the line out. */
+   *  to `station`, `stopsAway` stops and `distanceMi` along the line out
+   *  (null when the GPS fix isn't on the rail). */
   | {
       phase: "approaching";
       station: Station;
       stopped: boolean;
       stopsAway: number;
-      distanceMi: number;
+      distanceMi: number | null;
     }
   /** Live: stopped at the rider's origin. */
   | { phase: "atOrigin" }

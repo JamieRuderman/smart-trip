@@ -124,6 +124,15 @@ describe("stopsUntilOrigin", () => {
 });
 
 describe("vehicleDistanceToStationMi", () => {
+  it("is null for a fix off the rail, e.g. the feed's (0, 0)", () => {
+    expect(
+      vehicleDistanceToStationMi(
+        { position: { latitude: 0, longitude: 0 } },
+        "Novato Downtown",
+      ),
+    ).toBeNull();
+  });
+
   it("is ~0 at the station and grows along the line", () => {
     const at = STATION_COORDINATES["Novato Downtown"];
     expect(

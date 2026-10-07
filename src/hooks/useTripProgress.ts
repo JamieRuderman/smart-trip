@@ -11,6 +11,7 @@ import {
   computeMinutesUntil,
   formatDateYYYYMMDD,
   kmToMi,
+  minutesOfDay,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
@@ -134,7 +135,7 @@ export function useTripProgress({
   // Blue == "the train I'm taking" and overrides the semantic state colour
   // (green/gold/red) for the focused / riding trip, matching the blue card.
   const headerBg = isEnded
-    ? "bg-smart-neutral"
+    ? stateBg.past
     : isFocused
       ? "bg-my-trip-background"
       : stateBg[currentAccent === "future" && isNextTrip ? "ontime" : currentAccent];
@@ -171,9 +172,8 @@ export function useTripProgress({
 
   const arrivalMinutes =
     realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
   const minutesUntilArrival = hasStarted && !isEnded
-    ? Math.max(0, parseTimeToMinutes(arrivalMinutes) - nowMinutes)
+    ? Math.max(0, parseTimeToMinutes(arrivalMinutes) - minutesOfDay(currentTime))
     : null;
 
   return {

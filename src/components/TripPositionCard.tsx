@@ -139,10 +139,8 @@ export function TripPositionCard({
       headline = position.stopped
         ? t("myTrip.trainAt", { station: position.station })
         : t("myTrip.trainHeadingTo", { station: position.station });
-      details = [
-        t("myTrip.stopsAway", { count: position.stopsAway }),
-        miles(position.distanceMi),
-      ];
+      details = [t("myTrip.stopsAway", { count: position.stopsAway })];
+      if (position.distanceMi != null) details.push(miles(position.distanceMi));
       break;
     case "enRoute": {
       const stop = progress.nextStop;

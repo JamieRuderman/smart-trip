@@ -99,6 +99,10 @@ export const STATION_RAIL_ARC_KM: readonly number[] = stations.map((station) => 
   return snap?.arcKm ?? 0;
 });
 
+/** A point farther than this from the rail polyline isn't trusted to sit on
+ *  the line (bad GPS fix, yard move, off-corridor user). */
+export const MAX_ALONG_TRACK_RESIDUAL_KM = 1.5;
+
 /**
  * "Closeness on the same line" — along-track when both points snap to the
  * rail, haversine otherwise. The fallback matters: a passenger 50 m off
@@ -109,7 +113,6 @@ export const STATION_RAIL_ARC_KM: readonly number[] = stations.map((station) => 
  * many destinations in a tick (user vs every train) — saves re-snapping
  * the source on each call.
  */
-export const MAX_ALONG_TRACK_RESIDUAL_KM = 1.5;
 export function corridorDistanceKm(
   fromLat: number,
   fromLng: number,

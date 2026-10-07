@@ -75,6 +75,16 @@ describe("scheduledStationIndex", () => {
     expect(scheduledStationIndex(sb, "S", 8 * 60 + 10, 5)).toBeCloseTo(1);
   });
 
+  it("treats a malformed time as no stop rather than NaN", () => {
+    const times = [...stations.keys()].map(
+      (i) => `08:${String(i * 5).padStart(2, "0")}`,
+    );
+    times[2] = "bad";
+    // Stop 2 is skipped, so 08:07:30 is a quarter of the way from stop 1
+    // (08:05) to stop 3 (08:15).
+    expect(scheduledStationIndex(tripWith(times), "S", 8 * 60 + 7.5, 0)).toBeCloseTo(1.5);
+  });
+
   it("walks northbound in reverse station order", () => {
     // The southern terminus (last index) departs first, then a stop every 4
     // minutes heading north.

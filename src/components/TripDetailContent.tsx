@@ -404,6 +404,12 @@ export function TripDetailContent({
         )}
         {showInboundFerry && trip.inboundFerry && (
           <div className="mt-3 pt-3 border-t border-border">
+            {/* Tight ferry → train transfer ("take a later train"). A leg can't
+                both start and end at the terminal, so this never doubles the
+                outbound warning above. */}
+            {hasQuickConnection && !isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={trainOption} />
+            )}
             <FerryConnection
               ferry={trip.inboundFerry}
               trainDepartureTime={departureTime}

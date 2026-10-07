@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import {
   calculateTransferTime,
   isQuickConnection,
+  minutesOfDay,
   mpsToMph,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
@@ -212,10 +213,9 @@ export function useTripDetailModel({
   const alarmStatus = useAlarmStatus({
     tripId: trip.trip,
     minutesUntilDeparture: minutesUntil,
-    minutesUntilArrival: minutesUntilArrival ?? (
-      parseTimeToMinutes(arrivalTime) -
-      (currentTime.getHours() * 60 + currentTime.getMinutes())
-    ),
+    minutesUntilArrival:
+      minutesUntilArrival ??
+      parseTimeToMinutes(arrivalTime) - minutesOfDay(currentTime),
     minutesAfterArrival,
     minutesUntilLeave,
     hasStarted,

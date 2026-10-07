@@ -64,9 +64,13 @@ const schedMinutesCache = new WeakMap<ProcessedTrip, Array<number | null>>();
 function schedMinutesFor(trip: ProcessedTrip): Array<number | null> {
   const hit = schedMinutesCache.get(trip);
   if (hit) return hit;
-  const arr = trip.times.map((t) =>
-    !t || t === "~~" ? null : parseTimeToMinutes(t),
-  );
+  const arr = trip.times.map((t) => {
+    if (!t || t.includes("~~")) return null;
+    const minutes = parseTimeToMinutes(t);
+    // A malformed entry must read as "no stop", not NaN — NaN would poison the
+    // interpolation (and the marker position) for the whole trip.
+    return Number.isFinite(minutes) ? minutes : null;
+  });
   schedMinutesCache.set(trip, arr);
   return arr;
 }

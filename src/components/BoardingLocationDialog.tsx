@@ -7,7 +7,8 @@ interface BoardingLocationDialogProps {
   warning: BoardingLocationWarning;
   fromStation: Station;
   toStation: Station;
-  /** Switch to the warning's suggested leg instead. */
+  /** Fix the trip instead: swap the stations (`nearDestination`) or leave
+   *  from the station the rider is closest to (`nearOtherStation`). */
   onFix: () => void;
   /** Take the train as planned. */
   onContinue: () => void;
@@ -29,29 +30,32 @@ export function BoardingLocationDialog({
   onCancel,
 }: BoardingLocationDialogProps) {
   const { t } = useTranslation();
-  const { reversed } = warning;
-  const station = warning.suggested.from;
-  // A reversed trip suggested from the destination itself is a plain swap.
-  const swap = reversed && station === toStation;
-  const description = !reversed
-    ? t("boardingCheck.otherStationBody", { from: fromStation, station })
-    : swap
-      ? t("boardingCheck.reversedBody", { from: fromStation, to: toStation })
-      : t("boardingCheck.reversedAtStationBody", { from: fromStation, station });
+  const copy =
+    warning.kind === "nearDestination"
+      ? {
+          title: t("boardingCheck.reversedTitle"),
+          description: t("boardingCheck.reversedBody", {
+            from: fromStation,
+            to: toStation,
+          }),
+          fix: t("boardingCheck.swap"),
+        }
+      : {
+          title: t("boardingCheck.otherStationTitle", { from: fromStation }),
+          description: t("boardingCheck.otherStationBody", {
+            from: fromStation,
+            station: warning.station,
+          }),
+          fix: t("boardingCheck.leaveFrom", { station: warning.station }),
+        };
 
   return (
     <ConfirmDialog
-      title={
-        reversed
-          ? t("boardingCheck.reversedTitle")
-          : t("boardingCheck.otherStationTitle", { from: fromStation })
-      }
-      description={description}
+      title={copy.title}
+      description={copy.description}
       secondaryLabel={t("boardingCheck.takeAnyway")}
       onSecondary={onContinue}
-      primaryLabel={
-        swap ? t("boardingCheck.swap") : t("boardingCheck.leaveFrom", { station })
-      }
+      primaryLabel={copy.fix}
       onPrimary={onFix}
       onDismiss={onCancel}
     />

@@ -22,9 +22,9 @@ interface BoardingLocationCheckInput {
 }
 
 /**
- * The location check in front of "Take this train": catches a ride home
- * planned without swapping the morning's stations, or a trip leaving from a
- * station the rider isn't at. Silent without location access — it never
+ * The location check in front of "Take this train": warns when the rider is
+ * closest to a different station than the one the train leaves from — most
+ * often a ride home planned without swapping the morning's stations. Silent without location access — it never
  * prompts — and for trains it doesn't apply to (see
  * shouldCheckBoardingLocation).
  */
@@ -34,7 +34,7 @@ export function useBoardingLocationCheck({
   departureAt,
   now,
 }: BoardingLocationCheckInput) {
-  const { setFromStation, setToStation } = useStationSelection();
+  const { swapStations, setFromStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
   const [warning, setWarning] = useState<BoardingLocationWarning | null>(null);
   const enabled =
@@ -85,14 +85,12 @@ export function useBoardingLocationCheck({
     else proceed();
   };
 
-  /** Switch to the suggested leg instead of taking this train — it runs the
-   *  wrong way (or from the wrong station). The caller then closes its sheet
-   *  so the rider picks from the corrected schedule. */
+  /** Correct the trip instead of taking this train — it runs the wrong way
+   *  (or from the wrong station). The caller then closes its sheet so the
+   *  rider picks from the corrected schedule. */
   const fixTrip = () => {
-    if (warning) {
-      setFromStation(warning.suggested.from);
-      setToStation(warning.suggested.to);
-    }
+    if (warning?.kind === "nearDestination") swapStations();
+    else if (warning) setFromStation(warning.station);
     setWarning(null);
   };
 

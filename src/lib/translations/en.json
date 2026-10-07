@@ -243,11 +243,10 @@
   },
   "boardingCheck": {
     "reversedTitle": "Heading the other way?",
-    "reversedBody": "You're closer to {{to}} than to {{from}}, where this train leaves from. Did you mean to ride from {{to}} to {{from}}?",
-    "reversedAtStationBody": "You appear to be at {{station}}, but this train leaves from {{from}}. Did you mean to ride from {{station}} to {{from}}?",
+    "reversedBody": "You're closest to {{to}}, where this train is going. Did you mean to ride from {{to}} to {{from}}?",
     "swap": "Swap stations",
     "otherStationTitle": "Not at {{from}}?",
-    "otherStationBody": "You appear to be at {{station}}, but this train leaves from {{from}}.",
+    "otherStationBody": "You're closest to {{station}}, but this train leaves from {{from}}.",
     "leaveFrom": "Leave from {{station}}",
     "takeAnyway": "Take it anyway"
   },

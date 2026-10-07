@@ -23,7 +23,7 @@ If you grant permission, the app may access your device location to:
 - suggest the closest SMART station
 - improve trip-detail progress and distance messaging
 - warn you when you choose a train that leaves from a different station than
-  the one you appear to be at
+  the one you're closest to
 
 Location is processed on-device for these features. It is not included in the
 app's schedule or realtime transit API requests.

@@ -243,11 +243,10 @@
   },
   "boardingCheck": {
     "reversedTitle": "¿Vas en sentido contrario?",
-    "reversedBody": "Estás más cerca de {{to}} que de {{from}}, de donde sale este tren. ¿Querías viajar de {{to}} a {{from}}?",
-    "reversedAtStationBody": "Parece que estás en {{station}}, pero este tren sale de {{from}}. ¿Querías viajar de {{station}} a {{from}}?",
+    "reversedBody": "Estás más cerca de {{to}}, a donde va este tren. ¿Querías viajar de {{to}} a {{from}}?",
     "swap": "Intercambiar estaciones",
     "otherStationTitle": "¿No estás en {{from}}?",
-    "otherStationBody": "Parece que estás en {{station}}, pero este tren sale de {{from}}.",
+    "otherStationBody": "Estás más cerca de {{station}}, pero este tren sale de {{from}}.",
     "leaveFrom": "Salir de {{station}}",
     "takeAnyway": "Tomarlo de todos modos"
   },

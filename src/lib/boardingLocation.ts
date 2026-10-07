@@ -1,23 +1,19 @@
 import type { Station } from "@/types/smartSchedule";
 import {
-  getClosestStationWithDistance,
-  getDistanceToStationKm,
+  getClosestStationWithMargin,
+  isClosestStationConfident,
 } from "@/lib/stationUtils";
 
 /**
- * Why a "Take this train" tap looks like it leaves from the wrong place, with
- * the leg to offer instead (always leaving from the station the rider is at,
- * when they're at one).
+ * The rider tapped "Take this train" but is closest to a different station
+ * than the one it leaves from:
+ *  - `nearDestination`: closest to where it's going — the classic "forgot to
+ *    swap stations for the ride home". Offer a swap.
+ *  - `nearOtherStation`: closest to some other station. Offer leaving from it.
  */
-export interface BoardingLocationWarning {
-  /** The rider is clearly nearer where the train is going than where it
-   *  leaves from — the classic "forgot to swap stations for the ride home"
-   *  mistake — so the suggestion heads back to the origin. Otherwise they're
-   *  standing at a different station, and the suggestion keeps the
-   *  destination. */
-  reversed: boolean;
-  suggested: { from: Station; to: Station };
-}
+export type BoardingLocationWarning =
+  | { kind: "nearDestination" }
+  | { kind: "nearOtherStation"; station: Station };
 
 interface BoardingFix {
   lat: number;
@@ -25,13 +21,6 @@ interface BoardingFix {
   /** Accuracy radius in meters; null when the platform omitted it. */
   accuracy: number | null;
 }
-
-/** How much nearer the destination must be than the origin before we call the
- *  trip reversed, so a rider partway between two close stations isn't nagged. */
-const MIN_REVERSED_MARGIN_M = 500;
-
-/** Within this radius of a station counts as standing at it. */
-const AT_STATION_RADIUS_M = 400;
 
 /** Only check trains leaving within this window — further out, where the rider
  *  is right now says little about where they'll board. */
@@ -51,11 +40,8 @@ export function shouldCheckBoardingLocation(
 }
 
 /**
- * Compare a location fix against the leg the rider is about to focus, returning
- * a warning when they don't appear to be leaving from `from`: when they're
- * clearly nearer `to` than `from` (wherever they are — no station proximity is
- * required), or standing at another station. Otherwise silent, e.g. at home a
- * walk or drive from the origin.
+ * Warn when the station closest to the rider isn't the one the train leaves
+ * from. Silent when the fix is too coarse to tell which station is closest.
  */
 export function checkBoardingLocation(
   fix: BoardingFix,
@@ -64,32 +50,14 @@ export function checkBoardingLocation(
 ): BoardingLocationWarning | null {
   const { lat, lng, accuracy } = fix;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-  // The station the rider is standing at, if any. Stations sit ≥1.6 km apart,
-  // so a fix this close and this tight can't belong to a neighbor instead.
-  const closest = getClosestStationWithDistance(lat, lng);
-  const station =
-    closest.distanceKm * 1000 <= AT_STATION_RADIUS_M &&
-    (accuracy == null || accuracy <= AT_STATION_RADIUS_M)
-      ? closest.station
-      : null;
-
-  // An `accuracy`-sized error can swing the origin/destination difference by
-  // up to twice that, so the margin has to clear 2× the radius to be trusted.
-  const toOriginM = getDistanceToStationKm(lat, lng, from) * 1000;
-  const toDestinationM = getDistanceToStationKm(lat, lng, to) * 1000;
+  const closest = getClosestStationWithMargin(lat, lng);
   if (
-    toOriginM - toDestinationM >=
-    Math.max(MIN_REVERSED_MARGIN_M, 2 * (accuracy ?? 0))
+    closest.station === from ||
+    !isClosestStationConfident(closest.marginKm, accuracy)
   ) {
-    // Back to the origin — from the station they're at (the destination, or
-    // one past it), else from the destination: a plain swap.
-    return { reversed: true, suggested: { from: station ?? to, to: from } };
+    return null;
   }
-
-  if (station && station !== from) {
-    return { reversed: false, suggested: { from: station, to } };
-  }
-
-  return null;
+  return closest.station === to
+    ? { kind: "nearDestination" }
+    : { kind: "nearOtherStation", station: closest.station };
 }

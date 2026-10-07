@@ -11,8 +11,8 @@ import {
  * Pure derivation of a registered trip's LIVE departure/arrival/delay from the
  * normalized GTFS-RT trip-updates JSON (the shape `/api/gtfsrt/tripupdates`
  * returns). Server-side analog of the client's `useTripRealtimeStatusMap`, but
- * scoped to a single registration so the push cron can correct one activity's
- * countdown while the phone is locked. No DOM/React deps; unit-tested.
+ * scoped to a single registration so the push Durable Object can correct one
+ * activity's countdown while the phone is locked. No DOM/React deps; unit-tested.
  *
  * Matching: 511 shifts `departure.time` forward for delays and always reports
  * `departureDelay: 0`, so the scheduled time isn't recoverable from the feed.
@@ -169,7 +169,7 @@ function resolveStation(
 
 /**
  * Compute the live status for `reg` from the feed `updates`, or null when the
- * trip can't be located (no live data — the cron leaves the countdown as-is).
+ * trip can't be located (no live data — the DO leaves the countdown as-is).
  *
  * Match priority:
  *  1. **GTFS trip id** — an exact `trip_id` match on the registration's service
@@ -192,7 +192,7 @@ function resolveStation(
  * When none locates the run, it has either not appeared yet or — once its
  * scheduled arrival is past — finished and been pruned from the feed. In the
  * latter case a terminal `ended` status is synthesized from the registration so
- * the cron can dismiss the activity instead of leaving the countdown frozen at
+ * the DO can dismiss the activity instead of leaving the countdown frozen at
  * 0:00 (see `ARRIVED_DROP_GRACE_MS`); otherwise null (leave the native countdown
  * ticking).
  */
@@ -366,7 +366,7 @@ function findDestination(
 export type PushAction = "none" | "update" | "end";
 
 /**
- * Decide whether the cron should push for this activity, given the freshly
+ * Decide whether the DO should push for this activity, given the freshly
  * computed live status and what we last sent. Pure. We push an `end` once the
  * trip has arrived, an `update` when the delay, the departure→arrival phase, or
  * the cancellation changed, and otherwise nothing — the native countdown ticks

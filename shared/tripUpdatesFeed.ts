@@ -7,10 +7,10 @@ type TripUpdateData = GtfsRealtime.ITripUpdate;
 type StopTimeUpdate = GtfsRealtime.TripUpdate.IStopTimeUpdate;
 
 /**
- * Max age (ms) before the shared Redis cache refreshes the trip-updates feed
- * from 511 — bounds the GLOBAL upstream poll rate to stay under the rate limit.
- * Shared by the `/api/gtfsrt/tripupdates` endpoint and the in-process read the
- * Live Activity cron does, so both honour the same one-fetch-per-window budget.
+ * Max age (ms) before the edge cache refreshes the trip-updates feed from 511 —
+ * bounds the upstream poll rate to stay under the rate limit. Used by both the
+ * `/api/gtfsrt/tripupdates` endpoint and the Live Activity Durable Object's
+ * in-process read.
  */
 export const TRIPUPDATES_FRESHNESS_MS = 40_000;
 
@@ -38,11 +38,8 @@ export interface NormalizedTripUpdate {
  * Normalize a decoded GTFS-RT trip-updates feed to the JSON shape the
  * `/api/gtfsrt/tripupdates` endpoint serves. Pure.
  *
- * Exported so the Live Activity push cron can produce the SAME shape in-process
- * (via `fetchFeedCached` + `decodeFeed`) instead of fetching its own endpoint
- * over HTTP — that round-trip cold-starts a second function and intermittently
- * exceeded the cron's timeout, skipping whole runs. In-process reuses the same
- * Redis-backed 511 cache, so the upstream poll budget is unchanged.
+ * The Live Activity Durable Object gets the SAME shape in-process (via the web
+ * Worker's `getTripUpdates`) instead of fetching the endpoint over HTTP.
  */
 export function normalizeTripUpdates(feed: FeedMessage): {
   timestamp: number;

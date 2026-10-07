@@ -144,6 +144,11 @@
     "delayed": "{{minutes}} min delay",
     "stopSkipped": "Stop skipped"
   },
+  "futureSchedule": {
+    "title": "Viewing a future schedule",
+    "bodyWeekend": "Showing every weekend train. This schedule next runs {{day}}.",
+    "bodyWeekday": "Showing every weekday train. This schedule next runs {{day}}."
+  },
   "noMoreTrains": {
     "noMoreTrainsToday": "No more trains today",
     "allTrainsDeparted": "All scheduled trains for today have departed"

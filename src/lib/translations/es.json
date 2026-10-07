@@ -144,6 +144,11 @@
     "delayed": "{{minutes}} min de demora",
     "stopSkipped": "Parada omitida"
   },
+  "futureSchedule": {
+    "title": "Viendo un horario futuro",
+    "bodyWeekend": "Se muestran todos los trenes de fin de semana. Este horario vuelve a operar el {{day}}.",
+    "bodyWeekday": "Se muestran todos los trenes de día laboral. Este horario vuelve a operar el {{day}}."
+  },
   "noMoreTrains": {
     "noMoreTrainsToday": "No hay más trenes hoy",
     "allTrainsDeparted": "Todos los trenes programados para hoy han salido"

@@ -361,6 +361,21 @@ export function nextServiceDate(
   return localDateKey(from);
 }
 
+/**
+ * The date ("YYYY-MM-DD") `scheduleType` next runs when that isn't today, else
+ * null — e.g. the weekend schedule browsed on a Wednesday → that Saturday.
+ * Single definition of "browsing another day's schedule" for the list, the
+ * trip sheet and its progress clock.
+ */
+export function futureServiceDate(
+  now: Date,
+  scheduleType: ScheduleType,
+): string | null {
+  return scheduleType === getTodayScheduleType(now)
+    ? null
+    : nextServiceDate(now, scheduleType);
+}
+
 export function setScheduleData(
   payload: SchedulePayload,
   source: ScheduleSource = "remote",

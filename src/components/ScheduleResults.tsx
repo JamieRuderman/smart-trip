@@ -9,17 +9,14 @@ import {
   isTimeInPast,
   getNextTripIndex,
   getFirstInProgressTripIndex,
-  getTodayScheduleType,
+  futureServiceDate,
   effectiveDepartureTime,
 } from "@/lib/scheduleUtils";
-import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { parseServiceDate, parseTimeToMinutes } from "@/lib/timeUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { Station } from "@/types/smartSchedule";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
-
-const NO_REALTIME_STATUS = new Map<string, TripRealtimeStatus>();
 
 interface ScheduleResultsProps {
   filteredTrips: ProcessedTrip[];
@@ -54,33 +51,27 @@ export function ScheduleResults({
   focusedTripNumber = null,
 }: ScheduleResultsProps) {
   const direction = useStationDirection(fromStation, toStation);
-  const live = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
-  const { lastUpdated, isFeedUnavailable } = live;
+  const { statusMap: realtimeStatusMap, canceledByStartTime, lastUpdated, isFeedUnavailable } = useTripRealtimeStatusMap(fromStation, toStation, filteredTrips);
 
   // A schedule other than today's (weekend trains browsed on a Wednesday) runs
-  // on a later day, so today's clock and live feed say nothing about it: list
-  // every trip, none departed or "Next", with no live status — the feed's
-  // today-runs would otherwise attach to same-time rows.
-  const isFutureSchedule = scheduleType !== getTodayScheduleType(currentTime);
-  const realtimeStatusMap = isFutureSchedule
-    ? NO_REALTIME_STATUS
-    : live.statusMap;
-  const canceledByStartTime = isFutureSchedule
-    ? NO_REALTIME_STATUS
-    : live.canceledByStartTime;
-  const showEveryTrip = showAllTrips || isFutureSchedule;
+  // on a later day: judge its rows from the start of that day, as the trip
+  // sheet does, so every trip is listed and none has departed. Today's live
+  // feed and "Next" badge don't apply to it.
+  const serviceDate = futureServiceDate(currentTime, scheduleType);
+  const isFutureSchedule = serviceDate != null;
+  const rowClock = serviceDate ? parseServiceDate(serviceDate) : currentTime;
 
   const nextTripIndex =
-    !isFutureSchedule && filteredTrips.length > 0
-      ? getNextTripIndex(filteredTrips, currentTime, realtimeStatusMap)
+    filteredTrips.length > 0
+      ? getNextTripIndex(filteredTrips, rowClock, realtimeStatusMap)
       : -1;
 
   // Show in-progress trips (departed but not yet arrived) before the next upcoming trip.
-  const firstInProgressIndex = !showEveryTrip
-    ? getFirstInProgressTripIndex(filteredTrips, currentTime, realtimeStatusMap)
+  const firstInProgressIndex = !showAllTrips
+    ? getFirstInProgressTripIndex(filteredTrips, rowClock, realtimeStatusMap)
     : -1;
 
-  const sliceStart = showEveryTrip
+  const sliceStart = showAllTrips
     ? 0
     : firstInProgressIndex >= 0
       ? firstInProgressIndex
@@ -90,7 +81,8 @@ export function ScheduleResults({
 
   // Offer the earlier trains whenever rows are cut from the top — including
   // after the last train has left, when the list is down to the run still in
-  // progress. A future schedule is never cut, so it has no toggle.
+  // progress. A future schedule is never cut (and `showAllTrips` may be left
+  // over from today's), so it has no toggle.
   const earlierTrainsToggle = isFutureSchedule
     ? null
     : showAllTrips
@@ -103,7 +95,7 @@ export function ScheduleResults({
 
   const visibleTrips =
     selectedTripNumber != null &&
-    !showEveryTrip &&
+    !showAllTrips &&
     !displayedTrips.some((trip) => trip.trip === selectedTripNumber)
       ? filteredTrips.filter(
           (trip) =>
@@ -116,17 +108,18 @@ export function ScheduleResults({
   // early trip (live 10:00) must not steal the badge from an on-time later
   // one (09:30) that actually leaves sooner. Single pass.
   let nextVisibleIndex = -1;
-  let nextVisibleMinutes = Infinity;
-  visibleTrips.forEach((trip, i) => {
-    if (isFutureSchedule) return;
-    const departureTime = effectiveDepartureTime(trip, realtimeStatusMap);
-    if (isTimeInPast(currentTime, departureTime)) return;
-    const minutes = parseTimeToMinutes(departureTime);
-    if (minutes < nextVisibleMinutes) {
-      nextVisibleMinutes = minutes;
-      nextVisibleIndex = i;
-    }
-  });
+  if (!isFutureSchedule) {
+    let nextVisibleMinutes = Infinity;
+    visibleTrips.forEach((trip, i) => {
+      const departureTime = effectiveDepartureTime(trip, realtimeStatusMap);
+      if (isTimeInPast(currentTime, departureTime)) return;
+      const minutes = parseTimeToMinutes(departureTime);
+      if (minutes < nextVisibleMinutes) {
+        nextVisibleMinutes = minutes;
+        nextVisibleIndex = i;
+      }
+    });
+  }
 
   if (!direction) return null;
 
@@ -137,6 +130,8 @@ export function ScheduleResults({
    *    scan trip.times for any time matching a canceledByStartTime key (origin time).
    */
   const getRealtimeStatus = (trip: { departureTime: string; times: string[] }) => {
+    // Today's runs must not attach to a later day's same-time rows.
+    if (isFutureSchedule) return undefined;
     const primary = realtimeStatusMap.get(trip.departureTime);
     if (primary) return primary;
     if (canceledByStartTime.size === 0) return undefined;
@@ -162,7 +157,7 @@ export function ScheduleResults({
         {isFutureSchedule ? (
           <FutureScheduleNotice
             scheduleType={scheduleType}
-            currentTime={currentTime}
+            serviceDate={serviceDate}
           />
         ) : (
           nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />
@@ -176,12 +171,10 @@ export function ScheduleResults({
             // Live-aware: a delayed train past its scheduled slot but before
             // its live departure hasn't departed (keeps the aria "Departed"
             // announcement and badge flags consistent with the Next logic).
-            const isPastTrip =
-              !isFutureSchedule &&
-              isTimeInPast(
-                currentTime,
-                effectiveDepartureTime(trip, realtimeStatusMap),
-              );
+            const isPastTrip = isTimeInPast(
+              rowClock,
+              effectiveDepartureTime(trip, realtimeStatusMap),
+            );
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;
             const showFerry =
@@ -199,7 +192,6 @@ export function ScheduleResults({
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
                 isFocused={isFocused}
-                isFutureSchedule={isFutureSchedule}
                 showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}

@@ -4,7 +4,7 @@ import { useTripProgress } from "@/hooks/useTripProgress";
 import { TripDetailContent } from "./TripDetailContent";
 import { AppSheet } from "@/components/ui/app-sheet";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { getTodayScheduleType, nextServiceDate } from "@/lib/scheduleUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
 import { parseServiceDate } from "@/lib/timeUtils";
 import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
@@ -54,12 +54,12 @@ export function TripDetailSheet({
 
   // A trip from a schedule that isn't today's runs on a later day, so judge its
   // progress from the start of that day: today's clock would read an early
-  // Saturday run browsed on a Wednesday evening as "Ended" (hiding "Take this
-  // train"), and today's vehicle feed must not match it.
-  const progressTime =
-    rest.scheduleType === getTodayScheduleType(rest.currentTime)
-      ? rest.currentTime
-      : parseServiceDate(nextServiceDate(rest.currentTime, rest.scheduleType));
+  // Saturday run browsed on a Wednesday evening as "Ended", hiding "Take this
+  // train". The content gets the real clock plus the day, for its label.
+  const serviceDate = futureServiceDate(rest.currentTime, rest.scheduleType);
+  const progressTime = serviceDate
+    ? parseServiceDate(serviceDate)
+    : rest.currentTime;
 
   // Single hook for all trip progress logic: vehicle matching, stop inference,
   // distance calculations, and derived state.
@@ -101,6 +101,7 @@ export function TripDetailSheet({
         progress={progress}
         showCloseButton={!isMobile}
         isFocused={isFocused}
+        futureServiceDate={serviceDate}
       />
     </AppSheet>
   );

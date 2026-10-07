@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
@@ -35,9 +36,6 @@ interface TripCardProps {
    *  so it reads as "the trip I'm taking", overriding the
    *  delay/cancel/on-time state colour. */
   isFocused?: boolean;
-  /** True when this row is from a schedule that isn't today's, so its ferry
-   *  times aren't judged departed against today's clock. */
-  isFutureSchedule?: boolean;
 }
 
 export const TripCard = memo(function TripCard({
@@ -55,7 +53,6 @@ export const TripCard = memo(function TripCard({
   selectedTripNumber,
   onSelectTrip,
   isFocused = false,
-  isFutureSchedule = false,
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -65,8 +62,10 @@ export const TripCard = memo(function TripCard({
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
-  const ferryClock = isFutureSchedule ? undefined : currentTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
+  // A later day's ferries haven't departed, whatever today's clock says.
+  const ferryClock =
+    futureServiceDate(currentTime, scheduleType) == null ? currentTime : undefined;
 
   // Derive open state from URL-synced selectedTripNumber
   const isOpen = selectedTripNumber === trip.trip;

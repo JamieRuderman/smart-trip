@@ -1,9 +1,8 @@
 /**
  * Native GTFS-RT feed access for the Worker — fetch 511, decode the protobuf,
  * normalize, cached in **Cloudflare's edge Cache API** (`caches.default`). The
- * decode (`decodeFeed`) and normalize (`normalizeTripUpdates`) are reused
- * verbatim from the Vercel code (`api/`); only the fetch + cache are
- * re-implemented for the Workers runtime.
+ * decode (`decodeFeed`) and normalize (`normalizeTripUpdates`) are the pure
+ * shared code in `shared/`; only the fetch + cache are Workers-specific.
  *
  * Cache choice: the Cache API is free with **no per-day write limit**. It
  * replaced Workers KV, whose free-tier 1,000-writes/day cap was far too low for
@@ -18,12 +17,12 @@ import {
   getTranslation,
   transit_realtime,
   VEHICLE_STOP_STATUS,
-} from "../../../../api/_gtfsrt.js";
+} from "../../../../shared/gtfsrt.js";
 import {
   normalizeTripUpdates,
   TRIPUPDATES_FRESHNESS_MS,
   type NormalizedTripUpdate,
-} from "../../../../api/_tripUpdatesFeed.js";
+} from "../../../../shared/tripUpdatesFeed.js";
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
 
 type IFeedMessage = GtfsRealtime.IFeedMessage;

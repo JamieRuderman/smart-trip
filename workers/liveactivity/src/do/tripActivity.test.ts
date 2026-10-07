@@ -7,10 +7,10 @@ import {
   POLL_MS,
   type LastSent,
 } from "./tripActivity.js";
-import type { FeedTripUpdate } from "../../../../api/_liveActivityStatus.js";
+import type { FeedTripUpdate } from "../../../../shared/liveActivityStatus.js";
 import type { LiveActivityRegistration } from "../../../../src/lib/liveActivityPushTypes.js";
 
-// Real SMART northbound platform stop_ids (see _liveActivityStatus.test.ts).
+// Real SMART northbound platform stop_ids (see shared/liveActivityStatus.test.ts).
 const FROM_STOP = "71011"; // Larkspur / northbound
 const TO_STOP = "71021"; // San Rafael / northbound
 const SCHED_DEP_MS = Date.parse("2026-06-22T08:30:00-07:00");

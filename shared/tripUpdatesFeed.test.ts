@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
-import { transit_realtime } from "./_gtfsrt.js";
-import { normalizeTripUpdates } from "./_tripUpdatesFeed.js";
+import { transit_realtime } from "./gtfsrt.js";
+import { normalizeTripUpdates } from "./tripUpdatesFeed.js";
 
 const TripSR = transit_realtime.TripDescriptor.ScheduleRelationship;
 

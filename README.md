@@ -243,8 +243,9 @@ Group `feat(*)` first, then user-visible `fix(*)`. Trim anything users won't not
 ## Project Structure
 
 ```text
-workers/web/          Cloudflare Worker — GTFS-RT API, SPA host, Live Activity push (Durable Object)
-api/                  Shared transit + Live Activity logic imported by the Worker
+workers/web/          Cloudflare Worker — GTFS-RT API, SPA host, Live Activity routes
+workers/liveactivity/ Live Activity push Durable Object (deployed separately)
+shared/               Transit + Live Activity logic shared by the Workers
 public/               Static assets and hosted support/privacy pages
 sample/               Local GTFS-Realtime fixtures
 scripts/              Feed update and build helper scripts

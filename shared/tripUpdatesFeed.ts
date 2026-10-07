@@ -1,5 +1,5 @@
 import type { transit_realtime as GtfsRealtime } from "gtfs-realtime-bindings";
-import { TRIP_SCHEDULE_RELATIONSHIP, STOP_SCHEDULE_RELATIONSHIP } from "./_gtfsrt.js";
+import { TRIP_SCHEDULE_RELATIONSHIP, STOP_SCHEDULE_RELATIONSHIP } from "./gtfsrt.js";
 
 type FeedMessage = GtfsRealtime.IFeedMessage;
 type FeedEntity = GtfsRealtime.IFeedEntity;

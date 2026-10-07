@@ -1,7 +1,7 @@
 /**
  * Single source of truth for turning a raw live-vs-scheduled lateness into a
  * displayed delay. Shared verbatim by the client realtime status
- * (`useTripUpdates`) and the server push backend (`api/_liveActivityStatus`),
+ * (`useTripUpdates`) and the server push backend (`shared/liveActivityStatus`),
  * so the in-app "Delayed" badge and the Live Activity pill are computed by the
  * SAME code and can never disagree (e.g. a 30–59 s feed jitter must read as
  * on-time on both, not "Delayed" on the lock screen while the app says "On

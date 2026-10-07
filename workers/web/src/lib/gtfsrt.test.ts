@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getFeedBytes } from "./gtfsrt.js";
-import { transit_realtime } from "../../../../api/_gtfsrt.js";
+import { transit_realtime } from "../../../../shared/gtfsrt.js";
 
 /** A minimal but VALID encoded GTFS-RT FeedMessage — getFeedBytes now decodes
  *  fresh bytes before caching, so the fixture must be real protobuf. */

@@ -5,7 +5,7 @@ import {
   vehicleShortOfDestinationForReg,
   type FeedTripUpdate,
   type FeedVehiclePositions,
-} from "./_liveActivityStatus.js";
+} from "./liveActivityStatus.js";
 import type { LiveActivityRegistration } from "../src/lib/liveActivityPushTypes.js";
 
 // Real SMART platform stop_ids from the generated map: Larkspur northbound =

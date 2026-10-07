@@ -45,6 +45,9 @@ interface DepartureReminderProps {
    *  from "today" here: train numbers repeat across weekday/weekend, so an
    *  inferred type would focus/recognize the wrong run. */
   scheduleType: "weekday" | "weekend";
+  /** Whether the detail sheet this control sits in is open — false while it
+   *  animates closed. */
+  sheetOpen: boolean;
   /** Close the detail sheet this control sits in. The sheet's own close —
    *  the line map's sheets aren't driven by the selected trip. */
   onClose: () => void;
@@ -84,6 +87,7 @@ export function DepartureReminder({
   currentTime,
   timeFormat,
   scheduleType,
+  sheetOpen,
   onClose,
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
@@ -216,6 +220,7 @@ export function DepartureReminder({
           ? departureAt
           : focusedDepartureInstant(focusRun),
     now: currentTime.getTime(),
+    active: sheetOpen,
   });
 
   const doFocus = useCallback(() => {

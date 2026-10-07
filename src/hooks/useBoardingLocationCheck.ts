@@ -19,6 +19,9 @@ interface BoardingLocationCheckInput {
    *  rider's own leg). */
   departureAt: number | null;
   now: number;
+  /** Whether the sheet hosting the control is open. A check still waiting on
+   *  the fix when it starts closing is dropped instead of acting behind it. */
+  active: boolean;
 }
 
 /**
@@ -33,6 +36,7 @@ export function useBoardingLocationCheck({
   to,
   departureAt,
   now,
+  active,
 }: BoardingLocationCheckInput) {
   const { swapStations, setFromStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
@@ -45,13 +49,15 @@ export function useBoardingLocationCheck({
     if (enabled) void getRecentLocationFix();
   }, [enabled]);
 
-  const mountedRef = useRef(true);
+  // False once the sheet starts closing (it stays mounted while it animates
+  // out) or unmounts, so a check that settles afterwards doesn't act.
+  const activeRef = useRef(active);
   useEffect(() => {
-    mountedRef.current = true;
+    activeRef.current = active;
     return () => {
-      mountedRef.current = false;
+      activeRef.current = false;
     };
-  }, []);
+  }, [active]);
 
   /** Run `proceed`, unless the rider's location says they aren't leaving from
    *  `from` — then show the warning instead. No fix (no access, GPS slow or
@@ -78,9 +84,9 @@ export function useBoardingLocationCheck({
     } finally {
       window.clearTimeout(timer);
     }
-    // The sheet may have been closed while we waited; don't act behind it.
-    if (!mountedRef.current) return;
     setChecking(false);
+    // The sheet may have been closed while we waited; don't act behind it.
+    if (!activeRef.current) return;
     if (found) setWarning(found);
     else proceed();
   };

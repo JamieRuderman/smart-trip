@@ -5,14 +5,7 @@ import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
 import { useVehiclePositions } from "@/hooks/useVehiclePositions";
 import { useTripUpdates } from "@/hooks/useTripUpdates";
-import { importMapDiagram } from "@/pages/lazyPages";
-
-/** Fire-and-forget warm of the code-split map-diagram chunk (see lazyPages).
- *  Silently ignores a failed preload — the real navigation will refetch and
- *  surface any error through Suspense/the ErrorBoundary. */
-function warmMapDiagram() {
-  void importMapDiagram().catch(() => {});
-}
+import { warmMapDiagram } from "@/pages/lazyPages";
 
 export function MapDiagramPreviewCard() {
   const navigate = useNavigate();

@@ -56,8 +56,8 @@ All colors MUST be HSL.
 
     /* Lighter blue used for accent icons, borders, and subtle tints. */
     --my-trip: 211 81% 55%;
-    /* Darker blue used on solid surfaces that carry white text (pinned
-       card, focused sheet header, CTAs, "Riding" pill). Shared between
+    /* Darker blue used on solid surfaces that carry white text (My Trip
+       band and bar, focused sheet header, CTAs, "Riding" pill). Shared between
        light and dark themes — the lighter accent above adapts per mode. */
     --my-trip-background: 211 75% 48%;
 

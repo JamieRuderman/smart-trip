@@ -92,6 +92,19 @@ export function focusedTripMatchesSchedule(
   );
 }
 
+/**
+ * Stable identity of a focused run — train, service day and leg. Use as a React
+ * `key` so per-trip state (refs, latches) resets when the user switches trips.
+ */
+export function focusedTripKey(focused: FocusedTrip): string {
+  return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
+}
+
+/** Whether the focused run's service day is `now`'s local calendar day. */
+export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
+  return focused.serviceDate === toLocalDateKey(now);
+}
+
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isFocusedTrip(value: unknown): value is FocusedTrip {
@@ -183,8 +196,8 @@ export type FocusedRun = Pick<
 
 /**
  * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
- * so the pinned card can render regardless of the home screen's current
- * from/to. Null if the trip no longer exists in that schedule.
+ * so My Trip can render regardless of the home screen's current from/to. Null
+ * if the trip no longer exists in that schedule.
  */
 export function reconstructFocusedTrip(focused: FocusedRun): ProcessedTrip | null {
   const trips = getFilteredTrips(
@@ -433,9 +446,9 @@ export function bootFocusedTrip(): void {
   const migrated = migrateLegacyReminders();
   // The context's focusedTrip state initializes during render — before this
   // boot effect runs — so a record written by migration here isn't visible (no
-  // pinned card, no Stop/cancel control) until something nudges consumers to
+  // trip bar, no Stop/cancel control) until something nudges consumers to
   // re-read. Dispatch the change event so the migrated trip surfaces on first
-  // load instead of waiting for a reload. Runs on native too (the card still
+  // load instead of waiting for a reload. Runs on native too (the trip still
   // needs to appear, even though the OS owns the notification).
   if (migrated && typeof window !== "undefined") {
     window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));

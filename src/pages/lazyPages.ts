@@ -15,5 +15,12 @@ import { lazy } from "react";
 export const importMapDiagram = () => import("./MapDiagram");
 export const importMap = () => import("./Map");
 
+/** Fire-and-forget warm of the map-diagram chunk, e.g. on hover/focus of a
+ *  link to it. Silently ignores a failed preload — the real navigation will
+ *  refetch and surface any error through Suspense/the ErrorBoundary. */
+export function warmMapDiagram(): void {
+  void importMapDiagram().catch(() => {});
+}
+
 export const MapDiagram = lazy(importMapDiagram);
 export const Map = lazy(importMap);

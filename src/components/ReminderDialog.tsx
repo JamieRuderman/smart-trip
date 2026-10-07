@@ -40,9 +40,9 @@ type ReminderError = null | "permission" | "schedule-failed";
 
 /**
  * Centered modal for choosing a departure-reminder lead time. Popped after the
- * user taps "Take this train" (and the detail sheet closes) or from the home
- * card's "Add reminder" — so it always lands the user back on the home screen
- * with the pinned trip card, rather than leaving a sheet open behind it.
+ * user taps "Take this train" (and the detail sheet closes) or from My Trip's
+ * "Add reminder" — so it always lands the user on the My Trip view, rather
+ * than leaving a sheet open behind it.
  *
  * Operates purely on the already-focused trip: the caller passes the live
  * boarding `departureAt`, and arming/clearing flows through the shared

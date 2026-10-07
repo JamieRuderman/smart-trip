@@ -9,6 +9,10 @@ export function mpsToMph(mps: number): number {
   return Math.round(mps * 2.237);
 }
 
+export function kmToMi(km: number): number {
+  return km * 0.621371;
+}
+
 /**
  * Parse a time string into minutes since midnight
  * Handles special characters like * and ~

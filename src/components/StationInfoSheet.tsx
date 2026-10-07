@@ -273,7 +273,7 @@ export function StationInfoSheet({
           </p>
           <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
           {fromStation && toStation && (
-            // Route summary — mirrors the home "My Trip" card. The current
+            // Route summary — mirrors the My Trip view's header. The current
             // station collapses to "Here" so the user can see at a glance
             // whether they're looking at their origin, destination, or an
             // intermediate stop.
@@ -340,7 +340,7 @@ export function StationInfoSheet({
           <ul className="flex flex-col gap-2">
             {arrivals.map((a) => {
               // Highlight the user's focused ("Go") train blue here too,
-              // matching the schedule rows and pinned card. Shared predicate:
+              // matching the schedule rows and My Trip. Shared predicate:
               // number + direction + schedule type (the trip number is reused
               // across directions / weekday-weekend).
               const isFocused =

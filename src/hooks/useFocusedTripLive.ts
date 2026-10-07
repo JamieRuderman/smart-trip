@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import {
+  isFocusedTripToday,
   reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
-import { toLocalDateKey } from "@/lib/timeUtils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
@@ -20,8 +20,9 @@ export interface FocusedTripLive {
 }
 
 /**
- * Shared focused-trip realtime derivation used by the app-root workers that
- * track the pinned trip ({@link LiveActivitySync}, {@link ReminderDialogHost},
+ * Shared focused-trip realtime derivation used by the My Trip view, the
+ * schedule's trip bar, and the app-root workers that track the focused trip
+ * ({@link LiveActivitySync}, {@link ReminderDialogHost},
  * {@link FocusedTripAutoClear}). Reconstructs the trip, looks up its realtime
  * status (primary by departure time, cancelled-fallback by origin start time),
  * and gates that status to the focus's own service date — the RT feed describes
@@ -57,10 +58,9 @@ export function useFocusedTripLive(
     return null;
   }, [statusMap, canceledByStartTime, trip]);
 
-  const live =
-    focusedTrip.serviceDate === toLocalDateKey(new Date(now))
-      ? realtimeStatus
-      : null;
+  const live = isFocusedTripToday(focusedTrip, new Date(now))
+    ? realtimeStatus
+    : null;
 
   return { trip, live, lastUpdated };
 }

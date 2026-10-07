@@ -37,8 +37,8 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const nowSeconds = useNow(30_000);
   const now = nowSeconds * 1000;
 
-  // Shared focused-trip realtime derivation (same lookup as the pinned card),
-  // so the lock screen and the card always tell the same story.
+  // Shared focused-trip realtime derivation (same lookup as My Trip), so the
+  // lock screen and the app always tell the same story.
   const { live } = useFocusedTripLive(focusedTrip, now);
 
   // Anchor onto the focused trip's own service date (overnight-safe) rather

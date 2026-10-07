@@ -2,7 +2,6 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   X,
-  AlertTriangle,
   Calendar,
   Clock,
   MapPin,
@@ -11,33 +10,21 @@ import {
   ChevronUp,
   Train,
 } from "lucide-react";
-import { parseTimeToMinutes, mpsToMph } from "@/lib/timeUtils";
-import {
-  calculateTransferTime,
-  isQuickConnection,
-  serviceDateWeekdayLabel,
-} from "@/lib/timeUtils";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
-import { calculateFare } from "@/lib/scheduleUtils";
-import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { useStationSelection } from "@/contexts/stationSelection";
-import { useCountdown } from "@/hooks/useCountdown";
-import { useAlarmStatus } from "@/hooks/useAlarmStatus";
-import { useTripStatus } from "@/hooks/useTripStatus";
+import { mpsToMph, serviceDateWeekdayLabel } from "@/lib/timeUtils";
+import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
 import { useNow } from "@/hooks/useNow";
-import { TripIcon } from "./icons/TripIcon";
-import { WalkIcon } from "./icons/WalkIcon";
+import { useTripDetailModel } from "@/hooks/useTripDetailModel";
 import { StopTimeline } from "./StopTimeline";
 import { FerryConnection } from "./FerryConnection";
 import { GutterRow } from "./GutterRow";
-import { TimePair } from "./TimePair";
-import { AlarmStatusLabel } from "./AlarmStatusLabel";
+import { LiveTimePair } from "./LiveTimePair";
+import { QuickConnectionWarning } from "./QuickConnectionWarning";
+import { AlarmStatusIcon, AlarmStatusLabel } from "./AlarmStatusLabel";
 import { DepartureReminder } from "./DepartureReminder";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import type { TripProgressResult } from "@/hooks/useTripProgress";
 
 export interface TripDetailContentProps {
@@ -95,7 +82,6 @@ export function TripDetailContent({
   const { t, i18n } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const nowSec = useNow(1000, showDebugPanel);
-  const { preferences } = useUserPreferences();
 
   // The displayed trip belongs to a schedule (weekday/weekend) that may not be
   // today's. When it isn't, every "today-relative" readout — the live
@@ -110,171 +96,48 @@ export function TripDetailContent({
   const {
     headerBg,
     isEnded,
-    minutesAfterArrival,
     nextStop,
     distanceToNextStopMi,
     vehiclePosition,
     activeProgressSource,
     stopInference,
-    remainingStops,
     minutesUntilArrival,
   } = progress;
 
-  const { hasStarted, displayStops, currentIndex } = stopInference;
+  const { hasStarted } = stopInference;
 
-  // The live vehicle position vetoes a premature "At destination": if the train
-  // is still in transit to the rider's destination (or sitting at an earlier
-  // stop), it hasn't arrived — even once the scheduled arrival minute has passed
-  // on a running-late train. "Arrived" is only the vehicle STOPPED_AT the final
-  // stop, or gone from the leg entirely (a through train that pulled away).
-  const vehicleStopIndex =
-    vehiclePosition?.currentStation != null
-      ? displayStops.indexOf(vehiclePosition.currentStation)
-      : -1;
-  const stillApproachingDestination =
-    vehiclePosition != null &&
-    vehicleStopIndex !== -1 &&
-    !(
-      vehicleStopIndex === displayStops.length - 1 &&
-      vehiclePosition.currentStatus === "STOPPED_AT"
-    );
-
-  const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
-    useTripStatus(realtimeStatus);
-
-  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
-  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
-  const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
-  const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-
-  const minutesUntil = useCountdown(
-    trip.departureTime,
-    realtimeStatus?.liveDepartureTime,
-    currentTime,
-  );
-
-  // When this sheet is the user's focused trip and a leave reminder is armed,
-  // lead with the "leave in" countdown (reminder fires `leadMinutes` before
-  // departure, so it tracks the same clock as the departure countdown). Other
-  // trips' sheets never carry a reminder, so they skip the leave stage.
-  const { focusedTrip } = useStationSelection();
-  const reminderLeadMinutes =
-    isFocused && focusedTrip?.reminder != null
-      ? focusedTrip.reminder.leadMinutes
-      : null;
-  const minutesUntilLeave =
-    reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
-
-  // Trip metadata
-  const tripDurationMinutes =
-    parseTimeToMinutes(trip.arrivalTime) -
-    parseTimeToMinutes(trip.departureTime);
-  const tripDurationLabel =
-    tripDurationMinutes >= 60
-      ? t("tracker.durationHoursMinutes", {
-          hours: Math.floor(tripDurationMinutes / 60),
-          minutes: tripDurationMinutes % 60,
-        })
-      : t("tracker.durationMinutes", { minutes: tripDurationMinutes });
-
-  const fareInfo =
-    preferences.selectedFareType !== "none"
-      ? calculateFare(fromStation, toStation, preferences.selectedFareType)
-      : null;
-
-  const fromIdx = stationIndexMap[fromStation];
-  const toIdx = stationIndexMap[toStation];
-  const stopCount = Math.abs(toIdx - fromIdx);
-
-  const hasOutboundQuickConnection =
-    showFerry &&
-    trip.outboundFerry &&
-    isQuickConnection(
-      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
-    );
-  const hasInboundQuickConnection =
-    trip.inboundFerry &&
-    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION &&
-    isQuickConnection(
-      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
-    );
-  const hasQuickConnection =
-    hasOutboundQuickConnection || hasInboundQuickConnection;
-
-  const trainOption = hasInboundQuickConnection
-    ? t("quickConnection.laterTrain")
-    : t("quickConnection.earlierTrain");
-
-  // Delay at the stop the train is currently approaching — the SAME signal
-  // the map marker paints orange from. The endpoint-based statusLabel misses
-  // an en-route slip once the displayed leg's origin has been served and
-  // pruned from the feed, which read "On time" here while the marker showed
-  // the train delayed. (allStopDelayMinutes only carries entries at/above the
-  // shared threshold, so presence == delayed.)
-  const currentStopDelayMin =
-    currentIndex >= 0
-      ? (realtimeStatus?.allStopDelayMinutes?.[displayStops[currentIndex]] ?? 0)
-      : 0;
-
-  // Small header badge — "Ended" for finished trips, realtime label otherwise.
-  // Falls back to "Scheduled" before departure or "On time" once en route when
-  // no realtime data is available (GPS is tracking, no delay reported).
-  const headerStatusLabel = isEnded
-    ? t("tracker.ended")
-    : !isCanceledOrSkipped && !isDelayed && currentStopDelayMin > 0
-      ? t("tripCard.delayed", { minutes: currentStopDelayMin })
-      : statusLabel ??
-        (hasStarted ? t("tripCard.onTime") : t("tracker.scheduled"));
-
-  const directionLabel = isSouthbound(fromStation, toStation)
-    ? t("tracker.southbound")
-    : t("tracker.northbound");
-
-  // Live speed from the matched vehicle (m/s → mph). Only shown while a
-  // vehicle is actively reporting and moving.
-  const speedMph =
-    vehiclePosition?.position?.speed != null &&
-    vehiclePosition.position.speed > 0
-      ? mpsToMph(vehiclePosition.position.speed)
-      : null;
-
-  const alarmStatus = useAlarmStatus({
-    tripId: trip.trip,
-    minutesUntilDeparture: minutesUntil,
-    minutesUntilArrival: minutesUntilArrival ?? (
-      parseTimeToMinutes(arrivalTime) -
-      (currentTime.getHours() * 60 + currentTime.getMinutes())
-    ),
-    minutesAfterArrival,
-    minutesUntilLeave,
-    hasStarted,
-    isCanceled,
+  const {
     isCanceledOrSkipped,
-    isEnded,
-    hasRealtimeStopData: realtimeStatus?.hasRealtimeStopData ?? false,
-    hasLiveDepartureTime: realtimeStatus?.liveDepartureTime != null,
-    // A matched vehicle position is already staleness-filtered by
-    // useVehiclePositionForTrip, so its presence means live train tracking —
-    // enough to show a live arrival countdown instead of "On the way". (The
-    // dev-only vehiclePositionOverride deliberately counts, to simulate it.)
-    hasLivePosition: vehiclePosition != null,
-    stillApproachingDestination,
-    lastUpdated,
+    departureTime,
+    arrivalTime,
+    headerStatusLabel,
+    directionLabel,
+    tripDurationLabel,
+    fareInfo,
+    stopCount,
+    stopsLabel,
+    speedMph,
+    hasQuickConnection,
+    trainOption,
+    showInboundFerry,
+    alarmStatus,
+    isAtDestination: alarmAtDestination,
+  } = useTripDetailModel({
+    trip,
+    fromStation,
+    toStation,
     currentTime,
+    lastUpdated,
+    realtimeStatus,
+    showFerry,
+    progress,
+    isFocused,
   });
 
-  // Build the trip stats line: duration, remaining/total stops, fare
-  const stopsLabel = remainingStops != null && remainingStops < stopCount
-    ? t("tracker.remainingStopCount", { remaining: remainingStops, total: stopCount })
-    : t("tracker.stopCount", { count: stopCount });
-
-  // Once the rider has reached their destination the "approaching" cues stop
-  // making sense: the distance-to-stop grows as a through train pulls away, and
-  // the final stop shouldn't stay highlighted as the current stop. Never on
-  // another day's run: the alarm reads today's clock, so a Saturday train whose
-  // arrival time already passed today would grey out its whole timeline.
-  const isAtDestination =
-    !isOtherDay && alarmStatus.phase === "AT_DESTINATION";
+  // The alarm reads today's clock, so on another day's run a Saturday train
+  // whose arrival time already passed today would read "at destination" and
+  // grey out its whole timeline.
+  const isAtDestination = !isOtherDay && alarmAtDestination;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -307,27 +170,12 @@ export function TripDetailContent({
             <span className="text-white/60"> · </span>
             {directionLabel}
           </p>
-          <TimePair
-            departure={departureTime}
-            arrival={arrivalTime}
+          <LiveTimePair
+            trip={trip}
+            realtimeStatus={realtimeStatus}
+            canceled={isCanceledOrSkipped}
             format={timeFormat}
-            strikethrough={isCanceledOrSkipped}
-            className="text-2xl font-semibold text-white"
           />
-          {/* Struck-through scheduled comparison — only the column(s) that
-              actually have a live value, so an arrival-only delay doesn't
-              show an unchanged departure struck through beside it. */}
-          {(hasLiveDepartureTime || hasLiveArrivalTime) && (
-            <TimePair
-              departure={trip.departureTime}
-              arrival={trip.arrivalTime}
-              format={timeFormat}
-              className="text-xs mt-0.5 text-white/50"
-              strikethrough
-              showDeparture={hasLiveDepartureTime}
-              showArrival={hasLiveArrivalTime}
-            />
-          )}
         </div>
 
         {showCloseButton && (
@@ -357,25 +205,10 @@ export function TripDetailContent({
               className="h-6 w-6 text-muted-foreground"
               aria-hidden="true"
             />
-          ) : alarmStatus.kind === "leave-countdown" ? (
-            <WalkIcon
-              className="h-6 w-6 text-muted-foreground"
-              aria-hidden="true"
-            />
-          ) : alarmStatus.kind === "departure-countdown" ? (
-            <TripIcon
-              className="h-6 w-6 text-muted-foreground"
-              aria-hidden="true"
-            />
-          ) : alarmStatus.kind === "arrival-countdown" ? (
-            <MapPin
-              className="h-6 w-6 text-muted-foreground"
-              aria-hidden="true"
-            />
           ) : (
-            <Clock
+            <AlarmStatusIcon
+              status={alarmStatus}
               className="h-6 w-6 text-muted-foreground"
-              aria-hidden="true"
             />
           )}
         </div>
@@ -448,7 +281,7 @@ export function TripDetailContent({
                 aria-hidden="true"
               />
               <span>
-                {distanceToNextStopMi < 0.05
+                {distanceToNextStopMi < AT_STOP_THRESHOLD_MI
                   ? t("tracker.atStop", { stop: nextStop })
                   : t("tracker.distanceMiToStop", {
                       distance: distanceToNextStopMi.toFixed(1),
@@ -569,23 +402,7 @@ export function TripDetailContent({
           <div className="mt-3 pt-3 border-t border-border">
             {/* Quick connection warning — sits between the divider and ferry times */}
             {hasQuickConnection && !isCanceledOrSkipped && (
-              <div className="mb-3 p-3 rounded-lg bg-smart-gold/10 border border-smart-gold/40 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-smart-gold mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-smart-gold">
-                    {t("quickConnection.quickTransferWarning")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    <Trans
-                      i18nKey="quickConnection.message"
-                      values={{ trainOption }}
-                      components={{
-                        strong: <strong className="text-foreground" />,
-                      }}
-                    />
-                  </p>
-                </div>
-              </div>
+              <QuickConnectionWarning trainOption={trainOption} />
             )}
             <FerryConnection
               ferry={trip.outboundFerry}
@@ -595,18 +412,23 @@ export function TripDetailContent({
             />
           </div>
         )}
-        {trip.inboundFerry &&
-          trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={departureTime}
-                timeFormat={timeFormat}
-                inbound
-                fullLeg
-              />
-            </div>
-          )}
+        {showInboundFerry && trip.inboundFerry && (
+          <div className="mt-3 pt-3 border-t border-border">
+            {/* Tight ferry → train transfer ("take a later train"). A leg can't
+                both start and end at the terminal, so this never doubles the
+                outbound warning above. */}
+            {hasQuickConnection && !isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={trainOption} />
+            )}
+            <FerryConnection
+              ferry={trip.inboundFerry}
+              trainDepartureTime={departureTime}
+              timeFormat={timeFormat}
+              inbound
+              fullLeg
+            />
+          </div>
+        )}
       </div>
     </div>
   );

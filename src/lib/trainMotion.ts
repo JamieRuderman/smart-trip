@@ -64,9 +64,13 @@ const schedMinutesCache = new WeakMap<ProcessedTrip, Array<number | null>>();
 function schedMinutesFor(trip: ProcessedTrip): Array<number | null> {
   const hit = schedMinutesCache.get(trip);
   if (hit) return hit;
-  const arr = trip.times.map((t) =>
-    !t || t === "~~" ? null : parseTimeToMinutes(t),
-  );
+  const arr = trip.times.map((t) => {
+    if (!t || t.includes("~~")) return null;
+    const minutes = parseTimeToMinutes(t);
+    // A malformed entry must read as "no stop", not NaN — NaN would poison the
+    // interpolation (and the marker position) for the whole trip.
+    return Number.isFinite(minutes) ? minutes : null;
+  });
   schedMinutesCache.set(trip, arr);
   return arr;
 }
@@ -111,6 +115,25 @@ export function interpolateStationProgress(
 }
 
 /**
+ * Fractional station index the timetable puts `trip` at by `nowMinutes`
+ * (minute of day), shifted by `delayMinutes`. Null when the trip has no timed
+ * stops.
+ */
+export function scheduledStationIndex(
+  trip: ProcessedTrip,
+  direction: "S" | "N",
+  nowMinutes: number,
+  delayMinutes: number,
+): number | null {
+  return interpolateStationProgress(
+    schedMinutesFor(trip),
+    direction === "S" ? ORDER_SB : ORDER_NB,
+    nowMinutes,
+    delayMinutes,
+  );
+}
+
+/**
  * Compute a train's progress along its schedule at wall time `now`.
  * Returns null when the train can't be matched to a static trip.
  */
@@ -130,11 +153,11 @@ export function scheduledProgress(
   if (!trip) return null;
 
   const direction: "S" | "N" = train.directionId === 1 ? "N" : "S";
-  const base = schedMinutesFor(trip);
-  const delay = train.delayMinutes ?? 0;
-  const nowMinutes = minutesOfDay(now);
-  const order = direction === "S" ? ORDER_SB : ORDER_NB;
-
-  const progress = interpolateStationProgress(base, order, nowMinutes, delay);
+  const progress = scheduledStationIndex(
+    trip,
+    direction,
+    minutesOfDay(now),
+    train.delayMinutes ?? 0,
+  );
   return progress != null ? { progress, direction } : null;
 }

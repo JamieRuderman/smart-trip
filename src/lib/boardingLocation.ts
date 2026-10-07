@@ -51,9 +51,15 @@ export function checkBoardingLocation(
   const { lat, lng, accuracy } = fix;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   const closest = getClosestStationWithMargin(lat, lng);
+  // The true position can sit up to `accuracy` away in any direction, which
+  // can shrink the gap to the runner-up by twice that — so the gap has to
+  // clear 2× the radius before we name a station.
   if (
     closest.station === from ||
-    !isClosestStationConfident(closest.marginKm, accuracy)
+    !isClosestStationConfident(
+      closest.marginKm,
+      accuracy == null ? null : 2 * accuracy,
+    )
   ) {
     return null;
   }

@@ -60,18 +60,19 @@ describe("checkBoardingLocation", () => {
   });
 
   it("stays quiet on a fix too coarse to tell which station is closest", () => {
-    // 3 km accuracy against a ~2.3 km gap to the next station.
+    // ~2.3 km gap to the next station. A 1.5 km error could cross the midpoint
+    // (it can shrink the gap by up to 3 km), so say nothing.
     expect(
       checkBoardingLocation(
-        at("Santa Rosa Downtown", 3000),
+        at("Santa Rosa Downtown", 1500),
         "Santa Rosa North",
         "Santa Rosa Downtown",
       ),
     ).toBeNull();
-    // 1.5 km accuracy still fits inside that gap.
+    // A 1 km error can shrink it by at most 2 km — still clearly closest.
     expect(
       checkBoardingLocation(
-        at("Santa Rosa Downtown", 1500),
+        at("Santa Rosa Downtown", 1000),
         "Santa Rosa North",
         "Santa Rosa Downtown",
       ),

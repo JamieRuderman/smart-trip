@@ -69,6 +69,15 @@ describe("getRecentLocationFix (native)", () => {
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
   });
 
+  it("stops serving a cached fix once access is revoked", async () => {
+    geo.checkPermissions.mockResolvedValue({ location: "granted", coarseLocation: "granted" });
+    const getRecentLocationFix = await load();
+    expect(await getRecentLocationFix()).not.toBeNull();
+    geo.checkPermissions.mockResolvedValue({ location: "denied", coarseLocation: "denied" });
+    expect(await getRecentLocationFix()).toBeNull();
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+  });
+
   it("doesn't reuse a position that was already over five minutes old when it arrived", async () => {
     geo.checkPermissions.mockResolvedValue({ location: "granted", coarseLocation: "granted" });
     geo.getCurrentPosition.mockResolvedValue(position(Date.now() - 6 * 60_000));

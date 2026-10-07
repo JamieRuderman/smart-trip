@@ -166,20 +166,24 @@ function rememberFix(fix: Coordinates): Coordinates {
 const REUSE_FIX_MS = 5 * 60_000;
 
 /**
- * Where the rider is right now, without ever prompting for permission: the
- * app's latest fix if it's under five minutes old (e.g. from the map's live
- * watch), else a one-shot fix if access was already granted. Null when access
- * isn't granted or the fix fails. Concurrent callers share one request.
+ * Where the rider is right now, without ever prompting for permission: while
+ * access is granted, the app's latest fix if it's under five minutes old (e.g.
+ * from the map's live watch), else a one-shot fix. Null when access isn't
+ * granted (checked on every call, so a revoked grant stops cached fixes too)
+ * or the fix fails. Concurrent callers share one request.
  */
 export function getRecentLocationFix(): Promise<Coordinates | null> {
-  if (latestFix && Date.now() - latestFix.takenAt <= REUSE_FIX_MS) {
-    return Promise.resolve(latestFix.fix);
-  }
   if (!pendingFix) {
     pendingFix = (async () => {
       try {
         const access = await grantedLocationAccess();
-        if (!access) return null;
+        if (!access) {
+          latestFix = null;
+          return null;
+        }
+        if (latestFix && Date.now() - latestFix.takenAt <= REUSE_FIX_MS) {
+          return latestFix.fix;
+        }
         // Accept a position the OS cached in the last minute, and don't wait
         // long on a cold GPS.
         // Only ask for high accuracy with precise access: on Android 12+ a

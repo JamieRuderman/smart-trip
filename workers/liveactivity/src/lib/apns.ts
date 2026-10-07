@@ -6,7 +6,7 @@
  *   - ES256 provider-JWT signing via **WebCrypto** (`crypto.subtle`, ECDSA P-256)
  *   - the HTTP/2 POST via **`fetch()`** (Workers speaks HTTP/2 to APNs in prod)
  *
- * The pure status/content logic is shared (imported from `src/lib` / `api/`);
+ * The pure status/content logic is shared (imported from `src/lib` / `shared/`);
  * this APNs transport layer is the only Workers-specific implementation.
  */
 

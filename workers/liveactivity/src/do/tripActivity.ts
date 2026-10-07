@@ -7,7 +7,7 @@
  * departure instant (the departing→arriving flip) and arrival instant (the
  * end/dismissal), and re-checks the feed every `POLL_MS` in between so a
  * newly-appearing delay still lands. All the matching/decision/content logic is
- * the SAME pure code the Vercel backend uses — only the APNs transport is
+ * pure code shared from `shared/` and `src/lib` — only the APNs transport is
  * Workers-native (`../lib/apns`).
  *
  * The per-tick decision (`planTick`) is a PURE function (no storage/network), so
@@ -26,7 +26,7 @@ import {
   type FeedTripUpdate,
   type FeedVehiclePositions,
   type LiveTripStatus,
-} from "../../../../api/_liveActivityStatus.js";
+} from "../../../../shared/liveActivityStatus.js";
 import {
   buildContentState,
   encodeContentState,

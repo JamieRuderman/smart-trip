@@ -138,7 +138,7 @@ the local-only start (`startTripActivity`), so nothing registers.
 | `src/lib/liveActivityContent.ts` | platform-free content model + builders (shared client/server) |
 | `src/lib/liveActivityPushTypes.ts` | registration / token types + validators (shared) |
 | `src/lib/native/liveActivityPush.ts` | client: start-with-push + register / deregister (gated) |
-| `api/_liveActivityStatus.ts` | pure live-status derivation + push decision (shared) |
+| `shared/liveActivityStatus.ts` | pure live-status derivation + push decision (shared) |
 | `workers/web/src/index.ts` | `/api/liveactivity/{register,token}` routes → the Durable Object |
 | `workers/liveactivity/src/do/tripActivity.ts` | the Durable Object: alarms, feed re-check, push decision, lifecycle |
 | `workers/liveactivity/src/lib/apns.ts` | APNs ES256 JWT (WebCrypto) + payload builder + `fetch()` HTTP/2 sender |

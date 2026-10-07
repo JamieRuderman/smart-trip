@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  futureServiceDate,
   getFirstInProgressTripIndex,
   getNextTripIndex,
   getScheduleMeta,
@@ -270,5 +271,37 @@ describe("scheduleSwitchOffer", () => {
 
   it("still asks on Monday after a weekend the shown schedule matched", () => {
     expect(scheduleSwitchOffer("weekend", "2099-05-22", MON)).toBe("weekday");
+  });
+});
+
+describe("futureServiceDate", () => {
+  const WED = new Date(2099, 4, 20, 21, 20);
+  const SAT = new Date(2099, 4, 23, 8, 0);
+
+  it("is null for today's schedule", () => {
+    expect(futureServiceDate(WED, "weekday")).toBeNull();
+    expect(futureServiceDate(SAT, "weekend")).toBeNull();
+  });
+
+  it("is the next day the other schedule runs", () => {
+    expect(futureServiceDate(WED, "weekend")).toBe("2099-05-23");
+    expect(futureServiceDate(SAT, "weekday")).toBe("2099-05-25");
+  });
+
+  describe("with a holiday override", () => {
+    afterEach(() => {
+      setScheduleData(bundledSchedulePayload);
+    });
+
+    it("skips a holiday that runs the other schedule", () => {
+      // Memorial-Day-style Monday runs the weekend schedule.
+      setScheduleData({
+        ...bundledSchedulePayload,
+        scheduleOverrides: { "2099-05-25": "weekend" },
+      });
+      expect(futureServiceDate(SAT, "weekday")).toBe("2099-05-26");
+      // Browsing the weekend schedule on that Monday is today's schedule.
+      expect(futureServiceDate(new Date(2099, 4, 25, 9, 0), "weekend")).toBeNull();
+    });
   });
 });

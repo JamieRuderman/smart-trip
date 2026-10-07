@@ -4,6 +4,8 @@ import { useTripProgress } from "@/hooks/useTripProgress";
 import { TripDetailContent } from "./TripDetailContent";
 import { AppSheet } from "@/components/ui/app-sheet";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
+import { parseServiceDate } from "@/lib/timeUtils";
 import type { TripRealtimeStatus, VehiclePositionMatch } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
@@ -50,17 +52,30 @@ export function TripDetailSheet({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
+  // A trip from a schedule that isn't today's runs on a later day, so judge its
+  // progress from the start of that day: today's clock would read an early
+  // Saturday run browsed on a Wednesday evening as "Ended", hiding "Take this
+  // train". The content gets the real clock plus the day, for its label.
+  const serviceDate = futureServiceDate(rest.currentTime, rest.scheduleType);
+  const progressTime = serviceDate
+    ? parseServiceDate(serviceDate)
+    : rest.currentTime;
+  // Today's live feed and train positions belong to today's runs: a host that
+  // matched them by origin time (the pinned card) must not paint today's delay,
+  // cancellation or GPS onto a later day's run.
+  const realtimeStatus = serviceDate ? null : rest.realtimeStatus;
+
   // Single hook for all trip progress logic: vehicle matching, stop inference,
   // distance calculations, and derived state.
   const progress = useTripProgress({
     trip: rest.trip,
     fromStation: rest.fromStation,
     toStation: rest.toStation,
-    currentTime: rest.currentTime,
-    realtimeStatus: rest.realtimeStatus,
+    currentTime: progressTime,
+    realtimeStatus,
     isNextTrip: rest.isNextTrip,
     isFocused,
-    vehiclePositionOverride: rest.vehiclePositionOverride,
+    vehiclePositionOverride: serviceDate ? null : rest.vehiclePositionOverride,
   });
 
   const ariaLabel = t("tracker.tripDetailsAria", { trip: rest.trip.trip });
@@ -85,11 +100,13 @@ export function TripDetailSheet({
     >
       <TripDetailContent
         {...rest}
+        realtimeStatus={realtimeStatus}
         isOpen={isOpen}
         onClose={onClose}
         progress={progress}
         showCloseButton={!isMobile}
         isFocused={isFocused}
+        futureServiceDate={serviceDate}
       />
     </AppSheet>
   );

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { mpsToMph, serviceDateWeekdayLabel } from "@/lib/timeUtils";
 import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
-import { getTodayScheduleType, nextServiceDate } from "@/lib/scheduleUtils";
 import { useNow } from "@/hooks/useNow";
 import { useTripDetailModel } from "@/hooks/useTripDetailModel";
 import { StopTimeline } from "./StopTimeline";
@@ -55,6 +54,9 @@ export interface TripDetailContentProps {
    *  to the stop timeline so its on-time accent reads my-trip blue instead of
    *  the default green, matching the blue header band. */
   isFocused?: boolean;
+  /** The later day ("YYYY-MM-DD") the trip runs when its schedule isn't
+   *  today's, else null — decided once by TripDetailSheet. */
+  futureServiceDate: string | null;
 }
 
 
@@ -75,6 +77,7 @@ export function TripDetailContent({
   userToStation = null,
   scheduleType,
   isFocused = false,
+  futureServiceDate,
 }: TripDetailContentProps) {
   const { t, i18n } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -85,12 +88,9 @@ export function TripDetailContent({
   // countdown, distance-to-next-stop, GPS — is meaningless: the train runs on a
   // different day. Show the service day ("Departs Monday") and hide the live
   // tracking instead. (A future calendar-date picker would supersede this.)
-  const isOtherDay = scheduleType !== getTodayScheduleType(currentTime);
+  const isOtherDay = futureServiceDate != null;
   const serviceDayLabel = isOtherDay
-    ? serviceDateWeekdayLabel(
-        nextServiceDate(currentTime, scheduleType),
-        i18n.language,
-      )
+    ? serviceDateWeekdayLabel(futureServiceDate, i18n.language)
     : null;
 
   const {
@@ -121,7 +121,7 @@ export function TripDetailContent({
     trainOption,
     showInboundFerry,
     alarmStatus,
-    isAtDestination,
+    isAtDestination: alarmAtDestination,
   } = useTripDetailModel({
     trip,
     fromStation,
@@ -133,6 +133,11 @@ export function TripDetailContent({
     progress,
     isFocused,
   });
+
+  // The alarm reads today's clock, so on another day's run a Saturday train
+  // whose arrival time already passed today would read "at destination" and
+  // grey out its whole timeline.
+  const isAtDestination = !isOtherDay && alarmAtDestination;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

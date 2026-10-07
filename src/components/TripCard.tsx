@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
@@ -62,6 +63,9 @@ export const TripCard = memo(function TripCard({
   const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
+  // A later day's ferries haven't departed, whatever today's clock says.
+  const ferryClock =
+    futureServiceDate(currentTime, scheduleType) == null ? currentTime : undefined;
 
   // Derive open state from URL-synced selectedTripNumber
   const isOpen = selectedTripNumber === trip.trip;
@@ -252,7 +256,7 @@ export const TripCard = memo(function TripCard({
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
                 timeFormat={timeFormat}
-                currentTime={currentTime}
+                currentTime={ferryClock}
                 isMobile
               />
             )}
@@ -262,7 +266,7 @@ export const TripCard = memo(function TripCard({
                   ferry={trip.inboundFerry}
                   trainDepartureTime={departureTime}
                   timeFormat={timeFormat}
-                  currentTime={currentTime}
+                  currentTime={ferryClock}
                   isMobile
                   inbound
                 />
@@ -325,7 +329,7 @@ export const TripCard = memo(function TripCard({
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
                 timeFormat={timeFormat}
-                currentTime={currentTime}
+                currentTime={ferryClock}
               />
             )}
             {trip.inboundFerry &&
@@ -334,7 +338,7 @@ export const TripCard = memo(function TripCard({
                   ferry={trip.inboundFerry}
                   trainDepartureTime={departureTime}
                   timeFormat={timeFormat}
-                  currentTime={currentTime}
+                  currentTime={ferryClock}
                   inbound
                 />
               )}

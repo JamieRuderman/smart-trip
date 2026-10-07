@@ -174,12 +174,19 @@ function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
   return serviceDateInstant(focused.serviceDate, arrMin, dayOffset);
 }
 
+/** The fields that pin down a run and leg — all the schedule lookups below
+ *  read, so they also work for a leg that hasn't been focused yet. */
+export type FocusedRun = Pick<
+  FocusedTrip,
+  "tripNumber" | "fromStation" | "toStation" | "scheduleType" | "serviceDate"
+>;
+
 /**
  * Rebuild the full ProcessedTrip for a focused trip from static schedule data,
  * so the pinned card can render regardless of the home screen's current
  * from/to. Null if the trip no longer exists in that schedule.
  */
-export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | null {
+export function reconstructFocusedTrip(focused: FocusedRun): ProcessedTrip | null {
   const trips = getFilteredTrips(
     focused.fromStation,
     focused.toStation,
@@ -195,7 +202,7 @@ export function reconstructFocusedTrip(focused: FocusedTrip): ProcessedTrip | nu
  * control is rendered in (e.g. the line map's full-corridor view). Null if the
  * trip can't be reconstructed.
  */
-export function focusedDepartureInstant(focused: FocusedTrip): number | null {
+export function focusedDepartureInstant(focused: FocusedRun): number | null {
   const trip = reconstructFocusedTrip(focused);
   if (!trip) return null;
   return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));

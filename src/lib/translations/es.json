@@ -241,6 +241,15 @@
     "activityStartTitle": "Tu viaje desde {{station}} se acerca",
     "activityStartBody": "Tren {{trip}} — siguiéndolo en tu pantalla de bloqueo."
   },
+  "boardingCheck": {
+    "reversedTitle": "¿Vas en sentido contrario?",
+    "reversedBody": "Estás más cerca de {{to}}, a donde va este tren. ¿Querías viajar de {{to}} a {{from}}?",
+    "swap": "Intercambiar estaciones",
+    "otherStationTitle": "¿No estás en {{from}}?",
+    "otherStationBody": "Estás más cerca de {{station}}, pero este tren sale de {{from}}.",
+    "leaveFrom": "Salir de {{station}}",
+    "takeAnyway": "Tomarlo de todos modos"
+  },
   "tracker": {
     "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Sale en {{minutes}} min",

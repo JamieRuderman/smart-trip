@@ -104,18 +104,19 @@ function normalizeCoordinates(
   };
 }
 
-async function fetchNativeLocation(): Promise<Coordinates> {
+async function fetchNativeLocation(
+  options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+  { prompt = true } = {},
+): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
-  await Geolocation.requestPermissions();
-  const pos = await Geolocation.getCurrentPosition({
-    enableHighAccuracy: true,
-    timeout: 10000,
-    maximumAge: 0,
-  });
+  if (prompt) await Geolocation.requestPermissions();
+  const pos = await Geolocation.getCurrentPosition(options);
   return normalizeCoordinates(pos, null);
 }
 
-function fetchWebLocation(): Promise<Coordinates> {
+function fetchWebLocation(
+  options: PositionOptions = { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("Geolocation not supported"));
@@ -124,9 +125,88 @@ function fetchWebLocation(): Promise<Coordinates> {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve(normalizeCoordinates(pos, null)),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      options
     );
   });
+}
+
+/**
+ * Location access already granted, checked without prompting: "precise",
+ * "coarse" (Android's approximate-only grant), or null when not granted.
+ */
+async function grantedLocationAccess(): Promise<"precise" | "coarse" | null> {
+  if (Capacitor.isNativePlatform()) {
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const { location, coarseLocation } = await Geolocation.checkPermissions();
+    if (location === "granted") return "precise";
+    return coarseLocation === "granted" ? "coarse" : null;
+  }
+  if (!("permissions" in navigator)) return null;
+  const { state } = await navigator.permissions.query({ name: "geolocation" });
+  return state === "granted" ? "precise" : null;
+}
+
+/** The app's latest fix from any source (one-shot or watch), and when it was
+ *  taken, so one-off checks can reuse it instead of waking the GPS again. */
+let latestFix: { fix: Coordinates; takenAt: number } | null = null;
+let pendingFix: Promise<Coordinates | null> | null = null;
+
+function rememberFix(fix: Coordinates): Coordinates {
+  // Age from the position's own timestamp — a cached position can arrive
+  // already old — clamped to now in case the device clock runs ahead. Never
+  // let an older reading (e.g. a slow one-shot) replace a newer one.
+  const takenAt = Math.min(Date.now(), fix.timestampMs);
+  if (!latestFix || takenAt >= latestFix.takenAt) latestFix = { fix, takenAt };
+  return fix;
+}
+
+/** How old the latest fix can be and still count as where the rider is now —
+ *  long enough that a sheet left open a while doesn't make a tap wait on the
+ *  GPS again, short enough that it's still roughly where they are. */
+const REUSE_FIX_MS = 5 * 60_000;
+
+/**
+ * Where the rider is right now, without ever prompting for permission: while
+ * access is granted, the app's latest fix if it's under five minutes old (e.g.
+ * from the map's live watch), else a one-shot fix. Null when access isn't
+ * granted (checked on every call, so a revoked grant stops cached fixes too)
+ * or the fix fails. Concurrent callers share one request.
+ */
+export function getRecentLocationFix(): Promise<Coordinates | null> {
+  if (!pendingFix) {
+    pendingFix = (async () => {
+      try {
+        const access = await grantedLocationAccess();
+        if (!access) {
+          latestFix = null;
+          return null;
+        }
+        if (latestFix && Date.now() - latestFix.takenAt <= REUSE_FIX_MS) {
+          return latestFix.fix;
+        }
+        // Accept a position the OS cached in the last minute, and don't wait
+        // long on a cold GPS.
+        // Only ask for high accuracy with precise access: on Android 12+ a
+        // high-accuracy request under an approximate-only grant prompts the
+        // rider to upgrade to precise location.
+        const options = {
+          enableHighAccuracy: access === "precise",
+          timeout: 8000,
+          maximumAge: 60_000,
+        };
+        return rememberFix(
+          Capacitor.isNativePlatform()
+            ? await fetchNativeLocation(options, { prompt: false })
+            : await fetchWebLocation(options),
+        );
+      } catch {
+        return null;
+      } finally {
+        pendingFix = null;
+      }
+    })();
+  }
+  return pendingFix;
 }
 
 export function useGeolocation({
@@ -149,7 +229,7 @@ export function useGeolocation({
         ? await fetchNativeLocation()
         : await fetchWebLocation();
       lastCoordsRef.current = result;
-      setCoords(result);
+      setCoords(rememberFix(result));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Location unavailable");
     } finally {
@@ -163,11 +243,10 @@ export function useGeolocation({
       return;
     }
     // Web: only auto-request if permission is already granted (no prompt shown).
-    if (autoRequestOnWeb && "permissions" in navigator) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then((result) => {
-          if (result.state === "granted") void requestLocation();
+    if (autoRequestOnWeb) {
+      grantedLocationAccess()
+        .then((access) => {
+          if (access) void requestLocation();
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }
@@ -217,7 +296,7 @@ export function useGeolocation({
                 lastCoordsRef.current,
               );
               lastCoordsRef.current = normalized;
-              setCoords(normalized);
+              setCoords(rememberFix(normalized));
               setError(null);
             }
           }
@@ -236,7 +315,7 @@ export function useGeolocation({
           if (cancelled) return;
           const normalized = normalizeCoordinates(position, lastCoordsRef.current);
           lastCoordsRef.current = normalized;
-          setCoords(normalized);
+          setCoords(rememberFix(normalized));
           setError(null);
         },
         (watchError) => {

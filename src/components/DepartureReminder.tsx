@@ -19,6 +19,7 @@ import {
 } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import {
+  anchorLiveTime,
   focusedDepartureInstant,
   focusedTripMatchesSchedule,
   replacementRun,
@@ -51,6 +52,10 @@ interface DepartureReminderProps {
   arrivalTime: string;
   /** Live arrival override; takes precedence when set. */
   realtimeArrivalTime?: string | null;
+  /** This train's live departure ("HH:MM") per station, from the realtime
+   *  feed — for its live time at the rider's boarding station when that isn't
+   *  this view's fromStation (e.g. the line map's corridor view). */
+  liveStopDepartures?: Partial<Record<string, string>>;
   currentTime: Date;
   /** "12h" — controls the time format shown in the active reminder pill. */
   timeFormat: "12h" | "24h";
@@ -99,6 +104,7 @@ export function DepartureReminder({
   liveDepartureTime,
   arrivalTime,
   realtimeArrivalTime,
+  liveStopDepartures,
   currentTime,
   timeFormat,
   scheduleType,
@@ -222,17 +228,17 @@ export function DepartureReminder({
   }, [homeFromStation, homeToStation, fromStation, toStation, tripNumber, scheduleType, serviceDate]);
 
   // When focusRun leaves its boarding station: this view's live time when it
-  // starts there on today's service, else the run's scheduled one on its
+  // starts there on today's service; else the run's scheduled time on its
   // service date (e.g. the line map's corridor view, whose displayed departure
-  // is the terminus's, not the rider's boarding station's).
-  const focusRunDepartureAt = useMemo(
-    () =>
-      focusRun.fromStation === fromStation &&
-      scheduleType === getTodayScheduleType(currentTime)
-        ? departureAt
-        : focusedDepartureInstant(focusRun),
-    [focusRun, fromStation, scheduleType, currentTime, departureAt],
-  );
+  // is the terminus's, not the rider's boarding station's), moved to the live
+  // time the feed has for that station today.
+  const focusRunDepartureAt = useMemo(() => {
+    const today = scheduleType === getTodayScheduleType(currentTime);
+    if (today && focusRun.fromStation === fromStation) return departureAt;
+    const scheduled = focusedDepartureInstant(focusRun);
+    const live = today ? liveStopDepartures?.[focusRun.fromStation] : undefined;
+    return scheduled != null && live ? anchorLiveTime(scheduled, live) : scheduled;
+  }, [focusRun, fromStation, scheduleType, currentTime, departureAt, liveStopDepartures]);
 
   // Check the rider's location against the boarding station before focusing —
   // only for their own journey (the line map's corridor view starts at a

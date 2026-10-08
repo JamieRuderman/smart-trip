@@ -452,15 +452,6 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
 }
 
 /**
- * Builds maps from departure times to TripRealtimeStatus.
- * Primary map is keyed by the SCHEDULED departure time at fromStation (from the
- * static timetable), so it aligns with trip.departureTime in ScheduleResults.
- *
- * Delay detection: 511 always sends departureDelay: 0 and only shifts departure.time,
- * so we match each RT update to its static trip ({@link matchUpdatesToTrips}) and
- * compute the delay by diffing the live departure.time against the static scheduled time.
- */
-/**
  * A trip's live status from its leg's status maps: by its scheduled departure,
  * else — for a canceled run the feed sent without stop times — by any of its
  * stop times matching a canceled run's start time. Null when the feed has
@@ -479,6 +470,15 @@ export function findRealtimeStatus(
   return null;
 }
 
+/**
+ * Builds maps from departure times to TripRealtimeStatus.
+ * Primary map is keyed by the SCHEDULED departure time at fromStation (from the
+ * static timetable), so it aligns with trip.departureTime in ScheduleResults.
+ *
+ * Delay detection: 511 always sends departureDelay: 0 and only shifts departure.time,
+ * so we match each RT update to its static trip ({@link matchUpdatesToTrips}) and
+ * compute the delay by diffing the live departure.time against the static scheduled time.
+ */
 export function useTripRealtimeStatusMap(
   fromStation: Station | "",
   toStation: Station | "",

@@ -155,12 +155,26 @@ export function DepartureReminder({
       scheduleType,
     ) && focusedTrip.tripNumber === tripNumber;
 
-  // Whether the displayed leg IS the focused leg. When true, this view's
-  // (live) departureAt is the user's actual boarding departure; when false
-  // (e.g. the line-map corridor view), it isn't, so reminder math falls back
-  // to the focused leg's scheduled departure.
+  // Whether this view's departureTime is the train's departure from
+  // fromStation. The line map shows a train from a mid-corridor station (the
+  // one it last served, or a tapped arrival's) but keeps the corridor origin's
+  // times, so there departureAt is NOT a departure from fromStation.
+  const viewLeavesFromStation = useMemo(
+    () =>
+      getFilteredTrips(fromStation, toStation, scheduleType).find(
+        (trip) => trip.trip === tripNumber,
+      )?.departureTime === departureTime,
+    [fromStation, toStation, scheduleType, tripNumber, departureTime],
+  );
+
+  // Whether the displayed leg IS the focused leg, with this view's times
+  // leaving from its boarding station. When true, this view's (live)
+  // departureAt is the user's actual boarding departure; when false (e.g. the
+  // line-map corridor view), it isn't, so reminder math falls back to the
+  // focused leg's scheduled departure.
   const focusedExactLeg =
     isThisTripFocused &&
+    viewLeavesFromStation &&
     focusedTrip != null &&
     focusedTrip.fromStation === fromStation &&
     focusedTrip.toStation === toStation;
@@ -229,16 +243,27 @@ export function DepartureReminder({
 
   // When focusRun leaves its boarding station: this view's live time when it
   // starts there on today's service; else the run's scheduled time on its
-  // service date (e.g. the line map's corridor view, whose displayed departure
-  // is the terminus's, not the rider's boarding station's), moved to the live
-  // time the feed has for that station today.
+  // service date (e.g. the line map, whose displayed departure is the corridor
+  // origin's, not the rider's boarding station's — even when the view starts
+  // at that station), moved to the live time the feed has for that station
+  // today.
   const focusRunDepartureAt = useMemo(() => {
     const today = scheduleType === getTodayScheduleType(currentTime);
-    if (today && focusRun.fromStation === fromStation) return departureAt;
+    if (today && viewLeavesFromStation && focusRun.fromStation === fromStation) {
+      return departureAt;
+    }
     const scheduled = focusedDepartureInstant(focusRun);
     const live = today ? liveStopDepartures?.[focusRun.fromStation] : undefined;
     return scheduled != null && live ? anchorLiveTime(scheduled, live) : scheduled;
-  }, [focusRun, fromStation, scheduleType, currentTime, departureAt, liveStopDepartures]);
+  }, [
+    focusRun,
+    fromStation,
+    viewLeavesFromStation,
+    scheduleType,
+    currentTime,
+    departureAt,
+    liveStopDepartures,
+  ]);
 
   // Check the rider's location against the boarding station before focusing —
   // only for their own journey (the line map's corridor view starts at a

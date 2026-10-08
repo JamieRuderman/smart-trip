@@ -229,8 +229,8 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
  * yet departed — leaving closest to `target`, the time they were aiming for
  * (`run`'s live departure when known, else its scheduled one; ties go to the
  * later train). `liveStatus` (the leg's realtime status per train) makes it
- * skip canceled trains and ones skipping `from`, and judge "departed" by the
- * live departure, so a late train still counts. Null when none is left on
+ * skip canceled trains and ones skipping `from` or `to`, and judge "departed"
+ * by the live departure, so a late train still counts. Null when none is left on
  * `run`'s service day.
  */
 export function replacementRun(
@@ -257,7 +257,9 @@ export function replacementRun(
   let best: { tripNumber: number; gap: number; at: number } | null = null;
   for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
     const live = liveStatus(trip);
-    if (live?.isCanceled || live?.isOriginSkipped) continue;
+    if (live?.isCanceled || live?.isOriginSkipped || live?.isDestinationSkipped) {
+      continue;
+    }
     const scheduled = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));
     const at = live?.liveDepartureTime
       ? anchorLiveTime(scheduled, live.liveDepartureTime)

@@ -245,7 +245,7 @@ export function DepartureReminder({
 
   // While the location warning is up: the leg its fix switches to, and that
   // leg's live status, so the fix never takes a train that's canceled or
-  // skipping its new boarding station, and still counts a late one.
+  // skipping either end of it, and still counts a late one.
   const fixLeg = useMemo(
     () =>
       boardingCheck.warning &&

@@ -505,14 +505,18 @@ describe("replacementRun", () => {
         ? { isCanceled: false, isOriginSkipped: false, isDestinationSkipped: false, ...status }
         : null;
 
-  it("skips a train canceled live, even the same one", () => {
+  it.each([
+    { label: "canceled", status: { isCanceled: true } },
+    { label: "skipping the new boarding station", status: { isOriginSkipped: true } },
+    { label: "skipping the destination", status: { isDestinationSkipped: true } },
+  ])("skips a train $label live, even the same one", ({ status }) => {
     const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
     const next = replacementRun(
       run,
       "Santa Rosa North",
       "Larkspur",
       now,
-      { liveStatus: livePicked({ isCanceled: true }) },
+      { liveStatus: livePicked(status) },
     );
     expect(next).not.toBeNull();
     expect(next!.run.tripNumber).not.toBe(picked.trip);

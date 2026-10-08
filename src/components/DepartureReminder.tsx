@@ -37,6 +37,7 @@ import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
 import { BoardingLocationDialog } from "./BoardingLocationDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { StationsUpdatedNotice } from "./StationsUpdatedNotice";
 
 interface DepartureReminderProps {
   tripNumber: number;
@@ -198,6 +199,9 @@ export function DepartureReminder({
   }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
 
   const [confirmSwitch, setConfirmSwitch] = useState(false);
+  // The corrected leg when the location warning's fix found no train to take
+  // on it — shown in StationsUpdatedNotice until that closes.
+  const [noTrainLeg, setNoTrainLeg] = useState<{ from: Station; to: Station } | null>(null);
 
   // The run "Take this train" focuses. The Go control can be opened from the
   // line map, where the displayed trip runs origin→terminus. When the user has
@@ -303,19 +307,27 @@ export function DepartureReminder({
   // selected stations, then take the matching train on the corrected leg (the
   // same one when it serves it, else the one closest to this train's time —
   // see replacementRun) the way "Take this train" does, minus the "switch
-  // trains?" prompt: the rider has just picked a train twice over. No train
-  // left → just close onto the corrected schedule.
-  const fixAndFocus = (leg: { from: Station; to: Station }) => {
-    boardingCheck.dismiss();
+  // trains?" prompt: the rider has just picked a train twice over. No train to
+  // take → say the stations changed and to pick a time, and only switch them
+  // as that notice closes (switching rebuilds the home schedule, unmounting
+  // this sheet and the notice with it).
+  const switchStations = (leg: { from: Station; to: Station }) => {
     setFromStation(leg.from);
     setToStation(leg.to);
+  };
+  const fixAndFocus = (leg: { from: Station; to: Station }) => {
+    boardingCheck.dismiss();
     const next = replacementRun(focusRun, leg.from, leg.to, currentTime.getTime(), {
       target: focusRunDepartureAt ?? undefined,
       liveStatus: (trip) => findRealtimeStatus(fixLegLive, trip),
     });
-    if (!next) onClose();
+    if (!next) {
+      setNoTrainLeg(leg);
+      return;
+    }
+    switchStations(leg);
     // Already the rider's trip: re-focusing it would drop its reminder.
-    else if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();
+    if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();
     else focusAndOpen(next.run, next.departureAt);
   };
 
@@ -435,6 +447,17 @@ export function DepartureReminder({
             proceedWithGo();
           }}
           onCancel={boardingCheck.dismiss}
+        />
+      )}
+      {noTrainLeg && (
+        <StationsUpdatedNotice
+          fromStation={noTrainLeg.from}
+          toStation={noTrainLeg.to}
+          onClose={() => {
+            setNoTrainLeg(null);
+            switchStations(noTrainLeg);
+            onClose();
+          }}
         />
       )}
     </GutterRow>

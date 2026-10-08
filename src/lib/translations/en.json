@@ -271,7 +271,10 @@
     "otherStationTitle": "Not at {{from}}?",
     "otherStationBody": "You're closest to {{station}}, but this train leaves from {{from}}.",
     "leaveFrom": "Leave from {{station}}",
-    "takeAnyway": "Take it anyway"
+    "takeAnyway": "Take it anyway",
+    "updatedTitle": "Stations updated",
+    "updatedBody": "Your trip is now {{from}} to {{to}}. Pick a time to leave from the schedule.",
+    "updatedOk": "OK"
   },
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",

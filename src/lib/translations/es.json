@@ -271,7 +271,10 @@
     "otherStationTitle": "¿No estás en {{from}}?",
     "otherStationBody": "Estás más cerca de {{station}}, pero este tren sale de {{from}}.",
     "leaveFrom": "Salir de {{station}}",
-    "takeAnyway": "Tomarlo de todos modos"
+    "takeAnyway": "Tomarlo de todos modos",
+    "updatedTitle": "Estaciones actualizadas",
+    "updatedBody": "Tu viaje ahora es de {{from}} a {{to}}. Elige una hora de salida en el horario.",
+    "updatedOk": "Entendido"
   },
   "tracker": {
     "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",

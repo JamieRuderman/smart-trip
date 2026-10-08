@@ -309,13 +309,10 @@ export function DepartureReminder({
     boardingCheck.dismiss();
     setFromStation(leg.from);
     setToStation(leg.to);
-    const next = replacementRun(
-      focusRun,
-      leg.from,
-      leg.to,
-      currentTime.getTime(),
-      (trip) => findRealtimeStatus(fixLegLive, trip),
-    );
+    const next = replacementRun(focusRun, leg.from, leg.to, currentTime.getTime(), {
+      target: focusRunDepartureAt ?? undefined,
+      liveStatus: (trip) => findRealtimeStatus(fixLegLive, trip),
+    });
     if (!next) onClose();
     // Already the rider's trip: re-focusing it would drop its reminder.
     else if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();

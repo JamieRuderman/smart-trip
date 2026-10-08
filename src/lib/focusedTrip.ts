@@ -226,20 +226,26 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
  * The run to take on `from → to` in place of `run`, once the rider corrects
  * their stations, with its departure from `from`: the same train when it also
  * serves that leg and hasn't left `from` yet, else the train on that leg — not
- * yet departed — leaving closest to `run`'s own departure (the time they were
- * aiming for; ties go to the later one). `liveStatus` (the leg's realtime
- * status per train) makes it skip canceled trains and ones skipping `from`,
- * and judge "departed" by the live departure, so a late train still counts.
- * Null when none is left on `run`'s service day.
+ * yet departed — leaving closest to `target`, the time they were aiming for
+ * (`run`'s live departure when known, else its scheduled one; ties go to the
+ * later train). `liveStatus` (the leg's realtime status per train) makes it
+ * skip canceled trains and ones skipping `from`, and judge "departed" by the
+ * live departure, so a late train still counts. Null when none is left on
+ * `run`'s service day.
  */
 export function replacementRun(
   run: FocusedRun,
   from: Station,
   to: Station,
   now: number,
-  liveStatus: (trip: ProcessedTrip) => TripRealtimeStatus | null = () => null,
+  {
+    target = focusedDepartureInstant(run) ?? now,
+    liveStatus = () => null,
+  }: {
+    target?: number;
+    liveStatus?: (trip: ProcessedTrip) => TripRealtimeStatus | null;
+  } = {},
 ): { run: FocusedRun; departureAt: number } | null {
-  const target = focusedDepartureInstant(run) ?? now;
   // Trip numbers aren't guaranteed unique across directions, so only a
   // same-direction leg can carry the same train.
   const sameDirection =

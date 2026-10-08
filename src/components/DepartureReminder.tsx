@@ -7,6 +7,10 @@ import { useBoardingLocationCheck } from "@/hooks/useBoardingLocationCheck";
 import { useOpenTripView } from "@/hooks/useTripViewNavigation";
 import { isReminderSupported } from "@/lib/notificationScheduler";
 import {
+  correctedLeg,
+  type BoardingLocationWarning,
+} from "@/lib/boardingLocation";
+import {
   futureServiceDate,
   getTodayScheduleType,
   tripServesLeg,
@@ -14,6 +18,7 @@ import {
 import { isSouthbound } from "@/lib/stationUtils";
 import {
   focusedDepartureInstant,
+  focusedTripKey,
   focusedTripMatchesSchedule,
   replacementRun,
   type FocusedRun,
@@ -123,6 +128,8 @@ export function DepartureReminder({
     focusTrip,
     rescheduleReminder,
     setSelectedTrip,
+    setFromStation,
+    setToStation,
     openReminderDialog,
   } = useStationSelection();
 
@@ -229,52 +236,57 @@ export function DepartureReminder({
     active: sheetOpen,
   });
 
-  // Focus `run` (leaving at `runDepartureAt`) as the rider's trip.
-  const focusAndOpen = useCallback(
-    (run: FocusedRun, runDepartureAt: number) => {
-      void focusTrip(run);
-      // Close the detail sheet we're inside and land on the full-page My Trip
-      // view. (focusTrip commits the new focus synchronously, so the view
-      // renders the new trip, not the previous one.)
-      setSelectedTrip(null);
-      openTripView();
-      // Then pop the reminder modal (hosted at the app root, so it survives
-      // this sheet unmounting and the route change). Skip where notifications
-      // aren't supported, or when there's too little lead left to schedule a
-      // useful reminder — there's nothing worth configuring in either case.
-      // Focusing itself is still allowed right up to arrival.
-      if (
-        isReminderSupported() &&
-        !reminderLeadRange(runDepartureAt, currentTime.getTime()).tooLate
-      ) {
-        openReminderDialog();
-      }
-    },
-    [focusTrip, setSelectedTrip, openTripView, openReminderDialog, currentTime],
-  );
+  // Close the detail sheet we're inside and land on the full-page My Trip
+  // view.
+  const openMyTrip = () => {
+    setSelectedTrip(null);
+    openTripView();
+  };
 
-  const doFocus = useCallback(
-    () => focusAndOpen(focusRun, reminderDepartureAt),
-    [focusAndOpen, focusRun, reminderDepartureAt],
-  );
+  // Focus `run` (leaving at `runDepartureAt`) as the rider's trip.
+  const focusAndOpen = (run: FocusedRun, runDepartureAt: number) => {
+    // focusTrip commits the new focus synchronously, so My Trip renders the
+    // new trip, not the previous one.
+    void focusTrip(run);
+    openMyTrip();
+    // Then pop the reminder modal (hosted at the app root, so it survives this
+    // sheet unmounting and the route change). Skip where notifications aren't
+    // supported, or when there's too little lead left to schedule a useful
+    // reminder — there's nothing worth configuring in either case. Focusing
+    // itself is still allowed right up to arrival.
+    if (
+      isReminderSupported() &&
+      !reminderLeadRange(runDepartureAt, currentTime.getTime()).tooLate
+    ) {
+      openReminderDialog();
+    }
+  };
+
+  const doFocus = () => focusAndOpen(focusRun, reminderDepartureAt);
+
+  const proceedWithGo = () => {
+    if (isOtherTripFocused) setConfirmSwitch(true);
+    else doFocus();
+  };
 
   // "Swap stations" / "Leave from …" on the location warning: correct the
   // selected stations, then take the matching train on the corrected leg (the
   // same one when it serves it, else the one closest to this train's time —
-  // see replacementRun). No train left → just close onto the new schedule.
-  const fixAndFocus = useCallback(() => {
-    const leg = boardingCheck.fixTrip();
-    const run =
-      leg && replacementRun(focusRun, leg.from, leg.to, currentTime.getTime());
-    const runDepartureAt = run && focusedDepartureInstant(run);
-    if (run && runDepartureAt != null) focusAndOpen(run, runDepartureAt);
-    else onClose();
-  }, [boardingCheck, focusRun, currentTime, focusAndOpen, onClose]);
-
-  const proceedWithGo = useCallback(() => {
-    if (isOtherTripFocused) setConfirmSwitch(true);
-    else doFocus();
-  }, [doFocus, isOtherTripFocused]);
+  // see replacementRun) the way "Take this train" does, minus the "switch
+  // trains?" prompt: the rider has just picked a train twice over. No train
+  // left → just close onto the corrected schedule.
+  const fixAndFocus = (warning: BoardingLocationWarning) => {
+    boardingCheck.dismiss();
+    const leg = correctedLeg(warning, focusRun.fromStation, focusRun.toStation);
+    setFromStation(leg.from);
+    setToStation(leg.to);
+    const next = replacementRun(focusRun, leg.from, leg.to, currentTime.getTime());
+    if (!next) onClose();
+    // Already the rider's trip: re-focusing it would drop its reminder.
+    else if (focusedTrip && focusedTripKey(focusedTrip) === focusedTripKey(next.run)) {
+      openMyTrip();
+    } else focusAndOpen(next.run, next.departureAt);
+  };
 
   // Boarding station for the reminder text: the focused leg's origin when this
   // trip is focused (so the line-map corridor view still names the user's
@@ -345,10 +357,7 @@ export function DepartureReminder({
     return (
       <GutterRow>
         <Button
-          onClick={() => {
-            setSelectedTrip(null);
-            openTripView();
-          }}
+          onClick={openMyTrip}
           className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-my-trip-background text-white shadow-sm hover:bg-my-trip-background/90 active:bg-my-trip-background/90"
         >
           <TripIcon className="h-5 w-5" aria-hidden="true" />
@@ -364,10 +373,11 @@ export function DepartureReminder({
   // planning a trip) there's no real destination to focus, so hide Go.
   if (!homeFromStation || !homeToStation) return null;
   // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
-  // taking this train") doesn't need lead time — unlike the reminder modal —
-  // so it must NOT be gated on tooLateToSchedule, or the user couldn't
+  // taking this train") doesn't need lead time — unlike the reminder modal
+  // (see focusAndOpen) — so it must NOT be gated on that, or the user couldn't
   // re-focus a train shortly before departure (e.g. after tapping Stop).
   if (arrivalAt <= Date.now()) return null;
+  const locationWarning = boardingCheck.warning;
   return (
     <GutterRow>
       <Button
@@ -384,12 +394,12 @@ export function DepartureReminder({
         <span>{t("focusedTrip.go")}</span>
       </Button>
       {switchDialog}
-      {boardingCheck.warning && (
+      {locationWarning && (
         <BoardingLocationDialog
-          warning={boardingCheck.warning}
+          warning={locationWarning}
           fromStation={focusRun.fromStation}
           toStation={focusRun.toStation}
-          onFix={fixAndFocus}
+          onFix={() => fixAndFocus(locationWarning)}
           onContinue={() => {
             boardingCheck.dismiss();
             proceedWithGo();

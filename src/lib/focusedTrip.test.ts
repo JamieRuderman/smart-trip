@@ -461,16 +461,20 @@ describe("replacementRun", () => {
     const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
     expect(
       replacementRun(run, "Santa Rosa North", "Larkspur", now),
-    ).toEqual({ ...run, fromStation: "Santa Rosa North" });
+    ).toEqual({
+      run: { ...run, fromStation: "Santa Rosa North" },
+      departureAt: instant(pickedAtNorth.departureTime),
+    });
   });
 
   it("falls back to the closest train still to come once that one has left", () => {
     const now = instant(pickedAtNorth.departureTime);
     const next = replacementRun(run, "Santa Rosa North", "Larkspur", now);
     expect(next).not.toBeNull();
-    expect(next!.tripNumber).not.toBe(picked.trip);
-    const chosen = fromNorth.find((t) => t.trip === next!.tripNumber)!;
-    expect(instant(chosen.departureTime)).toBeGreaterThan(now);
+    expect(next!.run.tripNumber).not.toBe(picked.trip);
+    const chosen = fromNorth.find((t) => t.trip === next!.run.tripNumber)!;
+    expect(next!.departureAt).toBe(instant(chosen.departureTime));
+    expect(next!.departureAt).toBeGreaterThan(now);
   });
 
   it("swaps to the train closest to the picked time on the reverse leg", () => {
@@ -478,13 +482,13 @@ describe("replacementRun", () => {
     const target = instant(picked.departureTime);
     const now = target - 60 * 60_000;
     const next = replacementRun(run, "Larkspur", "Santa Rosa Downtown", now);
-    expect(next).toMatchObject({
+    expect(next?.run).toMatchObject({
       fromStation: "Larkspur",
       toStation: "Santa Rosa Downtown",
       serviceDate: SERVICE_DATE,
     });
     const gap = (hhmm: string) => Math.abs(instant(hhmm) - target);
-    const chosen = reverse.find((t) => t.trip === next!.tripNumber)!;
+    const chosen = reverse.find((t) => t.trip === next!.run.tripNumber)!;
     expect(instant(chosen.departureTime)).toBeGreaterThan(now);
     for (const t of reverse) {
       if (instant(t.departureTime) > now) {

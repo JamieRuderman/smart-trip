@@ -497,6 +497,20 @@ describe("replacementRun", () => {
     }
   });
 
+  it("skips trains live data rules out, including the same one", () => {
+    const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
+    const next = replacementRun(
+      run,
+      "Santa Rosa North",
+      "Larkspur",
+      now,
+      (trip) => trip.trip === picked.trip,
+    );
+    expect(next).not.toBeNull();
+    expect(next!.run.tripNumber).not.toBe(picked.trip);
+    expect(next!.departureAt).toBeGreaterThan(now);
+  });
+
   it("returns null when no train is left that day", () => {
     expect(
       replacementRun(run, "Larkspur", "Santa Rosa Downtown", instant("23:59")),

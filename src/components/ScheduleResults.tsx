@@ -14,7 +14,10 @@ import {
 } from "@/lib/scheduleUtils";
 import { parseServiceDate, parseTimeToMinutes } from "@/lib/timeUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import {
+  findRealtimeStatus,
+  useTripRealtimeStatusMap,
+} from "@/hooks/useTripUpdates";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { Station } from "@/types/smartSchedule";
 
@@ -129,18 +132,14 @@ export function ScheduleResults({
    * 2. Secondary: for CANCELED trips where the RT feed omitted stop_time_updates,
    *    scan trip.times for any time matching a canceledByStartTime key (origin time).
    */
-  const getRealtimeStatus = (trip: { departureTime: string; times: string[] }) => {
+  const getRealtimeStatus = (trip: { departureTime: string; times: string[] }) =>
     // Today's runs must not attach to a later day's same-time rows.
-    if (isFutureSchedule) return undefined;
-    const primary = realtimeStatusMap.get(trip.departureTime);
-    if (primary) return primary;
-    if (canceledByStartTime.size === 0) return undefined;
-    for (const t of trip.times) {
-      const secondary = canceledByStartTime.get(t);
-      if (secondary) return secondary;
-    }
-    return undefined;
-  };
+    isFutureSchedule
+      ? undefined
+      : findRealtimeStatus(
+          { statusMap: realtimeStatusMap, canceledByStartTime },
+          trip,
+        ) ?? undefined;
 
   return (
     <SectionCard>

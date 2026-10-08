@@ -460,6 +460,25 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
  * so we match each RT update to its static trip ({@link matchUpdatesToTrips}) and
  * compute the delay by diffing the live departure.time against the static scheduled time.
  */
+/**
+ * A trip's live status from its leg's status maps: by its scheduled departure,
+ * else — for a canceled run the feed sent without stop times — by any of its
+ * stop times matching a canceled run's start time. Null when the feed has
+ * nothing for it.
+ */
+export function findRealtimeStatus(
+  { statusMap, canceledByStartTime }: Pick<TripRealtimeStatusMaps, "statusMap" | "canceledByStartTime">,
+  trip: Pick<ProcessedTrip, "departureTime" | "times">,
+): TripRealtimeStatus | null {
+  const primary = statusMap.get(trip.departureTime);
+  if (primary) return primary;
+  for (const time of trip.times) {
+    const secondary = canceledByStartTime.get(time);
+    if (secondary) return secondary;
+  }
+  return null;
+}
+
 export function useTripRealtimeStatusMap(
   fromStation: Station | "",
   toStation: Station | "",

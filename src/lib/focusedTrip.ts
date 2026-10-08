@@ -226,14 +226,16 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
  * their stations, with its departure from `from`: the same train when it also
  * serves that leg and hasn't left `from` yet, else the train on that leg — not
  * yet departed — leaving closest to `run`'s own departure (the time they were
- * aiming for; ties go to the later one). Null when none is left on `run`'s
- * service day.
+ * aiming for; ties go to the later one). Trains `isUnavailable` rules out
+ * (e.g. canceled live) are skipped. Null when none is left on `run`'s service
+ * day.
  */
 export function replacementRun(
   run: FocusedRun,
   from: Station,
   to: Station,
   now: number,
+  isUnavailable: (trip: ProcessedTrip) => boolean = () => false,
 ): { run: FocusedRun; departureAt: number } | null {
   const target = focusedDepartureInstant(run) ?? now;
   // Trip numbers aren't guaranteed unique across directions, so only a
@@ -247,7 +249,7 @@ export function replacementRun(
   let best: { tripNumber: number; gap: number; at: number } | null = null;
   for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
     const at = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));
-    if (at <= now) continue;
+    if (at <= now || isUnavailable(trip)) continue;
     if (sameDirection && trip.trip === run.tripNumber) return onLeg(trip.trip, at);
     const gap = Math.abs(at - target);
     if (!best || gap < best.gap || (gap === best.gap && at > best.at)) {

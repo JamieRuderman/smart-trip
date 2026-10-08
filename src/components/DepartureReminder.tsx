@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useBoardingLocationCheck } from "@/hooks/useBoardingLocationCheck";
 import { useOpenTripView } from "@/hooks/useTripViewNavigation";
-import { isReminderSupported } from "@/lib/notificationScheduler";
 import {
-  correctedLeg,
-  type BoardingLocationWarning,
-} from "@/lib/boardingLocation";
+  findRealtimeStatus,
+  useTripRealtimeStatusMap,
+} from "@/hooks/useTripUpdates";
+import { isReminderSupported } from "@/lib/notificationScheduler";
+import { correctedLeg } from "@/lib/boardingLocation";
 import {
   futureServiceDate,
+  getFilteredTrips,
   getTodayScheduleType,
   tripServesLeg,
 } from "@/lib/scheduleUtils";
@@ -241,6 +243,26 @@ export function DepartureReminder({
     active: sheetOpen,
   });
 
+  // While the location warning is up: the leg its fix switches to, and that
+  // leg's live status, so the fix never takes a train that's canceled or
+  // skipping its new boarding station.
+  const fixLeg = useMemo(
+    () =>
+      boardingCheck.warning &&
+      correctedLeg(boardingCheck.warning, focusRun.fromStation, focusRun.toStation),
+    [boardingCheck.warning, focusRun],
+  );
+  const fixLegTrips = useMemo(
+    () => (fixLeg ? getFilteredTrips(fixLeg.from, fixLeg.to, focusRun.scheduleType) : []),
+    [fixLeg, focusRun.scheduleType],
+  );
+  const fixLegLive = useTripRealtimeStatusMap(
+    fixLeg?.from ?? "",
+    fixLeg?.to ?? "",
+    fixLegTrips,
+    focusRun.serviceDate.replace(/-/g, ""),
+  );
+
   // Close the detail sheet we're inside and land on the full-page My Trip
   // view.
   const openMyTrip = () => {
@@ -283,12 +305,20 @@ export function DepartureReminder({
   // see replacementRun) the way "Take this train" does, minus the "switch
   // trains?" prompt: the rider has just picked a train twice over. No train
   // left → just close onto the corrected schedule.
-  const fixAndFocus = (warning: BoardingLocationWarning) => {
+  const fixAndFocus = (leg: { from: Station; to: Station }) => {
     boardingCheck.dismiss();
-    const leg = correctedLeg(warning, focusRun.fromStation, focusRun.toStation);
     setFromStation(leg.from);
     setToStation(leg.to);
-    const next = replacementRun(focusRun, leg.from, leg.to, currentTime.getTime());
+    const next = replacementRun(
+      focusRun,
+      leg.from,
+      leg.to,
+      currentTime.getTime(),
+      (trip) => {
+        const live = findRealtimeStatus(fixLegLive, trip);
+        return live != null && (live.isCanceled || live.isOriginSkipped);
+      },
+    );
     if (!next) onClose();
     // Already the rider's trip: re-focusing it would drop its reminder.
     else if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();
@@ -384,7 +414,6 @@ export function DepartureReminder({
   // (see focusAndOpen) — so it must NOT be gated on that, or the user couldn't
   // re-focus a train shortly before departure (e.g. after tapping Stop).
   if (arrivalAt <= Date.now()) return null;
-  const locationWarning = boardingCheck.warning;
   return (
     <GutterRow>
       <Button
@@ -401,12 +430,12 @@ export function DepartureReminder({
         <span>{t("focusedTrip.go")}</span>
       </Button>
       {switchDialog}
-      {locationWarning && (
+      {boardingCheck.warning && fixLeg && (
         <BoardingLocationDialog
-          warning={locationWarning}
+          warning={boardingCheck.warning}
           fromStation={focusRun.fromStation}
           toStation={focusRun.toStation}
-          onFix={() => fixAndFocus(locationWarning)}
+          onFix={() => fixAndFocus(fixLeg)}
           onContinue={() => {
             boardingCheck.dismiss();
             proceedWithGo();

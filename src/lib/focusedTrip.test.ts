@@ -19,6 +19,7 @@ import {
 import { getFilteredTrips } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const FROM = stations[0];
 const TO = stations[stations.length - 1];
@@ -497,18 +498,42 @@ describe("replacementRun", () => {
     }
   });
 
-  it("skips trains live data rules out, including the same one", () => {
+  /** Live status for `picked` only. */
+  const livePicked =
+    (status: Partial<TripRealtimeStatus>) => (trip: { trip: number }) =>
+      trip.trip === picked.trip
+        ? { isCanceled: false, isOriginSkipped: false, isDestinationSkipped: false, ...status }
+        : null;
+
+  it("skips a train canceled live, even the same one", () => {
     const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
     const next = replacementRun(
       run,
       "Santa Rosa North",
       "Larkspur",
       now,
-      (trip) => trip.trip === picked.trip,
+      livePicked({ isCanceled: true }),
     );
     expect(next).not.toBeNull();
     expect(next!.run.tripNumber).not.toBe(picked.trip);
     expect(next!.departureAt).toBeGreaterThan(now);
+  });
+
+  it("keeps a late train that's past its scheduled time but hasn't left", () => {
+    const scheduled = instant(pickedAtNorth.departureTime);
+    const late = new Date(scheduled + 6 * 60_000);
+    const liveDepartureTime = `${String(late.getHours()).padStart(2, "0")}:${String(late.getMinutes()).padStart(2, "0")}`;
+    const next = replacementRun(
+      run,
+      "Santa Rosa North",
+      "Larkspur",
+      scheduled + 2 * 60_000,
+      livePicked({ liveDepartureTime }),
+    );
+    expect(next).toEqual({
+      run: { ...run, fromStation: "Santa Rosa North" },
+      departureAt: late.getTime(),
+    });
   });
 
   it("returns null when no train is left that day", () => {

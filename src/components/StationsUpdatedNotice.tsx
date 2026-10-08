@@ -1,15 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 /** How long the notice stays up before closing itself. */
 const AUTO_CLOSE_MS = 3000;
@@ -45,28 +37,12 @@ export function StationsUpdatedNotice({
   }, []);
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
-        <DialogHeader>
-          <DialogTitle>{t("boardingCheck.updatedTitle")}</DialogTitle>
-          <DialogDescription>
-            {t("boardingCheck.updatedBody", { from: fromStation, to: toStation })}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            onClick={onClose}
-            className="bg-my-trip-background text-white hover:bg-my-trip-background/90"
-          >
-            {t("boardingCheck.updatedOk")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      title={t("boardingCheck.updatedTitle")}
+      description={t("boardingCheck.updatedBody", { from: fromStation, to: toStation })}
+      primaryLabel={t("boardingCheck.updatedOk")}
+      onPrimary={onClose}
+      onDismiss={onClose}
+    />
   );
 }

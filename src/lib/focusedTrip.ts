@@ -101,6 +101,25 @@ export function focusedTripKey(focused: FocusedTrip): string {
   return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
 }
 
+/** Whether two runs are the same focus (train, service day, leg and schedule —
+ *  ignoring a focused trip's reminder and Live Activity fields). Used to detect a
+ *  focus change that happened while we awaited a permission prompt, so we don't
+ *  clobber it, and to tell a run apart from the one already focused. */
+export function sameFocusIdentity(
+  a: FocusedRun | null,
+  b: FocusedRun | null,
+): boolean {
+  return (
+    a != null &&
+    b != null &&
+    a.tripNumber === b.tripNumber &&
+    a.serviceDate === b.serviceDate &&
+    a.fromStation === b.fromStation &&
+    a.toStation === b.toStation &&
+    a.scheduleType === b.scheduleType
+  );
+}
+
 /** Whether the focused run's service day is `now`'s local calendar day. */
 export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
   return focused.serviceDate === toLocalDateKey(now);

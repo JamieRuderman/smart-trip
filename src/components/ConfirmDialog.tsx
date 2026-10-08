@@ -11,9 +11,9 @@ import {
 interface ConfirmDialogProps {
   title: string;
   description: string;
-  /** Outline button. */
-  secondaryLabel: string;
-  onSecondary: () => void;
+  /** Outline button; omit both for a one-button notice. */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   /** Filled "my trip" button. */
   primaryLabel: string;
   onPrimary: () => void;
@@ -21,7 +21,7 @@ interface ConfirmDialogProps {
   onDismiss: () => void;
 }
 
-/** The trip flow's two-button confirm prompt, mounted open. */
+/** The trip flow's confirm prompt (or one-button notice), mounted open. */
 export function ConfirmDialog({
   title,
   description,
@@ -44,9 +44,11 @@ export function ConfirmDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={onSecondary}>
-            {secondaryLabel}
-          </Button>
+          {secondaryLabel && onSecondary && (
+            <Button variant="outline" onClick={onSecondary}>
+              {secondaryLabel}
+            </Button>
+          )}
           <Button
             onClick={onPrimary}
             className="bg-my-trip-background text-white hover:bg-my-trip-background/90"

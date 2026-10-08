@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { deriveStatus, matchUpdatesToTrips } from "@/hooks/useTripUpdates";
+import {
+  deriveStatus,
+  findRealtimeStatus,
+  matchUpdatesToTrips,
+} from "@/hooks/useTripUpdates";
 import { GTFS_STOP_ID_TO_PLATFORM } from "@/lib/stationUtils";
 import { agencyWallTimeToEpochSeconds } from "@/lib/timeUtils";
-import type { GtfsRtTripUpdate } from "@/types/gtfsRt";
+import type { GtfsRtTripUpdate, TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 
 const DATE = "20260715";
@@ -179,5 +183,41 @@ describe("matchUpdatesToTrips", () => {
     const paired = matchUpdatesToTrips([opposite, own], [trip("t16", "09:44")], false);
     expect(paired.has(opposite)).toBe(false);
     expect(paired.has(own)).toBe(true);
+  });
+});
+
+describe("findRealtimeStatus", () => {
+  const status = (over: Partial<TripRealtimeStatus> = {}): TripRealtimeStatus => ({
+    isCanceled: false,
+    isOriginSkipped: false,
+    isDestinationSkipped: false,
+    ...over,
+  });
+  const trip = { departureTime: "08:10", times: ["07:30", "07:50", "08:10", "08:40"] };
+
+  it("finds a trip by its scheduled departure", () => {
+    const own = status({ delayMinutes: 4 });
+    const maps = {
+      statusMap: new Map([["08:10", own]]),
+      canceledByStartTime: new Map([["07:30", status({ isCanceled: true })]]),
+    };
+    expect(findRealtimeStatus(maps, trip)).toBe(own);
+  });
+
+  it("falls back to a canceled run whose start time is one of the trip's stop times", () => {
+    const canceled = status({ isCanceled: true });
+    const maps = {
+      statusMap: new Map<string, TripRealtimeStatus>(),
+      canceledByStartTime: new Map([["07:30", canceled]]),
+    };
+    expect(findRealtimeStatus(maps, trip)).toBe(canceled);
+  });
+
+  it("is null when the feed has nothing for the trip", () => {
+    const maps = {
+      statusMap: new Map([["09:00", status()]]),
+      canceledByStartTime: new Map([["06:00", status({ isCanceled: true })]]),
+    };
+    expect(findRealtimeStatus(maps, trip)).toBeNull();
   });
 });

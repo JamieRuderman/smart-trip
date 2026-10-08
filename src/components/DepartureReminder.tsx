@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { TripIcon } from "./icons/TripIcon";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,9 @@ import {
   focusedDepartureInstant,
   focusedTripMatchesSchedule,
   replacementRun,
+  sameFocusIdentity,
   type FocusedRun,
 } from "@/lib/focusedTrip";
-import { sameFocusIdentity } from "@/lib/liveActivityController";
 import { reminderLeadRange } from "@/lib/reminderLead";
 import {
   formatClockTime,
@@ -222,6 +222,19 @@ export function DepartureReminder({
   // The corrected leg when the location warning's fix found no train to take
   // on it — shown in StationsUpdatedNotice until that closes.
   const [noTrainLeg, setNoTrainLeg] = useState<{ from: Station; to: Station } | null>(null);
+  // The same leg until the notice closes and switches to it. Applied on
+  // unmount instead if this control goes away first (e.g. the train ends or
+  // is canceled while the notice is up), so the promised switch still lands.
+  const pendingSwitchRef = useRef<{ from: Station; to: Station } | null>(null);
+  useEffect(
+    () => () => {
+      const leg = pendingSwitchRef.current;
+      if (!leg) return;
+      setFromStation(leg.from);
+      setToStation(leg.to);
+    },
+    [setFromStation, setToStation],
+  );
 
   // The run "Take this train" focuses. The Go control can be opened from the
   // line map, where the displayed trip runs origin→terminus. When the user has
@@ -340,9 +353,10 @@ export function DepartureReminder({
   // see replacementRun) the way "Take this train" does, minus the "switch
   // trains?" prompt: the rider has just picked a train twice over. No train to
   // take → say the stations changed and to pick a time, and only switch them
-  // as that notice closes (switching rebuilds the home schedule, unmounting
+  // as that notice closes (switching can rebuild the home schedule, unmounting
   // this sheet and the notice with it).
   const switchStations = (leg: { from: Station; to: Station }) => {
+    pendingSwitchRef.current = null;
     setFromStation(leg.from);
     setToStation(leg.to);
   };
@@ -353,6 +367,7 @@ export function DepartureReminder({
       liveStatus: (trip) => findRealtimeStatus(fixLegLive, trip),
     });
     if (!next) {
+      pendingSwitchRef.current = leg;
       setNoTrainLeg(leg);
       return;
     }
@@ -423,6 +438,21 @@ export function DepartureReminder({
     />
   ) : null;
 
+  // The fix's "stations updated" notice. Portals out like switchDialog, and is
+  // rendered from every branch below: it holds the pending station switch, so
+  // a branch change while it's up (e.g. the train arriving) mustn't drop it.
+  const stationsNotice = noTrainLeg ? (
+    <StationsUpdatedNotice
+      fromStation={noTrainLeg.from}
+      toStation={noTrainLeg.to}
+      onClose={() => {
+        setNoTrainLeg(null);
+        switchStations(noTrainLeg);
+        onClose();
+      }}
+    />
+  ) : null;
+
   // A focused trip's status — the reminder countdown, Add-reminder, and
   // Cancel — all live on the full-page My Trip view, so the sheet just links
   // there. (The live-drift reschedule effect above still runs while the sheet
@@ -438,6 +468,7 @@ export function DepartureReminder({
           <span className="flex-1 text-left">{t("myTrip.view")}</span>
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </Button>
+        {stationsNotice}
       </GutterRow>
     );
   }
@@ -445,12 +476,12 @@ export function DepartureReminder({
   // "Going" means going somewhere — require a selected journey (origin +
   // destination). Without one (e.g. tapping a train on the line map before
   // planning a trip) there's no real destination to focus, so hide Go.
-  if (!homeFromStation || !homeToStation) return null;
+  if (!homeFromStation || !homeToStation) return stationsNotice;
   // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
   // taking this train") doesn't need lead time — unlike the reminder modal
   // (see focusAndOpen) — so it must NOT be gated on that, or the user couldn't
   // re-focus a train shortly before departure (e.g. after tapping Stop).
-  if (arrivalAt <= Date.now()) return null;
+  if (arrivalAt <= Date.now()) return stationsNotice;
   return (
     <GutterRow>
       <Button
@@ -480,17 +511,7 @@ export function DepartureReminder({
           onCancel={boardingCheck.dismiss}
         />
       )}
-      {noTrainLeg && (
-        <StationsUpdatedNotice
-          fromStation={noTrainLeg.from}
-          toStation={noTrainLeg.to}
-          onClose={() => {
-            setNoTrainLeg(null);
-            switchStations(noTrainLeg);
-            onClose();
-          }}
-        />
-      )}
+      {stationsNotice}
     </GutterRow>
   );
 }

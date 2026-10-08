@@ -14,6 +14,7 @@ import {
   loadFocusedTrip,
   reconstructFocusedTrip,
   saveFocusedTrip,
+  type FocusedRun,
   type FocusedTrip,
   type FocusedTripReminder,
 } from "@/lib/focusedTrip";
@@ -93,8 +94,8 @@ type ArmResult = { ok: true } | { ok: false; reason: "permission" | "schedule-fa
  *  sub-object). Used to detect a focus change that happened while we awaited a
  *  permission prompt, so we don't clobber it. */
 export function sameFocusIdentity(
-  a: FocusedTrip | null,
-  b: FocusedTrip | null,
+  a: FocusedRun | null,
+  b: FocusedRun | null,
 ): boolean {
   return (
     a != null &&

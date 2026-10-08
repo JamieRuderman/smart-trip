@@ -96,7 +96,7 @@ export function focusedTripMatchesSchedule(
  * Stable identity of a focused run — train, service day and leg. Use as a React
  * `key` so per-trip state (refs, latches) resets when the user switches trips.
  */
-export function focusedTripKey(focused: FocusedRun): string {
+export function focusedTripKey(focused: FocusedTrip): string {
   return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
 }
 
@@ -236,6 +236,10 @@ export function replacementRun(
   now: number,
 ): { run: FocusedRun; departureAt: number } | null {
   const target = focusedDepartureInstant(run) ?? now;
+  // Trip numbers aren't guaranteed unique across directions, so only a
+  // same-direction leg can carry the same train.
+  const sameDirection =
+    isSouthbound(from, to) === isSouthbound(run.fromStation, run.toStation);
   const onLeg = (tripNumber: number, departureAt: number) => ({
     run: { ...run, tripNumber, fromStation: from, toStation: to },
     departureAt,
@@ -244,7 +248,7 @@ export function replacementRun(
   for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
     const at = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));
     if (at <= now) continue;
-    if (trip.trip === run.tripNumber) return onLeg(trip.trip, at);
+    if (sameDirection && trip.trip === run.tripNumber) return onLeg(trip.trip, at);
     const gap = Math.abs(at - target);
     if (!best || gap < best.gap || (gap === best.gap && at > best.at)) {
       best = { tripNumber: trip.trip, gap, at };

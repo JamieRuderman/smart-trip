@@ -18,11 +18,11 @@ import {
 import { isSouthbound } from "@/lib/stationUtils";
 import {
   focusedDepartureInstant,
-  focusedTripKey,
   focusedTripMatchesSchedule,
   replacementRun,
   type FocusedRun,
 } from "@/lib/focusedTrip";
+import { sameFocusIdentity } from "@/lib/liveActivityController";
 import { reminderLeadRange } from "@/lib/reminderLead";
 import {
   formatClockTime,
@@ -215,23 +215,28 @@ export function DepartureReminder({
     return { ...run, fromStation, toStation };
   }, [homeFromStation, homeToStation, fromStation, toStation, tripNumber, scheduleType, serviceDate]);
 
+  // When focusRun leaves its boarding station: this view's live time when it
+  // starts there on today's service, else the run's scheduled one on its
+  // service date (e.g. the line map's corridor view, whose displayed departure
+  // is the terminus's, not the rider's boarding station's).
+  const focusRunDepartureAt = useMemo(
+    () =>
+      focusRun.fromStation === fromStation &&
+      scheduleType === getTodayScheduleType(currentTime)
+        ? departureAt
+        : focusedDepartureInstant(focusRun),
+    [focusRun, fromStation, scheduleType, currentTime, departureAt],
+  );
+
   // Check the rider's location against the boarding station before focusing —
   // only for their own journey (the line map's corridor view starts at a
-  // terminus most riders don't board at). Departure: this view's live time
-  // when it starts at the boarding station on today's service, else the run's
-  // scheduled one on its service date.
+  // terminus most riders don't board at).
   const isHomeLeg =
     focusRun.fromStation === homeFromStation && focusRun.toStation === homeToStation;
   const boardingCheck = useBoardingLocationCheck({
     from: focusRun.fromStation,
     to: focusRun.toStation,
-    departureAt:
-      !isHomeLeg || isThisTripFocused
-        ? null
-        : focusRun.fromStation === fromStation &&
-            scheduleType === getTodayScheduleType(currentTime)
-          ? departureAt
-          : focusedDepartureInstant(focusRun),
+    departureAt: !isHomeLeg || isThisTripFocused ? null : focusRunDepartureAt,
     now: currentTime.getTime(),
     active: sheetOpen,
   });
@@ -262,7 +267,10 @@ export function DepartureReminder({
     }
   };
 
-  const doFocus = () => focusAndOpen(focusRun, reminderDepartureAt);
+  // Gate the reminder modal on the departure of the run being focused (its
+  // boarding station), the same instant the modal itself counts down to.
+  const doFocus = () =>
+    focusAndOpen(focusRun, focusRunDepartureAt ?? reminderDepartureAt);
 
   const proceedWithGo = () => {
     if (isOtherTripFocused) setConfirmSwitch(true);
@@ -283,9 +291,8 @@ export function DepartureReminder({
     const next = replacementRun(focusRun, leg.from, leg.to, currentTime.getTime());
     if (!next) onClose();
     // Already the rider's trip: re-focusing it would drop its reminder.
-    else if (focusedTrip && focusedTripKey(focusedTrip) === focusedTripKey(next.run)) {
-      openMyTrip();
-    } else focusAndOpen(next.run, next.departureAt);
+    else if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();
+    else focusAndOpen(next.run, next.departureAt);
   };
 
   // Boarding station for the reminder text: the focused leg's origin when this

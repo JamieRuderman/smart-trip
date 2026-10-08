@@ -19,8 +19,12 @@ const geo = vi.hoisted(() => {
 vi.mock("@/hooks/useGeolocation", () => ({
   getRecentLocationFix: () => geo.get(),
 }));
+const selection = vi.hoisted(() => ({
+  setFromStation: vi.fn(),
+  setToStation: vi.fn(),
+}));
 vi.mock("@/contexts/stationSelection", () => ({
-  useStationSelection: () => ({ swapStations: vi.fn(), setFromStation: vi.fn() }),
+  useStationSelection: () => selection,
 }));
 
 import { useBoardingLocationCheck } from "./useBoardingLocationCheck";
@@ -78,6 +82,18 @@ describe("useBoardingLocationCheck", () => {
   it("warns instead of taking the train when closest to the destination", async () => {
     expect(await tap(AT_SAN_RAFAEL)).not.toHaveBeenCalled();
     expect(check.warning).toEqual({ kind: "nearDestination" });
+  });
+
+  it("switches the selected stations to the corrected leg on fix", async () => {
+    await tap(AT_SAN_RAFAEL);
+    let leg: ReturnType<typeof check.fixTrip> = null;
+    act(() => {
+      leg = check.fixTrip();
+    });
+    expect(leg).toEqual({ from: "San Rafael", to: "Petaluma Downtown" });
+    expect(selection.setFromStation).toHaveBeenCalledWith("San Rafael");
+    expect(selection.setToStation).toHaveBeenCalledWith("Petaluma Downtown");
+    expect(check.warning).toBeNull();
   });
 
   it("does nothing if the sheet starts closing while the check waits", async () => {

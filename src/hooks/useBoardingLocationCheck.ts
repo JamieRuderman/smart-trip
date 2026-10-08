@@ -3,6 +3,7 @@ import { useStationSelection } from "@/contexts/stationSelection";
 import { getRecentLocationFix } from "@/hooks/useGeolocation";
 import {
   checkBoardingLocation,
+  correctedLeg,
   shouldCheckBoardingLocation,
   type BoardingLocationWarning,
 } from "@/lib/boardingLocation";
@@ -38,7 +39,7 @@ export function useBoardingLocationCheck({
   now,
   active,
 }: BoardingLocationCheckInput) {
-  const { swapStations, setFromStation } = useStationSelection();
+  const { setFromStation, setToStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
   const [warning, setWarning] = useState<BoardingLocationWarning | null>(null);
   const enabled =
@@ -91,13 +92,16 @@ export function useBoardingLocationCheck({
     else proceed();
   };
 
-  /** Correct the trip instead of taking this train — it runs the wrong way
-   *  (or from the wrong station). The caller then closes its sheet so the
-   *  rider picks from the corrected schedule. */
+  /** Correct the selected stations instead of taking this train — it runs
+   *  the wrong way (or from the wrong station) — and return the corrected leg
+   *  so the caller can pick a train on it. */
   const fixTrip = () => {
-    if (warning?.kind === "nearDestination") swapStations();
-    else if (warning) setFromStation(warning.station);
     setWarning(null);
+    if (!warning) return null;
+    const leg = correctedLeg(warning, from, to);
+    setFromStation(leg.from);
+    setToStation(leg.to);
+    return leg;
   };
 
   return { checking, warning, guard, fixTrip, dismiss: () => setWarning(null) };

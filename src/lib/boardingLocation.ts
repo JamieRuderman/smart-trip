@@ -67,3 +67,15 @@ export function checkBoardingLocation(
     ? { kind: "nearDestination" }
     : { kind: "nearOtherStation", station: closest.station };
 }
+
+/** The leg a warning's fix switches to: swapped for `nearDestination`, else
+ *  leaving from the station the rider is closest to. */
+export function correctedLeg(
+  warning: BoardingLocationWarning,
+  from: Station,
+  to: Station,
+): { from: Station; to: Station } {
+  return warning.kind === "nearDestination"
+    ? { from: to, to: from }
+    : { from: warning.station, to };
+}

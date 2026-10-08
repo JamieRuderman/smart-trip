@@ -222,6 +222,35 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
 }
 
 /**
+ * The run to take on `from → to` in place of `run`, once the rider corrects
+ * their stations: the same train when it also serves that leg and hasn't left
+ * `from` yet, else the train on that leg — not yet departed — leaving closest
+ * to `run`'s own departure (the time they were aiming for; ties go to the
+ * later one). Null when none is left on `run`'s service day.
+ */
+export function replacementRun(
+  run: FocusedRun,
+  from: Station,
+  to: Station,
+  now: number,
+): FocusedRun | null {
+  const target = focusedDepartureInstant(run) ?? now;
+  let best: { tripNumber: number; gap: number; at: number } | null = null;
+  for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
+    const at = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));
+    if (at <= now) continue;
+    if (trip.trip === run.tripNumber) {
+      return { ...run, fromStation: from, toStation: to };
+    }
+    const gap = Math.abs(at - target);
+    if (!best || gap < best.gap || (gap === best.gap && at > best.at)) {
+      best = { tripNumber: trip.trip, gap, at };
+    }
+  }
+  return best && { ...run, tripNumber: best.tripNumber, fromStation: from, toStation: to };
+}
+
+/**
  * Resolve the focused trip's arrival (at its toStation) to an absolute instant
  * on its service date, rolling overnight trips to the next day. The single
  * source for the Live Activity countdown's arrival target. Sibling of

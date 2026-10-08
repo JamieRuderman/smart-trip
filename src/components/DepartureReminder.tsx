@@ -218,7 +218,14 @@ export function DepartureReminder({
     return departureAt;
   }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
 
-  const [confirmSwitch, setConfirmSwitch] = useState(false);
+  // A "switch trains?" confirmation waiting on the rider: the run to focus if
+  // they confirm, and — for the location warning's fix — the stations to
+  // switch to first.
+  const [confirmSwitch, setConfirmSwitch] = useState<{
+    run: FocusedRun;
+    departureAt: number;
+    leg?: { from: Station; to: Station };
+  } | null>(null);
   // The corrected leg when the location warning's fix found no train to take
   // on it — shown in StationsUpdatedNotice until that closes.
   const [noTrainLeg, setNoTrainLeg] = useState<{ from: Station; to: Station } | null>(null);
@@ -343,18 +350,22 @@ export function DepartureReminder({
     focusAndOpen(focusRun, focusRunDepartureAt ?? reminderDepartureAt);
 
   const proceedWithGo = () => {
-    if (isOtherTripFocused) setConfirmSwitch(true);
-    else doFocus();
+    if (isOtherTripFocused) {
+      setConfirmSwitch({
+        run: focusRun,
+        departureAt: focusRunDepartureAt ?? reminderDepartureAt,
+      });
+    } else doFocus();
   };
 
   // "Swap stations" / "Leave from …" on the location warning: correct the
   // selected stations, then take the matching train on the corrected leg (the
   // same one when it serves it, else the one closest to this train's time —
-  // see replacementRun) the way "Take this train" does, minus the "switch
-  // trains?" prompt: the rider has just picked a train twice over. No train to
-  // take → say the stations changed and to pick a time, and only switch them
-  // as that notice closes (switching can rebuild the home schedule, unmounting
-  // this sheet and the notice with it).
+  // see replacementRun) the way "Take this train" does — asking first when it
+  // would replace a different trip the rider already has. No train to take →
+  // say the stations changed and to pick a time. Either way the stations only
+  // switch once the rider is past the dialog (switching can rebuild the home
+  // schedule, unmounting this sheet and its dialogs with it).
   const switchStations = (leg: { from: Station; to: Station }) => {
     pendingSwitchRef.current = null;
     setFromStation(leg.from);
@@ -371,10 +382,16 @@ export function DepartureReminder({
       setNoTrainLeg(leg);
       return;
     }
-    switchStations(leg);
     // Already the rider's trip: re-focusing it would drop its reminder.
-    if (sameFocusIdentity(focusedTrip, next.run)) openMyTrip();
-    else focusAndOpen(next.run, next.departureAt);
+    if (sameFocusIdentity(focusedTrip, next.run)) {
+      switchStations(leg);
+      openMyTrip();
+    } else if (focusedTrip) {
+      setConfirmSwitch({ ...next, leg });
+    } else {
+      switchStations(leg);
+      focusAndOpen(next.run, next.departureAt);
+    }
   };
 
   // Boarding station for the reminder text: the focused leg's origin when this
@@ -419,22 +436,25 @@ export function DepartureReminder({
   // The "switch trains?" confirm dialog. Portals out of the gutter row, so it
   // can be rendered alongside whatever branch is active (only the Go branch
   // ever sets confirmSwitch, but rendering it unconditionally keeps it mounted
-  // across the brief states the user can't trigger it from).
+  // across the brief states the user can't trigger it from). Cancel drops the
+  // whole action, the location fix's station switch included.
   const switchDialog = confirmSwitch ? (
     <ConfirmDialog
       title={t("focusedTrip.switchTitle")}
       description={t("focusedTrip.switchBody", {
         current: focusedTrip?.tripNumber,
-        next: tripNumber,
+        next: confirmSwitch.run.tripNumber,
       })}
       secondaryLabel={t("focusedTrip.switchCancel")}
-      onSecondary={() => setConfirmSwitch(false)}
+      onSecondary={() => setConfirmSwitch(null)}
       primaryLabel={t("focusedTrip.switchConfirm")}
       onPrimary={() => {
-        setConfirmSwitch(false);
-        doFocus();
+        const { run, departureAt, leg } = confirmSwitch;
+        setConfirmSwitch(null);
+        if (leg) switchStations(leg);
+        focusAndOpen(run, departureAt);
       }}
-      onDismiss={() => setConfirmSwitch(false)}
+      onDismiss={() => setConfirmSwitch(null)}
     />
   ) : null;
 

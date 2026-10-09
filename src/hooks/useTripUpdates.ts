@@ -463,6 +463,7 @@ export function findRealtimeStatus(
 ): TripRealtimeStatus | null {
   const primary = statusMap.get(trip.departureTime);
   if (primary) return primary;
+  if (canceledByStartTime.size === 0) return null;
   for (const time of trip.times) {
     const secondary = canceledByStartTime.get(time);
     if (secondary) return secondary;

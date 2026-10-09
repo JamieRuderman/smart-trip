@@ -392,13 +392,16 @@ export function deriveStatus(
   );
 }
 
-export function useTripUpdates() {
+/** The shared trip-updates feed. `enabled: false` still reads whatever the
+ *  other subscribers keep fresh, without fetching or polling on its own. */
+export function useTripUpdates({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["gtfsrt", "tripupdates"],
     queryFn: fetchTripUpdates,
     refetchInterval: TRIP_UPDATES_POLL_INTERVAL,
     staleTime: 25 * 1000,
     retry: 2,
+    enabled,
   });
 }
 
@@ -452,6 +455,26 @@ export function matchUpdatesToTrips<T extends { tripId?: string; times: string[]
 }
 
 /**
+ * A trip's live status from its leg's status maps: by its scheduled departure,
+ * else — for a canceled run the feed sent without stop times — by any of its
+ * stop times matching a canceled run's start time. Null when the feed has
+ * nothing for it.
+ */
+export function findRealtimeStatus(
+  { statusMap, canceledByStartTime }: Pick<TripRealtimeStatusMaps, "statusMap" | "canceledByStartTime">,
+  trip: Pick<ProcessedTrip, "departureTime" | "times">,
+): TripRealtimeStatus | null {
+  const primary = statusMap.get(trip.departureTime);
+  if (primary) return primary;
+  if (canceledByStartTime.size === 0) return null;
+  for (const time of trip.times) {
+    const secondary = canceledByStartTime.get(time);
+    if (secondary) return secondary;
+  }
+  return null;
+}
+
+/**
  * Builds maps from departure times to TripRealtimeStatus.
  * Primary map is keyed by the SCHEDULED departure time at fromStation (from the
  * static timetable), so it aligns with trip.departureTime in ScheduleResults.
@@ -466,7 +489,11 @@ export function useTripRealtimeStatusMap(
   trips: ProcessedTrip[],
   serviceDay?: string,
 ): TripRealtimeStatusMaps {
-  const { data, error } = useTripUpdates();
+  // No leg yet (e.g. the location fix's leg while no warning is up) → nothing
+  // to map, so don't add another poller to the shared feed.
+  const { data, error } = useTripUpdates({
+    enabled: !!fromStation && !!toStation,
+  });
   const isUpstreamDown = isUpstreamFeedDown(error);
   const feedUnavailable = isFeedUnavailable(error);
 

@@ -4,7 +4,10 @@ import {
   reconstructFocusedTrip,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
-import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
+import {
+  findRealtimeStatus,
+  useTripRealtimeStatusMap,
+} from "@/hooks/useTripUpdates";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
@@ -45,18 +48,10 @@ export function useFocusedTripLive(
       focusedTrip.serviceDate.replace(/-/g, ""),
     );
 
-  const realtimeStatus = useMemo(() => {
-    if (!trip) return null;
-    const primary = statusMap.get(trip.departureTime);
-    if (primary) return primary;
-    if (canceledByStartTime.size > 0) {
-      for (const time of trip.times) {
-        const secondary = canceledByStartTime.get(time);
-        if (secondary) return secondary;
-      }
-    }
-    return null;
-  }, [statusMap, canceledByStartTime, trip]);
+  const realtimeStatus = useMemo(
+    () => (trip ? findRealtimeStatus({ statusMap, canceledByStartTime }, trip) : null),
+    [statusMap, canceledByStartTime, trip],
+  );
 
   const live = isFocusedTripToday(focusedTrip, new Date(now))
     ? realtimeStatus

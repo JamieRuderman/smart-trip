@@ -12,11 +12,14 @@ import {
   focusedArrivalInstant,
   focusedDepartureInstant,
   focusedTripClearInstant,
+  replacementRun,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
 } from "./focusedTrip";
 import { getFilteredTrips } from "@/lib/scheduleUtils";
 import stations from "@/data/stations";
+import type { Station } from "@/types/smartSchedule";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const FROM = stations[0];
 const TO = stations[stations.length - 1];
@@ -426,5 +429,137 @@ describe("migrateLegacyReminders", () => {
 
   it("is a no-op without a legacy key", () => {
     expect(migrateLegacyReminders()).toBeNull();
+  });
+});
+
+describe("replacementRun", () => {
+  const SERVICE_DATE = "2099-01-05";
+  /** `hhmm` on SERVICE_DATE as an epoch instant. */
+  const instant = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return new Date(2099, 0, 5, h, m).getTime();
+  };
+  const leg = (from: Station, to: Station) =>
+    getFilteredTrips(from, to, "weekday");
+
+  // A southbound train that stops at Santa Rosa North and then Santa Rosa
+  // Downtown — the rider picked it from Downtown but is closest to North.
+  const fromDowntown = leg("Santa Rosa Downtown", "Larkspur");
+  const fromNorth = leg("Santa Rosa North", "Larkspur");
+  const picked = fromDowntown.find((d) =>
+    fromNorth.some((n) => n.trip === d.trip),
+  )!;
+  const pickedAtNorth = fromNorth.find((n) => n.trip === picked.trip)!;
+  const run = {
+    tripNumber: picked.trip,
+    fromStation: "Santa Rosa Downtown" as Station,
+    toStation: "Larkspur" as Station,
+    scheduleType: "weekday" as const,
+    serviceDate: SERVICE_DATE,
+  };
+
+  it("keeps the same train when it also serves the corrected leg", () => {
+    const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
+    expect(
+      replacementRun(run, "Santa Rosa North", "Larkspur", now),
+    ).toEqual({
+      run: { ...run, fromStation: "Santa Rosa North" },
+      departureAt: instant(pickedAtNorth.departureTime),
+    });
+  });
+
+  it("falls back to the closest train still to come once that one has left", () => {
+    const now = instant(pickedAtNorth.departureTime);
+    const next = replacementRun(run, "Santa Rosa North", "Larkspur", now);
+    expect(next).not.toBeNull();
+    expect(next!.run.tripNumber).not.toBe(picked.trip);
+    const chosen = fromNorth.find((t) => t.trip === next!.run.tripNumber)!;
+    expect(next!.departureAt).toBe(instant(chosen.departureTime));
+    expect(next!.departureAt).toBeGreaterThan(now);
+  });
+
+  it("swaps to the train closest to the picked time on the reverse leg", () => {
+    const reverse = leg("Larkspur", "Santa Rosa Downtown");
+    const target = instant(picked.departureTime);
+    const now = target - 60 * 60_000;
+    const next = replacementRun(run, "Larkspur", "Santa Rosa Downtown", now);
+    expect(next?.run).toMatchObject({
+      fromStation: "Larkspur",
+      toStation: "Santa Rosa Downtown",
+      serviceDate: SERVICE_DATE,
+    });
+    const gap = (hhmm: string) => Math.abs(instant(hhmm) - target);
+    const chosen = reverse.find((t) => t.trip === next!.run.tripNumber)!;
+    expect(instant(chosen.departureTime)).toBeGreaterThan(now);
+    for (const t of reverse) {
+      if (instant(t.departureTime) > now) {
+        expect(gap(chosen.departureTime)).toBeLessThanOrEqual(gap(t.departureTime));
+      }
+    }
+  });
+
+  /** Live status for `picked` only. */
+  const livePicked =
+    (status: Partial<TripRealtimeStatus>) => (trip: { trip: number }) =>
+      trip.trip === picked.trip
+        ? { isCanceled: false, isOriginSkipped: false, isDestinationSkipped: false, ...status }
+        : null;
+
+  it.each([
+    { label: "canceled", status: { isCanceled: true } },
+    { label: "skipping the new boarding station", status: { isOriginSkipped: true } },
+    { label: "skipping the destination", status: { isDestinationSkipped: true } },
+  ])("skips a train $label live, even the same one", ({ status }) => {
+    const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
+    const next = replacementRun(
+      run,
+      "Santa Rosa North",
+      "Larkspur",
+      now,
+      { liveStatus: livePicked(status) },
+    );
+    expect(next).not.toBeNull();
+    expect(next!.run.tripNumber).not.toBe(picked.trip);
+    expect(next!.departureAt).toBeGreaterThan(now);
+  });
+
+  it("keeps a late train that's past its scheduled time but hasn't left", () => {
+    const scheduled = instant(pickedAtNorth.departureTime);
+    const late = new Date(scheduled + 6 * 60_000);
+    const liveDepartureTime = `${String(late.getHours()).padStart(2, "0")}:${String(late.getMinutes()).padStart(2, "0")}`;
+    const next = replacementRun(
+      run,
+      "Santa Rosa North",
+      "Larkspur",
+      scheduled + 2 * 60_000,
+      { liveStatus: livePicked({ liveDepartureTime }) },
+    );
+    expect(next).toEqual({
+      run: { ...run, fromStation: "Santa Rosa North" },
+      departureAt: late.getTime(),
+    });
+  });
+
+  it("aims for the given target, e.g. the picked train's live departure", () => {
+    const reverse = leg("Larkspur", "Santa Rosa Downtown");
+    const target = instant(picked.departureTime) + 45 * 60_000;
+    const now = instant(picked.departureTime) - 60 * 60_000;
+    const next = replacementRun(run, "Larkspur", "Santa Rosa Downtown", now, {
+      target,
+    });
+    expect(next).not.toBeNull();
+    const gap = (hhmm: string) => Math.abs(instant(hhmm) - target);
+    const chosen = reverse.find((t) => t.trip === next!.run.tripNumber)!;
+    for (const t of reverse) {
+      if (instant(t.departureTime) > now) {
+        expect(gap(chosen.departureTime)).toBeLessThanOrEqual(gap(t.departureTime));
+      }
+    }
+  });
+
+  it("returns null when no train is left that day", () => {
+    expect(
+      replacementRun(run, "Larkspur", "Santa Rosa Downtown", instant("23:59")),
+    ).toBeNull();
   });
 });

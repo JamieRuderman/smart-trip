@@ -1,6 +1,7 @@
 import type { Station } from "@/types/smartSchedule";
 import { Capacitor } from "@capacitor/core";
 import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
+import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
@@ -98,6 +99,25 @@ export function focusedTripMatchesSchedule(
  */
 export function focusedTripKey(focused: FocusedTrip): string {
   return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
+}
+
+/** Whether two runs are the same focus (train, service day, leg and schedule —
+ *  ignoring a focused trip's reminder and Live Activity fields). Used to detect a
+ *  focus change that happened while we awaited a permission prompt, so we don't
+ *  clobber it, and to tell a run apart from the one already focused. */
+export function sameFocusIdentity(
+  a: FocusedRun | null,
+  b: FocusedRun | null,
+): boolean {
+  return (
+    a != null &&
+    b != null &&
+    a.tripNumber === b.tripNumber &&
+    a.serviceDate === b.serviceDate &&
+    a.fromStation === b.fromStation &&
+    a.toStation === b.toStation &&
+    a.scheduleType === b.scheduleType
+  );
 }
 
 /** Whether the focused run's service day is `now`'s local calendar day. */
@@ -219,6 +239,58 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
   const trip = reconstructFocusedTrip(focused);
   if (!trip) return null;
   return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));
+}
+
+/**
+ * The run to take on `from → to` in place of `run`, once the rider corrects
+ * their stations, with its departure from `from`: the same train when it also
+ * serves that leg and hasn't left `from` yet, else the train on that leg — not
+ * yet departed — leaving closest to `target`, the time they were aiming for
+ * (`run`'s live departure when known, else its scheduled one; ties go to the
+ * later train). `liveStatus` (the leg's realtime status per train) makes it
+ * skip canceled trains and ones skipping `from` or `to`, and judge "departed"
+ * by the live departure, so a late train still counts. Null when none is left on
+ * `run`'s service day.
+ */
+export function replacementRun(
+  run: FocusedRun,
+  from: Station,
+  to: Station,
+  now: number,
+  {
+    target = focusedDepartureInstant(run) ?? now,
+    liveStatus = () => null,
+  }: {
+    target?: number;
+    liveStatus?: (trip: ProcessedTrip) => TripRealtimeStatus | null;
+  } = {},
+): { run: FocusedRun; departureAt: number } | null {
+  // Trip numbers aren't guaranteed unique across directions, so only a
+  // same-direction leg can carry the same train.
+  const sameDirection =
+    isSouthbound(from, to) === isSouthbound(run.fromStation, run.toStation);
+  const onLeg = (tripNumber: number, departureAt: number) => ({
+    run: { ...run, tripNumber, fromStation: from, toStation: to },
+    departureAt,
+  });
+  let best: { tripNumber: number; gap: number; at: number } | null = null;
+  for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
+    const live = liveStatus(trip);
+    if (live?.isCanceled || live?.isOriginSkipped || live?.isDestinationSkipped) {
+      continue;
+    }
+    const scheduled = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));
+    const at = live?.liveDepartureTime
+      ? anchorLiveTime(scheduled, live.liveDepartureTime)
+      : scheduled;
+    if (at <= now) continue;
+    if (sameDirection && trip.trip === run.tripNumber) return onLeg(trip.trip, at);
+    const gap = Math.abs(at - target);
+    if (!best || gap < best.gap || (gap === best.gap && at > best.at)) {
+      best = { tripNumber: trip.trip, gap, at };
+    }
+  }
+  return best && onLeg(best.tripNumber, best.at);
 }
 
 /**

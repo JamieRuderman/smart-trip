@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
   loadFocusedTrip,
+  sameFocusIdentity,
   saveFocusedTrip,
   type FocusedRun,
   type FocusedTrip,
@@ -15,7 +16,6 @@ import {
   notifyChange,
   reRegisterPushForFocus,
   replaceFocus,
-  sameFocusIdentity,
   syncFocusedActivityContent,
 } from "@/lib/liveActivityController";
 

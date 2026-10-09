@@ -13,6 +13,7 @@ import {
   focusedDepartureInstant,
   loadFocusedTrip,
   reconstructFocusedTrip,
+  sameFocusIdentity,
   saveFocusedTrip,
   type FocusedTrip,
   type FocusedTripReminder,
@@ -88,24 +89,6 @@ function onReminderFired(): void {
 }
 
 type ArmResult = { ok: true } | { ok: false; reason: "permission" | "schedule-failed" };
-
-/** Whether two focused trips are the same run (identity, ignoring the reminder
- *  sub-object). Used to detect a focus change that happened while we awaited a
- *  permission prompt, so we don't clobber it. */
-export function sameFocusIdentity(
-  a: FocusedTrip | null,
-  b: FocusedTrip | null,
-): boolean {
-  return (
-    a != null &&
-    b != null &&
-    a.tripNumber === b.tripNumber &&
-    a.serviceDate === b.serviceDate &&
-    a.fromStation === b.fromStation &&
-    a.toStation === b.toStation &&
-    a.scheduleType === b.scheduleType
-  );
-}
 
 /** Last content state sent per activity id — skips redundant plugin round-trips
  *  when the sync effect re-fires with unchanged data (RT poll, clock ticks). */

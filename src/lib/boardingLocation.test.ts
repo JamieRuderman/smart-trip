@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkBoardingLocation,
+  correctedLeg,
   shouldCheckBoardingLocation,
 } from "@/lib/boardingLocation";
 import { STATION_COORDINATES } from "@/data/stations";
@@ -112,5 +113,23 @@ describe("shouldCheckBoardingLocation", () => {
 
   it("skips a train more than two hours out", () => {
     expect(shouldCheckBoardingLocation(minutes(121), now)).toBe(false);
+  });
+});
+
+describe("correctedLeg", () => {
+  it("swaps the stations when the rider is closest to the destination", () => {
+    expect(
+      correctedLeg({ kind: "nearDestination" }, "Petaluma Downtown", "San Rafael"),
+    ).toEqual({ from: "San Rafael", to: "Petaluma Downtown" });
+  });
+
+  it("leaves from the station the rider is closest to, keeping the destination", () => {
+    expect(
+      correctedLeg(
+        { kind: "nearOtherStation", station: "Santa Rosa North" },
+        "Santa Rosa Downtown",
+        "Larkspur",
+      ),
+    ).toEqual({ from: "Santa Rosa North", to: "Larkspur" });
   });
 });

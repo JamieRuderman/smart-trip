@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useStationSelection } from "@/contexts/stationSelection";
 import { getRecentLocationFix } from "@/hooks/useGeolocation";
 import {
   checkBoardingLocation,
@@ -38,7 +37,6 @@ export function useBoardingLocationCheck({
   now,
   active,
 }: BoardingLocationCheckInput) {
-  const { swapStations, setFromStation } = useStationSelection();
   const [checking, setChecking] = useState(false);
   const [warning, setWarning] = useState<BoardingLocationWarning | null>(null);
   const enabled =
@@ -91,14 +89,5 @@ export function useBoardingLocationCheck({
     else proceed();
   };
 
-  /** Correct the trip instead of taking this train — it runs the wrong way
-   *  (or from the wrong station). The caller then closes its sheet so the
-   *  rider picks from the corrected schedule. */
-  const fixTrip = () => {
-    if (warning?.kind === "nearDestination") swapStations();
-    else if (warning) setFromStation(warning.station);
-    setWarning(null);
-  };
-
-  return { checking, warning, guard, fixTrip, dismiss: () => setWarning(null) };
+  return { checking, warning, guard, dismiss: () => setWarning(null) };
 }

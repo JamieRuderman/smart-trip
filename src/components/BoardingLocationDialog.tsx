@@ -7,8 +7,9 @@ interface BoardingLocationDialogProps {
   warning: BoardingLocationWarning;
   fromStation: Station;
   toStation: Station;
-  /** Fix the trip instead: swap the stations (`nearDestination`) or leave
-   *  from the station the rider is closest to (`nearOtherStation`). */
+  /** Fix the trip instead — swap the stations (`nearDestination`) or leave
+   *  from the station the rider is closest to (`nearOtherStation`) — and take
+   *  the matching train on it. */
   onFix: () => void;
   /** Take the train as planned. */
   onContinue: () => void;

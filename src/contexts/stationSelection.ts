@@ -27,6 +27,12 @@ export interface StationSelection {
   reminderDialogOpen: boolean;
   openReminderDialog: () => void;
   closeReminderDialog: () => void;
+  /** Whether the "stations updated, pick a time" notice is open — at the app
+   *  root, like the reminder modal, so it outlives the trip sheet whose
+   *  location fix switched the stations. */
+  stationsUpdatedOpen: boolean;
+  openStationsUpdated: () => void;
+  closeStationsUpdated: () => void;
   focusedTrip: FocusedTrip | null;
   focusTrip: (input: FocusTripInput) => Promise<void>;
   setReminder: (

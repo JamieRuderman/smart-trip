@@ -19,9 +19,6 @@ const geo = vi.hoisted(() => {
 vi.mock("@/hooks/useGeolocation", () => ({
   getRecentLocationFix: () => geo.get(),
 }));
-vi.mock("@/contexts/stationSelection", () => ({
-  useStationSelection: () => ({ swapStations: vi.fn(), setFromStation: vi.fn() }),
-}));
 
 import { useBoardingLocationCheck } from "./useBoardingLocationCheck";
 

@@ -392,13 +392,16 @@ export function deriveStatus(
   );
 }
 
-export function useTripUpdates() {
+/** The shared trip-updates feed. `enabled: false` still reads whatever the
+ *  other subscribers keep fresh, without fetching or polling on its own. */
+export function useTripUpdates({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["gtfsrt", "tripupdates"],
     queryFn: fetchTripUpdates,
     refetchInterval: TRIP_UPDATES_POLL_INTERVAL,
     staleTime: 25 * 1000,
     retry: 2,
+    enabled,
   });
 }
 
@@ -486,7 +489,11 @@ export function useTripRealtimeStatusMap(
   trips: ProcessedTrip[],
   serviceDay?: string,
 ): TripRealtimeStatusMaps {
-  const { data, error } = useTripUpdates();
+  // No leg yet (e.g. the location fix's leg while no warning is up) → nothing
+  // to map, so don't add another poller to the shared feed.
+  const { data, error } = useTripUpdates({
+    enabled: !!fromStation && !!toStation,
+  });
   const isUpstreamDown = isUpstreamFeedDown(error);
   const feedUnavailable = isFeedUnavailable(error);
 

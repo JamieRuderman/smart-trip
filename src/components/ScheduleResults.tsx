@@ -126,20 +126,11 @@ export function ScheduleResults({
 
   if (!direction) return null;
 
-  /**
-   * Two-level realtime status lookup:
-   * 1. Primary: match by fromStation scheduled departure time (normal case).
-   * 2. Secondary: for CANCELED trips where the RT feed omitted stop_time_updates,
-   *    scan trip.times for any time matching a canceledByStartTime key (origin time).
-   */
   const getRealtimeStatus = (trip: { departureTime: string; times: string[] }) =>
     // Today's runs must not attach to a later day's same-time rows.
     isFutureSchedule
-      ? undefined
-      : findRealtimeStatus(
-          { statusMap: realtimeStatusMap, canceledByStartTime },
-          trip,
-        ) ?? undefined;
+      ? null
+      : findRealtimeStatus({ statusMap: realtimeStatusMap, canceledByStartTime }, trip);
 
   return (
     <SectionCard>

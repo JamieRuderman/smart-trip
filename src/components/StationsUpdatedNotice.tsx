@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 /** How long the notice stays up before closing itself. */
@@ -11,6 +12,24 @@ interface StationsUpdatedNoticeProps {
   toStation: Station;
   /** Closed — by OK, dismissal, or the auto-close timer. */
   onClose: () => void;
+}
+
+/**
+ * App-root host for {@link StationsUpdatedNotice}, opened via context once the
+ * location warning's fix has switched the stations — so the notice reads the
+ * new trip and outlives the sheet the switch closes.
+ */
+export function StationsUpdatedHost() {
+  const { stationsUpdatedOpen, closeStationsUpdated, fromStation, toStation } =
+    useStationSelection();
+  if (!stationsUpdatedOpen || !fromStation || !toStation) return null;
+  return (
+    <StationsUpdatedNotice
+      fromStation={fromStation}
+      toStation={toStation}
+      onClose={closeStationsUpdated}
+    />
+  );
 }
 
 /**

@@ -284,6 +284,15 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     [],
   );
 
+  // The "stations updated" notice — likewise hosted at the app root (by
+  // StationsUpdatedHost) so it outlives the sheet that opened it.
+  const [stationsUpdatedOpen, setStationsUpdatedOpen] = useState(false);
+  const openStationsUpdated = useCallback(() => setStationsUpdatedOpen(true), []);
+  const closeStationsUpdated = useCallback(
+    () => setStationsUpdatedOpen(false),
+    [],
+  );
+
   const {
     focusedTrip,
     focusTrip,
@@ -344,6 +353,9 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       reminderDialogOpen,
       openReminderDialog,
       closeReminderDialog,
+      stationsUpdatedOpen,
+      openStationsUpdated,
+      closeStationsUpdated,
       focusedTrip,
       focusTrip,
       setReminder,
@@ -366,6 +378,9 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       reminderDialogOpen,
       openReminderDialog,
       closeReminderDialog,
+      stationsUpdatedOpen,
+      openStationsUpdated,
+      closeStationsUpdated,
       focusedTrip,
       focusTrip,
       setReminder,

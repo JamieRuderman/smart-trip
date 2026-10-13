@@ -254,11 +254,11 @@ export function reconstructFocusedTrip(focused: FocusedRun): ProcessedTrip | nul
 }
 
 /**
- * Resolve the focused trip's departure (at its fromStation) to an absolute
- * instant on its service date. Lets the reminder control compute a fire time
- * for the user's actual boarding station regardless of which leg/view the
- * control is rendered in (e.g. the line map's full-corridor view). Null if the
- * trip can't be reconstructed.
+ * Resolve the focused trip's (or a run about to be focused's) departure (at
+ * its fromStation) to an absolute instant on its service date — for when a
+ * view's own clock times are anchored to another day, or leave from another
+ * station (e.g. the line map's full-corridor view of a run). Null if the trip
+ * can't be reconstructed.
  */
 export function focusedDepartureInstant(focused: FocusedRun): number | null {
   const trip = reconstructFocusedTrip(focused);

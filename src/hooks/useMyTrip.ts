@@ -9,18 +9,19 @@ import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
 import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
+import { TOKEN, TRAIN_COLORS } from "@/components/SmartLineDiagram/tokens";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 type Accent = "past" | "canceled" | "delayed" | "onTrip";
 
 /** Each accent as a solid color, for drawing — the train marker takes the line
- *  map's my-trip blue while the trip is on its way. */
+ *  map's my-trip blue and running-late gold, so the two stay in step. */
 const ACCENT_COLOR: Record<Accent, string> = {
   past: "hsl(var(--muted-foreground))",
   canceled: "hsl(var(--destructive))",
-  delayed: "hsl(var(--smart-gold))",
-  onTrip: "hsl(var(--my-trip))",
+  delayed: TRAIN_COLORS.delayed,
+  onTrip: TOKEN.myTrip,
 };
 
 export interface MyTripInput {
@@ -51,7 +52,9 @@ export interface MyTripState {
   /** Solid background for "my trip" chrome: blue, running-late gold,
    *  cancelled red, or neutral once the trip has ended. White text on top. */
   accentBg: string;
-  /** The same accent as a CSS color, for drawing (the position card's train). */
+  /** The accent as a CSS color for drawing on the card surface (the position
+   *  card's train). Same states as `accentBg`, but in the drawing shades: the
+   *  line map's lighter my-trip blue, and the theme's muted gray once ended. */
   accentColor: string;
 }
 

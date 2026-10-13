@@ -217,8 +217,9 @@ export function TripPositionCard({
 
       {/* The track. Stops are evenly spaced in station-index space — the same
           schematic the line map uses — so the train lands between the right
-          dots. */}
-      <div className="mt-5 px-2">
+          dots. Inset enough (with the card's padding) that the train's pointer,
+          27px ahead of a marker at either end, stays inside the card. */}
+      <div className="mt-5 px-3">
         <div className="relative h-10">
           {/* Lead-in: the line coming from upstream stations, in the map's
               muted track color, fading out. */}
@@ -252,6 +253,10 @@ export function TripPositionCard({
             const isEndpoint = i === 0 || i === displayStops.length - 1;
             const color = stationTrackColor(station);
             const size = isEndpoint ? ENDPOINT_DOT_PX : STOP_DOT_PX;
+            // The map's station geometry (stroke-centered radius + stroke)
+            // scaled so the ring's outer edge is `size` across.
+            const r = isEndpoint ? TOKEN.terminalR : TOKEN.stationR;
+            const unit = size / (2 * r + TOKEN.stationStroke);
             return (
               <span
                 key={station}
@@ -260,7 +265,7 @@ export function TripPositionCard({
                   left: `${pct}%`,
                   width: size,
                   height: size,
-                  border: `${isEndpoint ? 3 : 2.5}px solid ${color}`,
+                  border: `${TOKEN.stationStroke * unit}px solid ${color}`,
                 }}
                 title={station}
                 aria-hidden="true"
@@ -269,8 +274,8 @@ export function TripPositionCard({
                   <span
                     className="rounded-full"
                     style={{
-                      width: size * TOKEN.terminalCoreRatio,
-                      height: size * TOKEN.terminalCoreRatio,
+                      width: 2 * r * TOKEN.terminalCoreRatio * unit,
+                      height: 2 * r * TOKEN.terminalCoreRatio * unit,
                       backgroundColor: color,
                     }}
                   />

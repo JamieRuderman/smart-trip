@@ -1,6 +1,10 @@
 import type { Station } from "@/types/smartSchedule";
 import { Capacitor } from "@capacitor/core";
-import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
+import {
+  getFilteredTrips,
+  getTodayScheduleType,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
@@ -123,6 +127,25 @@ export function sameFocusIdentity(
 /** Whether the focused run's service day is `now`'s local calendar day. */
 export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
   return focused.serviceDate === toLocalDateKey(now);
+}
+
+/**
+ * Whether a train running today — by trip number and direction, as the live
+ * map and line diagram see it — is the focused run. Adds the service-day check
+ * {@link focusedTripMatchesSchedule} leaves out: those surfaces only show
+ * today's runs, so a same-numbered focus on a later day isn't the train there.
+ */
+export function isFocusedTrainToday(
+  focused: FocusedTrip | null,
+  tripNumber: number,
+  isSouthboundLeg: boolean,
+  now: Date,
+): focused is FocusedTrip {
+  return (
+    focusedTripMatchesSchedule(focused, isSouthboundLeg, getTodayScheduleType(now)) &&
+    focused.tripNumber === tripNumber &&
+    isFocusedTripToday(focused, now)
+  );
 }
 
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

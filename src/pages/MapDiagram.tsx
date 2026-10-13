@@ -5,23 +5,25 @@ import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
-import { stationIndexMap, getClosestStation, isSouthbound } from "@/lib/stationUtils";
+import { findFullCorridorTrip } from "@/lib/scheduleUtils";
+import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
+import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
 import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
 } from "@/lib/animationConstants";
 import { useNow } from "@/hooks/useNow";
-import { TripDetailSheet } from "@/components/TripDetailSheet";
+import {
+  MapTripDetailSheet,
+  type MapTripDetail,
+} from "@/components/MapTripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import { StationInfoSheet } from "@/components/StationInfoSheet";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
 const WINDSOR = stations[0];
 const LARKSPUR = stations[stations.length - 1];
@@ -54,27 +56,29 @@ export default function MapDiagram() {
     return getClosestStation(userLat, userLng);
   }, [userLat, userLng]);
 
-  // The user's focused ("Go") trip reads as "my train" on the map — the same
-  // blue treatment a focused trip gets in every card. Match the focused run to
-  // its live marker by trip number + direction on today's schedule.
-  const myTrainKey = useMemo<string | null>(() => {
-    if (!focusedTrip) return null;
-    const sb = isSouthbound(focusedTrip.fromStation, focusedTrip.toStation);
-    if (!focusedTripMatchesSchedule(focusedTrip, sb, getTodayScheduleType())) {
-      return null;
-    }
-    const dir = sb ? 0 : 1;
-    const match = trains.find(
-      (tr) => tr.tripNumber === focusedTrip.tripNumber && tr.directionId === dir,
-    );
-    return match?.key ?? null;
-  }, [focusedTrip, trains]);
-
   // Stable Date that only advances on minute boundaries, so child sheets'
   // memos (arrivals/ETA) don't invalidate on every parent render.
   const nowSeconds = useNow(15_000);
   const nowMinute = Math.floor(nowSeconds / 60);
   const currentTime = useMemo(() => new Date(nowMinute * 60_000), [nowMinute]);
+
+  // The user's focused ("Go") trip reads as "my train" on the map — the same
+  // blue treatment a focused trip gets in every card. Match the focused run to
+  // its live marker by trip number + direction on today's service.
+  const myTrainKey = useMemo<string | null>(() => {
+    const match = trains.find(
+      (tr) =>
+        tr.tripNumber != null &&
+        tr.directionId != null &&
+        isFocusedTrainToday(
+          focusedTrip,
+          tr.tripNumber,
+          tr.directionId === 0,
+          currentTime,
+        ),
+    );
+    return match?.key ?? null;
+  }, [focusedTrip, trains, currentTime]);
 
   // Fade the diagram into the (already-visible) frame on mount, so the page
   // reads as a deliberate load — green header + blank container first, then the
@@ -88,12 +92,7 @@ export default function MapDiagram() {
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
   const [stationSheet, setStationSheet] = useState<Station | null>(null);
   const [stationSheetOpen, setStationSheetOpen] = useState(false);
-  const [detailTrip, setDetailTrip] = useState<{
-    trip: ProcessedTrip;
-    fromStation: Station;
-    toStation: Station;
-    realtimeStatus: TripRealtimeStatus | null;
-  } | null>(null);
+  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const handleTrainClick = useCallback((train: MapTrain) => {
@@ -278,24 +277,12 @@ export default function MapDiagram() {
       )}
 
       {detailTrip && (
-        <TripDetailSheet
+        <MapTripDetailSheet
+          detail={detailTrip}
           isOpen={detailOpen}
           onClose={closeDetail}
-          trip={detailTrip.trip}
-          fromStation={detailTrip.fromStation}
-          toStation={detailTrip.toStation}
           currentTime={currentTime}
           lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-          realtimeStatus={detailTrip.realtimeStatus}
-          timeFormat="12h"
-          isNextTrip={true}
-          showFerry={false}
-          isFocused={focusedTripMatchesSchedule(
-            focusedTrip,
-            detailTrip.toStation === LARKSPUR,
-            getTodayScheduleType(),
-          ) && focusedTrip.tripNumber === detailTrip.trip.trip}
-          scheduleType={getTodayScheduleType()}
           userFromStation={fromStation}
           userToStation={toStation}
         />

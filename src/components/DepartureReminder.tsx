@@ -20,7 +20,6 @@ import {
 import {
   anchorLiveTime,
   focusedDepartureInstant,
-  focusedTripIsLeg,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
@@ -65,7 +64,10 @@ interface DepartureReminderProps {
   scheduleType: "weekday" | "weekend";
   /** Whether this train is the rider's focused run, as the surface that opened
    *  the sheet decided it: a schedule row by trip number on the focused leg +
-   *  schedule type, the live maps by today's running train. */
+   *  schedule type, the live maps by today's running train. Pass true only for
+   *  a view of the focused leg itself — its stations, schedule and timetable
+   *  times — since the reminder math treats this view's departure as the
+   *  rider's boarding departure. */
   isFocused: boolean;
   /** Whether the detail sheet this control sits in is open — false while it
    *  animates closed. */
@@ -172,16 +174,6 @@ export function DepartureReminder({
     [fromStation, toStation, scheduleType, tripNumber, departureTime],
   );
 
-  // Whether the displayed leg IS the focused leg, with this view's times
-  // leaving from its boarding station. When true, this view's (live)
-  // departureAt is the user's actual boarding departure; when false (e.g. the
-  // line-map corridor view), it isn't, so reminder math falls back to the
-  // focused leg's scheduled departure.
-  const focusedExactLeg =
-    isThisTripFocused &&
-    viewLeavesFromStation &&
-    focusedTripIsLeg(focusedTrip, fromStation, toStation, scheduleType);
-
   // When the displayed schedule is today's service, anchor to the
   // (rollover-aware) displayed departure date. When it's a different service
   // (e.g. a weekend train chosen on a weekday), anchor to the next date that
@@ -198,26 +190,22 @@ export function DepartureReminder({
     return a < departureAt ? a + 24 * 60 * 60 * 1000 : a;
   }, [anchorTime, effectiveArrival, departureAt]);
 
-  // Departure used for ALL reminder math (lead range, fire time, drift). Use
-  // this view's live departureAt ONLY for the focused leg on today's service —
-  // there the displayed HH:MM is correctly anchored to today and reflects
-  // realtime drift. In every other focused case the displayed departureAt is
-  // mis-anchored, so resolve the focused leg's serviceDate-anchored departure:
-  //   • a different leg (e.g. the line-map corridor view) → target the user's
-  //     boarding station, not the corridor origin; and
-  //   • a non-today service (e.g. a weekend train picked on a weekday) →
-  //     buildDepartureTimestamp would anchor to today/tomorrow and arm the
-  //     reminder on the wrong day, so use the stored serviceDate instead.
+  // Departure used for ALL reminder math (lead range, fire time, drift). A
+  // focused view is the focused leg (see `isFocused`), so this view's live
+  // departureAt is the rider's boarding departure on today's service. On a
+  // non-today service (e.g. a weekend train picked on a weekday) it's anchored
+  // to the next day running that schedule, which may not be the focus's day,
+  // so use the stored serviceDate's departure instead.
   const reminderDepartureAt = useMemo(() => {
-    if (isThisTripFocused && focusedTrip) {
-      const focusedServiceIsToday =
-        focusedTrip.scheduleType === getTodayScheduleType(currentTime);
-      if (!focusedExactLeg || !focusedServiceIsToday) {
-        return focusedDepartureInstant(focusedTrip) ?? departureAt;
-      }
+    if (
+      isThisTripFocused &&
+      focusedTrip &&
+      focusedTrip.scheduleType !== getTodayScheduleType(currentTime)
+    ) {
+      return focusedDepartureInstant(focusedTrip) ?? departureAt;
     }
     return departureAt;
-  }, [isThisTripFocused, focusedExactLeg, focusedTrip, departureAt, currentTime]);
+  }, [isThisTripFocused, focusedTrip, departureAt, currentTime]);
 
   // A "switch trains?" confirmation waiting on the rider: what to take if
   // they confirm.
@@ -373,30 +361,23 @@ export function DepartureReminder({
     onClose();
   };
 
-  // Boarding station for the reminder text: the focused leg's origin when this
-  // trip is focused (so the line-map corridor view still names the user's
-  // station), otherwise this displayed leg's origin.
-  const reminderFromStation =
-    isThisTripFocused && focusedTrip ? focusedTrip.fromStation : fromStation;
-
   const buildText = useCallback(
     (leadMinutes: number) => ({
-      title: t("departureReminder.notificationTitle", { station: reminderFromStation }),
+      title: t("departureReminder.notificationTitle", { station: fromStation }),
       body: t("departureReminder.notificationBody", {
         leadMinutes,
-        station: reminderFromStation,
+        station: fromStation,
         time: formatClockTime(reminderDepartureAt, timeFormat, i18n.language),
         trip: tripNumber,
       }),
     }),
-    [reminderDepartureAt, reminderFromStation, i18n.language, t, timeFormat, tripNumber]
+    [reminderDepartureAt, fromStation, i18n.language, t, timeFormat, tripNumber]
   );
 
   // Live drift: when this focused trip has a reminder and the live departure
-  // implies a different fire time than what's stored, reschedule it. Only runs
-  // from the focused leg's own view, where reminderDepartureAt is the live
-  // boarding departure — the line-map corridor view's static time must not
-  // clobber a live-adjusted reminder.
+  // implies a different fire time than what's stored, reschedule it.
+  // reminderDepartureAt is the live boarding departure on a focused view (see
+  // `isFocused`); off focus both reminder fields are null, so nothing runs.
   const focusedReminderAt = isThisTripFocused
     ? focusedTrip?.reminder?.reminderAt ?? null
     : null;
@@ -404,13 +385,12 @@ export function DepartureReminder({
     ? focusedTrip?.reminder?.leadMinutes ?? null
     : null;
   useEffect(() => {
-    if (!focusedExactLeg) return;
     if (focusedReminderAt == null || focusedReminderLead == null) return;
     const expected = reminderDepartureAt - focusedReminderLead * 60_000;
     if (expected === focusedReminderAt) return;
     void rescheduleReminder(reminderDepartureAt, buildText(focusedReminderLead));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reminderDepartureAt, focusedExactLeg, focusedReminderAt, focusedReminderLead]);
+  }, [reminderDepartureAt, focusedReminderAt, focusedReminderLead]);
 
   // Whether the pending switch keeps the focused run (same train, service day
   // and schedule) and only changes its leg. Trip numbers repeat across the

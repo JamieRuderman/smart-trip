@@ -20,6 +20,7 @@ import {
 import {
   anchorLiveTime,
   focusedDepartureInstant,
+  focusedTripIsLeg,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
@@ -63,8 +64,8 @@ interface DepartureReminderProps {
    *  the wrong run. */
   scheduleType: "weekday" | "weekend";
   /** Whether this train is the rider's focused run, as the surface that opened
-   *  the sheet decided it: a schedule row by trip number + direction + schedule
-   *  type, the live maps by today's running train. */
+   *  the sheet decided it: a schedule row by trip number on the focused leg +
+   *  schedule type, the live maps by today's running train. */
   isFocused: boolean;
   /** Whether the detail sheet this control sits in is open — false while it
    *  animates closed. */
@@ -156,8 +157,7 @@ export function DepartureReminder({
 
   // Whether this is the focused train is the opening surface's call (see the
   // `isFocused` prop), so the control always agrees with the sheet's "My Trip"
-  // header. The displayed leg can still differ from the focused one (a
-  // same-direction home leg), which the reminder math below accounts for.
+  // header.
   const isThisTripFocused = isFocused && focusedTrip != null;
 
   // Whether this view's departureTime is the train's departure from
@@ -180,9 +180,7 @@ export function DepartureReminder({
   const focusedExactLeg =
     isThisTripFocused &&
     viewLeavesFromStation &&
-    focusedTrip != null &&
-    focusedTrip.fromStation === fromStation &&
-    focusedTrip.toStation === toStation;
+    focusedTripIsLeg(focusedTrip, fromStation, toStation, scheduleType);
 
   // When the displayed schedule is today's service, anchor to the
   // (rollover-aware) displayed departure date. When it's a different service
@@ -414,15 +412,38 @@ export function DepartureReminder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderDepartureAt, focusedExactLeg, focusedReminderAt, focusedReminderLead]);
 
+  // Whether the pending switch keeps the focused run (same train, service day
+  // and schedule) and only changes its leg. Trip numbers repeat across the
+  // weekday/weekend schedules, so a number match alone isn't the same train.
+  const switchesLegOnly =
+    confirmSwitch != null &&
+    focusedTrip != null &&
+    sameFocusIdentity(focusedTrip, {
+      ...confirmSwitch.run,
+      fromStation: focusedTrip.fromStation,
+      toStation: focusedTrip.toStation,
+    });
+
   // The "switch trains?" confirm dialog. Portals out of the gutter row. Cancel
   // drops the whole action, the location fix's station switch included.
   const switchDialog = confirmSwitch ? (
     <ConfirmDialog
       title={t("focusedTrip.switchTitle")}
-      description={t("focusedTrip.switchBody", {
-        current: focusedTrip?.tripNumber,
-        next: confirmSwitch.run.tripNumber,
-      })}
+      description={
+        // Same run, another leg: name the stations, not "Train 15 → 15".
+        switchesLegOnly && focusedTrip
+          ? t("focusedTrip.switchLegBody", {
+              trip: focusedTrip.tripNumber,
+              from: focusedTrip.fromStation,
+              to: focusedTrip.toStation,
+              nextFrom: confirmSwitch.run.fromStation,
+              nextTo: confirmSwitch.run.toStation,
+            })
+          : t("focusedTrip.switchBody", {
+              current: focusedTrip?.tripNumber,
+              next: confirmSwitch.run.tripNumber,
+            })
+      }
       secondaryLabel={t("focusedTrip.switchCancel")}
       onSecondary={() => setConfirmSwitch(null)}
       primaryLabel={t("focusedTrip.switchConfirm")}

@@ -76,25 +76,22 @@ export const FOCUSED_TRIP_CHANGED_EVENT = "smart-train-focused-trip-changed";
 export const REMINDER_FIRE_BUFFER_MS = 60_000;
 
 /**
- * Whether `focused` belongs to the same schedule as a displayed leg/arrival —
- * matched by direction + weekday/weekend schedule type, NOT exact leg. The same
- * physical train is shown under different legs (home schedule, line-map
- * corridor, station arrivals); this is the single source of truth for "is this
- * the focused train" on timetable surfaces (schedule rows and their sheets).
- * The live map surfaces use {@link isFocusedTrainToday}, which builds on it.
- * Callers that highlight a specific row still AND this with their own
- * trip-number equality. Direction guards against a trip number being reused on
- * the opposite-direction schedule.
+ * Whether the focused run is on this leg of this schedule — the same stations
+ * and weekday/weekend type. Timetable surfaces (the home schedule's rows) show
+ * a leg's own times, stops and fare, so only the focused leg reads as "My Trip"
+ * there; the same train on another leg is a different trip.
  */
-export function focusedTripMatchesSchedule(
+export function focusedTripIsLeg(
   focused: FocusedTrip | null,
-  isSouthboundLeg: boolean,
+  fromStation: Station,
+  toStation: Station,
   scheduleType: "weekday" | "weekend",
 ): focused is FocusedTrip {
   return (
     focused != null &&
-    focused.scheduleType === scheduleType &&
-    isSouthbound(focused.fromStation, focused.toStation) === isSouthboundLeg
+    focused.fromStation === fromStation &&
+    focused.toStation === toStation &&
+    focused.scheduleType === scheduleType
   );
 }
 
@@ -132,9 +129,11 @@ export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
 
 /**
  * Whether a train running today — by trip number and direction, as the live
- * map and line diagram see it — is the focused run. Adds the service-day check
- * {@link focusedTripMatchesSchedule} leaves out: those surfaces only show
- * today's runs, so a same-numbered focus on a later day isn't the train there.
+ * map and line diagram see it — is the focused run, whatever leg it's shown
+ * on (those surfaces then show the focused leg). Direction and schedule type
+ * guard against a trip number reused on the other direction's or day's
+ * schedule; the service day, against a same-numbered focus on a later day,
+ * since these surfaces only show today's runs.
  */
 export function isFocusedTrainToday(
   focused: FocusedTrip | null,
@@ -143,8 +142,10 @@ export function isFocusedTrainToday(
   now: Date,
 ): focused is FocusedTrip {
   return (
-    focusedTripMatchesSchedule(focused, isSouthboundLeg, getTodayScheduleType(now)) &&
+    focused != null &&
     focused.tripNumber === tripNumber &&
+    isSouthbound(focused.fromStation, focused.toStation) === isSouthboundLeg &&
+    focused.scheduleType === getTodayScheduleType(now) &&
     isFocusedTripToday(focused, now)
   );
 }

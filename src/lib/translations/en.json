@@ -237,6 +237,7 @@
     "departsOn": "Departs {{day}}",
     "switchTitle": "Change my trip?",
     "switchBody": "Your trip is set to Train {{current}}. Change it to Train {{next}}?",
+    "switchLegBody": "Your trip is set to Train {{trip}}, {{from}} → {{to}}. Change it to {{nextFrom}} → {{nextTo}}?",
     "switchConfirm": "Change",
     "switchCancel": "Cancel",
     "activityStartTitle": "Trip from {{station}} coming up",

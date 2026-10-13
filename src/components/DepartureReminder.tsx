@@ -14,12 +14,12 @@ import { correctedLeg, type Leg } from "@/lib/boardingLocation";
 import {
   futureServiceDate,
   getFilteredTrips,
-  getTodayScheduleType,
   tripServesLeg,
 } from "@/lib/scheduleUtils";
 import {
   anchorLiveTime,
   focusedDepartureInstant,
+  isFocusedTripToday,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
@@ -157,10 +157,11 @@ export function DepartureReminder({
     openStationsUpdated,
   } = useStationSelection();
 
-  // Whether this is the focused train is the opening surface's call (see the
-  // `isFocused` prop), so the control always agrees with the sheet's "My Trip"
-  // header.
-  const isThisTripFocused = isFocused && focusedTrip != null;
+  // The rider's focused run when this view is it. Whether this is the focused
+  // train is the opening surface's call (see the `isFocused` prop), so the
+  // control always agrees with the sheet's "My Trip" header.
+  const thisFocus = isFocused ? focusedTrip : null;
+  const isThisTripFocused = thisFocus != null;
 
   // Whether this view's departureTime is the train's departure from
   // fromStation. The line map shows a train from a mid-corridor station (the
@@ -191,21 +192,23 @@ export function DepartureReminder({
   }, [anchorTime, effectiveArrival, departureAt]);
 
   // Departure used for ALL reminder math (lead range, fire time, drift). A
-  // focused view is the focused leg (see `isFocused`), so this view's live
-  // departureAt is the rider's boarding departure on today's service. On a
-  // non-today service (e.g. a weekend train picked on a weekday) it's anchored
-  // to the next day running that schedule, which may not be the focus's day,
-  // so use the stored serviceDate's departure instead.
+  // focused view is the focused leg (see `isFocused`), so on today's service
+  // with the focus on today this view's live departureAt is the rider's
+  // boarding departure. Otherwise it's anchored to another day than the
+  // focus's — a non-today service (e.g. a weekend train picked on a weekday)
+  // to the next day running that schedule, a focus on another date (one picked
+  // past the next-day rollover, or an overnight run after midnight) to today —
+  // so use the stored serviceDate's departure instead, as ReminderDriftSync
+  // does (it reads the feed only on the focus's own day).
   const reminderDepartureAt = useMemo(() => {
     if (
-      isThisTripFocused &&
-      focusedTrip &&
-      focusedTrip.scheduleType !== getTodayScheduleType(currentTime)
+      thisFocus &&
+      (otherDayServiceDate != null || !isFocusedTripToday(thisFocus, currentTime))
     ) {
-      return focusedDepartureInstant(focusedTrip) ?? departureAt;
+      return focusedDepartureInstant(thisFocus) ?? departureAt;
     }
     return departureAt;
-  }, [isThisTripFocused, focusedTrip, departureAt, currentTime]);
+  }, [thisFocus, otherDayServiceDate, departureAt, currentTime]);
 
   // A "switch trains?" confirmation waiting on the rider: what to take if
   // they confirm.
@@ -378,12 +381,8 @@ export function DepartureReminder({
   // implies a different fire time than what's stored, reschedule it.
   // reminderDepartureAt is the live boarding departure on a focused view (see
   // `isFocused`); off focus both reminder fields are null, so nothing runs.
-  const focusedReminderAt = isThisTripFocused
-    ? focusedTrip?.reminder?.reminderAt ?? null
-    : null;
-  const focusedReminderLead = isThisTripFocused
-    ? focusedTrip?.reminder?.leadMinutes ?? null
-    : null;
+  const focusedReminderAt = thisFocus?.reminder?.reminderAt ?? null;
+  const focusedReminderLead = thisFocus?.reminder?.leadMinutes ?? null;
   useEffect(() => {
     if (focusedReminderAt == null || focusedReminderLead == null) return;
     const expected = reminderDepartureAt - focusedReminderLead * 60_000;

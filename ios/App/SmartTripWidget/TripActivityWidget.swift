@@ -54,7 +54,8 @@ struct TripActivityWidget: Widget {
             } minimal: {
                 // Same current-leg glyph as the compact leading slot — so a trip
                 // pushed to the tiny minimal slot (e.g. another app holds the
-                // primary island) still advances instead of a frozen glyph.
+                // primary island) re-derives its leg on each system re-render
+                // instead of showing a frozen glyph.
                 CompactLeadingIcon(model: model, accent: accent)
             }
             .keylineTint(accent)
@@ -97,6 +98,21 @@ private func countdownStage(_ model: TripActivityModel, now: Date = Date()) -> C
         return .departure
     }
     return .arrival
+}
+
+/// The progress-track milestone that opens the leg in progress: the bell while
+/// counting down to the leave alarm, the walker once it fires until departure,
+/// the train once rolling, then the destination pin once arrived. Derived from
+/// `countdownStage` (not `TripLegs`) so the compact glyph never disagrees with
+/// the countdown beside it — even with no usable track (missing or inverted
+/// departure → arrival) or an armed alarm at/after departure.
+private func activeMilestone(_ model: TripActivityModel, now: Date = Date()) -> TripMilestone {
+    if isArrived(model, now: now) { return .arrival }
+    switch countdownStage(model, now: now) {
+    case .alarm: return .alarm
+    case .departure: return model.armedReminderDate != nil ? .walking : .train
+    case .arrival: return .train
+    }
 }
 
 /// The instant the active stage's countdown ticks down to.
@@ -528,21 +544,15 @@ private struct WalkIconShape: Shape {
     }
 }
 
-/// Compact-leading glyph: the milestone that opens the leg currently filling on
-/// the progress track (see `TripLegs.activeMilestone`), so the compact pill names
-/// the leg you're on — the bell while counting down to the leave alarm, the
-/// walker on the way to the station, then the train once it's rolling. Once
-/// arrived the destination pin pairs with the trailing checkmark.
+/// Compact-leading glyph: the milestone that opens the leg you're on (see
+/// `activeMilestone`); once arrived the destination pin pairs with the trailing
+/// checkmark.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
 
     var body: some View {
-        let now = Date()
-        let milestone = isArrived(model, now: now)
-            ? TripMilestone.arrival
-            : TripLegs(model: model)?.activeMilestone(now: now) ?? .train
-        milestone.icon(size: 20)
+        activeMilestone(model).icon(size: 20)
             .foregroundStyle(accent)
             .padding(.horizontal, 2)
     }
@@ -834,14 +844,6 @@ private struct TripLegs {
     var durations: [TimeInterval]? {
         guard let alarm, let walk else { return nil }
         return [alarm, walk, train].map { $0.upperBound.timeIntervalSince($0.lowerBound) }
-    }
-
-    /// The milestone that opens the leg in progress at `now`: the bell until the
-    /// alarm, the walker until departure, then the train.
-    func activeMilestone(now: Date = Date()) -> TripMilestone {
-        if let alarm, now < alarm.upperBound { return .alarm }
-        if walk != nil, now < train.lowerBound { return .walking }
-        return .train
     }
 }
 

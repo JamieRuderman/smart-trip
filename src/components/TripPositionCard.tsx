@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/useNow";
 import { warmMapDiagram } from "@/pages/lazyPages";
 import { resolveLegPosition, type LegPosition } from "@/lib/legProgress";
-import { isSouthbound } from "@/lib/stationUtils";
+import { isSouthbound, stationZoneMap } from "@/lib/stationUtils";
 import { minutesOfDay } from "@/lib/timeUtils";
 import { scheduledStationIndex } from "@/lib/trainMotion";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
+import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { SectionCard } from "@/components/ui/section-card";
-import { TripIcon } from "./icons/TripIcon";
+import { TOKEN, TRAIN_COLORS } from "./SmartLineDiagram/tokens";
 import { TimeDisplay } from "./TimeDisplay";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripProgressResult } from "@/hooks/useTripProgress";
@@ -26,6 +27,50 @@ const LEAD_IN_PCT = 14;
 const LEAD_IN_STOPS = 3;
 const LEG_SPAN_PCT = 100 - LEAD_IN_PCT;
 const MILES_PRECISION = 1;
+
+// The track mirrors the line map's look, scaled to the card: a muted line
+// beyond the leg, the whole leg in its fare-zone colors, hollow station rings
+// (the rider's two stations enlarged with a filled core) and the map's train
+// marker, whose place on the line shows how far along the trip is.
+const TRACK_PX = 6;
+const STOP_DOT_PX = 12;
+const ENDPOINT_DOT_PX = 16;
+const MARKER_PX = 32;
+/** The map's halo radius relative to its marker's outer edge. */
+const HALO_SCALE =
+  TOKEN.trainPulseR / (TOKEN.trainInnerR + TOKEN.trainStroke / 2);
+
+const zoneColor = (station: Station) =>
+  ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR;
+
+/** The leg's zone colors as a hard-stop gradient across its width: each stop
+ *  owns the track halfway to its neighbors, as on the line map. */
+function zoneGradient(stops: Station[]): string {
+  const last = stops.length - 1;
+  if (last < 1) return stops.length ? zoneColor(stops[0]) : BRAND_LINE_COLOR;
+  const bands = stops.map((station, i) => {
+    const start = i === 0 ? 0 : ((i - 0.5) / last) * 100;
+    const end = i === last ? 100 : ((i + 0.5) / last) * 100;
+    return `${zoneColor(station)} ${start}% ${end}%`;
+  });
+  return `linear-gradient(to right, ${bands.join(", ")})`;
+}
+
+/** The map marker's 'my trip' blue, or its delayed gold / canceled gray; muted
+ *  once the trip is over. Same precedence as the My Trip accent. */
+function trainAccent(
+  progress: TripProgressResult,
+  model: TripDetailModel,
+): string {
+  if (progress.isEnded || model.isCanceledOrSkipped) {
+    return TRAIN_COLORS.canceled;
+  }
+  return model.isDelayed ? TRAIN_COLORS.delayed : TOKEN.myTrip;
+}
+
+/** The map's direction pointer (TOKEN.trainArrow), turned to point along the
+ *  track and scaled to the card marker. */
+const POINTER_SCALE = MARKER_PX / 2 / (TOKEN.trainInnerR + TOKEN.trainStroke / 2);
 
 /** Where the train marker sits, as % of the track width (null: not drawn). */
 function markerPctFor(position: LegPosition): number | null {
@@ -72,8 +117,6 @@ interface TripPositionCardProps {
   clockTime: Date;
   progress: TripProgressResult;
   model: TripDetailModel;
-  /** The "my trip" accent background (blue / gold / neutral). */
-  accentBg: string;
   timeFormat: "12h" | "24h";
 }
 
@@ -92,7 +135,6 @@ export function TripPositionCard({
   clockTime,
   progress,
   model,
-  accentBg,
   timeFormat,
 }: TripPositionCardProps) {
   const { t } = useTranslation();
@@ -117,8 +159,8 @@ export function TripPositionCard({
   });
 
   const markerPct = markerPctFor(position);
-  const filledPct =
-    markerPct == null ? 0 : Math.max(0, markerPct - LEAD_IN_PCT);
+  const legGradient = zoneGradient(displayStops);
+  const accent = trainAccent(progress, model);
   const isEstimate =
     position.phase === "enRoute" && position.source === "schedule";
   const showLive = vehicle != null && position.phase !== "arrived";
@@ -189,25 +231,28 @@ export function TripPositionCard({
           schematic the line map uses — so the train lands between the right
           dots. */}
       <div className="mt-5 px-2">
-        <div className="relative h-8">
-          {/* Lead-in: the line coming from upstream stations. */}
+        <div className="relative h-10">
+          {/* Lead-in: the line coming from upstream stations, in the map's
+              muted track color, fading out. */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 border-t-2 border-dashed border-muted-foreground/30"
-            style={{ left: 0, width: `${LEAD_IN_PCT}%` }}
+            className="absolute top-1/2 -translate-y-1/2"
+            style={{
+              left: 0,
+              width: `${LEAD_IN_PCT}%`,
+              height: TRACK_PX,
+              background: `linear-gradient(to right, transparent, ${TOKEN.mutedTrack} 70%)`,
+            }}
             aria-hidden="true"
           />
+          {/* The leg, in its fare zones' colors. */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-muted"
-            style={{ left: `${LEAD_IN_PCT}%`, right: 0 }}
-            aria-hidden="true"
-          />
-          <div
-            className={cn(
-              "absolute top-1/2 -translate-y-1/2 h-1 rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none",
-              accentBg,
-              isEstimate && "opacity-60",
-            )}
-            style={{ left: `${LEAD_IN_PCT}%`, width: `${filledPct}%` }}
+            className="absolute top-1/2 -translate-y-1/2"
+            style={{
+              left: `${LEAD_IN_PCT}%`,
+              right: 0,
+              height: TRACK_PX,
+              background: legGradient,
+            }}
             aria-hidden="true"
           />
           {displayStops.map((station, i) => {
@@ -217,52 +262,82 @@ export function TripPositionCard({
                 ? (LEG_SPAN_PCT * i) / (displayStops.length - 1)
                 : 0);
             const isEndpoint = i === 0 || i === displayStops.length - 1;
-            const passed = markerPct != null && pct <= markerPct + 0.01;
+            const color = zoneColor(station);
+            const size = isEndpoint ? ENDPOINT_DOT_PX : STOP_DOT_PX;
             return (
               <span
                 key={station}
-                className={cn(
-                  "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card",
-                  isEndpoint ? "h-3.5 w-3.5" : "h-2 w-2",
-                  passed
-                    ? accentBg
-                    : isEndpoint
-                      ? "bg-foreground/70"
-                      : "bg-muted-foreground/40",
-                )}
-                style={{ left: `${pct}%` }}
+                className="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card"
+                style={{
+                  left: `${pct}%`,
+                  width: size,
+                  height: size,
+                  border: `${isEndpoint ? 3 : 2.5}px solid ${color}`,
+                }}
                 title={station}
                 aria-hidden="true"
-              />
+              >
+                {isEndpoint && (
+                  <span
+                    className="rounded-full"
+                    style={{
+                      width: size * TOKEN.terminalCoreRatio,
+                      height: size * TOKEN.terminalCoreRatio,
+                      backgroundColor: color,
+                    }}
+                  />
+                )}
+              </span>
             );
           })}
           {markerPct != null && (
             <span
               className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-1000 ease-out motion-reduce:transition-none"
-              style={{ left: `${markerPct}%` }}
+              style={{ left: `${markerPct}%`, width: MARKER_PX, height: MARKER_PX }}
               aria-hidden="true"
             >
+              {/* The map marker's soft halo. */}
+              <span
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{
+                  width: MARKER_PX * HALO_SCALE,
+                  height: MARKER_PX * HALO_SCALE,
+                  backgroundColor: accent,
+                  opacity: TOKEN.trainPulseOpacity,
+                }}
+              />
               {/* A brief pulse on each fresh GPS fix (re-keyed per report),
                   rather than an endless animation on a screen left open for
                   the whole ride. */}
               {showLive && (
                 <span
                   key={vehicle.timestamp}
-                  className={cn(
-                    "absolute inset-0 rounded-full opacity-40 animate-ping motion-reduce:animate-none",
-                    accentBg,
-                  )}
-                  style={{ animationIterationCount: 2 }}
+                  className="absolute inset-0 rounded-full opacity-40 animate-ping motion-reduce:animate-none"
+                  style={{ backgroundColor: accent, animationIterationCount: 2 }}
                 />
               )}
+              {/* Direction pointer, tucked under the disc as on the map; the
+                  rider's leg always runs left to right here. */}
+              <svg
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible"
+                width={MARKER_PX}
+                height={MARKER_PX}
+                viewBox={`${-MARKER_PX / 2} ${-MARKER_PX / 2} ${MARKER_PX} ${MARKER_PX}`}
+              >
+                <path
+                  d={TOKEN.trainArrow}
+                  fill={accent}
+                  transform={`rotate(90) scale(${POINTER_SCALE})`}
+                />
+              </svg>
               <span
                 className={cn(
-                  "relative flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md ring-[3px] ring-card",
-                  accentBg,
+                  "absolute inset-0 flex items-center justify-center rounded-full bg-card text-[13px] font-black tabular-nums",
                   isEstimate && "opacity-75",
                 )}
+                style={{ border: `3px solid ${accent}`, color: accent }}
               >
-                <TripIcon className="h-4 w-4" />
+                {trip.trip}
               </span>
             </span>
           )}
@@ -270,11 +345,10 @@ export function TripPositionCard({
 
         {/* Endpoint labels + live-aware times, aligned under the dots. */}
         <div className="mt-2 flex justify-between gap-3 text-xs">
-          {/* Start the origin label at its dot's left edge (the endpoint dot
-              is 14px wide). */}
+          {/* Start the origin label at its dot's left edge. */}
           <div
             className="min-w-0"
-            style={{ paddingLeft: `calc(${LEAD_IN_PCT}% - 7px)` }}
+            style={{ paddingLeft: `calc(${LEAD_IN_PCT}% - ${ENDPOINT_DOT_PX / 2}px)` }}
           >
             <p className="truncate font-medium">{fromStation}</p>
             <TimeDisplay

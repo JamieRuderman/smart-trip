@@ -197,7 +197,6 @@ function MyTripView({
             clockTime={clockTime}
             progress={progress}
             model={model}
-            accentBg={accentBg}
             timeFormat={TIME_FORMAT}
           />
         )}

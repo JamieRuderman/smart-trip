@@ -397,6 +397,10 @@ describe("focusedTripIsLeg", () => {
     expect(focusedTripIsLeg(focused, FROM, stations[stations.length - 2], "weekday")).toBe(false);
   });
 
+  it("rejects the reversed leg", () => {
+    expect(focusedTripIsLeg(focused, TO, FROM, "weekday")).toBe(false);
+  });
+
   it("rejects the other schedule type or no focus", () => {
     expect(focusedTripIsLeg(focused, FROM, TO, "weekend")).toBe(false);
     expect(focusedTripIsLeg(null, FROM, TO, "weekday")).toBe(false);

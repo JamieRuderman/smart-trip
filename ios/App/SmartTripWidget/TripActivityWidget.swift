@@ -20,9 +20,8 @@ import WidgetKit
  * app is backgrounded, and the earlier `.relative` style kept ticking *upward*
  * past the target there, so the lock screen / expanded island showed an
  * ever-growing "2 min, 30 sec" of elapsed time instead of holding at zero. The
- * compact island pairs the same clamping timer with the glyph that opens the
- * leg in progress (see `CompactLeadingIcon`): the bell before the alarm, the
- * walker on the way to the station, then the train en route.
+ * compact island pairs the same clamping timer with the current leg's glyph
+ * (see `CompactLeadingIcon`).
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -53,10 +52,9 @@ struct TripActivityWidget: Widget {
             } compactTrailing: {
                 CompactCountdown(model: model)
             } minimal: {
-                // Stage-aware (bell → walker → train), same as the compact
-                // leading slot — so a trip pushed to the tiny minimal slot (e.g.
-                // another app holds the primary island) still follows the leg in
-                // progress instead of a frozen glyph.
+                // Same current-leg glyph as the compact leading slot — so a trip
+                // pushed to the tiny minimal slot (e.g. another app holds the
+                // primary island) still advances instead of a frozen glyph.
                 CompactLeadingIcon(model: model, accent: accent)
             }
             .keylineTint(accent)
@@ -408,9 +406,8 @@ private func appendSVGArc(_ path: inout Path, to end: CGPoint, radius: CGFloat,
     }
 }
 
-/// The SMART/lucide `map-pin` glyph — a teardrop pin with a hole — for the
-/// destination milestone that ends the progress track (and the compact island
-/// once arrived), matching the home card's MapPin.
+/// The SMART/lucide `map-pin` glyph — a teardrop pin with a hole — matching the
+/// home card's MapPin.
 /// Drawn as a vector so it matches the web app exactly; mirror of lucide-react's
 /// `MapPin` (keep in lockstep). Stroked like `TrainIcon`.
 private struct MapPinIcon: View {
@@ -466,10 +463,10 @@ private struct MapPinIconShape: Shape {
     }
 }
 
-/// A walking-person glyph for the walk-to-the-station leg on the compact island —
-/// a head over striding legs + arms. Drawn as a vector (not an SF Symbol) so it
-/// matches the web app's `WalkIcon` exactly; mirror of Tabler Icons' `walk`
-/// (MIT). Stroked like `TrainIcon`; keep in lockstep with the web component.
+/// A walking-person glyph — a head over striding legs + arms. Drawn as a vector
+/// (not an SF Symbol) so it matches the web app's `WalkIcon` exactly; mirror of
+/// Tabler Icons' `walk` (MIT). Stroked like `TrainIcon`; keep in lockstep with
+/// the web component.
 private struct WalkIcon: View {
     var size: CGFloat
     var strokeRatio: CGFloat = 0.083
@@ -531,31 +528,23 @@ private struct WalkIconShape: Shape {
     }
 }
 
-/// Compact-leading glyph: the milestone icon that opens the progress segment
-/// currently filling on the expanded island / lock screen, so the compact pill
-/// names the leg you're on — the bell while counting down to the leave alarm,
-/// the walker on the way to the station, then the train once it's rolling. A
-/// train-only trip has no walk leg, so it shows the train until arrival; once
+/// Compact-leading glyph: the milestone that opens the leg currently filling on
+/// the progress track (see `TripLegs.activeMilestone`), so the compact pill names
+/// the leg you're on — the bell while counting down to the leave alarm, the
+/// walker on the way to the station, then the train once it's rolling. Once
 /// arrived the destination pin pairs with the trailing checkmark.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
 
-    @ViewBuilder
     var body: some View {
-        Group {
-            if isArrived(model) {
-                MapPinIcon(size: 20)
-            } else {
-                switch countdownStage(model) {
-                case .alarm: BellRingIcon(size: 20)
-                case .departure where model.armedReminderDate != nil: WalkIcon(size: 20)
-                case .departure, .arrival: TrainIcon(size: 20)
-                }
-            }
-        }
-        .foregroundStyle(accent)
-        .padding(.horizontal, 2)
+        let now = Date()
+        let milestone = isArrived(model, now: now)
+            ? TripMilestone.arrival
+            : TripLegs(model: model)?.activeMilestone(now: now) ?? .train
+        milestone.icon(size: 20)
+            .foregroundStyle(accent)
+            .padding(.horizontal, 2)
     }
 }
 
@@ -796,6 +785,22 @@ private struct SurfaceStyle {
     )
 }
 
+/// The boundaries labelled above the progress track, in trip order. Each of the
+/// first three opens the leg after it; the destination pin closes the track.
+private enum TripMilestone {
+    case alarm, walking, train, arrival
+
+    @ViewBuilder
+    func icon(size: CGFloat, strokeRatio: CGFloat = 0.083) -> some View {
+        switch self {
+        case .alarm: BellRingIcon(size: size, strokeRatio: strokeRatio)
+        case .walking: WalkIcon(size: size, strokeRatio: strokeRatio)
+        case .train: TrainIcon(size: size, strokeRatio: strokeRatio)
+        case .arrival: MapPinIcon(size: size, strokeRatio: strokeRatio)
+        }
+    }
+}
+
 /// The date intervals behind the progress track. `nil` when the payload lacks
 /// a usable departure → arrival window; `alarm` is nil for a train-only trip.
 private struct TripLegs {
@@ -829,6 +834,14 @@ private struct TripLegs {
     var durations: [TimeInterval]? {
         guard let alarm, let walk else { return nil }
         return [alarm, walk, train].map { $0.upperBound.timeIntervalSince($0.lowerBound) }
+    }
+
+    /// The milestone that opens the leg in progress at `now`: the bell until the
+    /// alarm, the walker until departure, then the train.
+    func activeMilestone(now: Date = Date()) -> TripMilestone {
+        if let alarm, now < alarm.upperBound { return .alarm }
+        if walk != nil, now < train.lowerBound { return .walking }
+        return .train
     }
 }
 
@@ -911,10 +924,6 @@ private struct TripProgressTrack: View {
         .environment(\.colorScheme, style.trackColorScheme)
     }
 
-    private enum ProgressPhase {
-        case alarm, walking, train, arrival
-    }
-
     /// Completed legs are a faded outline; the current and upcoming legs are
     /// native bars whose distance still to cover is a faded solid fill.
     @ViewBuilder
@@ -936,25 +945,18 @@ private struct TripProgressTrack: View {
     }
 
     private func milestoneIcon(
-        _ phase: ProgressPhase,
+        _ milestone: TripMilestone,
         x: CGFloat,
         totalWidth: CGFloat,
         completed: Bool
     ) -> some View {
-        let size = phase == .walking ? walkingIconSize : iconSize
+        let size = milestone == .walking ? walkingIconSize : iconSize
         let inset = size / 2
         let clampedX = min(max(x, inset), max(inset, totalWidth - inset))
-        return Group {
-            switch phase {
-            case .alarm: BellRingIcon(size: size, strokeRatio: 0.1)
-            case .walking: WalkIcon(size: size, strokeRatio: 0.1)
-            case .train: TrainIcon(size: size, strokeRatio: 0.1)
-            case .arrival: MapPinIcon(size: size, strokeRatio: 0.1)
-            }
-        }
-        .foregroundStyle(accent)
-        .opacity(completed ? style.completedOpacity : 1)
-        .position(x: clampedX, y: walkingIconSize / 2)
+        return milestone.icon(size: size, strokeRatio: 0.1)
+            .foregroundStyle(accent)
+            .opacity(completed ? style.completedOpacity : 1)
+            .position(x: clampedX, y: walkingIconSize / 2)
     }
 
     /// Allocate the available width proportionally, then clamp only genuinely

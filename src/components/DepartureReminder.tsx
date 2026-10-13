@@ -17,11 +17,9 @@ import {
   getTodayScheduleType,
   tripServesLeg,
 } from "@/lib/scheduleUtils";
-import { isSouthbound } from "@/lib/stationUtils";
 import {
   anchorLiveTime,
   focusedDepartureInstant,
-  focusedTripMatchesSchedule,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
@@ -64,6 +62,10 @@ interface DepartureReminderProps {
    *  repeat across weekday/weekend, so an inferred type would focus/recognize
    *  the wrong run. */
   scheduleType: "weekday" | "weekend";
+  /** Whether this train is the rider's focused run, as the surface that opened
+   *  the sheet decided it: a schedule row by trip number + direction + schedule
+   *  type, the live maps by today's running train. */
+  isFocused: boolean;
   /** Whether the detail sheet this control sits in is open — false while it
    *  animates closed. */
   sheetOpen: boolean;
@@ -116,6 +118,7 @@ export function DepartureReminder({
   currentTime,
   timeFormat,
   scheduleType,
+  isFocused,
   sheetOpen,
   onClose,
 }: DepartureReminderProps) {
@@ -151,18 +154,11 @@ export function DepartureReminder({
     openStationsUpdated,
   } = useStationSelection();
 
-  // The same train can be viewed under different legs — its full corridor on
-  // the line map (origin→terminus) and the user's selected leg on the home
-  // schedule. Recognize "this is the focused train" by trip number + direction
-  // + schedule type (NOT exact leg) so the control behaves identically wherever
-  // it's opened. Shared predicate keeps this in lockstep with the schedule-row
-  // and station-arrival highlights.
-  const isThisTripFocused =
-    focusedTripMatchesSchedule(
-      focusedTrip,
-      isSouthbound(fromStation, toStation),
-      scheduleType,
-    ) && focusedTrip.tripNumber === tripNumber;
+  // Whether this is the focused train is the opening surface's call (see the
+  // `isFocused` prop), so the control always agrees with the sheet's "My Trip"
+  // header. The displayed leg can still differ from the focused one (a
+  // same-direction home leg), which the reminder math below accounts for.
+  const isThisTripFocused = isFocused && focusedTrip != null;
 
   // Whether this view's departureTime is the train's departure from
   // fromStation. The line map shows a train from a mid-corridor station (the

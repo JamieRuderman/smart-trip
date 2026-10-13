@@ -12,11 +12,13 @@ import {
   focusedArrivalInstant,
   focusedDepartureInstant,
   focusedTripClearInstant,
+  isFocusedTrainToday,
   replacementRun,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
 } from "./focusedTrip";
-import { getFilteredTrips } from "@/lib/scheduleUtils";
+import { getFilteredTrips, getTodayScheduleType } from "@/lib/scheduleUtils";
+import { toLocalDateKey } from "@/lib/timeUtils";
 import stations from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -348,6 +350,37 @@ describe("anchorLiveTime", () => {
     expect(anchorLiveTime(STATIC, "08:45*")).toBe(
       new Date(2026, 5, 9, 8, 45, 0, 0).getTime(),
     );
+  });
+});
+
+describe("isFocusedTrainToday", () => {
+  // A Wednesday; FROM → TO (Windsor → Larkspur) is southbound.
+  const now = new Date(2026, 2, 11, 8, 0);
+  const today = makeFocused({
+    scheduleType: getTodayScheduleType(now),
+    serviceDate: toLocalDateKey(now),
+  });
+
+  it("matches the focused run's number and direction on its service day", () => {
+    expect(isFocusedTrainToday(today, SAMPLE.trip, true, now)).toBe(true);
+  });
+
+  it("rejects another train, the opposite direction, or no focus", () => {
+    expect(isFocusedTrainToday(today, SAMPLE.trip + 1, true, now)).toBe(false);
+    expect(isFocusedTrainToday(today, SAMPLE.trip, false, now)).toBe(false);
+    expect(isFocusedTrainToday(null, SAMPLE.trip, true, now)).toBe(false);
+  });
+
+  it("rejects a same-numbered focus on the other schedule type", () => {
+    const other = today.scheduleType === "weekday" ? "weekend" : "weekday";
+    expect(
+      isFocusedTrainToday({ ...today, scheduleType: other }, SAMPLE.trip, true, now),
+    ).toBe(false);
+  });
+
+  it("rejects a same-schedule focus on a later service day", () => {
+    const tomorrow = { ...today, serviceDate: "2026-03-12" };
+    expect(isFocusedTrainToday(tomorrow, SAMPLE.trip, true, now)).toBe(false);
   });
 });
 

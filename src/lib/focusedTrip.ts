@@ -1,6 +1,10 @@
 import type { Station } from "@/types/smartSchedule";
 import { Capacitor } from "@capacitor/core";
-import { getFilteredTrips, type ProcessedTrip } from "@/lib/scheduleUtils";
+import {
+  getFilteredTrips,
+  getTodayScheduleType,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
@@ -76,10 +80,11 @@ export const REMINDER_FIRE_BUFFER_MS = 60_000;
  * matched by direction + weekday/weekend schedule type, NOT exact leg. The same
  * physical train is shown under different legs (home schedule, line-map
  * corridor, station arrivals); this is the single source of truth for "is this
- * the focused train" so every surface (schedule row, station sheet, detail
- * sheet) highlights it identically. Callers that highlight a specific row still
- * AND this with their own trip-number equality. Direction guards against a trip
- * number being reused on the opposite-direction schedule.
+ * the focused train" on timetable surfaces (schedule rows and their sheets).
+ * The live map surfaces use {@link isFocusedTrainToday}, which builds on it.
+ * Callers that highlight a specific row still AND this with their own
+ * trip-number equality. Direction guards against a trip number being reused on
+ * the opposite-direction schedule.
  */
 export function focusedTripMatchesSchedule(
   focused: FocusedTrip | null,
@@ -123,6 +128,25 @@ export function sameFocusIdentity(
 /** Whether the focused run's service day is `now`'s local calendar day. */
 export function isFocusedTripToday(focused: FocusedTrip, now: Date): boolean {
   return focused.serviceDate === toLocalDateKey(now);
+}
+
+/**
+ * Whether a train running today — by trip number and direction, as the live
+ * map and line diagram see it — is the focused run. Adds the service-day check
+ * {@link focusedTripMatchesSchedule} leaves out: those surfaces only show
+ * today's runs, so a same-numbered focus on a later day isn't the train there.
+ */
+export function isFocusedTrainToday(
+  focused: FocusedTrip | null,
+  tripNumber: number,
+  isSouthboundLeg: boolean,
+  now: Date,
+): focused is FocusedTrip {
+  return (
+    focusedTripMatchesSchedule(focused, isSouthboundLeg, getTodayScheduleType(now)) &&
+    focused.tripNumber === tripNumber &&
+    isFocusedTripToday(focused, now)
+  );
 }
 
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

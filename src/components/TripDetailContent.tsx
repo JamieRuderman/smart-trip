@@ -372,6 +372,7 @@ export function TripDetailContent({
             currentTime={currentTime}
             timeFormat={timeFormat}
             scheduleType={scheduleType}
+            isFocused={isFocused}
             sheetOpen={isOpen}
             onClose={onClose}
           />

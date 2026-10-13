@@ -20,11 +20,12 @@ import { MapLiveDataChip } from "@/components/MapLiveDataChip";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
-import { TripDetailSheet } from "@/components/TripDetailSheet";
-import { findFullCorridorTrip, getTodayScheduleType } from "@/lib/scheduleUtils";
-import { stationIndexMap } from "@/lib/stationUtils";
+import {
+  MapTripDetailSheet,
+  type MapTripDetail,
+} from "@/components/MapTripDetailSheet";
+import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
-import { useStationSelection } from "@/contexts/stationSelection";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import {
   MARKER_COLOR,
@@ -34,8 +35,6 @@ import {
   trainMarkerSignature,
 } from "@/lib/mapMarkers";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import type { TripRealtimeStatus } from "@/types/gtfsRt";
-import type { Station } from "@/types/smartSchedule";
 
 const WINDSOR = stations[0];
 const LARKSPUR = stations[stations.length - 1];
@@ -97,31 +96,13 @@ function MapContents() {
   const { theme } = useTheme();
   const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
-  // The user's currently-selected schedule leg comes from the shared
-  // StationSelectionContext. Used only to mark matching rows in the trip
-  // detail sheet — does not affect what's drawn on the map itself.
-  const { fromStation: userFromSelection, toStation: userToSelection } =
-    useStationSelection();
-  const userFromStation =
-    userFromSelection && stationIndexMap[userFromSelection] != null
-      ? userFromSelection
-      : null;
-  const userToStation =
-    userToSelection && stationIndexMap[userToSelection] != null
-      ? userToSelection
-      : null;
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
     autoRequestOnWeb: true,
   });
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [detailTrip, setDetailTrip] = useState<{
-    trip: ProcessedTrip;
-    fromStation: Station;
-    toStation: Station;
-    realtimeStatus: TripRealtimeStatus | null;
-  } | null>(null);
+  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
@@ -162,12 +143,7 @@ function MapContents() {
     const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
     const realtimeStatus =
       statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({
-      trip: displayTrip,
-      fromStation: displayFrom,
-      toStation: terminus,
-      realtimeStatus,
-    });
+    setDetailTrip({ trip: displayTrip, realtimeStatus });
   }, [sbStatusMaps, nbStatusMaps]);
 
   useEffect(() => {
@@ -509,28 +485,15 @@ function MapContents() {
         </div>
       )}
 
-      {/* Full trip detail sheet — opens over the map when a marker is tapped.
-          Renders nothing until a trip has been resolved. isNextTrip=true so
-          the header reads as an active, on-time trip when all displayed
-          stops are still in the future (the narrowed view hides past stops,
-          which would otherwise flip the header into the neutral "future"
-          state). */}
+      {/* Trip detail sheet — opens over the map when a marker is tapped.
+          Renders nothing until a trip has been resolved. */}
       {detailTrip && (
-        <TripDetailSheet
+        <MapTripDetailSheet
+          detail={detailTrip}
           isOpen={detailOpen}
           onClose={closeDetail}
-          trip={detailTrip.trip}
-          fromStation={detailTrip.fromStation}
-          toStation={detailTrip.toStation}
           currentTime={new Date()}
           lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-          realtimeStatus={detailTrip.realtimeStatus}
-          timeFormat="12h"
-          isNextTrip={true}
-          showFerry={false}
-          scheduleType={getTodayScheduleType()}
-          userFromStation={userFromStation}
-          userToStation={userToStation}
         />
       )}
     </div>

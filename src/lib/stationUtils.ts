@@ -43,6 +43,12 @@ export const stationIndexMap: Record<Station, number> = stations.reduce(
   {} as Record<Station, number>
 );
 
+/** `station` when it's on the line, else null — for a selection that may be
+ *  empty ("") or a stale stored name. */
+export function validStation(station: Station | ""): Station | null {
+  return station && stationIndexMap[station] != null ? station : null;
+}
+
 /**
  * Get the zone number for a station
  */

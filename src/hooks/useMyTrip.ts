@@ -9,8 +9,20 @@ import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
 import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
+import { TOKEN, TRAIN_COLORS } from "@/components/SmartLineDiagram/tokens";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+
+type Accent = "past" | "canceled" | "delayed" | "onTrip";
+
+/** Each accent as a solid color, for drawing — the train marker takes the line
+ *  map's my-trip blue and running-late gold, so the two stay in step. */
+const ACCENT_COLOR: Record<Accent, string> = {
+  past: "hsl(var(--muted-foreground))",
+  canceled: "hsl(var(--destructive))",
+  delayed: TRAIN_COLORS.delayed,
+  onTrip: TOKEN.myTrip,
+};
 
 export interface MyTripInput {
   focusedTrip: FocusedTrip;
@@ -40,6 +52,10 @@ export interface MyTripState {
   /** Solid background for "my trip" chrome: blue, running-late gold,
    *  cancelled red, or neutral once the trip has ended. White text on top. */
   accentBg: string;
+  /** The accent as a CSS color for drawing on the card surface (the position
+   *  card's train). Same states as `accentBg`, but in the drawing shades: the
+   *  line map's lighter my-trip blue, and the theme's muted gray once ended. */
+  accentColor: string;
 }
 
 /** Whether the focused leg shows its train's ferry connection: it has one and
@@ -107,13 +123,15 @@ export function useMyTripState({
     isFocused: true,
   });
 
-  const accentBg = progress.isEnded
-    ? stateBg.past
+  const accent: Accent = progress.isEnded
+    ? "past"
     : model.isCanceledOrSkipped
-      ? stateBg.canceled
+      ? "canceled"
       : model.isDelayed
-        ? stateBg.delayed
-        : "bg-my-trip-background";
+        ? "delayed"
+        : "onTrip";
+  const accentBg =
+    accent === "onTrip" ? "bg-my-trip-background" : stateBg[accent];
 
   return {
     focusedTrip,
@@ -126,5 +144,6 @@ export function useMyTripState({
     progress,
     model,
     accentBg,
+    accentColor: ACCENT_COLOR[accent],
   };
 }

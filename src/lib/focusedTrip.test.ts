@@ -12,6 +12,7 @@ import {
   focusedArrivalInstant,
   focusedDepartureInstant,
   focusedTripClearInstant,
+  focusedTripIsLeg,
   isFocusedTrainToday,
   replacementRun,
   FOCUSED_TRIP_STORAGE_KEY,
@@ -381,6 +382,24 @@ describe("isFocusedTrainToday", () => {
   it("rejects a same-schedule focus on a later service day", () => {
     const tomorrow = { ...today, serviceDate: "2026-03-12" };
     expect(isFocusedTrainToday(tomorrow, SAMPLE.trip, true, now)).toBe(false);
+  });
+});
+
+describe("focusedTripIsLeg", () => {
+  const focused = makeFocused();
+
+  it("matches the focused leg on its schedule", () => {
+    expect(focusedTripIsLeg(focused, FROM, TO, "weekday")).toBe(true);
+  });
+
+  it("rejects the same train on another leg in the same direction", () => {
+    expect(focusedTripIsLeg(focused, stations[1], TO, "weekday")).toBe(false);
+    expect(focusedTripIsLeg(focused, FROM, stations[stations.length - 2], "weekday")).toBe(false);
+  });
+
+  it("rejects the other schedule type or no focus", () => {
+    expect(focusedTripIsLeg(focused, FROM, TO, "weekend")).toBe(false);
+    expect(focusedTripIsLeg(null, FROM, TO, "weekday")).toBe(false);
   });
 });
 

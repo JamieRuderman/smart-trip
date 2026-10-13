@@ -237,6 +237,7 @@
     "departsOn": "Sale el {{day}}",
     "switchTitle": "¿Cambiar mi viaje?",
     "switchBody": "Tu viaje es el tren {{current}}. ¿Cambiarlo al tren {{next}}?",
+    "switchLegBody": "Tu viaje es el tren {{trip}}, {{from}} → {{to}}. ¿Cambiarlo a {{nextFrom}} → {{nextTo}}?",
     "switchConfirm": "Cambiar",
     "switchCancel": "Cancelar",
     "activityStartTitle": "Tu viaje desde {{station}} se acerca",

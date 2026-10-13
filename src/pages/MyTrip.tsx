@@ -78,6 +78,7 @@ function MyTripView({
     progress,
     model,
     accentBg,
+    accentColor,
   } = state;
   const { fromStation, toStation } = focusedTrip;
 
@@ -197,6 +198,7 @@ function MyTripView({
             clockTime={clockTime}
             progress={progress}
             model={model}
+            accentColor={accentColor}
             timeFormat={TIME_FORMAT}
           />
         )}

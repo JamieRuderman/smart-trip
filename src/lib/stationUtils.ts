@@ -6,6 +6,7 @@ import {
   type PlatformInfo,
   type TrainDirection,
 } from "@/data/generated/stationPlatforms.generated";
+import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 import { FERRY_CONSTANTS } from "./fareConstants";
 
 /**
@@ -33,6 +34,12 @@ export const stationZoneMap: Record<Station, number> = stationZones.reduce(
   },
   {} as Record<Station, number>
 );
+
+/** A station's track color on the line map: its fare zone's color, or the
+ *  brand green for a station without one. */
+export function stationTrackColor(station: Station): string {
+  return ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR;
+}
 
 // Pre-computed station index lookup (derived from stations data)
 export const stationIndexMap: Record<Station, number> = stations.reduce(

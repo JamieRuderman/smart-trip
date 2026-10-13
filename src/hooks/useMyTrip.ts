@@ -12,6 +12,17 @@ import { stateBg } from "@/lib/tripTheme";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
+type Accent = "past" | "canceled" | "delayed" | "onTrip";
+
+/** Each accent as a solid color, for drawing — the train marker takes the line
+ *  map's my-trip blue while the trip is on its way. */
+const ACCENT_COLOR: Record<Accent, string> = {
+  past: "hsl(var(--muted-foreground))",
+  canceled: "hsl(var(--destructive))",
+  delayed: "hsl(var(--smart-gold))",
+  onTrip: "hsl(var(--my-trip))",
+};
+
 export interface MyTripInput {
   focusedTrip: FocusedTrip;
   /** The focused trip reconstructed from the schedule. */
@@ -40,6 +51,8 @@ export interface MyTripState {
   /** Solid background for "my trip" chrome: blue, running-late gold,
    *  cancelled red, or neutral once the trip has ended. White text on top. */
   accentBg: string;
+  /** The same accent as a CSS color, for drawing (the position card's train). */
+  accentColor: string;
 }
 
 /** Whether the focused leg shows its train's ferry connection: it has one and
@@ -107,13 +120,15 @@ export function useMyTripState({
     isFocused: true,
   });
 
-  const accentBg = progress.isEnded
-    ? stateBg.past
+  const accent: Accent = progress.isEnded
+    ? "past"
     : model.isCanceledOrSkipped
-      ? stateBg.canceled
+      ? "canceled"
       : model.isDelayed
-        ? stateBg.delayed
-        : "bg-my-trip-background";
+        ? "delayed"
+        : "onTrip";
+  const accentBg =
+    accent === "onTrip" ? "bg-my-trip-background" : stateBg[accent];
 
   return {
     focusedTrip,
@@ -126,5 +141,6 @@ export function useMyTripState({
     progress,
     model,
     accentBg,
+    accentColor: ACCENT_COLOR[accent],
   };
 }

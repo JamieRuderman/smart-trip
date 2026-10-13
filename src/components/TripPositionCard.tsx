@@ -5,14 +5,15 @@ import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/useNow";
 import { warmMapDiagram } from "@/pages/lazyPages";
 import { resolveLegPosition, type LegPosition } from "@/lib/legProgress";
-import { isSouthbound, stationZoneMap } from "@/lib/stationUtils";
+import { isSouthbound, stationTrackColor } from "@/lib/stationUtils";
 import { minutesOfDay } from "@/lib/timeUtils";
 import { scheduledStationIndex } from "@/lib/trainMotion";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
-import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
+import { BRAND_LINE_COLOR } from "@/data/smartLineLayout";
 import { SectionCard } from "@/components/ui/section-card";
-import { TOKEN, TRAIN_COLORS } from "./SmartLineDiagram/tokens";
+import { TOKEN } from "./SmartLineDiagram/tokens";
+import { TrainGlyph } from "./SmartLineDiagram/TrainGlyph";
 import { TimeDisplay } from "./TimeDisplay";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripProgressResult } from "@/hooks/useTripProgress";
@@ -20,8 +21,8 @@ import type { TripDetailModel } from "@/hooks/useTripDetailModel";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 
-/** Width (% of the track) of the dashed lead-in before the origin — where a
- *  train that hasn't reached the rider's station yet is drawn. */
+/** Width (% of the track) of the lead-in before the origin — where a train
+ *  that hasn't reached the rider's station yet is drawn. */
 const LEAD_IN_PCT = 14;
 /** Stops upstream that the lead-in spans; a train farther out sits at its tip. */
 const LEAD_IN_STOPS = 3;
@@ -35,42 +36,27 @@ const MILES_PRECISION = 1;
 const TRACK_PX = 6;
 const STOP_DOT_PX = 12;
 const ENDPOINT_DOT_PX = 16;
-const MARKER_PX = 32;
-/** The map's halo radius relative to its marker's outer edge. */
-const HALO_SCALE =
-  TOKEN.trainPulseR / (TOKEN.trainInnerR + TOKEN.trainStroke / 2);
-
-const zoneColor = (station: Station) =>
-  ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR;
+/** Card px per line-map viewBox unit for the train marker. */
+const MARKER_SCALE = 0.68;
+/** Half-size, in map units, of the box holding the marker's halo and pointer. */
+const MARKER_BOX_R = TOKEN.trainPulseRMax;
+const MARKER_BOX_PX = 2 * MARKER_BOX_R * MARKER_SCALE;
+/** The marker disc's outer diameter, for the GPS-fix ping. */
+const MARKER_DISC_PX =
+  (2 * TOKEN.trainInnerR + TOKEN.trainStroke) * MARKER_SCALE;
 
 /** The leg's zone colors as a hard-stop gradient across its width: each stop
  *  owns the track halfway to its neighbors, as on the line map. */
 function zoneGradient(stops: Station[]): string {
+  if (stops.length === 0) return BRAND_LINE_COLOR;
   const last = stops.length - 1;
-  if (last < 1) return stops.length ? zoneColor(stops[0]) : BRAND_LINE_COLOR;
   const bands = stops.map((station, i) => {
     const start = i === 0 ? 0 : ((i - 0.5) / last) * 100;
     const end = i === last ? 100 : ((i + 0.5) / last) * 100;
-    return `${zoneColor(station)} ${start}% ${end}%`;
+    return `${stationTrackColor(station)} ${start}% ${end}%`;
   });
   return `linear-gradient(to right, ${bands.join(", ")})`;
 }
-
-/** The map marker's 'my trip' blue, or its delayed gold / canceled gray; muted
- *  once the trip is over. Same precedence as the My Trip accent. */
-function trainAccent(
-  progress: TripProgressResult,
-  model: TripDetailModel,
-): string {
-  if (progress.isEnded || model.isCanceledOrSkipped) {
-    return TRAIN_COLORS.canceled;
-  }
-  return model.isDelayed ? TRAIN_COLORS.delayed : TOKEN.myTrip;
-}
-
-/** The map's direction pointer (TOKEN.trainArrow), turned to point along the
- *  track and scaled to the card marker. */
-const POINTER_SCALE = MARKER_PX / 2 / (TOKEN.trainInnerR + TOKEN.trainStroke / 2);
 
 /** Where the train marker sits, as % of the track width (null: not drawn). */
 function markerPctFor(position: LegPosition): number | null {
@@ -117,6 +103,8 @@ interface TripPositionCardProps {
   clockTime: Date;
   progress: TripProgressResult;
   model: TripDetailModel;
+  /** The My Trip accent as a color (see useMyTripState) — the train's. */
+  accentColor: string;
   timeFormat: "12h" | "24h";
 }
 
@@ -135,6 +123,7 @@ export function TripPositionCard({
   clockTime,
   progress,
   model,
+  accentColor,
   timeFormat,
 }: TripPositionCardProps) {
   const { t } = useTranslation();
@@ -160,7 +149,6 @@ export function TripPositionCard({
 
   const markerPct = markerPctFor(position);
   const legGradient = zoneGradient(displayStops);
-  const accent = trainAccent(progress, model);
   const isEstimate =
     position.phase === "enRoute" && position.source === "schedule";
   const showLive = vehicle != null && position.phase !== "arrived";
@@ -262,7 +250,7 @@ export function TripPositionCard({
                 ? (LEG_SPAN_PCT * i) / (displayStops.length - 1)
                 : 0);
             const isEndpoint = i === 0 || i === displayStops.length - 1;
-            const color = zoneColor(station);
+            const color = stationTrackColor(station);
             const size = isEndpoint ? ENDPOINT_DOT_PX : STOP_DOT_PX;
             return (
               <span
@@ -293,52 +281,47 @@ export function TripPositionCard({
           {markerPct != null && (
             <span
               className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-1000 ease-out motion-reduce:transition-none"
-              style={{ left: `${markerPct}%`, width: MARKER_PX, height: MARKER_PX }}
+              style={{
+                left: `${markerPct}%`,
+                width: MARKER_BOX_PX,
+                height: MARKER_BOX_PX,
+              }}
               aria-hidden="true"
             >
-              {/* The map marker's soft halo. */}
-              <span
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                style={{
-                  width: MARKER_PX * HALO_SCALE,
-                  height: MARKER_PX * HALO_SCALE,
-                  backgroundColor: accent,
-                  opacity: TOKEN.trainPulseOpacity,
-                }}
-              />
               {/* A brief pulse on each fresh GPS fix (re-keyed per report),
                   rather than an endless animation on a screen left open for
-                  the whole ride. */}
+                  the whole ride. Inset, not translated, so the ping's own
+                  transform doesn't knock it off center. */}
               {showLive && (
                 <span
                   key={vehicle.timestamp}
-                  className="absolute inset-0 rounded-full opacity-40 animate-ping motion-reduce:animate-none"
-                  style={{ backgroundColor: accent, animationIterationCount: 2 }}
+                  className="absolute rounded-full opacity-40 animate-ping motion-reduce:animate-none"
+                  style={{
+                    inset: (MARKER_BOX_PX - MARKER_DISC_PX) / 2,
+                    backgroundColor: accentColor,
+                    animationIterationCount: 2,
+                  }}
                 />
               )}
-              {/* Direction pointer, tucked under the disc as on the map; the
-                  rider's leg always runs left to right here. */}
+              {/* The line map's marker, its halo still; the rider's leg always
+                  runs left to right here. */}
               <svg
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible"
-                width={MARKER_PX}
-                height={MARKER_PX}
-                viewBox={`${-MARKER_PX / 2} ${-MARKER_PX / 2} ${MARKER_PX} ${MARKER_PX}`}
-              >
-                <path
-                  d={TOKEN.trainArrow}
-                  fill={accent}
-                  transform={`rotate(90) scale(${POINTER_SCALE})`}
-                />
-              </svg>
-              <span
                 className={cn(
-                  "absolute inset-0 flex items-center justify-center rounded-full bg-card text-[13px] font-black tabular-nums",
+                  "absolute inset-0 overflow-visible",
                   isEstimate && "opacity-75",
                 )}
-                style={{ border: `3px solid ${accent}`, color: accent }}
+                width={MARKER_BOX_PX}
+                height={MARKER_BOX_PX}
+                viewBox={`${-MARKER_BOX_R} ${-MARKER_BOX_R} ${2 * MARKER_BOX_R} ${2 * MARKER_BOX_R}`}
               >
-                {trip.trip}
-              </span>
+                <TrainGlyph
+                  accent={accentColor}
+                  label={String(trip.trip)}
+                  bearing={90}
+                  fill="hsl(var(--card))"
+                  pulse={false}
+                />
+              </svg>
             </span>
           )}
         </div>

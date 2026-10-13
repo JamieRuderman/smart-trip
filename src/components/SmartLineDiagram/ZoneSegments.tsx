@@ -1,7 +1,6 @@
 import { memo } from "react";
 import stations from "@/data/stations";
-import { stationIndexMap, stationZoneMap } from "@/lib/stationUtils";
-import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
+import { stationIndexMap, stationTrackColor } from "@/lib/stationUtils";
 import type { Station } from "@/types/smartSchedule";
 import { TOKEN } from "./tokens";
 
@@ -50,8 +49,7 @@ export const ZoneSegments = memo(function ZoneSegments({
     if (hasRange && i === maxIdx) sMid = here;
     const len = nMid - sMid;
     if (len <= 0) continue;
-    const color =
-      ZONE_TRACK_COLORS[stationZoneMap[stations[i]]] ?? BRAND_LINE_COLOR;
+    const color = stationTrackColor(stations[i]);
     segs.push(
       <path
         key={stations[i]}

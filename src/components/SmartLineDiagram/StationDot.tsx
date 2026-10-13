@@ -1,6 +1,6 @@
 import type { Station } from "@/types/smartSchedule";
-import { stationZoneMap } from "@/lib/stationUtils";
-import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
+import { stationTrackColor } from "@/lib/stationUtils";
+import { BRAND_LINE_COLOR } from "@/data/smartLineLayout";
 import { TOKEN } from "./tokens";
 
 interface StationDotProps {
@@ -33,7 +33,7 @@ export function StationDot({
   const stroke = muted
     ? TOKEN.mutedTrack
     : colorTrackByZone
-      ? ZONE_TRACK_COLORS[stationZoneMap[station]] ?? BRAND_LINE_COLOR
+      ? stationTrackColor(station)
       : BRAND_LINE_COLOR;
 
   return (

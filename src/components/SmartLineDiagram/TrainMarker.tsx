@@ -5,8 +5,9 @@ import { trainStationProgress } from "@/lib/trainProgress";
 import { gpsStationProgress } from "@/lib/trainGpsProgress";
 import { scheduledProgress } from "@/lib/trainMotion";
 import { isTrainDelayed } from "@/lib/realtimeConstants";
-import { ANIM, FONT_FAMILY, TOKEN, TRAIN_COLORS } from "./tokens";
+import { TOKEN, TRAIN_COLORS } from "./tokens";
 import { keepLeftOnDoubleTrack } from "./doubleTrack";
+import { TrainGlyph } from "./TrainGlyph";
 
 interface TrainMarkerProps {
   train: MapTrain;
@@ -79,64 +80,13 @@ function TrainMarkerImpl({
           : undefined
       }
     >
-      <circle r={TOKEN.trainPulseR} fill={accent} opacity={TOKEN.trainPulseOpacity}>
-        <animate
-          attributeName="r"
-          values={ANIM.trainPulseR}
-          dur={ANIM.pulseDur}
-          repeatCount="indefinite"
-        />
-        <animate
-          attributeName="opacity"
-          values={ANIM.trainPulseOpacity}
-          dur={ANIM.pulseDur}
-          repeatCount="indefinite"
-        />
-      </circle>
-      <g transform={`rotate(${pos.bearing})`}>
-        <path d={TOKEN.trainArrow} fill={accent} />
-      </g>
-      <circle
-        r={TOKEN.trainInnerR}
-        fill={TOKEN.stationFill}
-        stroke={accent}
-        strokeWidth={TOKEN.trainStroke}
+      <TrainGlyph
+        accent={accent}
+        label={label}
+        bearing={pos.bearing}
+        selected={selected}
+        myTripBadge={isMyTrain && accent !== TOKEN.myTrip}
       />
-      <text
-        y={TOKEN.trainTextBaseline}
-        textAnchor="middle"
-        fill={accent}
-        style={{
-          fontFamily: FONT_FAMILY,
-          fontWeight: TOKEN.trainNumberWeight,
-          fontSize: `${TOKEN.trainNumberSize}px`,
-          letterSpacing: TOKEN.labelTracking,
-        }}
-      >
-        {label}
-      </text>
-      {selected && (
-        <circle
-          r={TOKEN.trainSelectedR}
-          fill="none"
-          stroke={accent}
-          strokeWidth={TOKEN.trainSelectedStroke}
-          strokeDasharray={TOKEN.trainSelectedDash}
-        />
-      )}
-      {isMyTrain && accent !== TOKEN.myTrip && (
-        // Small blue badge in the lower-right of the marker — used when the
-        // accent stays gold/gray (delayed/canceled) so the "my trip" signal is
-        // still visible. Skipped when the whole marker is already blue.
-        <circle
-          cx={TOKEN.trainInnerR * 0.7}
-          cy={TOKEN.trainInnerR * 0.7}
-          r={TOKEN.userOnTrainR}
-          fill={TOKEN.myTrip}
-          stroke={TOKEN.stationFill}
-          strokeWidth={TOKEN.userOnTrainStroke}
-        />
-      )}
     </g>
   );
 }

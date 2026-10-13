@@ -20,9 +20,9 @@ import WidgetKit
  * app is backgrounded, and the earlier `.relative` style kept ticking *upward*
  * past the target there, so the lock screen / expanded island showed an
  * ever-growing "2 min, 30 sec" of elapsed time instead of holding at zero. The
- * compact island pairs the same clamping timer with a stage-matched glyph (see
- * `CompactLeadingIcon`): a walking person to the alarm, the train to departure,
- * then a map pin to the destination en route.
+ * compact island pairs the same clamping timer with the glyph that opens the
+ * leg in progress (see `CompactLeadingIcon`): the bell before the alarm, the
+ * walker on the way to the station, then the train en route.
  */
 struct TripActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -53,10 +53,10 @@ struct TripActivityWidget: Widget {
             } compactTrailing: {
                 CompactCountdown(model: model)
             } minimal: {
-                // Stage-aware (walk → train → map pin), same as the compact
+                // Stage-aware (bell → walker → train), same as the compact
                 // leading slot — so a trip pushed to the tiny minimal slot (e.g.
-                // another app holds the primary island) still shows the map pin
-                // once en route instead of a frozen train.
+                // another app holds the primary island) still follows the leg in
+                // progress instead of a frozen glyph.
                 CompactLeadingIcon(model: model, accent: accent)
             }
             .keylineTint(accent)
@@ -408,8 +408,9 @@ private func appendSVGArc(_ path: inout Path, to end: CGPoint, radius: CGFloat,
     }
 }
 
-/// The SMART/lucide `map-pin` glyph — a teardrop pin with a hole — for the "to
-/// destination" stage on the compact island, matching the home card's MapPin.
+/// The SMART/lucide `map-pin` glyph — a teardrop pin with a hole — for the
+/// destination milestone that ends the progress track (and the compact island
+/// once arrived), matching the home card's MapPin.
 /// Drawn as a vector so it matches the web app exactly; mirror of lucide-react's
 /// `MapPin` (keep in lockstep). Stroked like `TrainIcon`.
 private struct MapPinIcon: View {
@@ -465,7 +466,7 @@ private struct MapPinIconShape: Shape {
     }
 }
 
-/// A walking-person glyph for the "time to leave" stage on the compact island —
+/// A walking-person glyph for the walk-to-the-station leg on the compact island —
 /// a head over striding legs + arms. Drawn as a vector (not an SF Symbol) so it
 /// matches the web app's `WalkIcon` exactly; mirror of Tabler Icons' `walk`
 /// (MIT). Stroked like `TrainIcon`; keep in lockstep with the web component.
@@ -530,10 +531,12 @@ private struct WalkIconShape: Shape {
     }
 }
 
-/// Compact-leading glyph: tracks the active countdown stage so the icon always
-/// matches the timer beside it (and the home card) — a walking person to the
-/// leave alarm, the brand train to departure, then a map pin to the destination
-/// once en route.
+/// Compact-leading glyph: the milestone icon that opens the progress segment
+/// currently filling on the expanded island / lock screen, so the compact pill
+/// names the leg you're on — the bell while counting down to the leave alarm,
+/// the walker on the way to the station, then the train once it's rolling. A
+/// train-only trip has no walk leg, so it shows the train until arrival; once
+/// arrived the destination pin pairs with the trailing checkmark.
 private struct CompactLeadingIcon: View {
     let model: TripActivityModel
     let accent: Color
@@ -541,10 +544,14 @@ private struct CompactLeadingIcon: View {
     @ViewBuilder
     var body: some View {
         Group {
-            switch countdownStage(model) {
-            case .alarm: WalkIcon(size: 20)
-            case .departure: TrainIcon(size: 20)
-            case .arrival: MapPinIcon(size: 20)
+            if isArrived(model) {
+                MapPinIcon(size: 20)
+            } else {
+                switch countdownStage(model) {
+                case .alarm: BellRingIcon(size: 20)
+                case .departure where model.armedReminderDate != nil: WalkIcon(size: 20)
+                case .departure, .arrival: TrainIcon(size: 20)
+                }
             }
         }
         .foregroundStyle(accent)

@@ -80,10 +80,11 @@ export const REMINDER_FIRE_BUFFER_MS = 60_000;
  * matched by direction + weekday/weekend schedule type, NOT exact leg. The same
  * physical train is shown under different legs (home schedule, line-map
  * corridor, station arrivals); this is the single source of truth for "is this
- * the focused train" so every surface (schedule row, station sheet, detail
- * sheet) highlights it identically. Callers that highlight a specific row still
- * AND this with their own trip-number equality. Direction guards against a trip
- * number being reused on the opposite-direction schedule.
+ * the focused train" on timetable surfaces (schedule rows and their sheets).
+ * The live map surfaces use {@link isFocusedTrainToday}, which builds on it.
+ * Callers that highlight a specific row still AND this with their own
+ * trip-number equality. Direction guards against a trip number being reused on
+ * the opposite-direction schedule.
  */
 export function focusedTripMatchesSchedule(
   focused: FocusedTrip | null,

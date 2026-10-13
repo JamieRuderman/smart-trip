@@ -21,7 +21,7 @@ import { AppSheet } from "@/components/ui/app-sheet";
 import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { focusedTripMatchesSchedule } from "@/lib/focusedTrip";
+import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import {
   cardTripState,
   stateCardStyle,
@@ -340,15 +340,13 @@ export function StationInfoSheet({
           <ul className="flex flex-col gap-2">
             {arrivals.map((a) => {
               // Highlight the user's focused ("Go") train blue here too,
-              // matching the schedule rows and My Trip. Shared predicate:
-              // number + direction + schedule type (the trip number is reused
-              // across directions / weekday-weekend).
-              const isFocused =
-                focusedTripMatchesSchedule(
-                  focusedTrip,
-                  a.isSouthbound,
-                  scheduleType,
-                ) && focusedTrip.tripNumber === a.tripNumber;
+              // matching the diagram's marker and the sheet the row opens.
+              const isFocused = isFocusedTrainToday(
+                focusedTrip,
+                a.tripNumber,
+                a.isSouthbound,
+                currentTime,
+              );
               return (
                 <ArrivalRow
                   key={`${a.tripNumber}-${a.isSouthbound}`}

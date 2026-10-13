@@ -25,9 +25,7 @@ import {
   type MapTripDetail,
 } from "@/components/MapTripDetailSheet";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
-import { stationIndexMap } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
-import { useStationSelection } from "@/contexts/stationSelection";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import {
   MARKER_COLOR,
@@ -98,19 +96,6 @@ function MapContents() {
   const { theme } = useTheme();
   const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
-  // The user's currently-selected schedule leg comes from the shared
-  // StationSelectionContext. Used only to mark matching rows in the trip
-  // detail sheet — does not affect what's drawn on the map itself.
-  const { fromStation: userFromSelection, toStation: userToSelection } =
-    useStationSelection();
-  const userFromStation =
-    userFromSelection && stationIndexMap[userFromSelection] != null
-      ? userFromSelection
-      : null;
-  const userToStation =
-    userToSelection && stationIndexMap[userToSelection] != null
-      ? userToSelection
-      : null;
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
     autoRequestOnNative: true,
@@ -158,12 +143,7 @@ function MapContents() {
     const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
     const realtimeStatus =
       statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({
-      trip: displayTrip,
-      fromStation: displayFrom,
-      toStation: terminus,
-      realtimeStatus,
-    });
+    setDetailTrip({ trip: displayTrip, realtimeStatus });
   }, [sbStatusMaps, nbStatusMaps]);
 
   useEffect(() => {
@@ -514,8 +494,6 @@ function MapContents() {
           onClose={closeDetail}
           currentTime={new Date()}
           lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-          userFromStation={userFromStation}
-          userToStation={userToStation}
         />
       )}
     </div>

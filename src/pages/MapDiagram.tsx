@@ -66,6 +66,7 @@ export default function MapDiagram() {
   // blue treatment a focused trip gets in every card. Match the focused run to
   // its live marker by trip number + direction on today's service.
   const myTrainKey = useMemo<string | null>(() => {
+    if (!focusedTrip) return null;
     const match = trains.find(
       (tr) =>
         tr.tripNumber != null &&
@@ -127,12 +128,7 @@ export default function MapDiagram() {
     const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
     const realtimeStatus =
       statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({
-      trip: displayTrip,
-      fromStation: displayFrom,
-      toStation: terminus,
-      realtimeStatus,
-    });
+    setDetailTrip({ trip: displayTrip, realtimeStatus });
   }, [sbStatusMaps, nbStatusMaps]);
 
   useEffect(() => {
@@ -191,8 +187,6 @@ export default function MapDiagram() {
         statusMaps.statusMap.get(trip.departureTime) ?? null;
       setDetailTrip({
         trip: { ...trip, fromStation, toStation },
-        fromStation,
-        toStation,
         realtimeStatus,
       });
     },
@@ -283,8 +277,6 @@ export default function MapDiagram() {
           onClose={closeDetail}
           currentTime={currentTime}
           lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-          userFromStation={fromStation}
-          userToStation={toStation}
         />
       )}
     </>

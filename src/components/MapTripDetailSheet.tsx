@@ -2,6 +2,7 @@ import stations from "@/data/stations";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { getTodayScheduleType, type ProcessedTrip } from "@/lib/scheduleUtils";
+import { stationIndexMap } from "@/lib/stationUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { MyTripGate } from "./MyTripGate";
@@ -9,12 +10,11 @@ import { TripDetailSheet } from "./TripDetailSheet";
 
 const LARKSPUR = stations[stations.length - 1];
 
-/** A train run as a map resolves it: from a mid-corridor station (the stop it
- *  last served, or a tapped arrival's station) to the end of the line. */
+/** A train run as a map resolves it: `trip` runs from a mid-corridor station
+ *  (the stop it last served, or a tapped arrival's station) to the end of the
+ *  line. */
 export interface MapTripDetail {
   trip: ProcessedTrip;
-  fromStation: Station;
-  toStation: Station;
   realtimeStatus: TripRealtimeStatus | null;
 }
 
@@ -24,10 +24,10 @@ interface MapTripDetailSheetProps {
   onClose: () => void;
   currentTime: Date;
   lastUpdated: Date | null;
-  /** The home screen's selected leg, marked on the run's stop timeline. */
-  userFromStation: Station | null;
-  userToStation: Station | null;
 }
+
+const validStation = (station: Station | ""): Station | null =>
+  station && stationIndexMap[station] != null ? station : null;
 
 /**
  * Trip sheet for a train opened from the live map or line diagram (its marker,
@@ -42,17 +42,16 @@ export function MapTripDetailSheet({
   onClose,
   currentTime,
   lastUpdated,
-  userFromStation,
-  userToStation,
 }: MapTripDetailSheetProps) {
-  const { focusedTrip } = useStationSelection();
+  const { fromStation, toStation, focusedTrip } = useStationSelection();
+  const { trip: run } = detail;
   const shared = { isOpen, onClose, currentTime, lastUpdated } as const;
 
   if (
     isFocusedTrainToday(
       focusedTrip,
-      detail.trip.trip,
-      detail.toStation === LARKSPUR,
+      run.trip,
+      run.toStation === LARKSPUR,
       currentTime,
     )
   ) {
@@ -79,20 +78,20 @@ export function MapTripDetailSheet({
   // isNextTrip=true so the header reads as an active, on-time trip when all
   // displayed stops are still in the future (the narrowed view hides past
   // stops, which would otherwise flip the header into the neutral "future"
-  // state).
+  // state). The home screen's selected leg is marked on the run's stops.
   return (
     <TripDetailSheet
       {...shared}
-      trip={detail.trip}
-      fromStation={detail.fromStation}
-      toStation={detail.toStation}
+      trip={run}
+      fromStation={run.fromStation}
+      toStation={run.toStation}
       realtimeStatus={detail.realtimeStatus}
       timeFormat="12h"
       isNextTrip={true}
       showFerry={false}
       scheduleType={getTodayScheduleType()}
-      userFromStation={userFromStation}
-      userToStation={userToStation}
+      userFromStation={validStation(fromStation)}
+      userToStation={validStation(toStation)}
     />
   );
 }

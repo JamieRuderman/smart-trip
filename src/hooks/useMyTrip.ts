@@ -42,6 +42,18 @@ export interface MyTripState {
   accentBg: string;
 }
 
+/** Whether the focused leg shows its train's ferry connection: it has one and
+ *  the leg ends at the ferry terminal. */
+export function focusedLegShowsFerry(
+  focusedTrip: FocusedTrip,
+  trip: ProcessedTrip,
+): boolean {
+  return (
+    !!trip.outboundFerry &&
+    focusedTrip.toStation === FERRY_CONSTANTS.FERRY_STATION
+  );
+}
+
 /**
  * Everything the My Trip surfaces (the full-page view and the schedule page's
  * in-progress bar) derive from the focused trip, so both always agree. Takes
@@ -70,9 +82,7 @@ export function useMyTripState({
     [isFutureService, focusedTrip.serviceDate, currentTime],
   );
 
-  const showFerry =
-    !!trip.outboundFerry &&
-    focusedTrip.toStation === FERRY_CONSTANTS.FERRY_STATION;
+  const showFerry = focusedLegShowsFerry(focusedTrip, trip);
 
   const progress = useTripProgress({
     trip,

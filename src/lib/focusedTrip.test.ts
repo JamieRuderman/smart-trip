@@ -371,6 +371,13 @@ describe("isFocusedTrainToday", () => {
     expect(isFocusedTrainToday(null, SAMPLE.trip, true, now)).toBe(false);
   });
 
+  it("rejects a same-numbered focus on the other schedule type", () => {
+    const other = today.scheduleType === "weekday" ? "weekend" : "weekday";
+    expect(
+      isFocusedTrainToday({ ...today, scheduleType: other }, SAMPLE.trip, true, now),
+    ).toBe(false);
+  });
+
   it("rejects a same-schedule focus on a later service day", () => {
     const tomorrow = { ...today, serviceDate: "2026-03-12" };
     expect(isFocusedTrainToday(tomorrow, SAMPLE.trip, true, now)).toBe(false);

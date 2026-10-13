@@ -6,7 +6,7 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
-import { stationIndexMap, getClosestStation } from "@/lib/stationUtils";
+import { validStation, getClosestStation } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
@@ -39,12 +39,8 @@ export default function MapDiagram() {
     setToStation,
     focusedTrip,
   } = useStationSelection();
-  const fromStation =
-    fromSelection && stationIndexMap[fromSelection] != null
-      ? fromSelection
-      : null;
-  const toStation =
-    toSelection && stationIndexMap[toSelection] != null ? toSelection : null;
+  const fromStation = validStation(fromSelection);
+  const toStation = validStation(toSelection);
 
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,

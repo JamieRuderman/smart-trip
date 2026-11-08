@@ -91,8 +91,6 @@ export function StationSelector({
   const lineIndex = (place: Place | "") =>
     place ? getStationIndex(placeStation(place)) : -1;
 
-  // `place` in one end's dropdown, with the other end marked by its badge and
-  // gutter icon.
   const item = (
     place: Place,
     other: Place | "",

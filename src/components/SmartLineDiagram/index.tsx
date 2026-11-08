@@ -114,7 +114,6 @@ export function SmartLineDiagram({
     return selected.size > 0 ? selected : null;
   }, [fromStation, toStation]);
 
-  // The train leg's stations — San Francisco rides it from Larkspur.
   const fromTrainStation = fromStation ? placeStation(fromStation) : null;
   const toTrainStation = toStation ? placeStation(toStation) : null;
   const ferrySelected = fromStation === SAN_FRANCISCO || toStation === SAN_FRANCISCO;
@@ -162,7 +161,6 @@ export function SmartLineDiagram({
   }, []);
 
   const ferryD = useMemo(() => buildSmoothPath(FERRY_WAYPOINTS, 28), []);
-  // A selected trip that doesn't ride the ferry leaves it muted.
   const ferryMuted = !!selectedRange && !ferrySelected;
   const ferryStroke = ferryMuted
     ? TOKEN.mutedTrack

@@ -20,6 +20,7 @@ export function ActiveTripBar({ currentTime }: { currentTime: Date }) {
   const { focusedTrip } = useStationSelection();
   const openTripView = useOpenTripView();
   if (!focusedTrip) return null;
+  const places = focusedPlaces(focusedTrip);
 
   return (
     <MyTripGate focusedTrip={focusedTrip} currentTime={currentTime}>
@@ -69,7 +70,7 @@ export function ActiveTripBar({ currentTime }: { currentTime: Date }) {
                   {" · "}
                   {t("myTrip.trainNumber", { trip: trip.trip })}
                   {" · "}
-                  {focusedPlaces(focusedTrip).from} → {focusedPlaces(focusedTrip).to}
+                  {places.from} → {places.to}
                 </span>
               </span>
               <ChevronRight

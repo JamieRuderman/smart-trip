@@ -37,6 +37,23 @@ describe("selectAlarmStatus", () => {
     expect(status.byFerry).toBe(true);
   });
 
+  it("keeps counting down to the SF ferry instead of reading 'At station'", () => {
+    const status = selectAlarmStatus({
+      minutesUntilDeparture: 1,
+      departsByFerry: true,
+      minutesUntilArrival: 110,
+      minutesAfterArrival: -110,
+      hasStarted: false,
+      isCanceled: false,
+      isCanceledOrSkipped: false,
+      isEnded: false,
+      hasFreshRealtime: false,
+    });
+
+    expect(status.phase).toBe("PRE_DEPARTURE");
+    expect(status.byFerry).toBe(true);
+  });
+
   it("leads with the leave countdown while the armed reminder is still ahead", () => {
     const status = selectAlarmStatus({
       minutesUntilDeparture: 20,

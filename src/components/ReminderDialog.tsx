@@ -170,7 +170,11 @@ export function ReminderDialog({
                 {t("departureReminder.tooLateTitle")}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {t("departureReminder.tooLateBody")}
+                {t(
+                  byFerry
+                    ? "departureReminder.ferryTooLateBody"
+                    : "departureReminder.tooLateBody",
+                )}
               </p>
             </div>
           </div>
@@ -235,7 +239,12 @@ export function ReminderDialog({
                     {t("departureReminder.warningTitle")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {t("departureReminder.warningBody", { count: clamped })}
+                    {t(
+                      byFerry
+                        ? "departureReminder.ferryWarningBody"
+                        : "departureReminder.warningBody",
+                      { count: clamped },
+                    )}
                   </p>
                 </div>
               </div>

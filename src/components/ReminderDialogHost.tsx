@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { focusedBoardingInstant, type FocusedTrip } from "@/lib/focusedTrip";
+import {
+  focusedBoardingInstant,
+  focusedTripKey,
+  type FocusedTrip,
+} from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { ReminderDialog } from "./ReminderDialog";
@@ -56,7 +60,7 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
     <ReminderDialog
       // "Take this train" opens the dialog before the new focus lands; remounting
       // per trip reseeds the slider, which otherwise kept the previous trip's lead.
-      key={`${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}`}
+      key={focusedTripKey(focusedTrip)}
       open={reminderDialogOpen}
       onClose={closeReminderDialog}
       departureAt={departureAt}

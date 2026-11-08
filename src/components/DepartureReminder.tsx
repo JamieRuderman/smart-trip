@@ -142,7 +142,6 @@ export function DepartureReminder({
     [otherDayServiceDate, currentTime],
   );
 
-  // This view's trip on its leg as scheduled.
   const legTrip = useMemo(
     () =>
       getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).find(
@@ -157,7 +156,6 @@ export function DepartureReminder({
   // times, so there departureAt is NOT a departure from fromStation.
   const viewLeavesFromStation = legTrip?.departureTime === departureTime;
 
-  // The SF ferry this trip starts with: the rider sets off on it, not the train.
   const ferryDepartureTime = viewLeavesFromStation
     ? legTrip?.inboundFerry?.depart
     : undefined;

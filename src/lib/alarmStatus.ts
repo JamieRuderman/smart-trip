@@ -175,7 +175,7 @@ export function selectAlarmStatus(
     };
   }
 
-  if (minutesUntilDeparture <= 2) {
+  if (minutesUntilDeparture <= 2 && !departsByFerry) {
     return {
       phase: "BOARDING_WINDOW",
       kind: "message",

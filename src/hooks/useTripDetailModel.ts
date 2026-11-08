@@ -120,7 +120,6 @@ export function useTripDetailModel({
   const minutesUntil = trip.inboundFerry
     ? computeMinutesUntil(currentTime, trip.inboundFerry.depart)
     : minutesUntilTrain;
-  // A trip from SF counts down to its ferry, then — once aboard — to the train.
   const departsByFerry = trip.inboundFerry != null && minutesUntil >= 0;
 
   // When this is the user's focused trip and a leave reminder is armed, lead
@@ -135,7 +134,7 @@ export function useTripDetailModel({
   const minutesUntilLeave =
     reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
 
-  // Trip metadata — door to door, ferry included.
+  // Trip metadata
   const scheduledEnds = tripEnds(trip);
   const tripDurationMinutes =
     parseTimeToMinutes(scheduledEnds.end) - parseTimeToMinutes(scheduledEnds.start);

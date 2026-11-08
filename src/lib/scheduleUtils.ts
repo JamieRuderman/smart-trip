@@ -287,7 +287,12 @@ export function getNextFerryDeparture(
   now: Date,
   inbound = false,
 ): FerryConnection | null {
-  return upcomingFerries(now, inbound)[0] ?? null;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return (
+    ferryRuns(getTodayScheduleType(now), inbound).find(
+      (f) => parseTimeToMinutes(f.depart) >= nowMinutes,
+    ) ?? null
+  );
 }
 
 /** Ferry timetables from the currently-applied payload. */

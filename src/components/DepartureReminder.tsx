@@ -20,11 +20,12 @@ import {
   focusedBoardingInstant,
   focusedPlaces,
   isFocusedTripToday,
+  keepsFerry,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
 } from "@/lib/focusedTrip";
-import { SAN_FRANCISCO } from "@/lib/places";
+import { SAN_FRANCISCO, legPlaces } from "@/lib/places";
 import { reminderLeadRange } from "@/lib/reminderLead";
 import { buildReminderText } from "@/lib/reminderText";
 import {
@@ -351,8 +352,9 @@ export function DepartureReminder({
   };
 
   const switchStations = ({ from, to }: Leg) => {
-    setFromStation(from);
-    setToStation(to);
+    const places = legPlaces(from, to, keepsFerry(focusRun, from, to));
+    setFromStation(places.from);
+    setToStation(places.to);
   };
 
   // Commit to `next`: switch to its stations, if any, then focus it.

@@ -15,6 +15,7 @@ import {
   focusedTripClearInstant,
   focusedTripIsLeg,
   isFocusedTrainToday,
+  keepsFerry,
   replacementRun,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
@@ -667,5 +668,33 @@ describe("replacementRun", () => {
     expect(
       replacementRun(run, "Larkspur", "Santa Rosa Downtown", instant("23:59")),
     ).toBeNull();
+  });
+});
+
+describe("correcting the boarding station of a trip to SF", () => {
+  const toSf = {
+    tripNumber: getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday", true)[0].trip,
+    fromStation: "Petaluma Downtown" as Station,
+    toStation: "Larkspur" as Station,
+    viaFerry: true as const,
+    scheduleType: "weekday" as const,
+    serviceDate: "2099-01-05",
+  };
+
+  it("keeps SF when leaving from another station, not when swapping ends", () => {
+    expect(keepsFerry(toSf, "Petaluma North", "Larkspur")).toBe(true);
+    expect(keepsFerry(toSf, "Larkspur", "Petaluma Downtown")).toBe(false);
+    expect(
+      keepsFerry({ ...toSf, viaFerry: undefined }, "Petaluma North", "Larkspur"),
+    ).toBe(false);
+  });
+
+  it("replaces it with a train that still meets a ferry", () => {
+    const next = replacementRun(toSf, "Petaluma North", "Larkspur", 0, {
+      target: new Date(2099, 0, 5, 12, 0).getTime(),
+    });
+    expect(next?.run.viaFerry).toBe(true);
+    const ferryTrains = getFilteredTrips("Petaluma North", "Larkspur", "weekday", true);
+    expect(ferryTrains.some((t) => t.trip === next?.run.tripNumber)).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
+import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { legPlaces, type Place } from "@/lib/places";
 import { parseTimeToMinutes, toLocalDateKey } from "@/lib/timeUtils";
 import { FOCUS_ARRIVAL_EVICT_GRACE_MIN } from "@/lib/tripConstants";
@@ -301,6 +302,19 @@ export function focusedBoardingInstant(
 }
 
 /**
+ * Whether `run`'s San Francisco end survives a correction to `from → to`: it
+ * rides the ferry and its Larkspur end stays where it was — leaving from
+ * another station for SF, but not swapping ends.
+ */
+export function keepsFerry(run: FocusedRun, from: Station, to: Station): boolean {
+  if (run.viaFerry !== true) return false;
+  return (
+    (run.toStation === FERRY_CONSTANTS.FERRY_STATION && to === run.toStation) ||
+    (run.fromStation === FERRY_CONSTANTS.FERRY_STATION && from === run.fromStation)
+  );
+}
+
+/**
  * The run to take on `from → to` in place of `run`, once the rider corrects
  * their stations, with its departure from `from`: the same train when it also
  * serves that leg and hasn't left `from` yet, else the train on that leg — not
@@ -328,18 +342,20 @@ export function replacementRun(
   // same-direction leg can carry the same train.
   const sameDirection =
     isSouthbound(from, to) === isSouthbound(run.fromStation, run.toStation);
+  const viaFerry = keepsFerry(run, from, to);
   const onLeg = (tripNumber: number, departureAt: number): { run: FocusedRun; departureAt: number } => ({
     run: {
       tripNumber,
       fromStation: from,
       toStation: to,
+      ...(viaFerry ? { viaFerry: true as const } : {}),
       scheduleType: run.scheduleType,
       serviceDate: run.serviceDate,
     },
     departureAt,
   });
   let best: { tripNumber: number; gap: number; at: number } | null = null;
-  for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
+  for (const trip of getFilteredTrips(from, to, run.scheduleType, viaFerry)) {
     const live = liveStatus(trip);
     if (live?.isCanceled || live?.isOriginSkipped || live?.isDestinationSkipped) {
       continue;

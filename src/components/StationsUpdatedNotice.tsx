@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Station } from "@/types/smartSchedule";
+import type { Place } from "@/lib/places";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -8,8 +8,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 const AUTO_CLOSE_MS = 3000;
 
 interface StationsUpdatedNoticeProps {
-  fromStation: Station;
-  toStation: Station;
+  fromStation: Place;
+  toStation: Place;
   /** Closed — by OK, dismissal, or the auto-close timer. */
   onClose: () => void;
 }
@@ -20,13 +20,13 @@ interface StationsUpdatedNoticeProps {
  * new trip and outlives the sheet the switch closes.
  */
 export function StationsUpdatedHost() {
-  const { stationsUpdatedOpen, closeStationsUpdated, fromStation, toStation } =
+  const { stationsUpdatedOpen, closeStationsUpdated, fromPlace, toPlace } =
     useStationSelection();
-  if (!stationsUpdatedOpen || !fromStation || !toStation) return null;
+  if (!stationsUpdatedOpen || !fromPlace || !toPlace) return null;
   return (
     <StationsUpdatedNotice
-      fromStation={fromStation}
-      toStation={toStation}
+      fromStation={fromPlace}
+      toStation={toPlace}
       onClose={closeStationsUpdated}
     />
   );

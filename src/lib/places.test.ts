@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { SAN_FRANCISCO, isFerryLeg, legPlaces, placeStation } from "./places";
+import {
+  SAN_FRANCISCO,
+  isFerryLeg,
+  legPlaces,
+  placeStation,
+  validPlace,
+  type Place,
+} from "./places";
 
 describe("places", () => {
   it("reaches San Francisco from Larkspur", () => {
     expect(placeStation(SAN_FRANCISCO)).toBe("Larkspur");
     expect(placeStation("Petaluma Downtown")).toBe("Petaluma Downtown");
+  });
+
+  it("keeps San Francisco and line stations, dropping anything else", () => {
+    expect(validPlace(SAN_FRANCISCO)).toBe(SAN_FRANCISCO);
+    expect(validPlace("Larkspur")).toBe("Larkspur");
+    expect(validPlace("Oakland" as Place)).toBeNull();
+    expect(validPlace("")).toBeNull();
   });
 
   it("rides the ferry only when an end is San Francisco", () => {

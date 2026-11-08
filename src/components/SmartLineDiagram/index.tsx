@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Maximize2 } from "lucide-react";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import type { Station } from "@/types/smartSchedule";
+import { SAN_FRANCISCO, placeStation, type Place } from "@/lib/places";
 import { useSvgScreenScale } from "@/hooks/useSvgScreenScale";
 import { usePanZoom } from "@/hooks/usePanZoom";
 import {
@@ -29,7 +30,7 @@ import {
   BRAND_LINE_COLOR,
 } from "@/data/smartLineLayout";
 import { snapToPath } from "@/lib/pathSnap";
-import { stationIndexMap } from "@/lib/stationUtils";
+import { stationIndexMap, stationTrackColor } from "@/lib/stationUtils";
 import { TOKEN, MOTION_TICK_MS } from "./tokens";
 import { useClockTick } from "./useClockTick";
 import { buildSmoothPath } from "./buildSmoothPath";
@@ -51,16 +52,18 @@ export interface SmartLineDiagramProps {
   /** Currently-selected train key (matches `MapTrain.key`). */
   selectedTrainKey?: string | null;
   onTrainClick?: (train: MapTrain) => void;
-  /** Tap a station — optional hook for detail cards / filtering. */
-  onStationClick?: (station: Station) => void;
+  /** Tap a station or the San Francisco ferry terminus — optional hook for
+   *  detail cards / filtering. */
+  onStationClick?: (place: Place) => void;
   /** Color the track segments by zone instead of a single brand green. */
   colorTrackByZone?: boolean;
   /** Show the dashed ferry extension from Larkspur to the SF Ferry Building. */
   showFerry?: boolean;
-  /** User's selected origin station — enlarged in place of the north terminus. */
-  fromStation?: Station | null;
-  /** User's selected destination station — enlarged in place of the south terminus. */
-  toStation?: Station | null;
+  /** User's selected origin — enlarged in place of the north terminus. San
+   *  Francisco highlights the ferry terminus and its Larkspur connection. */
+  fromStation?: Place | null;
+  /** User's selected destination — enlarged in place of the south terminus. */
+  toStation?: Place | null;
   /** Station closest to the user's current location — shows a pulsing blue dot. */
   userStation?: Station | null;
   /** Key (matches `MapTrain.key`) of the user's focused ("Go") trip's live
@@ -104,20 +107,25 @@ export function SmartLineDiagram({
   // place of the corridor terminals. Falls back to first/last only when
   // neither is selected, so the diagram always has emphasized anchor points.
   const enlargedStations = useMemo(() => {
-    const selected = new Set<Station>();
+    const selected = new Set<Place>();
     if (fromStation) selected.add(fromStation);
     if (toStation) selected.add(toStation);
     return selected.size > 0 ? selected : null;
   }, [fromStation, toStation]);
 
+  // The train leg's stations — San Francisco rides it from Larkspur.
+  const fromTrainStation = fromStation ? placeStation(fromStation) : null;
+  const toTrainStation = toStation ? placeStation(toStation) : null;
+  const ferrySelected = fromStation === SAN_FRANCISCO || toStation === SAN_FRANCISCO;
+
   // Index range of the user's selected from→to span. When both endpoints are
   // set, stations outside this range render in the muted track color.
   const selectedRange = useMemo(() => {
-    if (!fromStation || !toStation) return null;
-    const a = stationIndexMap[fromStation];
-    const b = stationIndexMap[toStation];
+    if (!fromTrainStation || !toTrainStation) return null;
+    const a = stationIndexMap[fromTrainStation];
+    const b = stationIndexMap[toTrainStation];
     return { min: Math.min(a, b), max: Math.max(a, b) };
-  }, [fromStation, toStation]);
+  }, [fromTrainStation, toTrainStation]);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -153,9 +161,12 @@ export function SmartLineDiagram({
   }, []);
 
   const ferryD = useMemo(() => buildSmoothPath(FERRY_WAYPOINTS, 28), []);
-  // Larkspur is the last station — the ferry connection follows its state.
-  const ferryMuted =
-    !!selectedRange && selectedRange.max < stationIndexMap.Larkspur;
+  // A selected trip that doesn't ride the ferry leaves it muted.
+  const ferryMuted = !!selectedRange && !ferrySelected;
+  const ferryColor = colorTrackByZone
+    ? stationTrackColor("Larkspur")
+    : BRAND_LINE_COLOR;
+  const onFerryClick = onStationClick && (() => onStationClick(SAN_FRANCISCO));
   const now = useClockTick(MOTION_TICK_MS);
   const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width, VIEW_BOX.height);
   const { tx, ty, scale, transform, reset } = usePanZoom(svgRef, {
@@ -194,7 +205,13 @@ export function SmartLineDiagram({
             <g opacity={0.9}>
               <path
                 d={ferryD}
-                stroke={ferryMuted ? TOKEN.mutedTrack : TOKEN.detailStroke}
+                stroke={
+                  ferryMuted
+                    ? TOKEN.mutedTrack
+                    : ferrySelected
+                      ? ferryColor
+                      : TOKEN.detailStroke
+                }
                 strokeWidth={TOKEN.lineW * 0.55}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -205,6 +222,9 @@ export function SmartLineDiagram({
                 x={FERRY_WAYPOINTS[2].x}
                 y={FERRY_WAYPOINTS[2].y}
                 muted={ferryMuted}
+                selected={ferrySelected}
+                color={ferryColor}
+                onClick={onFerryClick}
               />
             </g>
           )}
@@ -224,8 +244,8 @@ export function SmartLineDiagram({
               pathD={ROUTE_PATH_D}
               totalLength={snap.totalLength}
               stationArcs={snap.arcs}
-              fromStation={fromStation}
-              toStation={toStation}
+              fromStation={fromTrainStation}
+              toStation={toTrainStation}
             />
           )}
 
@@ -334,6 +354,8 @@ export function SmartLineDiagram({
             ty={ty}
             scale={scale}
             muted={ferryMuted}
+            inbound={fromStation === SAN_FRANCISCO}
+            onClick={onFerryClick}
           />
         )}
       </svg>

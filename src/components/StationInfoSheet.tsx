@@ -22,6 +22,7 @@ import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
+import { placeStation, type Place } from "@/lib/places";
 import {
   cardTripState,
   stateCardStyle,
@@ -66,13 +67,13 @@ export interface StationInfoSheetProps {
   station: Station;
   currentTime: Date;
   /** Currently-selected origin (for the active trip). */
-  fromStation?: Station | null;
+  fromStation?: Place | null;
   /** Currently-selected destination (for the active trip). */
-  toStation?: Station | null;
+  toStation?: Place | null;
   /** Set the tapped station as the trip origin. */
-  onSetFrom?: (station: Station) => void;
+  onSetFrom?: (place: Place) => void;
   /** Set the tapped station as the trip destination. */
-  onSetTo?: (station: Station) => void;
+  onSetTo?: (place: Place) => void;
   /** Clear the trip origin — called when tapping the From button while this
    *  station is already the origin. */
   onClearFrom?: () => void;
@@ -128,8 +129,8 @@ export function StationInfoSheet({
   // the wrong way aren't actionable from the station they tapped.
   const directionFilter = useMemo<"southbound" | "northbound" | null>(() => {
     if (!fromStation || !toStation) return null;
-    const a = stationIndexMap[fromStation];
-    const b = stationIndexMap[toStation];
+    const a = stationIndexMap[placeStation(fromStation)];
+    const b = stationIndexMap[placeStation(toStation)];
     if (a == null || b == null) return null;
     return a < b ? "southbound" : "northbound";
   }, [fromStation, toStation]);
@@ -187,7 +188,7 @@ export function StationInfoSheet({
           // train; otherwise fall back to the train's end-of-line terminus.
           const destinationStation: Station =
             directionFilter && toStation && (directionFilter === "southbound") === isSouthbound
-              ? toStation
+              ? placeStation(toStation)
               : terminus;
           let destinationTime: string | null = null;
           if (destinationStation !== station) {
@@ -273,19 +274,7 @@ export function StationInfoSheet({
           </p>
           <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
           {fromStation && toStation && (
-            // Route summary — mirrors the My Trip view's header. The current
-            // station collapses to "Here" so the user can see at a glance
-            // whether they're looking at their origin, destination, or an
-            // intermediate stop.
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
-              <span className="whitespace-nowrap">
-                {fromStation === station ? t("stationInfo.here") : fromStation}
-              </span>
-              <span className="font-normal text-white/60">→</span>
-              <span className="whitespace-nowrap">
-                {toStation === station ? t("stationInfo.here") : toStation}
-              </span>
-            </p>
+            <RouteSummary from={fromStation} to={toStation} here={station} />
           )}
         </div>
         <button
@@ -367,7 +356,34 @@ export function StationInfoSheet({
   );
 }
 
-function FromToColumn({
+/** Route summary under a sheet's title — mirrors the My Trip view's header.
+ *  The sheet's own place collapses to "Here" so the user can see at a glance
+ *  whether they're looking at their origin, destination, or an intermediate
+ *  stop. */
+export function RouteSummary({
+  from,
+  to,
+  here,
+}: {
+  from: Place;
+  to: Place;
+  here: Place;
+}) {
+  const { t } = useTranslation();
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
+      <span className="whitespace-nowrap">
+        {from === here ? t("stationInfo.here") : from}
+      </span>
+      <span className="font-normal text-white/60">→</span>
+      <span className="whitespace-nowrap">
+        {to === here ? t("stationInfo.here") : to}
+      </span>
+    </p>
+  );
+}
+
+export function FromToColumn({
   role,
   isCurrent,
   onClick,

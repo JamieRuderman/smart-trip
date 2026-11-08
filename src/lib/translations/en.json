@@ -203,12 +203,18 @@
     "setStation": "Set",
     "clearStation": "Clear",
     "inMinutes": "in {{minutes}} min",
+    "inHoursMinutes": "in {{hours}}h {{minutes}}m",
     "nowArriving": "now",
     "setAsDepartureAria": "Set as departure",
     "setAsDestinationAria": "Set as destination",
     "clearDepartureAria": "Clear departure",
     "clearDestinationAria": "Clear destination",
-    "openTripAria": "Open trip {{trip}} to {{terminus}}"
+    "openTripAria": "Open trip {{trip}} to {{terminus}}",
+    "ferryLabel": "Golden Gate Ferry",
+    "ferryTerminalAria": "San Francisco ferry terminal info",
+    "nextFerries": "Next ferries to Larkspur",
+    "noMoreFerries": "No more ferries today.",
+    "arrivesLarkspur": "arrives Larkspur {{time}}"
   },
   "departureReminder": {
     "setReminder": "Add reminder",

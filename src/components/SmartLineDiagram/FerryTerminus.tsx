@@ -3,9 +3,14 @@ import { TOKEN } from "./tokens";
 interface FerryTerminusProps {
   x: number;
   y: number;
-  /** When true (Larkspur is outside the selected range), render in the same
-   *  muted track color as Larkspur's dot. */
+  /** When true (a trip is selected that doesn't ride the ferry), render in the
+   *  muted track color. */
   muted?: boolean;
+  /** San Francisco is an end of the selected trip: fill the glyph with the
+   *  route `color`, like a selected station's core. */
+  selected?: boolean;
+  color: string;
+  onClick?: () => void;
 }
 
 /**
@@ -13,13 +18,33 @@ interface FerryTerminusProps {
  * group so it scales with pan/zoom; the matching `FerryLabels` (San
  * Francisco / next-ferry ETA) lives in the constant-size label layer.
  */
-export function FerryTerminus({ x, y, muted = false }: FerryTerminusProps) {
-  const stroke = muted ? TOKEN.mutedTrack : TOKEN.detailStroke;
+export function FerryTerminus({
+  x,
+  y,
+  muted = false,
+  selected = false,
+  color,
+  onClick,
+}: FerryTerminusProps) {
+  const stroke = muted ? TOKEN.mutedTrack : selected ? color : TOKEN.detailStroke;
+  const waveStroke = selected ? TOKEN.stationFill : stroke;
   return (
-    <g transform={`translate(${x}, ${y})`}>
+    <g
+      transform={`translate(${x}, ${y})`}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      onClick={
+        onClick
+          ? (e) => {
+              e.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+    >
+      {onClick && <circle r={TOKEN.hitAreaR} fill="transparent" />}
       <circle
         r={TOKEN.terminalR + 2}
-        fill={TOKEN.stationFill}
+        fill={selected ? color : TOKEN.stationFill}
         stroke={stroke}
         strokeWidth={TOKEN.stationStroke}
       />
@@ -28,14 +53,14 @@ export function FerryTerminus({ x, y, muted = false }: FerryTerminusProps) {
       <g transform="translate(0, -2)">
         <path
           d="M -7 0 Q -3.5 -4 0 0 T 7 0"
-          stroke={stroke}
+          stroke={waveStroke}
           strokeWidth={2}
           fill="none"
           strokeLinecap="round"
         />
         <path
           d="M -7 4 Q -3.5 0 0 4 T 7 4"
-          stroke={stroke}
+          stroke={waveStroke}
           strokeWidth={2}
           fill="none"
           strokeLinecap="round"

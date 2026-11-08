@@ -1,5 +1,6 @@
 import type { Station } from "@/types/smartSchedule";
 import { FERRY_CONSTANTS } from "./fareConstants";
+import { validStation } from "./stationUtils";
 
 /** San Francisco: not a SMART station, reached by the Golden Gate ferry from
  *  Larkspur. */
@@ -11,6 +12,12 @@ export type Place = Station | typeof SAN_FRANCISCO;
 /** The SMART station a place is reached from. */
 export function placeStation(place: Place): Station {
   return place === SAN_FRANCISCO ? FERRY_CONSTANTS.FERRY_STATION : place;
+}
+
+/** `place` when it's San Francisco or on the line, else null — for a selection
+ *  that may be empty ("") or a stale stored name. */
+export function validPlace(place: Place | ""): Place | null {
+  return place === SAN_FRANCISCO ? place : validStation(place);
 }
 
 /** Whether a trip between these ends rides the ferry at its Larkspur end. */

@@ -5,6 +5,7 @@ import {
   futureServiceDate,
   getFilteredTrips,
   getFirstInProgressTripIndex,
+  getNextFerryDeparture,
   getNextTripIndex,
   getScheduleMeta,
   getTodayScheduleType,
@@ -415,6 +416,13 @@ describe("adjacentFerry", () => {
       run("15:00", "15:35"),
     );
     expect(adjacentFerry(run("15:00", "15:35"), true, "weekday")).toBeNull();
+  });
+
+  it("finds the next ferry leaving San Francisco from the inbound timetable", () => {
+    useFerries([["12:30", "13:05"]], [["11:45", "12:20"], ["13:15", "13:50"]]);
+    const tuesdayNoon = new Date(2099, 4, 26, 12, 0);
+    expect(getNextFerryDeparture(tuesdayNoon, true)).toEqual(run("13:15", "13:50"));
+    expect(getNextFerryDeparture(new Date(2099, 4, 26, 14, 0), true)).toBeNull();
   });
 
   it("reads the timetable of the schedule type it's given", () => {

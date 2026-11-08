@@ -308,9 +308,16 @@ function sortedFerries(scheduleType: ScheduleType): FerryConnection[] {
   return ferries;
 }
 
-export function getNextFerryDeparture(now: Date): FerryConnection | null {
+/** `inbound` reads the SF → Larkspur timetable instead: the next ferry
+ *  leaving San Francisco. */
+export function getNextFerryDeparture(
+  now: Date,
+  inbound = false,
+): FerryConnection | null {
   const scheduleType = getTodayScheduleType(now);
-  const ferries = sortedFerries(scheduleType);
+  const ferries = inbound
+    ? ferryRuns(scheduleType, true)
+    : sortedFerries(scheduleType);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return (
     ferries.find((f) => parseTimeToMinutes(f.depart) >= nowMinutes) ?? null
@@ -319,6 +326,18 @@ export function getNextFerryDeparture(now: Date): FerryConnection | null {
 
 /** Ferry timetables from the currently-applied payload. */
 let activeFerrySchedules: FerrySchedules = bundledSchedulePayload.ferrySchedules;
+
+/** The day's Larkspur → SF runs, or SF → Larkspur when `inbound`, in
+ *  departure order. */
+export function ferryRuns(
+  scheduleType: ScheduleType,
+  inbound: boolean,
+): FerryConnection[] {
+  const key: keyof FerrySchedules = inbound
+    ? `${scheduleType}InboundFerries`
+    : `${scheduleType}Ferries`;
+  return activeFerrySchedules[key];
+}
 
 /**
  * The run beside `ferry` on the Larkspur ↔ SF timetable: the next departure
@@ -331,10 +350,7 @@ export function adjacentFerry(
   inbound: boolean,
   scheduleType: ScheduleType,
 ): FerryConnection | null {
-  const key: keyof FerrySchedules = inbound
-    ? `${scheduleType}InboundFerries`
-    : `${scheduleType}Ferries`;
-  const runs = activeFerrySchedules[key];
+  const runs = ferryRuns(scheduleType, inbound);
   const departMinutes = parseTimeToMinutes(ferry.depart);
   if (!inbound) {
     return (

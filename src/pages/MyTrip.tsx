@@ -11,7 +11,7 @@ import {
   AlarmStatusIcon,
   AlarmStatusLabel,
 } from "@/components/AlarmStatusLabel";
-import { FerryConnection } from "@/components/FerryConnection";
+import { FerryLeg } from "@/components/FerryLeg";
 import { FocusedTripReminderRow } from "@/components/FocusedTripReminderRow";
 import { LiveTimePair } from "@/components/LiveTimePair";
 import { MyTripGate } from "@/components/MyTripGate";
@@ -233,6 +233,21 @@ function MyTripView({
           )}
         </SectionCard>
 
+        {model.showInboundFerry && trip.inboundFerry && (
+          <SectionCard className="p-4 md:p-5">
+            {model.hasQuickConnection && !model.isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={model.trainOption} />
+            )}
+            <FerryLeg
+              ferry={trip.inboundFerry}
+              trainTime={model.departureTime}
+              scheduleType={focusedTrip.scheduleType}
+              timeFormat={TIME_FORMAT}
+              inbound
+            />
+          </SectionCard>
+        )}
+
         {/* Every stop on the leg, with the train's current stop highlighted. */}
         <SectionCard className="p-4 md:p-5">
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -251,28 +266,17 @@ function MyTripView({
           />
         </SectionCard>
 
-        {((showFerry && trip.outboundFerry) || model.showInboundFerry) && (
+        {showFerry && trip.outboundFerry && (
           <SectionCard className="p-4 md:p-5">
             {model.hasQuickConnection && !model.isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={model.trainOption} />
             )}
-            {showFerry && trip.outboundFerry && (
-              <FerryConnection
-                ferry={trip.outboundFerry}
-                trainArrivalTime={model.arrivalTime}
-                timeFormat={TIME_FORMAT}
-                fullLeg
-              />
-            )}
-            {model.showInboundFerry && trip.inboundFerry && (
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={model.departureTime}
-                timeFormat={TIME_FORMAT}
-                inbound
-                fullLeg
-              />
-            )}
+            <FerryLeg
+              ferry={trip.outboundFerry}
+              trainTime={model.arrivalTime}
+              scheduleType={focusedTrip.scheduleType}
+              timeFormat={TIME_FORMAT}
+            />
           </SectionCard>
         )}
 

@@ -55,6 +55,9 @@ export const FARE_TYPES = {
 export const FERRY_CONSTANTS = {
   // Station that has ferry connections
   FERRY_STATION: "Larkspur",
+
+  SCHEDULE_URL:
+    "https://www.goldengate.org/ferry/route-schedule/larkspur-san-francisco/",
 } as const;
 
 /**

@@ -133,7 +133,17 @@
     "inbound": "Entrada",
     "outbound": "Salida",
     "larkspur": "Lark",
-    "sanFrancisco": "SF"
+    "sanFrancisco": "SF",
+    "toSanFrancisco": "Ferry a San Francisco",
+    "fromSanFrancisco": "Ferry desde San Francisco",
+    "sfTerminal": "Ferry Building de SF",
+    "larkspurTerminal": "Terminal de ferry de Larkspur",
+    "gate": "Puerta {{gate}}",
+    "rideMinutes": "{{minutes}} min de trayecto",
+    "nextFerry": "Siguiente ferry",
+    "earlierFerry": "Ferry anterior",
+    "lastFerry": "Último ferry del día",
+    "goldenGateSchedule": "Horario de Golden Gate Ferry"
   },
   "tripCard": {
     "nextTrain": "Próximo tren",

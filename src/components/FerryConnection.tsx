@@ -16,10 +16,6 @@ interface FerryConnectionProps {
   timeFormat?: "12h" | "24h";
   inbound?: boolean; // when true, show ferry arrival then train departure
   currentTime?: Date;
-  /** Show both ends of the ferry leg (Larkspur → SF). Used in the trip detail
-   *  card where there's room. The compact schedule listing leaves this off and
-   *  shows only the Larkspur-side connection time. */
-  fullLeg?: boolean;
 }
 
 export function FerryConnection({
@@ -30,7 +26,6 @@ export function FerryConnection({
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
   currentTime,
-  fullLeg = false,
 }: FerryConnectionProps) {
   const { t } = useTranslation();
 
@@ -49,16 +44,8 @@ export function FerryConnection({
   const isShortConnection =
     transferTime < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
 
-  // ferry.depart / ferry.arrive are always in travel order; only the terminal
-  // names flip by direction. Outbound runs Larkspur → SF, inbound SF → Larkspur.
-  const originName = inbound ? t("ferry.sanFrancisco") : t("ferry.larkspur");
-  const destName = inbound ? t("ferry.larkspur") : t("ferry.sanFrancisco");
-  // Full leg mutes the boarding (departure) end once the ferry has left.
-  const boardingHasPassed =
-    currentTime != null && isTimeInPast(currentTime, ferry.depart);
-
-  // Compact (listing) view: the single Larkspur-side connection time — catch it
-  // (outbound) or step off it (inbound) — with a tense-aware label.
+  // The single Larkspur-side connection time — catch it (outbound) or step off
+  // it (inbound) — with a tense-aware label.
   const compactTime = inbound ? ferry.arrive : ferry.depart;
   const compactTimePassed =
     currentTime != null && isTimeInPast(currentTime, compactTime);
@@ -78,37 +65,10 @@ export function FerryConnection({
       )}
     >
       <div className={cn("flex flex-col gap-1", isMobile ? "items-start" : "items-end")}>
-        {fullLeg ? (
-          <div
-            className={cn(
-              "flex items-baseline gap-2 whitespace-nowrap",
-              isMobile ? "text-sm" : "text-base"
-            )}
-          >
-            <span className="flex items-baseline gap-1">
-              <span className="text-[10px] uppercase text-muted-foreground">
-                {originName}
-              </span>
-              <TimeDisplay
-                time={ferry.depart}
-                format={timeFormat}
-                className={cn(boardingHasPassed && "text-muted-foreground/70")}
-              />
-            </span>
-            <span aria-hidden="true">→</span>
-            <span className="flex items-baseline gap-1">
-              <TimeDisplay time={ferry.arrive} format={timeFormat} />
-              <span className="text-[10px] uppercase text-muted-foreground">
-                {destName}
-              </span>
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-baseline gap-1 text-sm">
-            <span className="text-muted-foreground">{compactLabel}</span>
-            <TimeDisplay time={compactTime} format={timeFormat} />
-          </div>
-        )}
+        <div className="flex items-baseline gap-1 text-sm">
+          <span className="text-muted-foreground">{compactLabel}</span>
+          <TimeDisplay time={compactTime} format={timeFormat} />
+        </div>
         <div
           className={cn(
             "flex items-center gap-2 text-xs leading-none",
@@ -130,14 +90,9 @@ export function FerryConnection({
         )}
       >
         <Ship className="h-5 w-5" />
-        {/* In the full-leg mobile view the Lark → SF ordering already conveys
-            direction, so the word would only be redundant width; show it
-            everywhere else (compact listing, and any desktop view). */}
-        {(!fullLeg || !isMobile) && (
-          <span className="text-[10px] uppercase">
-            {inbound ? t("ferry.inbound") : t("ferry.outbound")}
-          </span>
-        )}
+        <span className="text-[10px] uppercase">
+          {inbound ? t("ferry.inbound") : t("ferry.outbound")}
+        </span>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import stations from "@/data/stations";
 import {
   bundledSchedulePayload,
+  type FerrySchedules,
   type ScheduleOverrides,
   type SchedulePayload,
 } from "@/data/scheduleData";
@@ -311,6 +312,36 @@ export function getNextFerryDeparture(now: Date): FerryConnection | null {
   );
 }
 
+/** Ferry timetables from the currently-applied payload. */
+let activeFerrySchedules: FerrySchedules = bundledSchedulePayload.ferrySchedules;
+
+/**
+ * The run beside `ferry` on the Larkspur ↔ SF timetable: the next departure
+ * after it for an outbound (Larkspur → SF) run — the fallback if the train runs
+ * late — or the one before it for an inbound run, which allows a longer
+ * transfer. Null when `ferry` is the day's last outbound or first inbound run.
+ */
+export function adjacentFerry(
+  ferry: FerryConnection,
+  inbound: boolean,
+  scheduleType: ScheduleType,
+): FerryConnection | null {
+  const key: keyof FerrySchedules = inbound
+    ? `${scheduleType}InboundFerries`
+    : `${scheduleType}Ferries`;
+  const runs = activeFerrySchedules[key];
+  const departMinutes = parseTimeToMinutes(ferry.depart);
+  if (!inbound) {
+    return (
+      runs.find((f) => parseTimeToMinutes(f.depart) > departMinutes) ?? null
+    );
+  }
+  const earlier = runs.filter(
+    (f) => parseTimeToMinutes(f.depart) < departMinutes,
+  );
+  return earlier[earlier.length - 1] ?? null;
+}
+
 /**
  * Effective schedule overrides — starts from the build-time bundled map and
  * is swapped wholesale when `setScheduleData` receives a fresh payload (so
@@ -393,6 +424,7 @@ export function setScheduleData(
     activeScheduleOverrides = payload.scheduleOverrides
       ? { ...payload.scheduleOverrides }
       : { ...bundledScheduleOverrides };
+    activeFerrySchedules = payload.ferrySchedules;
     // Downstream caches were built from the previous payload — evict them.
     ferryCache = null;
     scheduleMeta = {

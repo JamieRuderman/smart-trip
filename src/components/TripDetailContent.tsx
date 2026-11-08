@@ -15,7 +15,7 @@ import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
 import { useNow } from "@/hooks/useNow";
 import { useTripDetailModel } from "@/hooks/useTripDetailModel";
 import { StopTimeline } from "./StopTimeline";
-import { FerryConnection } from "./FerryConnection";
+import { FerryLeg } from "./FerryLeg";
 import { GutterRow } from "./GutterRow";
 import { LiveTimePair } from "./LiveTimePair";
 import { QuickConnectionWarning } from "./QuickConnectionWarning";
@@ -386,6 +386,24 @@ export function TripDetailContent({
         data-sheet-scroll-area="true"
         className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1 pb-6"
       >
+        {showInboundFerry && trip.inboundFerry && (
+          <div className="mb-3 pb-3 border-b border-border">
+            {/* Tight ferry → train transfer ("take a later train"). A leg can't
+                both start and end at the terminal, so this never doubles the
+                outbound warning below. */}
+            {hasQuickConnection && !isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={trainOption} />
+            )}
+            <FerryLeg
+              ferry={trip.inboundFerry}
+              trainTime={departureTime}
+              scheduleType={scheduleType}
+              timeFormat={timeFormat}
+              inbound
+            />
+          </div>
+        )}
+
         <StopTimeline
           trip={trip}
           fromStation={fromStation}
@@ -406,28 +424,11 @@ export function TripDetailContent({
             {hasQuickConnection && !isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={trainOption} />
             )}
-            <FerryConnection
+            <FerryLeg
               ferry={trip.outboundFerry}
-              trainArrivalTime={arrivalTime}
+              trainTime={arrivalTime}
+              scheduleType={scheduleType}
               timeFormat={timeFormat}
-              fullLeg
-            />
-          </div>
-        )}
-        {showInboundFerry && trip.inboundFerry && (
-          <div className="mt-3 pt-3 border-t border-border">
-            {/* Tight ferry → train transfer ("take a later train"). A leg can't
-                both start and end at the terminal, so this never doubles the
-                outbound warning above. */}
-            {hasQuickConnection && !isCanceledOrSkipped && (
-              <QuickConnectionWarning trainOption={trainOption} />
-            )}
-            <FerryConnection
-              ferry={trip.inboundFerry}
-              trainDepartureTime={departureTime}
-              timeFormat={timeFormat}
-              inbound
-              fullLeg
             />
           </div>
         )}

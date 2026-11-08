@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  adjacentFerry,
   futureServiceDate,
   getFirstInProgressTripIndex,
   getNextTripIndex,
@@ -303,5 +304,52 @@ describe("futureServiceDate", () => {
       // Browsing the weekend schedule on that Monday is today's schedule.
       expect(futureServiceDate(new Date(2099, 4, 25, 9, 0), "weekend")).toBeNull();
     });
+  });
+});
+
+describe("adjacentFerry", () => {
+  afterEach(() => {
+    setScheduleData(bundledSchedulePayload);
+  });
+
+  const run = (depart: string, arrive: string) => ({ depart, arrive });
+
+  function useFerries(outbound: string[][], inbound: string[][]) {
+    setScheduleData({
+      ...bundledSchedulePayload,
+      ferrySchedules: {
+        weekdayFerries: outbound.map(([d, a]) => run(d, a)),
+        weekendFerries: [],
+        weekdayInboundFerries: inbound.map(([d, a]) => run(d, a)),
+        weekendInboundFerries: [],
+      },
+    });
+  }
+
+  it("finds the next outbound run after the one the train meets", () => {
+    useFerries(
+      [["15:45", "16:20"], ["16:30", "17:05"], ["18:00", "18:35"]],
+      [],
+    );
+    expect(adjacentFerry(run("16:30", "17:05"), false, "weekday")).toEqual(
+      run("18:00", "18:35"),
+    );
+    expect(adjacentFerry(run("18:00", "18:35"), false, "weekday")).toBeNull();
+  });
+
+  it("finds the inbound run before the one that meets the train", () => {
+    useFerries(
+      [],
+      [["15:00", "15:35"], ["15:45", "16:20"], ["17:00", "17:35"]],
+    );
+    expect(adjacentFerry(run("15:45", "16:20"), true, "weekday")).toEqual(
+      run("15:00", "15:35"),
+    );
+    expect(adjacentFerry(run("15:00", "15:35"), true, "weekday")).toBeNull();
+  });
+
+  it("reads the timetable of the schedule type it's given", () => {
+    useFerries([["16:30", "17:05"], ["18:00", "18:35"]], []);
+    expect(adjacentFerry(run("16:30", "17:05"), false, "weekend")).toBeNull();
   });
 });

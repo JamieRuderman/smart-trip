@@ -29,6 +29,9 @@ export interface StationZone {
 export interface FerryConnection {
   depart: string;
   arrive: string;
+  /** Ferry Building gate letter at the SF end, e.g. "C". Absent from schedule
+   *  payloads cached before the transform emitted it. */
+  sfGate?: string;
 }
 
 // Helper type for a tuple of N strings

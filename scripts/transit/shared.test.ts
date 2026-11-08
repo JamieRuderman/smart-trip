@@ -8,6 +8,7 @@ import type {
 } from "../../src/types/gtfs.js";
 
 import {
+  buildFerrySchedules,
   buildTrainSchedules,
   deriveScheduleOverrides,
   deriveServiceTypes,
@@ -366,5 +367,68 @@ describe("buildTrainSchedules", () => {
 
     expect(result.weekday.southbound).toHaveLength(1);
     expect(result.weekday.southbound[0].tripId).toBe("T1");
+  });
+});
+
+describe("buildFerrySchedules", () => {
+  const stop = (stop_id: string, stop_name: string, stop_lat: string) => ({
+    stop_id,
+    stop_name,
+    stop_lat,
+    stop_lon: "-122.4",
+  });
+  const call = (
+    trip_id: string,
+    stop_id: string,
+    stop_sequence: string,
+    time: string,
+  ): GtfsStopTime => ({
+    trip_id,
+    stop_id,
+    stop_sequence,
+    arrival_time: time,
+    departure_time: time,
+  });
+
+  it("carries the Ferry Building gate each run uses at the SF end", () => {
+    const feed: GtfsFeed = {
+      schemaVersion: 1,
+      operatorId: "GF",
+      fetchedAt: "2026-11-07T12:00:00Z",
+      sourceUrl: "",
+      agency: [],
+      routes: [{ route_id: "LSSF", route_type: "4" }],
+      stops: [
+        stop("LARK", "Larkspur", "37.944712"),
+        stop("SFC", "San Francisco-Gate C", "37.795921"),
+        stop("SFB", "San Francisco-Gate B", "37.796533"),
+      ],
+      stopTimes: [
+        call("OUT", "LARK", "1", "16:30:00"),
+        call("OUT", "SFC", "2", "17:05:00"),
+        call("IN_C", "SFC", "1", "15:45:00"),
+        call("IN_C", "LARK", "2", "16:20:00"),
+        call("IN_B", "SFB", "1", "17:35:00"),
+        call("IN_B", "LARK", "2", "18:50:00"),
+      ],
+      shapes: null,
+      calendar: [{ ...WEEKDAY, service_id: "wk" }],
+      calendarDates: [],
+      trips: [
+        { route_id: "LSSF", service_id: "wk", trip_id: "OUT" },
+        { route_id: "LSSF", service_id: "wk", trip_id: "IN_C" },
+        { route_id: "LSSF", service_id: "wk", trip_id: "IN_B" },
+      ],
+    };
+
+    const out = buildFerrySchedules(feed);
+
+    expect(out.weekdayFerries).toEqual([
+      { depart: "16:30", arrive: "17:05", sfGate: "C" },
+    ]);
+    expect(out.weekdayInboundFerries).toEqual([
+      { depart: "15:45", arrive: "16:20", sfGate: "C" },
+      { depart: "17:35", arrive: "18:50", sfGate: "B" },
+    ]);
   });
 });

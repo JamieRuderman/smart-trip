@@ -5,13 +5,12 @@ import { Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isTimeInPast } from "@/lib/scheduleUtils";
 import { FerryTransfer } from "./FerryLeg";
-import { calculateTimeDifference } from "@/lib/timeUtils";
 import { useTranslation } from "react-i18next";
 
 interface FerryConnectionProps {
   ferry: FerryConnectionType;
-  trainArrivalTime?: string; // for outbound (train -> ferry)
-  trainDepartureTime?: string; // for inbound (ferry -> train)
+  /** Minutes between train and ferry at Larkspur. */
+  minutes: number;
   isMobile?: boolean;
   timeFormat?: "12h" | "24h";
   inbound?: boolean; // when true, show ferry arrival then train departure
@@ -20,26 +19,13 @@ interface FerryConnectionProps {
 
 export function FerryConnection({
   ferry,
-  trainArrivalTime,
-  trainDepartureTime,
+  minutes,
   isMobile = false,
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
   currentTime,
 }: FerryConnectionProps) {
   const { t } = useTranslation();
-
-  let transferTime = 0;
-
-  if (inbound) {
-    if (trainDepartureTime) {
-      transferTime = calculateTimeDifference(ferry.arrive, trainDepartureTime);
-    }
-  } else {
-    if (trainArrivalTime) {
-      transferTime = calculateTimeDifference(trainArrivalTime, ferry.depart);
-    }
-  }
 
   // The single Larkspur-side connection time — catch it (outbound) or step off
   // it (inbound) — with a tense-aware label.
@@ -66,7 +52,7 @@ export function FerryConnection({
           <span className="text-muted-foreground">{compactLabel}</span>
           <TimeDisplay time={compactTime} format={timeFormat} />
         </div>
-        <FerryTransfer minutes={transferTime} className="gap-2 leading-none" />
+        <FerryTransfer minutes={minutes} className="gap-2 leading-none" />
       </div>
       <div
         className={cn(

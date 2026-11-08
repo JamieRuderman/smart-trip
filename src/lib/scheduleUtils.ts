@@ -8,7 +8,12 @@ import {
 import bundledScheduleOverrides from "@/data/scheduleOverrides";
 import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
-import { parseTimeToMinutes, isTimeInPast, toLocalDateKey } from "./timeUtils";
+import {
+  calculateTimeDifference,
+  parseTimeToMinutes,
+  isTimeInPast,
+  toLocalDateKey,
+} from "./timeUtils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type {
@@ -546,6 +551,37 @@ export function tripEnds(
     liveStart: liveDeparture != null,
     liveEnd: liveArrival != null,
   };
+}
+
+/**
+ * A trip's ferry and the minutes between it and the train at Larkspur, against
+ * the train's live time there when `status` has it; null on a trip with no ferry.
+ */
+export function ferryTransfer(
+  trip: Pick<ProcessedTrip, "departureTime" | "arrivalTime" | "inboundFerry" | "outboundFerry">,
+  status?: TripRealtimeStatus | null
+): { ferry: FerryConnection; inbound: boolean; minutes: number } | null {
+  if (trip.inboundFerry) {
+    return {
+      ferry: trip.inboundFerry,
+      inbound: true,
+      minutes: calculateTimeDifference(
+        trip.inboundFerry.arrive,
+        status?.liveDepartureTime ?? trip.departureTime
+      ),
+    };
+  }
+  if (trip.outboundFerry) {
+    return {
+      ferry: trip.outboundFerry,
+      inbound: false,
+      minutes: calculateTimeDifference(
+        status?.liveArrivalTime ?? trip.arrivalTime,
+        trip.outboundFerry.depart
+      ),
+    };
+  }
+  return null;
 }
 
 // Fast next trip calculation

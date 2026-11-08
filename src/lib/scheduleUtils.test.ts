@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   adjacentFerry,
+  ferryTransfer,
   futureServiceDate,
   getFilteredTrips,
   getFirstInProgressTripIndex,
@@ -79,6 +80,19 @@ describe("trips that start or end with the SF ferry", () => {
       { departureTime: "08:00", arrivalTime: "08:45", outboundFerry: ferry("08:50", "09:25") },
     ] as ProcessedTrip[];
     expect(getFirstInProgressTripIndex(trips, now)).toBe(0);
+  });
+
+  it("times the Larkspur transfer against the train's live time", () => {
+    const toSf = { departureTime: "08:00", arrivalTime: "08:45", outboundFerry: ferry("09:00", "09:35") };
+    const fromSf = { departureTime: "09:22", arrivalTime: "10:00", inboundFerry: ferry("08:40", "09:15") };
+    const minutes = (t: Partial<ProcessedTrip>, status?: Partial<TripRealtimeStatus>) =>
+      ferryTransfer(t as ProcessedTrip, status as TripRealtimeStatus)?.minutes;
+    expect(minutes(toSf)).toBe(15);
+    expect(minutes(toSf, { liveArrivalTime: "08:53" })).toBe(7);
+    expect(minutes(fromSf)).toBe(7);
+    expect(minutes(fromSf, { liveDepartureTime: "09:30" })).toBe(15);
+    expect(ferryTransfer(fromSf)?.inbound).toBe(true);
+    expect(ferryTransfer(trip("08:00", "08:45"))).toBeNull();
   });
 });
 

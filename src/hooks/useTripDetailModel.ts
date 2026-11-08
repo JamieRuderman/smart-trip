@@ -1,13 +1,12 @@
 import { useTranslation } from "react-i18next";
 import {
-  calculateTransferTime,
   computeMinutesUntil,
   isQuickConnection,
   minutesOfDay,
   mpsToMph,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
-import { calculateFare, tripEnds } from "@/lib/scheduleUtils";
+import { calculateFare, ferryTransfer, tripEnds } from "@/lib/scheduleUtils";
 import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -155,21 +154,9 @@ export function useTripDetailModel({
   const toIdx = stationIndexMap[toStation];
   const stopCount = Math.abs(toIdx - fromIdx);
 
-  const hasOutboundQuickConnection =
-    trip.outboundFerry &&
-    isQuickConnection(
-      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
-    );
-  const hasInboundQuickConnection =
-    trip.inboundFerry != null &&
-    isQuickConnection(
-      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
-    );
-  const hasQuickConnection = Boolean(
-    hasOutboundQuickConnection || hasInboundQuickConnection,
-  );
-
-  const trainOption = hasInboundQuickConnection
+  const transfer = ferryTransfer(trip, realtimeStatus);
+  const hasQuickConnection = transfer != null && isQuickConnection(transfer.minutes);
+  const trainOption = transfer?.inbound
     ? t("quickConnection.laterTrain")
     : t("quickConnection.earlierTrain");
 

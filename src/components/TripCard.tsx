@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { futureServiceDate, tripEnds } from "@/lib/scheduleUtils";
+import { ferryTransfer, futureServiceDate, tripEnds } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
@@ -12,7 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { stateText, stateCardStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
-import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
+import { isQuickConnection } from "@/lib/timeUtils";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 
 interface TripCardProps {
@@ -58,8 +58,6 @@ export const TripCard = memo(function TripCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
-  const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
-  const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
   const {
     start: startTime,
     end: endTime,
@@ -78,18 +76,8 @@ export const TripCard = memo(function TripCard({
   const [isDetailMounted, setIsDetailMounted] = useState(isOpen);
   const isFirstRender = useRef(true);
 
-  const hasOutboundQuickConnection =
-    trip.outboundFerry &&
-    isQuickConnection(
-      calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
-    );
-
-  const hasInboundQuickConnection =
-    trip.inboundFerry &&
-    isQuickConnection(
-      calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
-    );
-
+  const transfer = ferryTransfer(trip, realtimeStatus);
+  const hasQuickConnection = transfer != null && isQuickConnection(transfer.minutes);
 
   const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 
@@ -171,7 +159,7 @@ export const TripCard = memo(function TripCard({
     isOriginSkipped ? t("tripCard.stopSkipped") : null,
     isNextTrip ? t("tripCard.nextTrain") : null,
     isPastTrip ? t("tripCard.departed") : null,
-    hasOutboundQuickConnection || hasInboundQuickConnection
+    hasQuickConnection
       ? t("tripCard.tapForTransferWarning")
       : null,
   ].filter(Boolean);
@@ -250,23 +238,12 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             )}
-            {trip.outboundFerry && (
+            {transfer && (
               <FerryConnection
-                ferry={trip.outboundFerry}
-                trainArrivalTime={arrivalTime}
+                {...transfer}
                 timeFormat={timeFormat}
                 currentTime={ferryClock}
                 isMobile
-              />
-            )}
-            {trip.inboundFerry && (
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={departureTime}
-                timeFormat={timeFormat}
-                currentTime={ferryClock}
-                isMobile
-                inbound
               />
             )}
           </div>
@@ -322,22 +299,8 @@ export const TripCard = memo(function TripCard({
                 {t("tripCard.nextTrain")}
               </span>
             )}
-            {trip.outboundFerry && (
-              <FerryConnection
-                ferry={trip.outboundFerry}
-                trainArrivalTime={arrivalTime}
-                timeFormat={timeFormat}
-                currentTime={ferryClock}
-              />
-            )}
-            {trip.inboundFerry && (
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={departureTime}
-                timeFormat={timeFormat}
-                currentTime={ferryClock}
-                inbound
-              />
+            {transfer && (
+              <FerryConnection {...transfer} timeFormat={timeFormat} currentTime={ferryClock} />
             )}
           </div>
         )}

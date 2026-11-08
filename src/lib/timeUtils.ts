@@ -48,19 +48,6 @@ export function calculateTimeDifference(
 }
 
 /**
- * Calculate transfer time between train arrival and ferry departure
- */
-export function calculateTransferTime(
-  trainTime: string,
-  ferryTime: string
-): number {
-  const cleanTrainTime = cleanTimeString(trainTime);
-  const cleanFerryTime = cleanTimeString(ferryTime);
-
-  return calculateTimeDifference(cleanTrainTime, cleanFerryTime);
-}
-
-/**
  * Check if a time is in the past compared to current time
  * Handles proper timezone and creates today's date with the specified time
  */

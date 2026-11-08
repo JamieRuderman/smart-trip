@@ -5,7 +5,6 @@ import {
   useTripDetailModel,
   type TripDetailModel,
 } from "@/hooks/useTripDetailModel";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
 import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
@@ -46,7 +45,6 @@ export interface MyTripState {
   /** The clock the trip is evaluated against: now, or the start of its service
    *  day for a future-service run. Pass it to anything driven by `progress`. */
   clockTime: Date;
-  showFerry: boolean;
   progress: TripProgressResult;
   model: TripDetailModel;
   /** Solid background for "my trip" chrome: blue, running-late gold,
@@ -56,18 +54,6 @@ export interface MyTripState {
    *  card's train). Same states as `accentBg`, but in the drawing shades: the
    *  line map's lighter my-trip blue, and the theme's muted gray once ended. */
   accentColor: string;
-}
-
-/** Whether the focused leg shows its train's ferry connection: it has one and
- *  the leg ends at the ferry terminal. */
-export function focusedLegShowsFerry(
-  focusedTrip: FocusedTrip,
-  trip: ProcessedTrip,
-): boolean {
-  return (
-    !!trip.outboundFerry &&
-    focusedTrip.toStation === FERRY_CONSTANTS.FERRY_STATION
-  );
 }
 
 /**
@@ -98,8 +84,6 @@ export function useMyTripState({
     [isFutureService, focusedTrip.serviceDate, currentTime],
   );
 
-  const showFerry = focusedLegShowsFerry(focusedTrip, trip);
-
   const progress = useTripProgress({
     trip,
     fromStation: focusedTrip.fromStation,
@@ -118,7 +102,6 @@ export function useMyTripState({
     currentTime: clockTime,
     lastUpdated,
     realtimeStatus: live,
-    showFerry,
     progress,
     isFocused: true,
   });
@@ -140,7 +123,6 @@ export function useMyTripState({
     isFutureService,
     serviceDayLabel,
     clockTime,
-    showFerry,
     progress,
     model,
     accentBg,

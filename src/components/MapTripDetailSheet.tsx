@@ -2,7 +2,6 @@ import type { ReactElement } from "react";
 import stations from "@/data/stations";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
-import { focusedLegShowsFerry } from "@/hooks/useMyTrip";
 import {
   focusedTripKey,
   isFocusedTrainToday,
@@ -62,7 +61,6 @@ export function MapTripDetailSheet({
       realtimeStatus={detail.realtimeStatus}
       timeFormat="12h"
       isNextTrip={true}
-      showFerry={false}
       scheduleType={getTodayScheduleType(currentTime)}
       userFromStation={validStation(fromStation)}
       userToStation={validStation(toStation)}
@@ -118,7 +116,6 @@ function FocusedLegSheet({
       realtimeStatus={live}
       timeFormat="12h"
       isNextTrip={true}
-      showFerry={focusedLegShowsFerry(focusedTrip, trip)}
       isFocused={true}
       scheduleType={focusedTrip.scheduleType}
     />

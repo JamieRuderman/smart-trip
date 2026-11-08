@@ -3,6 +3,7 @@ import { Calendar, ChevronLeft, Clock, MapPin, Ticket } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedPlaces } from "@/lib/focusedTrip";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { MyTripState } from "@/hooks/useMyTrip";
@@ -74,13 +75,13 @@ function MyTripView({
     isFutureService,
     serviceDayLabel,
     clockTime,
-    showFerry,
     progress,
     model,
     accentBg,
     accentColor,
   } = state;
   const { fromStation, toStation } = focusedTrip;
+  const places = focusedPlaces(focusedTrip);
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -116,11 +117,11 @@ function MyTripView({
           {/* Each station name is an unbreakable unit so a long name wraps
               as a whole rather than mid-name. */}
           <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug">
-            <span className="whitespace-nowrap">{fromStation}</span>
+            <span className="whitespace-nowrap">{places.from}</span>
             <span className="font-normal text-white/60" aria-hidden="true">
               →
             </span>
-            <span className="whitespace-nowrap">{toStation}</span>
+            <span className="whitespace-nowrap">{places.to}</span>
           </p>
 
           <div className="mt-4 flex items-end gap-4">
@@ -233,7 +234,7 @@ function MyTripView({
           )}
         </SectionCard>
 
-        {model.showInboundFerry && trip.inboundFerry && (
+        {trip.inboundFerry && (
           <SectionCard className="p-4 md:p-5">
             {model.hasQuickConnection && !model.isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={model.trainOption} />
@@ -266,7 +267,7 @@ function MyTripView({
           />
         </SectionCard>
 
-        {showFerry && trip.outboundFerry && (
+        {trip.outboundFerry && (
           <SectionCard className="p-4 md:p-5">
             {model.hasQuickConnection && !model.isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={model.trainOption} />

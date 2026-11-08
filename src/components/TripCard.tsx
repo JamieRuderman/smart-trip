@@ -12,7 +12,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { stateText, stateCardStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateTransferTime, isQuickConnection } from "@/lib/timeUtils";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 
@@ -20,7 +19,6 @@ interface TripCardProps {
   trip: ProcessedTrip;
   isNextTrip: boolean;
   isPastTrip: boolean;
-  showFerry: boolean;
   timeFormat: "12h" | "24h";
   realtimeStatus?: TripRealtimeStatus | null;
   lastUpdated: Date | null;
@@ -42,7 +40,6 @@ export const TripCard = memo(function TripCard({
   trip,
   isNextTrip,
   isPastTrip,
-  showFerry,
   timeFormat,
   realtimeStatus,
   lastUpdated,
@@ -63,6 +60,10 @@ export const TripCard = memo(function TripCard({
   const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
+  // The ends the rider sees: an SF ferry's time where the trip starts or ends
+  // with one (no live feed for it), else the train's live-aware time.
+  const startTime = trip.inboundFerry?.depart ?? departureTime;
+  const endTime = trip.outboundFerry?.arrive ?? arrivalTime;
   // A later day's ferries haven't departed, whatever today's clock says.
   const ferryClock =
     futureServiceDate(currentTime, scheduleType) == null ? currentTime : undefined;
@@ -76,7 +77,6 @@ export const TripCard = memo(function TripCard({
   const isFirstRender = useRef(true);
 
   const hasOutboundQuickConnection =
-    showFerry &&
     trip.outboundFerry &&
     isQuickConnection(
       calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
@@ -84,13 +84,14 @@ export const TripCard = memo(function TripCard({
 
   const hasInboundQuickConnection =
     trip.inboundFerry &&
-    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION &&
     isQuickConnection(
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
 
-  const hasLiveDepartureTime = realtimeStatus?.liveDepartureTime != null;
-  const hasLiveArrivalTime = realtimeStatus?.liveArrivalTime != null;
+  const hasLiveDepartureTime =
+    !trip.inboundFerry && realtimeStatus?.liveDepartureTime != null;
+  const hasLiveArrivalTime =
+    !trip.outboundFerry && realtimeStatus?.liveArrivalTime != null;
 
   const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 
@@ -166,8 +167,8 @@ export const TripCard = memo(function TripCard({
 
   const ariaParts = [
     `Train ${trip.trip}`,
-    `departs ${departureTime}`,
-    `arrives ${arrivalTime}`,
+    `departs ${startTime}`,
+    `arrives ${endTime}`,
     isCanceled ? t("tripCard.canceled") : null,
     isOriginSkipped ? t("tripCard.stopSkipped") : null,
     isNextTrip ? t("tripCard.nextTrain") : null,
@@ -213,7 +214,7 @@ export const TripCard = memo(function TripCard({
             <div className="flex flex-row gap-2 items-start text-lg whitespace-nowrap">
               <div className="flex flex-col">
                 <TimeDisplay
-                  time={departureTime}
+                  time={startTime}
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveDepartureTime)}
                 />
@@ -221,7 +222,7 @@ export const TripCard = memo(function TripCard({
               <span className={cardState === "future" ? "text-muted-foreground" : stateText[cardState]}>→</span>
               <div className="flex flex-col">
                 <TimeDisplay
-                  time={arrivalTime}
+                  time={endTime}
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveArrivalTime)}
                 />
@@ -251,7 +252,7 @@ export const TripCard = memo(function TripCard({
                 )}
               </div>
             )}
-            {showFerry && trip.outboundFerry && (
+            {trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
@@ -260,24 +261,23 @@ export const TripCard = memo(function TripCard({
                 isMobile
               />
             )}
-            {trip.inboundFerry &&
-              trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
-                <FerryConnection
-                  ferry={trip.inboundFerry}
-                  trainDepartureTime={departureTime}
-                  timeFormat={timeFormat}
-                  currentTime={ferryClock}
-                  isMobile
-                  inbound
-                />
-              )}
+            {trip.inboundFerry && (
+              <FerryConnection
+                ferry={trip.inboundFerry}
+                trainDepartureTime={departureTime}
+                timeFormat={timeFormat}
+                currentTime={ferryClock}
+                isMobile
+                inbound
+              />
+            )}
           </div>
         ) : (
           <div className="flex flex-col md:flex-row items-center gap-4 w-full">
             <div className="flex flex-row gap-2 text-md items-start">
               <div className="flex flex-col min-w-20 items-end">
                 <TimeDisplay
-                  time={departureTime}
+                  time={startTime}
                   isNextTrip={false}
                   format={timeFormat}
                   className={cn(
@@ -296,7 +296,7 @@ export const TripCard = memo(function TripCard({
               <span className={cardState === "future" ? "text-muted-foreground" : stateText[cardState]}>→</span>
               <div className="flex flex-col">
                 <TimeDisplay
-                  time={arrivalTime}
+                  time={endTime}
                   isNextTrip={false}
                   format={timeFormat}
                   className={getTimeToneClass(hasLiveArrivalTime)}
@@ -324,7 +324,7 @@ export const TripCard = memo(function TripCard({
                 {t("tripCard.nextTrain")}
               </span>
             )}
-            {showFerry && trip.outboundFerry && (
+            {trip.outboundFerry && (
               <FerryConnection
                 ferry={trip.outboundFerry}
                 trainArrivalTime={arrivalTime}
@@ -332,16 +332,15 @@ export const TripCard = memo(function TripCard({
                 currentTime={ferryClock}
               />
             )}
-            {trip.inboundFerry &&
-              trip.fromStation === FERRY_CONSTANTS.FERRY_STATION && (
-                <FerryConnection
-                  ferry={trip.inboundFerry}
-                  trainDepartureTime={departureTime}
-                  timeFormat={timeFormat}
-                  currentTime={ferryClock}
-                  inbound
-                />
-              )}
+            {trip.inboundFerry && (
+              <FerryConnection
+                ferry={trip.inboundFerry}
+                trainDepartureTime={departureTime}
+                timeFormat={timeFormat}
+                currentTime={ferryClock}
+                inbound
+              />
+            )}
           </div>
         )}
       </div>
@@ -358,7 +357,6 @@ export const TripCard = memo(function TripCard({
           realtimeStatus={realtimeStatus}
           timeFormat={timeFormat}
           isNextTrip={isNextTrip}
-          showFerry={showFerry}
           isFocused={isFocused}
           scheduleType={scheduleType}
         />

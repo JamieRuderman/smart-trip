@@ -21,7 +21,6 @@ export interface TripDetailSheetProps {
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
-  showFerry: boolean;
   /** When true, this is the user's focused ("Go") / riding trip — the header
    *  band turns blue to match the blue card style. */
   isFocused?: boolean;

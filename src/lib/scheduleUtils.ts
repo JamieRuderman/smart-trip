@@ -26,7 +26,9 @@ export interface ProcessedTrip {
   trip: number;
   tripId?: string;
   times: string[];
+  /** The ferry on to SF after the train — only on a leg the rider continues to SF. */
   outboundFerry?: FerryConnection;
+  /** The ferry from SF before the train — only on a leg the rider starts in SF. */
   inboundFerry?: FerryConnection;
   departureTime: string;
   arrivalTime: string;
@@ -42,8 +44,12 @@ interface StationPair {
   isSouthbound: boolean;
 }
 
+/** Keyed by "fromStation-toStation-scheduleType". */
 interface ScheduleCache {
-  [key: string]: ProcessedTrip[]; // key: "fromStation-toStation-scheduleType"
+  trips: Record<string, ProcessedTrip[]>;
+  /** Larkspur legs continued by ferry to or from SF: only the trains with a
+   *  connection, each carrying its ferry. */
+  ferryTrips: Record<string, ProcessedTrip[]>;
 }
 
 // Note: stationIndexMap is now imported from stationUtils
@@ -67,7 +73,7 @@ stations.forEach((fromStation, fromIndex) => {
 
 // Pre-process schedule data
 function processScheduleData(payload: SchedulePayload): ScheduleCache {
-  const cache: ScheduleCache = {};
+  const cache: ScheduleCache = { trips: {}, ferryTrips: {} };
   const { trainSchedules, ferrySchedules } = payload;
 
   // Validate that train schedules data is loaded
@@ -161,34 +167,33 @@ function processScheduleData(payload: SchedulePayload): ScheduleCache {
 
                 if (isValid) {
                   const key = `${fromStation}-${toStation}-${scheduleType}`;
-                  if (!cache[key]) cache[key] = [];
-
-                  const larkspurTime = getTimeForStation(
-                    trip.times,
-                    FERRY_CONSTANTS.FERRY_STATION
-                  );
-                  const hasLarkspurTime = !larkspurTime.includes("~~");
-
-                  cache[key].push({
+                  const processed: ProcessedTrip = {
                     trip: trip.trip,
                     tripId: trip.tripId,
                     times: trip.times,
-                    outboundFerry:
-                      toStation === FERRY_CONSTANTS.FERRY_STATION &&
-                      hasLarkspurTime
-                        ? findOutboundFerry(larkspurTime, outboundFerries)
-                        : undefined,
-                    inboundFerry:
-                      fromStation === FERRY_CONSTANTS.FERRY_STATION &&
-                      hasLarkspurTime
-                        ? findInboundFerry(larkspurTime, inboundFerries)
-                        : undefined,
                     departureTime,
                     arrivalTime,
                     fromStation,
                     toStation,
                     isValid: true,
-                  });
+                  };
+                  if (!cache.trips[key]) cache.trips[key] = [];
+                  cache.trips[key].push(processed);
+
+                  const ferryLeg =
+                    toStation === FERRY_CONSTANTS.FERRY_STATION
+                      ? findOutboundFerry(arrivalTime, outboundFerries)
+                      : fromStation === FERRY_CONSTANTS.FERRY_STATION
+                        ? findInboundFerry(departureTime, inboundFerries)
+                        : undefined;
+                  if (ferryLeg) {
+                    if (!cache.ferryTrips[key]) cache.ferryTrips[key] = [];
+                    cache.ferryTrips[key].push(
+                      toStation === FERRY_CONSTANTS.FERRY_STATION
+                        ? { ...processed, outboundFerry: ferryLeg }
+                        : { ...processed, inboundFerry: ferryLeg },
+                    );
+                  }
                 }
               }
             }
@@ -221,7 +226,7 @@ try {
   scheduleCache = processScheduleData(bundledSchedulePayload);
 } catch (error) {
   console.error("[ScheduleUtils] Error processing schedule data:", error);
-  scheduleCache = {};
+  scheduleCache = { trips: {}, ferryTrips: {} };
 }
 
 /**
@@ -290,7 +295,7 @@ function sortedFerries(scheduleType: ScheduleType): FerryConnection[] {
   const larkspur = stations[stations.length - 1];
   const seen = new Set<string>();
   const ferries: FerryConnection[] = [];
-  for (const trip of getFilteredTrips(windsor, larkspur, scheduleType)) {
+  for (const trip of getFilteredTrips(windsor, larkspur, scheduleType, true)) {
     const f = trip.outboundFerry;
     if (!f || seen.has(f.depart)) continue;
     seen.add(f.depart);
@@ -447,15 +452,19 @@ export { getStationIndex } from "./stationUtils";
  * @param fromStation - Origin station
  * @param toStation - Destination station
  * @param scheduleType - Type of schedule (weekday or weekend)
+ * @param viaFerry - The leg's Larkspur end continues by ferry to or from SF:
+ *   only trains with a ferry connection, each carrying it. Otherwise no trip
+ *   carries a ferry.
  * @returns Array of processed trips for the route
  */
 export function getFilteredTrips(
   fromStation: Station,
   toStation: Station,
-  scheduleType: ScheduleType
+  scheduleType: ScheduleType,
+  viaFerry = false
 ): ProcessedTrip[] {
   const key = `${fromStation}-${toStation}-${scheduleType}`;
-  return scheduleCache[key] || [];
+  return (viaFerry ? scheduleCache.ferryTrips : scheduleCache.trips)[key] || [];
 }
 
 /**
@@ -468,9 +477,10 @@ export function tripServesLeg(
   tripNumber: number,
   fromStation: Station,
   toStation: Station,
-  scheduleType: ScheduleType
+  scheduleType: ScheduleType,
+  viaFerry = false
 ): boolean {
-  return getFilteredTrips(fromStation, toStation, scheduleType).some(
+  return getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).some(
     (trip) => trip.trip === tripNumber
   );
 }
@@ -533,6 +543,26 @@ export function effectiveArrivalTime(
   );
 }
 
+/**
+ * When the rider sets off: the SF ferry's departure on a trip that starts with
+ * one — it won't wait for a late train — else the train's live-aware departure.
+ */
+export function tripStartTime(
+  trip: Pick<ProcessedTrip, "departureTime" | "inboundFerry">,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
+): string {
+  return trip.inboundFerry?.depart ?? effectiveDepartureTime(trip, realtimeStatusMap);
+}
+
+/** When the rider gets in: the SF ferry's arrival on a trip that ends with one,
+ *  else the train's live-aware arrival. */
+export function tripEndTime(
+  trip: Pick<ProcessedTrip, "departureTime" | "arrivalTime" | "outboundFerry">,
+  realtimeStatusMap?: Map<string, TripRealtimeStatus>
+): string {
+  return trip.outboundFerry?.arrive ?? effectiveArrivalTime(trip, realtimeStatusMap);
+}
+
 // Fast next trip calculation
 /**
  * Finds the index of the first trip that hasn't departed yet, in schedule
@@ -553,9 +583,7 @@ export function getNextTripIndex(
   realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    if (
-      !isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap))
-    ) {
+    if (!isTimeInPast(currentTime, tripStartTime(trips[i], realtimeStatusMap))) {
       return i;
     }
   }
@@ -576,8 +604,8 @@ export function getFirstInProgressTripIndex(
 ): number {
   for (let i = 0; i < trips.length; i++) {
     if (
-      isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap)) &&
-      !isTimeInPast(currentTime, effectiveArrivalTime(trips[i], realtimeStatusMap))
+      isTimeInPast(currentTime, tripStartTime(trips[i], realtimeStatusMap)) &&
+      !isTimeInPast(currentTime, tripEndTime(trips[i], realtimeStatusMap))
     ) {
       return i;
     }

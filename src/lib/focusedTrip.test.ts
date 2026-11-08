@@ -10,6 +10,7 @@ import {
   migrateLegacyReminders,
   reconstructFocusedTrip,
   focusedArrivalInstant,
+  focusedBoardingInstant,
   focusedDepartureInstant,
   focusedTripClearInstant,
   focusedTripIsLeg,
@@ -202,6 +203,55 @@ describe("focusedArrivalInstant / focusedDepartureInstant", () => {
 
   it("returns null when the trip is no longer in the schedule", () => {
     expect(focusedArrivalInstant(makeFocused({ tripNumber: 999999 }))).toBeNull();
+  });
+});
+
+describe("trips that start or end with the SF ferry", () => {
+  beforeEach(() => localStorage.clear());
+
+  const FROM_SF = getFilteredTrips(TO, FROM, "weekday", true)[0];
+  const focusFromSf = makeFocused({
+    tripNumber: FROM_SF.trip,
+    fromStation: TO,
+    toStation: FROM,
+    viaFerry: true,
+  });
+
+  it("boards a trip from SF at its ferry, whatever the train's live time", () => {
+    const [h, m] = FROM_SF.inboundFerry!.depart.split(":").map(Number);
+    const ferryAt = new Date(2099, 0, 1, h, m).getTime();
+    expect(focusedBoardingInstant(focusFromSf)).toBe(ferryAt);
+    expect(focusedBoardingInstant(focusFromSf, "23:59")).toBe(ferryAt);
+  });
+
+  it("boards any other trip at the train, moved to its live departure", () => {
+    const f = makeFocused();
+    const scheduled = focusedDepartureInstant(f)!;
+    expect(focusedBoardingInstant(f)).toBe(scheduled);
+    expect(focusedBoardingInstant(f, "23:59")).toBe(anchorLiveTime(scheduled, "23:59"));
+  });
+
+  it("rebuilds the trip with its ferry only on a ferry leg", () => {
+    expect(reconstructFocusedTrip(focusFromSf)?.inboundFerry).toEqual(FROM_SF.inboundFerry);
+    expect(
+      reconstructFocusedTrip({ ...focusFromSf, viaFerry: undefined })?.inboundFerry,
+    ).toBeUndefined();
+  });
+
+  it("round-trips the ferry flag and rejects any other value", () => {
+    saveFocusedTrip(focusFromSf);
+    expect(loadFocusedTrip()).toEqual(focusFromSf);
+    localStorage.setItem(
+      FOCUSED_TRIP_STORAGE_KEY,
+      JSON.stringify({ ...focusFromSf, viaFerry: false }),
+    );
+    expect(loadFocusedTrip()).toBeNull();
+  });
+
+  it("tells a ferry leg apart from the same stations without it", () => {
+    expect(focusedTripIsLeg(focusFromSf, TO, FROM, "weekday", true)).toBe(true);
+    expect(focusedTripIsLeg(focusFromSf, TO, FROM, "weekday")).toBe(false);
+    expect(focusedTripIsLeg(makeFocused(), FROM, TO, "weekday", true)).toBe(false);
   });
 });
 

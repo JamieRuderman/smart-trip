@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 import {
   calculateTransferTime,
+  computeMinutesUntil,
   isQuickConnection,
   minutesOfDay,
   mpsToMph,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { calculateFare } from "@/lib/scheduleUtils";
 import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -27,7 +27,6 @@ export interface TripDetailModelInput {
   currentTime: Date;
   lastUpdated: Date | null;
   realtimeStatus?: TripRealtimeStatus | null;
-  showFerry: boolean;
   /** All trip progress state, computed once by the caller. */
   progress: TripProgressResult;
   /** The displayed trip is the user's focused trip — its armed leave reminder
@@ -41,7 +40,8 @@ export interface TripDetailModel {
   /** Live-aware departure/arrival "HH:MM". */
   departureTime: string;
   arrivalTime: string;
-  /** Minutes until (live-aware) departure; negative once departed. */
+  /** Minutes until the rider sets off — the SF ferry on a trip that starts
+   *  with one, else the train's live-aware departure; negative once departed. */
   minutesUntil: number;
   /** "On time" / "Delayed N min" / "Ended" / … for the header band. */
   headerStatusLabel: string | null;
@@ -55,8 +55,6 @@ export interface TripDetailModel {
   hasQuickConnection: boolean;
   /** "earlier"/"later train" wording for the quick-connection warning. */
   trainOption: string;
-  /** The trip starts at the ferry terminal with an inbound ferry to show. */
-  showInboundFerry: boolean;
   alarmStatus: AlarmStatusSelection;
   /** The rider has reached their destination — "approaching" cues stop. */
   isAtDestination: boolean;
@@ -75,7 +73,6 @@ export function useTripDetailModel({
   currentTime,
   lastUpdated,
   realtimeStatus,
-  showFerry,
   progress,
   isFocused,
 }: TripDetailModelInput): TripDetailModel {
@@ -115,11 +112,16 @@ export function useTripDetailModel({
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
 
-  const minutesUntil = useCountdown(
+  const minutesUntilTrain = useCountdown(
     trip.departureTime,
     realtimeStatus?.liveDepartureTime,
     currentTime,
   );
+  const minutesUntil = trip.inboundFerry
+    ? computeMinutesUntil(currentTime, trip.inboundFerry.depart)
+    : minutesUntilTrain;
+  // A trip from SF counts down to its ferry, then — once aboard — to the train.
+  const departsByFerry = trip.inboundFerry != null && minutesUntil >= 0;
 
   // When this is the user's focused trip and a leave reminder is armed, lead
   // with the "leave in" countdown (reminder fires `leadMinutes` before
@@ -133,10 +135,10 @@ export function useTripDetailModel({
   const minutesUntilLeave =
     reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
 
-  // Trip metadata
+  // Trip metadata — door to door, ferry included.
   const tripDurationMinutes =
-    parseTimeToMinutes(trip.arrivalTime) -
-    parseTimeToMinutes(trip.departureTime);
+    parseTimeToMinutes(trip.outboundFerry?.arrive ?? trip.arrivalTime) -
+    parseTimeToMinutes(trip.inboundFerry?.depart ?? trip.departureTime);
   const tripDurationLabel =
     tripDurationMinutes >= 60
       ? t("tracker.durationHoursMinutes", {
@@ -155,16 +157,11 @@ export function useTripDetailModel({
   const stopCount = Math.abs(toIdx - fromIdx);
 
   const hasOutboundQuickConnection =
-    showFerry &&
     trip.outboundFerry &&
     isQuickConnection(
       calculateTransferTime(trip.arrivalTime, trip.outboundFerry.depart),
     );
-  const showInboundFerry =
-    trip.inboundFerry != null &&
-    trip.fromStation === FERRY_CONSTANTS.FERRY_STATION;
   const hasInboundQuickConnection =
-    showInboundFerry &&
     trip.inboundFerry != null &&
     isQuickConnection(
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
@@ -212,7 +209,8 @@ export function useTripDetailModel({
 
   const alarmStatus = useAlarmStatus({
     tripId: trip.trip,
-    minutesUntilDeparture: minutesUntil,
+    minutesUntilDeparture: departsByFerry ? minutesUntil : minutesUntilTrain,
+    departsByFerry,
     minutesUntilArrival:
       minutesUntilArrival ??
       parseTimeToMinutes(arrivalTime) - minutesOfDay(currentTime),
@@ -259,7 +257,6 @@ export function useTripDetailModel({
     speedMph,
     hasQuickConnection,
     trainOption,
-    showInboundFerry,
     alarmStatus,
     isAtDestination,
   };

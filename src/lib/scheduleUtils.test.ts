@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   adjacentFerry,
   futureServiceDate,
+  getFilteredTrips,
   getFirstInProgressTripIndex,
   getNextTripIndex,
   getScheduleMeta,
@@ -17,6 +18,7 @@ import {
   type SchedulePayload,
 } from "@/data/scheduleData";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import { parseTimeToMinutes } from "@/lib/timeUtils";
 
 /** Minimal ProcessedTrip — these helpers only read departure/arrival times. */
 function trip(departureTime: string, arrivalTime: string): ProcessedTrip {
@@ -54,6 +56,73 @@ describe("getNextTripIndex", () => {
       ["08:30", { liveDepartureTime: "09:10" } as TripRealtimeStatus],
     ]);
     expect(getNextTripIndex(trips, now, live)).toBe(1);
+  });
+});
+
+describe("trips that start or end with the SF ferry", () => {
+  const ferry = (depart: string, arrive: string) => ({ depart, arrive });
+  // 09:00 local.
+  const now = new Date(2026, 5, 18, 9, 0);
+
+  it("judges a trip from SF departed once its ferry has left", () => {
+    const trips = [
+      { departureTime: "09:20", arrivalTime: "10:00", inboundFerry: ferry("08:40", "09:15") },
+      { departureTime: "10:20", arrivalTime: "11:00", inboundFerry: ferry("09:40", "10:15") },
+    ] as ProcessedTrip[];
+    expect(getNextTripIndex(trips, now)).toBe(1);
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(0);
+  });
+
+  it("keeps a trip to SF in progress until its ferry arrives", () => {
+    const trips = [
+      { departureTime: "08:00", arrivalTime: "08:45", outboundFerry: ferry("08:50", "09:25") },
+    ] as ProcessedTrip[];
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(0);
+  });
+});
+
+describe("getFilteredTrips viaFerry", () => {
+  afterEach(() => {
+    setScheduleData(bundledSchedulePayload);
+  });
+
+  const run = (depart: string, arrive: string) => ({ depart, arrive });
+  const toLarkspur = () => getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday");
+  const fromLarkspur = () => getFilteredTrips("Larkspur", "Petaluma Downtown", "weekday");
+
+  it("gives a plain Larkspur leg no ferry", () => {
+    expect(toLarkspur().length).toBeGreaterThan(0);
+    expect(toLarkspur().some((t) => t.outboundFerry || t.inboundFerry)).toBe(false);
+    expect(fromLarkspur().some((t) => t.outboundFerry || t.inboundFerry)).toBe(false);
+  });
+
+  it("keeps only the trains with a ferry connection on a leg to or from SF", () => {
+    setScheduleData({
+      ...bundledSchedulePayload,
+      ferrySchedules: {
+        weekdayFerries: [run("12:00", "12:35")],
+        weekendFerries: [],
+        weekdayInboundFerries: [run("12:00", "12:35")],
+        weekendInboundFerries: [],
+      },
+    });
+    const noon = 12 * 60;
+
+    const toSf = getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday", true);
+    expect(toSf.map((t) => t.trip)).toEqual(
+      toLarkspur()
+        .filter((t) => parseTimeToMinutes(t.arrivalTime) <= noon)
+        .map((t) => t.trip),
+    );
+    expect(toSf.every((t) => t.outboundFerry?.depart === "12:00" && !t.inboundFerry)).toBe(true);
+
+    const fromSf = getFilteredTrips("Larkspur", "Petaluma Downtown", "weekday", true);
+    expect(fromSf.map((t) => t.trip)).toEqual(
+      fromLarkspur()
+        .filter((t) => parseTimeToMinutes(t.departureTime) > noon + 35)
+        .map((t) => t.trip),
+    );
+    expect(fromSf.every((t) => t.inboundFerry?.depart === "12:00" && !t.outboundFerry)).toBe(true);
   });
 });
 

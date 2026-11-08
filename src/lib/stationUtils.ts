@@ -7,7 +7,6 @@ import {
   type TrainDirection,
 } from "@/data/generated/stationPlatforms.generated";
 import { BRAND_LINE_COLOR, ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
-import { FERRY_CONSTANTS } from "./fareConstants";
 
 /**
  * Maps GTFS platform stop IDs (from SMART's stops.txt) to a station + direction.
@@ -68,13 +67,6 @@ export function getStationZone(station: Station): number {
  */
 export function getStationIndex(station: Station): number {
   return stationIndexMap[station];
-}
-
-/**
- * Check if a station has ferry connections
- */
-export function hasFerryConnection(station: string): boolean {
-  return station === FERRY_CONSTANTS.FERRY_STATION;
 }
 
 /**

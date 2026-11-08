@@ -5,18 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, HeartHandshake } from "lucide-react";
 import type { Station } from "@/types/smartSchedule";
+import type { Place } from "@/lib/places";
 import { type HeaderHeights } from "@/hooks/useHeaderHeights";
 import { ShrinkingContainer } from "./ShrinkingContainer";
 import { StationSelector } from "./StationSelector";
 import { useTranslation } from "react-i18next";
 
 export type StickyHeaderProps = {
-  fromStation: Station | "";
-  toStation: Station | "";
+  fromStation: Place | "";
+  toStation: Place | "";
   scheduleType: "weekday" | "weekend";
   headerHeights: HeaderHeights;
-  onFromStationChange: (station: Station) => void;
-  onToStationChange: (station: Station) => void;
+  onFromStationChange: (place: Place) => void;
+  onToStationChange: (place: Place) => void;
   onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   onSwapStations: () => void;
   closestStation?: Station | null;

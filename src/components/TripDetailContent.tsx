@@ -36,7 +36,6 @@ export interface TripDetailContentProps {
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
-  showFerry: boolean;
   /** Whether the hosting sheet is open — false while it animates closed. */
   isOpen: boolean;
   onClose: () => void;
@@ -68,7 +67,6 @@ export function TripDetailContent({
   lastUpdated,
   realtimeStatus,
   timeFormat,
-  showFerry,
   isOpen,
   onClose,
   progress,
@@ -119,7 +117,6 @@ export function TripDetailContent({
     speedMph,
     hasQuickConnection,
     trainOption,
-    showInboundFerry,
     alarmStatus,
     isAtDestination: alarmAtDestination,
   } = useTripDetailModel({
@@ -129,7 +126,6 @@ export function TripDetailContent({
     currentTime,
     lastUpdated,
     realtimeStatus,
-    showFerry,
     progress,
     isFocused,
   });
@@ -364,6 +360,7 @@ export function TripDetailContent({
             tripNumber={trip.trip}
             fromStation={fromStation}
             toStation={toStation}
+            viaFerry={trip.inboundFerry != null || trip.outboundFerry != null}
             departureTime={trip.departureTime}
             liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
             arrivalTime={trip.arrivalTime}
@@ -386,7 +383,7 @@ export function TripDetailContent({
         data-sheet-scroll-area="true"
         className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1 pb-6"
       >
-        {showInboundFerry && trip.inboundFerry && (
+        {trip.inboundFerry && (
           <div className="mb-3 pb-3 border-b border-border">
             {/* Tight ferry → train transfer ("take a later train"). A leg can't
                 both start and end at the terminal, so this never doubles the
@@ -418,7 +415,7 @@ export function TripDetailContent({
           isFocused={isFocused}
         />
 
-        {showFerry && trip.outboundFerry && (
+        {trip.outboundFerry && (
           <div className="mt-3 pt-3 border-t border-border">
             {/* Quick connection warning — sits between the divider and ferry times */}
             {hasQuickConnection && !isCanceledOrSkipped && (

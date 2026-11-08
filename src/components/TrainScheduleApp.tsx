@@ -41,8 +41,11 @@ export function TrainScheduleApp() {
       ? HEADER_MAX_HEIGHTS.large
       : HEADER_MAX_HEIGHTS.small;
   const {
+    fromPlace,
+    toPlace,
     fromStation,
     toStation,
+    viaFerry,
     scheduleType,
     selectedTripNumber,
     setFromStation,
@@ -64,9 +67,9 @@ export function TrainScheduleApp() {
   // so trips recompute when cached/remote schedule data swaps in memory.
   const filteredTrips = useMemo(() => {
     if (!fromStation || !toStation) return [];
-    return getFilteredTrips(fromStation, toStation, scheduleType);
+    return getFilteredTrips(fromStation, toStation, scheduleType, viaFerry);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromStation, toStation, scheduleType, scheduleDataVersion]);
+  }, [fromStation, toStation, viaFerry, scheduleType, scheduleDataVersion]);
 
   const { alerts } = useServiceAlerts(fromStation, toStation);
 
@@ -164,7 +167,7 @@ export function TrainScheduleApp() {
   const focusedTripNumber =
     fromStation &&
     toStation &&
-    focusedTripIsLeg(focusedTrip, fromStation, toStation, scheduleType)
+    focusedTripIsLeg(focusedTrip, fromStation, toStation, scheduleType, viaFerry)
       ? focusedTrip.tripNumber
       : null;
 
@@ -174,8 +177,8 @@ export function TrainScheduleApp() {
       ref={headerContainerRef}
     >
       <StickyHeader
-        fromStation={fromStation}
-        toStation={toStation}
+        fromStation={fromPlace}
+        toStation={toPlace}
         scheduleType={scheduleType}
         headerHeights={headerHeights}
         onFromStationChange={setFromStation}
@@ -259,7 +262,6 @@ export function TrainScheduleApp() {
           realtimeStatus={devFixture.realtimeStatus}
           timeFormat="12h"
           isNextTrip={false}
-          showFerry={false}
           scheduleType={scheduleType}
           vehiclePositionOverride={devFixture.vehiclePosition}
         />

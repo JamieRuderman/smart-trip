@@ -22,6 +22,7 @@
     "startStation": "Salida",
     "endStation": "Llegada",
     "nearYou": "Cerca de ti",
+    "viaLarkspurFerry": "vía ferry de Larkspur",
     "useMyLocation": "Usar mi ubicación"
   },
   "scheduleDaySwitch": {
@@ -237,6 +238,7 @@
     "tooLateBody": "Este tren sale demasiado pronto para programar un aviso.",
     "notificationTitle": "Sal hacia {{station}}",
     "notificationBody": "El tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes).",
+    "ferryNotificationBody": "El ferry para el tren {{trip}} sale a las {{time}}: sal ya para alcanzarlo ({{leadMinutes}} min antes).",
     "alarmStop": "Detener",
     "alarmViewTrip": "Ver viaje"
   },
@@ -290,6 +292,8 @@
   "tracker": {
     "departsInHoursMinutes": "Sale en {{hours}}h {{minutes}}m",
     "departsInMinutes": "Sale en {{minutes}} min",
+    "ferryDepartsInMinutes": "El ferry sale en {{minutes}} min",
+    "ferryDepartsInHoursMinutes": "El ferry sale en {{hours}}h {{minutes}}m",
     "leaveInHoursMinutes": "Salir en {{hours}}h {{minutes}}m",
     "leaveInMinutes": "Salir en {{minutes}} min",
     "leaveNow": "Salir ya",

@@ -22,6 +22,7 @@
     "startStation": "Departing",
     "endStation": "Arriving",
     "nearYou": "Near you",
+    "viaLarkspurFerry": "via Larkspur ferry",
     "useMyLocation": "Use my location"
   },
   "scheduleDaySwitch": {
@@ -237,6 +238,7 @@
     "tooLateBody": "This train leaves too soon to set a reminder.",
     "notificationTitle": "Leave for {{station}}",
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before).",
+    "ferryNotificationBody": "The ferry for train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before).",
     "alarmStop": "Stop",
     "alarmViewTrip": "View trip"
   },
@@ -290,6 +292,8 @@
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Departs in {{minutes}} min",
+    "ferryDepartsInMinutes": "Ferry departs in {{minutes}} min",
+    "ferryDepartsInHoursMinutes": "Ferry departs in {{hours}}h {{minutes}}m",
     "leaveInHoursMinutes": "Leave in {{hours}}h {{minutes}}m",
     "leaveInMinutes": "Leave in {{minutes}} min",
     "leaveNow": "Leave now",

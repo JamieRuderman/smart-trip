@@ -3,6 +3,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -15,76 +16,64 @@ import {
   LocateFixed,
   Loader2,
 } from "lucide-react";
-import { getAllStations, hasFerryConnection } from "@/lib/stationUtils";
+import { getAllStations, getStationIndex } from "@/lib/stationUtils";
+import { SAN_FRANCISCO, placeStation, type Place } from "@/lib/places";
 import type { Station } from "@/types/smartSchedule";
 import { PillBadge } from "./PillBadge";
 import { useTranslation } from "react-i18next";
 
 export type StationSelectorProps = {
-  fromStation: Station | "";
-  toStation: Station | "";
-  onFromStationChange: (station: Station) => void;
-  onToStationChange: (station: Station) => void;
+  fromStation: Place | "";
+  toStation: Place | "";
+  onFromStationChange: (place: Place) => void;
+  onToStationChange: (place: Place) => void;
   onSwapStations: () => void;
   closestStation?: Station | null;
   locationLoading?: boolean;
   onRequestLocation?: () => void;
 };
 
-// Reusable component for displaying station name with ferry icon
-const StationWithFerry = ({
-  station,
-  direction,
-}: {
-  station: string;
-  direction: "southbound" | "northbound";
-}) => (
+const PlaceName = ({ place }: { place: Place }) => (
   <div className="flex items-center gap-2">
-    <span>{station}</span>
-    {hasFerryConnection(station) && (
-      <>
-        <span className="text-muted-foreground">
-          {direction === "southbound" ? "←" : "→"}
-        </span>
-        <Ship className="h-4 w-4 ml-1" />
-      </>
-    )}
+    <span>{place}</span>
+    {place === SAN_FRANCISCO && <Ship className="h-4 w-4" aria-hidden="true" />}
   </div>
 );
 
-// Custom SelectItem that handles ferry stations properly
-const StationSelectItem = ({
-  station,
-  direction,
+const PlaceSelectItem = ({
+  place,
   badge,
   gutterIcon,
   ...props
 }: {
-  station: string;
-  direction: "southbound" | "northbound";
+  place: Place;
   badge?: React.ReactNode;
   gutterIcon?: React.ReactNode;
-} & React.ComponentProps<typeof SelectItem>) => (
-  <SelectItem {...props}>
-    {gutterIcon && (
-      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-        {gutterIcon}
-      </span>
-    )}
-    <div className="flex items-center w-full">
-      <span>{station}</span>
-      {hasFerryConnection(station) && (
-        <>
-          <span className="text-muted-foreground ml-2">
-            {direction === "southbound" ? "←" : "→"}
-          </span>
-          <Ship className="h-4 w-4 ml-2" />
-        </>
+} & Omit<React.ComponentProps<typeof SelectItem>, "value">) => {
+  const { t } = useTranslation();
+  return (
+    <SelectItem value={place} {...props}>
+      {gutterIcon && (
+        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+          {gutterIcon}
+        </span>
       )}
-      {badge}
-    </div>
-  </SelectItem>
-);
+      <div className="flex items-center w-full">
+        {place === SAN_FRANCISCO ? (
+          <span className="flex flex-col">
+            <PlaceName place={place} />
+            <span className="text-xs text-muted-foreground">
+              {t("header.viaLarkspurFerry")}
+            </span>
+          </span>
+        ) : (
+          <span>{place}</span>
+        )}
+        {badge}
+      </div>
+    </SelectItem>
+  );
+};
 
 export function StationSelector({
   fromStation,
@@ -99,22 +88,101 @@ export function StationSelector({
   // Show location button whenever a handler is provided — on all platforms
   const showLocationButton = !!onRequestLocation;
   const { t } = useTranslation();
-  const stations = getAllStations();
+  const places: Place[] = getAllStations();
+  const sameStation = (a: Place, b: Place | "") =>
+    b !== "" && placeStation(a) === placeStation(b);
+  const lineIndex = (place: Place | "") =>
+    place ? getStationIndex(placeStation(place)) : -1;
 
-  // Clear the other station if it's selected in this dropdown
-  const handleFromStationChange = (station: Station) => {
-    onFromStationChange(station);
-    if (station === toStation) {
-      onToStationChange("" as Station);
+  // Clear the other end if it's on the station just picked (San Francisco
+  // shares Larkspur's).
+  const handleFromStationChange = (place: Place) => {
+    onFromStationChange(place);
+    if (sameStation(place, toStation)) {
+      onToStationChange("" as Place);
     }
   };
 
-  const handleToStationChange = (station: Station) => {
-    onToStationChange(station);
-    if (station === fromStation) {
-      onFromStationChange("" as Station);
+  const handleToStationChange = (place: Place) => {
+    onToStationChange(place);
+    if (sameStation(place, fromStation)) {
+      onFromStationChange("" as Place);
     }
   };
+
+  const fromItem = (place: Place) => (
+    <PlaceSelectItem
+      key={place}
+      place={place}
+      role="option"
+      className={place === toStation ? "text-primary" : ""}
+      gutterIcon={
+        place === toStation ? (
+          lineIndex(toStation) > lineIndex(fromStation) ? (
+            <CornerDownRight
+              className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
+              style={{ strokeWidth: 3 }}
+            />
+          ) : (
+            <CornerUpRight
+              className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
+              style={{ strokeWidth: 3 }}
+            />
+          )
+        ) : undefined
+      }
+      badge={
+        <>
+          {place === toStation && (
+            <PillBadge
+              label={t("header.endStation")}
+              color="ontime"
+              className="ml-2"
+            />
+          )}
+          {place === closestStation && (
+            <PillBadge
+              label={t("header.nearYou")}
+              color="ontime"
+              className="ml-2"
+            />
+          )}
+        </>
+      }
+    />
+  );
+
+  const toItem = (place: Place) => (
+    <PlaceSelectItem
+      key={place}
+      place={place}
+      role="option"
+      className={place === fromStation ? "text-primary" : ""}
+      gutterIcon={
+        place === fromStation ? (
+          <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
+        ) : undefined
+      }
+      badge={
+        <>
+          {place === fromStation && (
+            <PillBadge
+              label={t("header.startStation")}
+              color="ontime"
+              className="ml-2"
+            />
+          )}
+          {place === closestStation && (
+            <PillBadge
+              label={t("header.nearYou")}
+              color="ontime"
+              className="ml-2"
+            />
+          )}
+        </>
+      }
+    />
+  );
 
   return (
     <div className="flex items-center gap-3 mb-2">
@@ -136,7 +204,7 @@ export function StationSelector({
             aria-label={t("header.selectDepartureStation")}
           >
             {fromStation ? (
-              <StationWithFerry station={fromStation} direction="southbound" />
+              <PlaceName place={fromStation} />
             ) : (
               <SelectValue placeholder={t("header.departure")} />
             )}
@@ -145,50 +213,9 @@ export function StationSelector({
             role="listbox"
             aria-label={t("header.availableStations")}
           >
-            {stations.map((station) => (
-              <StationSelectItem
-                key={station}
-                station={station}
-                value={station}
-                role="option"
-                direction="southbound"
-                className={station === toStation ? "text-primary" : ""}
-                gutterIcon={
-                  station === toStation ? (
-                    stations.indexOf(toStation as Station) >
-                    stations.indexOf(fromStation as Station) ? (
-                      <CornerDownRight
-                        className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
-                        style={{ strokeWidth: 3 }}
-                      />
-                    ) : (
-                      <CornerUpRight
-                        className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
-                        style={{ strokeWidth: 3 }}
-                      />
-                    )
-                  ) : undefined
-                }
-                badge={
-                  <>
-                    {station === toStation && (
-                      <PillBadge
-                        label={t("header.endStation")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                    {station === closestStation && (
-                      <PillBadge
-                        label={t("header.nearYou")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                  </>
-                }
-              />
-            ))}
+            {places.map(fromItem)}
+            <SelectSeparator />
+            {fromItem(SAN_FRANCISCO)}
           </SelectContent>
         </Select>
 
@@ -198,7 +225,7 @@ export function StationSelector({
             aria-label={t("header.selectArrivalStation")}
           >
             {toStation ? (
-              <StationWithFerry station={toStation} direction="northbound" />
+              <PlaceName place={toStation} />
             ) : (
               <SelectValue placeholder={t("header.destination")} />
             )}
@@ -207,39 +234,9 @@ export function StationSelector({
             role="listbox"
             aria-label={t("header.availableStations")}
           >
-            {stations.map((station) => (
-              <StationSelectItem
-                key={station}
-                station={station}
-                value={station}
-                role="option"
-                direction="northbound"
-                className={station === fromStation ? "text-primary" : ""}
-                gutterIcon={
-                  station === fromStation ? (
-                    <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
-                  ) : undefined
-                }
-                badge={
-                  <>
-                    {station === fromStation && (
-                      <PillBadge
-                        label={t("header.startStation")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                    {station === closestStation && (
-                      <PillBadge
-                        label={t("header.nearYou")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                  </>
-                }
-              />
-            ))}
+            {places.map(toItem)}
+            <SelectSeparator />
+            {toItem(SAN_FRANCISCO)}
           </SelectContent>
         </Select>
       </div>

@@ -9,6 +9,8 @@ const REALTIME_FRESH_MS = 120 * 1000;
 interface UseAlarmStatusParams {
   tripId: number;
   minutesUntilDeparture: number;
+  /** The departure counted down is the SF ferry the trip starts with. */
+  departsByFerry?: boolean;
   minutesUntilArrival: number;
   minutesAfterArrival: number;
   /** Minutes until the armed leave reminder fires, or null when none is armed. */
@@ -36,6 +38,7 @@ export function useAlarmStatus(
   const {
     tripId,
     minutesUntilDeparture,
+    departsByFerry = false,
     minutesUntilArrival,
     minutesAfterArrival,
     minutesUntilLeave = null,
@@ -73,6 +76,7 @@ export function useAlarmStatus(
     () =>
       selectAlarmStatus({
         minutesUntilDeparture,
+        departsByFerry,
         minutesUntilArrival,
         minutesAfterArrival,
         minutesUntilLeave,
@@ -87,6 +91,7 @@ export function useAlarmStatus(
       }),
     [
       minutesUntilDeparture,
+      departsByFerry,
       minutesUntilArrival,
       minutesAfterArrival,
       minutesUntilLeave,

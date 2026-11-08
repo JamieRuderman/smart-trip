@@ -10,7 +10,7 @@ import {
   getNextTripIndex,
   getFirstInProgressTripIndex,
   futureServiceDate,
-  effectiveDepartureTime,
+  tripStartTime,
 } from "@/lib/scheduleUtils";
 import { parseServiceDate, parseTimeToMinutes } from "@/lib/timeUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
@@ -18,7 +18,6 @@ import {
   findRealtimeStatus,
   useTripRealtimeStatusMap,
 } from "@/hooks/useTripUpdates";
-import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import type { Station } from "@/types/smartSchedule";
 
 interface ScheduleResultsProps {
@@ -114,7 +113,7 @@ export function ScheduleResults({
   if (!isFutureSchedule) {
     let nextVisibleMinutes = Infinity;
     visibleTrips.forEach((trip, i) => {
-      const departureTime = effectiveDepartureTime(trip, realtimeStatusMap);
+      const departureTime = tripStartTime(trip, realtimeStatusMap);
       if (isTimeInPast(currentTime, departureTime)) return;
       const minutes = parseTimeToMinutes(departureTime);
       if (minutes < nextVisibleMinutes) {
@@ -163,12 +162,10 @@ export function ScheduleResults({
             // announcement and badge flags consistent with the Next logic).
             const isPastTrip = isTimeInPast(
               rowClock,
-              effectiveDepartureTime(trip, realtimeStatusMap),
+              tripStartTime(trip, realtimeStatusMap),
             );
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;
-            const showFerry =
-              !!trip.outboundFerry && toStation === FERRY_CONSTANTS.FERRY_STATION;
 
             // The focused trip stays in the list (the trip bar also links to
             // it) and is highlighted blue. focusedTripNumber is only set when
@@ -183,7 +180,6 @@ export function ScheduleResults({
                 isNextTrip={isNextTrip}
                 isPastTrip={isPastTrip}
                 isFocused={isFocused}
-                showFerry={showFerry}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
                 lastUpdated={lastUpdated}

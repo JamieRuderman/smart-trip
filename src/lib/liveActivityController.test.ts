@@ -59,6 +59,7 @@ const loadFocusedTrip = vi.fn((): FocusedTrip | null => FOCUS);
 vi.mock("@/lib/focusedTrip", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/focusedTrip")>()),
   focusedDepartureInstant: () => DEPARTURE,
+  focusedBoardingInstant: () => DEPARTURE,
   focusedArrivalInstant: () => ARRIVAL,
   reconstructFocusedTrip: () => TRIP,
   loadFocusedTrip: () => loadFocusedTrip(),

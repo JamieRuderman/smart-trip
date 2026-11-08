@@ -170,11 +170,12 @@ export function planTick(input: TickInput): TickPlan {
     vehicleShortOfDestination = false,
   } = input;
   const fallbackDelayMs = Math.max(0, lastSent?.delayMinutes ?? 0) * 60_000;
-  const fallbackDepartureEpochMs = reg.departureEpochMs + fallbackDelayMs;
+  const fallbackDepartureEpochMs =
+    reg.boardingEpochMs ?? reg.departureEpochMs + fallbackDelayMs;
   const displayedArrivalEpochMs = lastSent?.arrivalEpochMs ?? reg.arrivalEpochMs;
   const reminderLeadMs =
     reg.reminderLeadMinutes != null ? reg.reminderLeadMinutes * 60_000 : null;
-  const status = updates
+  const liveStatus = updates
     ? computeLiveTripStatus({ reg, updates, now, vehicleShortOfDestination })
     : !vehicleShortOfDestination &&
         now >= displayedArrivalEpochMs + ARRIVED_DROP_GRACE_MS
@@ -186,6 +187,10 @@ export function planTick(input: TickInput): TickPlan {
           isEnded: true,
         }
       : null;
+  const status =
+    liveStatus && reg.boardingEpochMs != null
+      ? { ...liveStatus, departureEpochMs: reg.boardingEpochMs }
+      : liveStatus;
 
   // The leave-alarm instant tracks the LIVE departure (delay-adjusted), so it
   // matches the in-app "Leave in" countdown; null when no reminder is armed.
@@ -325,12 +330,13 @@ export class TripActivityDO {
 
   /** Ensure an alarm is pending no later than the next scheduled-time wake. */
   private async ensureScheduled(reg: LiveActivityRegistration): Promise<void> {
+    const departureEpochMs = reg.boardingEpochMs ?? reg.departureEpochMs;
     const reminderEpochMs =
       reg.reminderLeadMinutes != null
-        ? reg.departureEpochMs - reg.reminderLeadMinutes * 60_000
+        ? departureEpochMs - reg.reminderLeadMinutes * 60_000
         : null;
     const next = nextWake(
-      reg.departureEpochMs,
+      departureEpochMs,
       reg.arrivalEpochMs,
       Date.now(),
       reminderEpochMs,

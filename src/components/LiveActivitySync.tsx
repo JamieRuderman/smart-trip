@@ -4,7 +4,7 @@ import { useStationSelection } from "@/contexts/stationSelection";
 import {
   anchorLiveTime,
   focusedArrivalInstant,
-  focusedDepartureInstant,
+  focusedBoardingInstant,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
@@ -43,18 +43,15 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
 
   // Anchor onto the focused trip's own service date (overnight-safe) rather
   // than "today", so these are correct on any route/view and any clock day.
-  const staticDepartureAt = useMemo(
-    () => focusedDepartureInstant(focusedTrip),
-    [focusedTrip],
+  const liveDepartureTime = live?.liveDepartureTime;
+  const departureAt = useMemo(
+    () => focusedBoardingInstant(focusedTrip, liveDepartureTime),
+    [focusedTrip, liveDepartureTime],
   );
   const staticArrivalAt = useMemo(
     () => focusedArrivalInstant(focusedTrip),
     [focusedTrip],
   );
-  const departureAt =
-    staticDepartureAt != null && live?.liveDepartureTime
-      ? anchorLiveTime(staticDepartureAt, live.liveDepartureTime)
-      : staticDepartureAt;
   const arrivalAt =
     staticArrivalAt != null && live?.liveArrivalTime
       ? anchorLiveTime(staticArrivalAt, live.liveArrivalTime)

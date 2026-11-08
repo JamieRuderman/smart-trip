@@ -68,6 +68,11 @@ export interface LiveActivityRegistration {
    *  it sleeps until this instant rather than burning a poll tick every 90s for
    *  the hours in between. Absent when the activity is already running. */
   activityStartEpochMs?: number;
+  /** Epoch ms the rider sets off on the San Francisco ferry ahead of the train,
+   *  when the trip starts with one. The ferry runs to its own timetable, so the
+   *  departure stage and leave alarm count down to this fixed instant instead of
+   *  the train's live departure. Absent for a trip that boards the train. */
+  boardingEpochMs?: number;
 }
 
 /** The per-activity APNs token payload iOS POSTs to the token endpoint (the
@@ -120,7 +125,11 @@ export function isLiveActivityRegistration(
     (r.activityStartEpochMs === undefined ||
       (typeof r.activityStartEpochMs === "number" &&
         Number.isFinite(r.activityStartEpochMs) &&
-        r.activityStartEpochMs < (r.departureEpochMs as number)))
+        r.activityStartEpochMs < (r.departureEpochMs as number))) &&
+    (r.boardingEpochMs === undefined ||
+      (typeof r.boardingEpochMs === "number" &&
+        Number.isFinite(r.boardingEpochMs) &&
+        r.boardingEpochMs <= (r.departureEpochMs as number)))
   );
 }
 

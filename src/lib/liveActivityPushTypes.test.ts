@@ -45,6 +45,21 @@ describe("isLiveActivityRegistration", () => {
     },
   );
 
+  it("accepts a ferry boarding at or before the train's departure", () => {
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        boardingEpochMs: VALID_REG.departureEpochMs - 40 * 60_000,
+      }),
+    ).toBe(true);
+    expect(
+      isLiveActivityRegistration({
+        ...VALID_REG,
+        boardingEpochMs: VALID_REG.departureEpochMs + 60_000,
+      }),
+    ).toBe(false);
+  });
+
   it("rejects non-objects", () => {
     expect(isLiveActivityRegistration(null)).toBe(false);
     expect(isLiveActivityRegistration("x")).toBe(false);

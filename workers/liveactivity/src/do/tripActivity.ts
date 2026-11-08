@@ -187,9 +187,15 @@ export function planTick(input: TickInput): TickPlan {
           isEnded: true,
         }
       : null;
+  // The SF ferry has no live data, so until it leaves the train's delay would
+  // mislabel its countdown. Mirrored by LiveActivitySync in the app.
   const status =
     liveStatus && reg.boardingEpochMs != null
-      ? { ...liveStatus, departureEpochMs: reg.boardingEpochMs }
+      ? {
+          ...liveStatus,
+          departureEpochMs: reg.boardingEpochMs,
+          delayMinutes: now < reg.boardingEpochMs ? 0 : liveStatus.delayMinutes,
+        }
       : liveStatus;
 
   // The leave-alarm instant tracks the LIVE departure (delay-adjusted), so it

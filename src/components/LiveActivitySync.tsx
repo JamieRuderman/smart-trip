@@ -5,8 +5,10 @@ import {
   anchorLiveTime,
   focusedArrivalInstant,
   focusedBoardingInstant,
+  focusedPlaces,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
+import { SAN_FRANCISCO } from "@/lib/places";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
@@ -56,15 +58,19 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     staticArrivalAt != null && live?.liveArrivalTime
       ? anchorLiveTime(staticArrivalAt, live.liveArrivalTime)
       : staticArrivalAt;
+  const phase =
+    departureAt != null ? derivePhase({ departureEpochMs: departureAt, now }) : null;
   // Shared departure-else-arrival precedence, so the lock-screen pill flips
   // to "Delayed" for an en-route slip exactly when the in-app card does.
-  const delayMinutes = effectiveDelayMinutes(live) ?? null;
+  // Mirrors the worker's planTick: the SF ferry has no live data, so the train's
+  // delay would mislabel its countdown.
+  const countingToFerry =
+    phase === "pre-departure" && focusedPlaces(focusedTrip).from === SAN_FRANCISCO;
+  const delayMinutes = countingToFerry ? null : (effectiveDelayMinutes(live) ?? null);
   // A skipped boarding stop is a cancellation as far as this user's leg is
   // concerned — mirror useTripStatus's isCanceledOrSkipped.
   const isCanceled = (live?.isCanceled ?? false) || (live?.isOriginSkipped ?? false);
 
-  const phase =
-    departureAt != null ? derivePhase({ departureEpochMs: departureAt, now }) : null;
   const liveActivityId = focusedTrip.liveActivityId ?? null;
   // Re-push content (which carries reminderSet) when a reminder is armed/cleared
   // so the bell icon appears/disappears live.

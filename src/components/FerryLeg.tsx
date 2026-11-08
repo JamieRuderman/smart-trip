@@ -66,7 +66,7 @@ export function FerryLeg({
       below="dashed"
       aside={<WalkIcon className="h-4 w-4 text-muted-foreground" />}
     >
-      <Transfer minutes={transferMinutes} />
+      <FerryTransfer minutes={transferMinutes} />
     </LegRow>
   );
 
@@ -106,7 +106,7 @@ export function FerryLeg({
                   format={timeFormat}
                 />
               </p>
-              <Transfer minutes={transferMinutes} />
+              <FerryTransfer minutes={transferMinutes} />
             </>
           )}
         </div>
@@ -164,15 +164,7 @@ export function FerryLeg({
               </GutterRow>
             )}
             <GutterRow>
-              <a
-                href={FERRY_CONSTANTS.SCHEDULE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-foreground underline-offset-2 hover:text-primary hover:underline"
-              >
-                {t("ferry.goldenGateSchedule")}
-                <ExternalLink className="h-3 w-3" aria-hidden="true" />
-              </a>
+              <FerryScheduleLink className="text-foreground" />
             </GutterRow>
           </div>
         </div>
@@ -263,7 +255,15 @@ function TerminalTime({
   );
 }
 
-function Transfer({ minutes }: { minutes: number }) {
+/** The walk between train and ferry at Larkspur — gold with a warning icon
+ *  when it's too tight to make comfortably. */
+export function FerryTransfer({
+  minutes,
+  className,
+}: {
+  minutes: number;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const tight = isQuickConnection(minutes);
   return (
@@ -271,6 +271,7 @@ function Transfer({ minutes }: { minutes: number }) {
       className={cn(
         "flex items-center gap-1.5 text-xs text-muted-foreground",
         tight && cn(stateText.delayed, "font-medium"),
+        className,
       )}
     >
       {tight ? (
@@ -280,5 +281,24 @@ function Transfer({ minutes }: { minutes: number }) {
       )}
       {minutes} {t("ferry.minTransfer")}
     </span>
+  );
+}
+
+/** Golden Gate Ferry's own Larkspur ↔ San Francisco timetable. */
+export function FerryScheduleLink({ className }: { className?: string }) {
+  const { t } = useTranslation();
+  return (
+    <a
+      href={FERRY_CONSTANTS.SCHEDULE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "inline-flex items-center gap-1 underline-offset-2 hover:text-primary hover:underline",
+        className,
+      )}
+    >
+      {t("ferry.goldenGateSchedule")}
+      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+    </a>
   );
 }

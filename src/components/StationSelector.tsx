@@ -42,38 +42,36 @@ const PlaceName = ({ place }: { place: Place }) => (
 
 const PlaceSelectItem = ({
   place,
+  ferryHint,
   badge,
   gutterIcon,
   ...props
 }: {
   place: Place;
+  /** Subtitle under San Francisco. */
+  ferryHint: string;
   badge?: React.ReactNode;
   gutterIcon?: React.ReactNode;
-} & Omit<React.ComponentProps<typeof SelectItem>, "value">) => {
-  const { t } = useTranslation();
-  return (
-    <SelectItem value={place} {...props}>
-      {gutterIcon && (
-        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-          {gutterIcon}
+} & Omit<React.ComponentProps<typeof SelectItem>, "value">) => (
+  <SelectItem value={place} {...props}>
+    {gutterIcon && (
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        {gutterIcon}
+      </span>
+    )}
+    <div className="flex items-center w-full">
+      {place === SAN_FRANCISCO ? (
+        <span className="flex flex-col">
+          <PlaceName place={place} />
+          <span className="text-xs text-muted-foreground">{ferryHint}</span>
         </span>
+      ) : (
+        <span>{place}</span>
       )}
-      <div className="flex items-center w-full">
-        {place === SAN_FRANCISCO ? (
-          <span className="flex flex-col">
-            <PlaceName place={place} />
-            <span className="text-xs text-muted-foreground">
-              {t("header.viaLarkspurFerry")}
-            </span>
-          </span>
-        ) : (
-          <span>{place}</span>
-        )}
-        {badge}
-      </div>
-    </SelectItem>
-  );
-};
+      {badge}
+    </div>
+  </SelectItem>
+);
 
 export function StationSelector({
   fromStation,
@@ -89,56 +87,29 @@ export function StationSelector({
   const showLocationButton = !!onRequestLocation;
   const { t } = useTranslation();
   const places: Place[] = getAllStations();
-  const sameStation = (a: Place, b: Place | "") =>
-    b !== "" && placeStation(a) === placeStation(b);
+  const ferryHint = t("header.viaLarkspurFerry");
   const lineIndex = (place: Place | "") =>
     place ? getStationIndex(placeStation(place)) : -1;
 
-  // Clear the other end if it's on the station just picked (San Francisco
-  // shares Larkspur's).
-  const handleFromStationChange = (place: Place) => {
-    onFromStationChange(place);
-    if (sameStation(place, toStation)) {
-      onToStationChange("" as Place);
-    }
-  };
-
-  const handleToStationChange = (place: Place) => {
-    onToStationChange(place);
-    if (sameStation(place, fromStation)) {
-      onFromStationChange("" as Place);
-    }
-  };
-
-  const fromItem = (place: Place) => (
+  // `place` in one end's dropdown, with the other end marked by its badge and
+  // gutter icon.
+  const item = (
+    place: Place,
+    other: Place | "",
+    otherLabel: string,
+    otherIcon: React.ReactNode,
+  ) => (
     <PlaceSelectItem
       key={place}
       place={place}
+      ferryHint={ferryHint}
       role="option"
-      className={place === toStation ? "text-primary" : ""}
-      gutterIcon={
-        place === toStation ? (
-          lineIndex(toStation) > lineIndex(fromStation) ? (
-            <CornerDownRight
-              className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
-              style={{ strokeWidth: 3 }}
-            />
-          ) : (
-            <CornerUpRight
-              className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
-              style={{ strokeWidth: 3 }}
-            />
-          )
-        ) : undefined
-      }
+      className={place === other ? "text-primary" : ""}
+      gutterIcon={place === other ? otherIcon : undefined}
       badge={
         <>
-          {place === toStation && (
-            <PillBadge
-              label={t("header.endStation")}
-              color="ontime"
-              className="ml-2"
-            />
+          {place === other && (
+            <PillBadge label={otherLabel} color="ontime" className="ml-2" />
           )}
           {place === closestStation && (
             <PillBadge
@@ -152,37 +123,31 @@ export function StationSelector({
     />
   );
 
-  const toItem = (place: Place) => (
-    <PlaceSelectItem
-      key={place}
-      place={place}
-      role="option"
-      className={place === fromStation ? "text-primary" : ""}
-      gutterIcon={
-        place === fromStation ? (
-          <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
-        ) : undefined
-      }
-      badge={
-        <>
-          {place === fromStation && (
-            <PillBadge
-              label={t("header.startStation")}
-              color="ontime"
-              className="ml-2"
-            />
-          )}
-          {place === closestStation && (
-            <PillBadge
-              label={t("header.nearYou")}
-              color="ontime"
-              className="ml-2"
-            />
-          )}
-        </>
-      }
-    />
-  );
+  const fromItem = (place: Place) =>
+    item(
+      place,
+      toStation,
+      t("header.endStation"),
+      lineIndex(toStation) > lineIndex(fromStation) ? (
+        <CornerDownRight
+          className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
+          style={{ strokeWidth: 3 }}
+        />
+      ) : (
+        <CornerUpRight
+          className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
+          style={{ strokeWidth: 3 }}
+        />
+      ),
+    );
+
+  const toItem = (place: Place) =>
+    item(
+      place,
+      fromStation,
+      t("header.startStation"),
+      <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />,
+    );
 
   return (
     <div className="flex items-center gap-3 mb-2">
@@ -198,7 +163,7 @@ export function StationSelector({
 
       {/* Station Selectors */}
       <div className="flex-1 min-w-0 space-y-3">
-        <Select value={fromStation} onValueChange={handleFromStationChange}>
+        <Select value={fromStation} onValueChange={onFromStationChange}>
           <SelectTrigger
             className="h-11"
             aria-label={t("header.selectDepartureStation")}
@@ -219,7 +184,7 @@ export function StationSelector({
           </SelectContent>
         </Select>
 
-        <Select value={toStation} onValueChange={handleToStationChange}>
+        <Select value={toStation} onValueChange={onToStationChange}>
           <SelectTrigger
             className="h-11"
             aria-label={t("header.selectArrivalStation")}

@@ -7,13 +7,17 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { isFerryLeg, legPlaces, placeStation, type Place } from "@/lib/places";
+import { isFerryLeg, placeStation, type Place } from "@/lib/places";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { toLocalDateKey } from "@/lib/timeUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { useFocusedTrip } from "@/hooks/useFocusedTrip";
 import { endTripActivity } from "@/lib/native/liveActivity";
-import { FOCUSED_TRIP_CHANGED_EVENT, loadFocusedTrip } from "@/lib/focusedTrip";
+import {
+  FOCUSED_TRIP_CHANGED_EVENT,
+  focusedPlaces,
+  loadFocusedTrip,
+} from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
   type StationSelection,
@@ -128,22 +132,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     // truly cold start, leaving the empty state.
     const persisted = loadPersistedState();
     const focusedOnMount = loadFocusedTrip();
-    const focusedPlaces = focusedOnMount
-      ? legPlaces(
-          focusedOnMount.fromStation,
-          focusedOnMount.toStation,
-          focusedOnMount.viaFerry === true,
-        )
-      : null;
+    const focusedOnMountPlaces = focusedOnMount ? focusedPlaces(focusedOnMount) : null;
     return {
       fromPlace:
         (searchParams.get("from") as Place) ||
         (persisted ? persisted.fromStation : "") ||
-        (focusedPlaces ? focusedPlaces.from : ""),
+        (focusedOnMountPlaces ? focusedOnMountPlaces.from : ""),
       toPlace:
         (searchParams.get("to") as Place) ||
         (persisted ? persisted.toStation : "") ||
-        (focusedPlaces ? focusedPlaces.to : ""),
+        (focusedOnMountPlaces ? focusedOnMountPlaces.to : ""),
       // Schedule type is derived from the calendar day, never restored from
       // persistence: a leg saved on a weekday must not force the weekday
       // schedule when reopened on a weekend (and vice-versa). Restoring it

@@ -1,10 +1,10 @@
 import type { FerryConnection as FerryConnectionType } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
-import { APP_CONSTANTS, FARE_CONSTANTS } from "@/lib/fareConstants";
-import { Ship, AlertTriangle, Clock } from "lucide-react";
+import { APP_CONSTANTS } from "@/lib/fareConstants";
+import { Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { stateText } from "@/lib/tripTheme";
 import { isTimeInPast } from "@/lib/scheduleUtils";
+import { FerryTransfer } from "./FerryLeg";
 import { calculateTimeDifference } from "@/lib/timeUtils";
 import { useTranslation } from "react-i18next";
 
@@ -41,9 +41,6 @@ export function FerryConnection({
     }
   }
 
-  const isShortConnection =
-    transferTime < FARE_CONSTANTS.QUICK_CONNECTION_THRESHOLD;
-
   // The single Larkspur-side connection time — catch it (outbound) or step off
   // it (inbound) — with a tense-aware label.
   const compactTime = inbound ? ferry.arrive : ferry.depart;
@@ -69,19 +66,7 @@ export function FerryConnection({
           <span className="text-muted-foreground">{compactLabel}</span>
           <TimeDisplay time={compactTime} format={timeFormat} />
         </div>
-        <div
-          className={cn(
-            "flex items-center gap-2 text-xs leading-none",
-            isShortConnection && cn(stateText["delayed"], "font-medium")
-          )}
-        >
-          {isShortConnection ? (
-            <AlertTriangle className="h-3 w-3" />
-          ) : (
-            <Clock className="h-3 w-3" />
-          )}
-          {transferTime} {t("ferry.minTransfer")}
-        </div>
+        <FerryTransfer minutes={transferTime} className="gap-2 leading-none" />
       </div>
       <div
         className={cn(

@@ -7,7 +7,7 @@ import {
   mpsToMph,
   parseTimeToMinutes,
 } from "@/lib/timeUtils";
-import { calculateFare } from "@/lib/scheduleUtils";
+import { calculateFare, tripEnds } from "@/lib/scheduleUtils";
 import { stationIndexMap, isSouthbound } from "@/lib/stationUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useStationSelection } from "@/contexts/stationSelection";
@@ -136,9 +136,9 @@ export function useTripDetailModel({
     reminderLeadMinutes != null ? minutesUntil - reminderLeadMinutes : null;
 
   // Trip metadata — door to door, ferry included.
+  const scheduledEnds = tripEnds(trip);
   const tripDurationMinutes =
-    parseTimeToMinutes(trip.outboundFerry?.arrive ?? trip.arrivalTime) -
-    parseTimeToMinutes(trip.inboundFerry?.depart ?? trip.departureTime);
+    parseTimeToMinutes(scheduledEnds.end) - parseTimeToMinutes(scheduledEnds.start);
   const tripDurationLabel =
     tripDurationMinutes >= 60
       ? t("tracker.durationHoursMinutes", {

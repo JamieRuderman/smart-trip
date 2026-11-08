@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
-import { futureServiceDate } from "@/lib/scheduleUtils";
+import { futureServiceDate, tripEnds } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
@@ -60,10 +60,12 @@ export const TripCard = memo(function TripCard({
   const openTimerRef = useRef<number | null>(null);
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  // The ends the rider sees: an SF ferry's time where the trip starts or ends
-  // with one (no live feed for it), else the train's live-aware time.
-  const startTime = trip.inboundFerry?.depart ?? departureTime;
-  const endTime = trip.outboundFerry?.arrive ?? arrivalTime;
+  const {
+    start: startTime,
+    end: endTime,
+    liveStart: hasLiveDepartureTime,
+    liveEnd: hasLiveArrivalTime,
+  } = tripEnds(trip, realtimeStatus);
   // A later day's ferries haven't departed, whatever today's clock says.
   const ferryClock =
     futureServiceDate(currentTime, scheduleType) == null ? currentTime : undefined;
@@ -88,10 +90,6 @@ export const TripCard = memo(function TripCard({
       calculateTransferTime(trip.inboundFerry.arrive, trip.departureTime),
     );
 
-  const hasLiveDepartureTime =
-    !trip.inboundFerry && realtimeStatus?.liveDepartureTime != null;
-  const hasLiveArrivalTime =
-    !trip.outboundFerry && realtimeStatus?.liveArrivalTime != null;
 
   const cardState = cardTripState({ isCanceledOrSkipped, isDelayed, isNextTrip, isPastTrip });
 

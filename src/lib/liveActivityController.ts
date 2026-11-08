@@ -263,8 +263,8 @@ function buildRegistrationForFocus(
   const trip = reconstructFocusedTrip(saved);
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
-  const boardingAt = focusedBoardingInstant(saved);
   if (!trip || departureAt == null || arrivalAt == null) return null;
+  const ferryBoardingAt = trip.inboundFerry ? focusedBoardingInstant(saved) : null;
   const southbound = isSouthbound(saved.fromStation, saved.toStation);
   const originStartTime = originStartTimeFor(trip, southbound);
   return {
@@ -280,7 +280,7 @@ function buildRegistrationForFocus(
     arrivalEpochMs: arrivalAt,
     ...(originStartTime ? { originStartTime } : {}),
     ...(trip.tripId ? { tripId: trip.tripId } : {}),
-    ...(trip.inboundFerry && boardingAt != null ? { boardingEpochMs: boardingAt } : {}),
+    ...(ferryBoardingAt != null ? { boardingEpochMs: ferryBoardingAt } : {}),
     // Carry the armed reminder's lead so the server can keep the leave-alarm
     // countdown alive across its locked-screen delay pushes (otherwise every
     // push would drop the "Leave in" stage back to "Departs in").

@@ -10,7 +10,7 @@ import {
   getNextTripIndex,
   getFirstInProgressTripIndex,
   futureServiceDate,
-  tripStartTime,
+  tripEnds,
 } from "@/lib/scheduleUtils";
 import { parseServiceDate, parseTimeToMinutes } from "@/lib/timeUtils";
 import { useStationDirection } from "@/hooks/useStationDirection";
@@ -113,7 +113,7 @@ export function ScheduleResults({
   if (!isFutureSchedule) {
     let nextVisibleMinutes = Infinity;
     visibleTrips.forEach((trip, i) => {
-      const departureTime = tripStartTime(trip, realtimeStatusMap);
+      const departureTime = tripEnds(trip, realtimeStatusMap.get(trip.departureTime)).start;
       if (isTimeInPast(currentTime, departureTime)) return;
       const minutes = parseTimeToMinutes(departureTime);
       if (minutes < nextVisibleMinutes) {
@@ -162,7 +162,7 @@ export function ScheduleResults({
             // announcement and badge flags consistent with the Next logic).
             const isPastTrip = isTimeInPast(
               rowClock,
-              tripStartTime(trip, realtimeStatusMap),
+              tripEnds(trip, realtimeStatusMap.get(trip.departureTime)).start,
             );
             const realtimeStatus = getRealtimeStatus(trip);
             const isNextTrip = index === nextVisibleIndex;

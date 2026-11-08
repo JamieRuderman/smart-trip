@@ -3,13 +3,11 @@ import { TOKEN } from "./tokens";
 interface FerryTerminusProps {
   x: number;
   y: number;
-  /** When true (a trip is selected that doesn't ride the ferry), render in the
-   *  muted track color. */
-  muted?: boolean;
-  /** San Francisco is an end of the selected trip: fill the glyph with the
-   *  route `color`, like a selected station's core. */
+  /** Outline color — the ferry path's. */
+  stroke: string;
+  /** San Francisco is an end of the selected trip: fill the glyph with
+   *  `stroke`, like a selected station's core. */
   selected?: boolean;
-  color: string;
   onClick?: () => void;
 }
 
@@ -21,12 +19,10 @@ interface FerryTerminusProps {
 export function FerryTerminus({
   x,
   y,
-  muted = false,
+  stroke,
   selected = false,
-  color,
   onClick,
 }: FerryTerminusProps) {
-  const stroke = muted ? TOKEN.mutedTrack : selected ? color : TOKEN.detailStroke;
   const waveStroke = selected ? TOKEN.stationFill : stroke;
   return (
     <g
@@ -44,7 +40,7 @@ export function FerryTerminus({
       {onClick && <circle r={TOKEN.hitAreaR} fill="transparent" />}
       <circle
         r={TOKEN.terminalR + 2}
-        fill={selected ? color : TOKEN.stationFill}
+        fill={selected ? stroke : TOKEN.stationFill}
         stroke={stroke}
         strokeWidth={TOKEN.stationStroke}
       />

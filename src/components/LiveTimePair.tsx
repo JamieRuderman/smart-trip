@@ -1,4 +1,4 @@
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
+import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { TimePair } from "./TimePair";
 
@@ -21,28 +21,26 @@ export function LiveTimePair({
   canceled: boolean;
   format: "12h" | "24h";
 }) {
-  const liveDeparture = trip.inboundFerry ? undefined : realtimeStatus?.liveDepartureTime;
-  const liveArrival = trip.outboundFerry ? undefined : realtimeStatus?.liveArrivalTime;
-  const scheduledDeparture = trip.inboundFerry?.depart ?? trip.departureTime;
-  const scheduledArrival = trip.outboundFerry?.arrive ?? trip.arrivalTime;
+  const live = tripEnds(trip, realtimeStatus);
+  const scheduled = tripEnds(trip);
   return (
     <>
       <TimePair
-        departure={liveDeparture ?? scheduledDeparture}
-        arrival={liveArrival ?? scheduledArrival}
+        departure={live.start}
+        arrival={live.end}
         format={format}
         strikethrough={canceled}
         className="text-2xl font-semibold text-white"
       />
-      {(liveDeparture != null || liveArrival != null) && (
+      {(live.liveStart || live.liveEnd) && (
         <TimePair
-          departure={scheduledDeparture}
-          arrival={scheduledArrival}
+          departure={scheduled.start}
+          arrival={scheduled.end}
           format={format}
           className="text-xs mt-0.5 text-white/50"
           strikethrough
-          showDeparture={liveDeparture != null}
-          showArrival={liveArrival != null}
+          showDeparture={live.liveStart}
+          showArrival={live.liveEnd}
         />
       )}
     </>

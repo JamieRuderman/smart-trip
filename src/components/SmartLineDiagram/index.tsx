@@ -31,6 +31,7 @@ import {
 } from "@/data/smartLineLayout";
 import { snapToPath } from "@/lib/pathSnap";
 import { stationIndexMap, stationTrackColor } from "@/lib/stationUtils";
+import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { TOKEN, MOTION_TICK_MS } from "./tokens";
 import { useClockTick } from "./useClockTick";
 import { buildSmoothPath } from "./buildSmoothPath";
@@ -163,9 +164,13 @@ export function SmartLineDiagram({
   const ferryD = useMemo(() => buildSmoothPath(FERRY_WAYPOINTS, 28), []);
   // A selected trip that doesn't ride the ferry leaves it muted.
   const ferryMuted = !!selectedRange && !ferrySelected;
-  const ferryColor = colorTrackByZone
-    ? stationTrackColor("Larkspur")
-    : BRAND_LINE_COLOR;
+  const ferryStroke = ferryMuted
+    ? TOKEN.mutedTrack
+    : !ferrySelected
+      ? TOKEN.detailStroke
+      : colorTrackByZone
+        ? stationTrackColor(FERRY_CONSTANTS.FERRY_STATION)
+        : BRAND_LINE_COLOR;
   const onFerryClick = onStationClick && (() => onStationClick(SAN_FRANCISCO));
   const now = useClockTick(MOTION_TICK_MS);
   const screenScale = useSvgScreenScale(svgRef, VIEW_BOX.width, VIEW_BOX.height);
@@ -205,13 +210,7 @@ export function SmartLineDiagram({
             <g opacity={0.9}>
               <path
                 d={ferryD}
-                stroke={
-                  ferryMuted
-                    ? TOKEN.mutedTrack
-                    : ferrySelected
-                      ? ferryColor
-                      : TOKEN.detailStroke
-                }
+                stroke={ferryStroke}
                 strokeWidth={TOKEN.lineW * 0.55}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -221,9 +220,8 @@ export function SmartLineDiagram({
               <FerryTerminus
                 x={FERRY_WAYPOINTS[2].x}
                 y={FERRY_WAYPOINTS[2].y}
-                muted={ferryMuted}
+                stroke={ferryStroke}
                 selected={ferrySelected}
-                color={ferryColor}
                 onClick={onFerryClick}
               />
             </g>

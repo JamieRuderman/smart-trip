@@ -1,18 +1,28 @@
+import { useMemo } from "react";
 import { Ship } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import stations from "@/data/stations";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { focusedPlaces, isFocusedTrainToday } from "@/lib/focusedTrip";
 import { SAN_FRANCISCO, type Place } from "@/lib/places";
-import { upcomingFerries } from "@/lib/scheduleUtils";
+import {
+  getFilteredTrips,
+  getTodayScheduleType,
+  upcomingFerries,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import { stationTrackColor } from "@/lib/stationUtils";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { stateCardStyle } from "@/lib/tripTheme";
-import { cn } from "@/lib/utils";
+import { myTripCardStyle, stateCardStyle } from "@/lib/tripTheme";
+import type { Station } from "@/types/smartSchedule";
 import { FerryScheduleLink } from "./FerryLeg";
-import { PlaceSheet } from "./StationInfoSheet";
+import { PlaceSheet, PlaceSheetRow } from "./StationInfoSheet";
 
 const MAX_FERRIES = 6;
+const WINDSOR = stations[0];
 
 export interface FerryTerminalSheetProps {
   isOpen: boolean;
@@ -24,6 +34,9 @@ export interface FerryTerminalSheetProps {
   onSetTo?: (place: Place) => void;
   onClearFrom?: () => void;
   onClearTo?: () => void;
+  /** Open the trip sheet for the train a ferry connects to, from Larkspur —
+   *  where its ferry leg begins — to the end of the line. */
+  onFerryClick?: (trip: ProcessedTrip, fromStation: Station, toStation: Station) => void;
 }
 
 /**
@@ -41,10 +54,29 @@ export function FerryTerminalSheet({
   onSetTo,
   onClearFrom,
   onClearTo,
+  onFerryClick,
 }: FerryTerminalSheetProps) {
   const { t } = useTranslation();
+  const { focusedTrip } = useStationSelection();
   const nowMinutes = minutesOfDay(currentTime);
   const ferries = upcomingFerries(currentTime, true).slice(0, MAX_FERRIES);
+  const scheduleType = getTodayScheduleType(currentTime);
+
+  // Two trains can share a ferry; a row opens the earlier, the one it's timed for.
+  const connectingTrains = useMemo(() => {
+    const byFerry = new Map<string, ProcessedTrip>();
+    for (const trip of getFilteredTrips(
+      FERRY_CONSTANTS.FERRY_STATION,
+      WINDSOR,
+      scheduleType,
+      true,
+    )) {
+      if (trip.inboundFerry && !byFerry.has(trip.inboundFerry.depart)) {
+        byFerry.set(trip.inboundFerry.depart, trip);
+      }
+    }
+    return byFerry;
+  }, [scheduleType]);
 
   return (
     <PlaceSheet
@@ -70,13 +102,24 @@ export function FerryTerminalSheet({
         <ul className="flex flex-col gap-2">
           {ferries.map((ferry) => {
             const etaMinutes = parseTimeToMinutes(ferry.depart) - nowMinutes;
+            const train = connectingTrains.get(ferry.depart);
+            const isFocused =
+              train != null &&
+              isFocusedTrainToday(focusedTrip, train.trip, false, currentTime) &&
+              focusedPlaces(focusedTrip).from === SAN_FRANCISCO;
             return (
-              <li
+              <PlaceSheetRow
                 key={ferry.depart}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg border",
-                  stateCardStyle.future,
-                )}
+                tone={isFocused ? myTripCardStyle : stateCardStyle.future}
+                onClick={
+                  train && onFerryClick
+                    ? () => onFerryClick(train, FERRY_CONSTANTS.FERRY_STATION, WINDSOR)
+                    : undefined
+                }
+                ariaLabel={t("stationInfo.openTripAria", {
+                  trip: train?.trip,
+                  terminus: WINDSOR,
+                })}
               >
                 <Ship className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="flex-1 min-w-0 leading-tight">
@@ -106,7 +149,7 @@ export function FerryTerminalSheet({
                     })}
                   </div>
                 </div>
-              </li>
+              </PlaceSheetRow>
             );
           })}
         </ul>

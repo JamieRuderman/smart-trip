@@ -599,13 +599,39 @@ function ArrivalRow({
     </>
   );
 
-  const cardClasses = cn(
-    "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
-    // Blue == "you're taking this train" — overrides the semantic state
-    // colour for the user-focused ("Go") trip.
-    isFocused ? myTripCardStyle : stateCardStyle[cardState],
+  return (
+    <PlaceSheetRow
+      // Blue == "you're taking this train" — overrides the semantic state
+      // colour for the user-focused ("Go") trip.
+      tone={isFocused ? myTripCardStyle : stateCardStyle[cardState]}
+      onClick={onClick}
+      ariaLabel={t("stationInfo.openTripAria", {
+        trip: arrival.tripNumber,
+        terminus: arrival.terminus,
+      })}
+    >
+      {rowContent}
+    </PlaceSheetRow>
   );
+}
 
+/** A row in a place sheet's list, tinted by `tone` — a button when it opens a
+ *  trip. */
+export function PlaceSheetRow({
+  tone,
+  onClick,
+  ariaLabel,
+  children,
+}: {
+  tone: string;
+  onClick?: () => void;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  const className = cn(
+    "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
+    tone,
+  );
   return (
     <li>
       {onClick ? (
@@ -613,18 +639,15 @@ function ArrivalRow({
           type="button"
           onClick={onClick}
           className={cn(
-            cardClasses,
+            className,
             "w-full text-left touch-manipulation cursor-pointer focus:outline-none",
           )}
-          aria-label={t("stationInfo.openTripAria", {
-            trip: arrival.tripNumber,
-            terminus: arrival.terminus,
-          })}
+          aria-label={ariaLabel}
         >
-          {rowContent}
+          {children}
         </button>
       ) : (
-        <div className={cardClasses}>{rowContent}</div>
+        <div className={className}>{children}</div>
       )}
     </li>
   );

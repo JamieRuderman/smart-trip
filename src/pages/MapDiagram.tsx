@@ -170,9 +170,10 @@ export default function MapDiagram() {
     setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
   }, []);
 
-  // Tap an arrival row in the station sheet → close the station sheet and
-  // open the trip detail sheet for that train, with the tapped station as
-  // the displayed origin so only the upcoming portion of the trip shows.
+  // Tap an arrival row in a station sheet, or a ferry in San Francisco's →
+  // close that sheet and open the trip detail sheet for the train, with the
+  // tapped station (Larkspur for a ferry) as the displayed origin so only the
+  // upcoming portion of the trip shows.
   const handleArrivalClick = useCallback(
     (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
       closeStationSheet();
@@ -263,6 +264,7 @@ export default function MapDiagram() {
           onSetTo={handleSetTo}
           onClearFrom={handleClearFrom}
           onClearTo={handleClearTo}
+          onFerryClick={handleArrivalClick}
         />
       )}
 

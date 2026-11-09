@@ -535,8 +535,17 @@ function ArrivalRow({
       ? t("stationInfo.nowArriving")
       : t("stationInfo.inMinutes", { minutes: arrival.etaMinutes });
 
-  const rowContent = (
-    <>
+  return (
+    <PlaceSheetRow
+      // Blue == "you're taking this train" — overrides the semantic state
+      // colour for the user-focused ("Go") trip.
+      tone={isFocused ? myTripCardStyle : stateCardStyle[cardState]}
+      onClick={onClick}
+      ariaLabel={t("stationInfo.openTripAria", {
+        trip: arrival.tripNumber,
+        terminus: arrival.terminus,
+      })}
+    >
       {/* Train icon + number, tinted by trip state (delayed = gold,
           canceled = red, otherwise foreground). */}
       <div className={cn("flex items-center gap-1.5 shrink-0", stateText[cardState])}>
@@ -596,21 +605,6 @@ function ArrivalRow({
           />
         )}
       </div>
-    </>
-  );
-
-  return (
-    <PlaceSheetRow
-      // Blue == "you're taking this train" — overrides the semantic state
-      // colour for the user-focused ("Go") trip.
-      tone={isFocused ? myTripCardStyle : stateCardStyle[cardState]}
-      onClick={onClick}
-      ariaLabel={t("stationInfo.openTripAria", {
-        trip: arrival.tripNumber,
-        terminus: arrival.terminus,
-      })}
-    >
-      {rowContent}
     </PlaceSheetRow>
   );
 }
@@ -625,7 +619,7 @@ export function PlaceSheetRow({
 }: {
   tone: string;
   onClick?: () => void;
-  ariaLabel: string;
+  ariaLabel?: string;
   children: ReactNode;
 }) {
   const className = cn(

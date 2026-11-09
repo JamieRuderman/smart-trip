@@ -10,6 +10,7 @@ import {
   getNextTripIndex,
   getScheduleMeta,
   getTodayScheduleType,
+  inboundFerryTrain,
   scheduleSwitchOffer,
   setScheduleData,
   type ProcessedTrip,
@@ -437,6 +438,14 @@ describe("adjacentFerry", () => {
     const tuesdayNoon = new Date(2099, 4, 26, 12, 0);
     expect(getNextFerryDeparture(tuesdayNoon, true)).toEqual(run("13:15", "13:50"));
     expect(getNextFerryDeparture(new Date(2099, 4, 26, 14, 0), true)).toBeNull();
+  });
+
+  it("finds the earliest train a ferry from SF is timed for", () => {
+    useFerries([], [["05:00", "05:35"], ["05:10", "05:45"]]);
+    const [first, second] = getFilteredTrips("Larkspur", "Windsor", "weekday", true);
+    expect(second.inboundFerry).toEqual(run("05:10", "05:45"));
+    expect(inboundFerryTrain(run("05:10", "05:45"), "weekday")?.trip).toBe(first.trip);
+    expect(inboundFerryTrain(run("05:00", "05:35"), "weekday")).toBeNull();
   });
 
   it("reads the timetable of the schedule type it's given", () => {

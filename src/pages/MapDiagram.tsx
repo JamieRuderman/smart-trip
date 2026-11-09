@@ -264,7 +264,7 @@ export default function MapDiagram() {
           onSetTo={handleSetTo}
           onClearFrom={handleClearFrom}
           onClearTo={handleClearTo}
-          onFerryClick={handleArrivalClick}
+          onFerryClick={(trip) => handleArrivalClick(trip, trip.fromStation, trip.toStation)}
         />
       )}
 

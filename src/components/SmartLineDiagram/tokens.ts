@@ -85,6 +85,13 @@ export const TOKEN = {
   myTrip: "hsl(var(--my-trip))",
 } as const;
 
+/** A place name's type on the line map: larger and bolder at a trip end. */
+export function labelFont(isTerminal: boolean): { size: number; weight: number } {
+  return isTerminal
+    ? { size: TOKEN.terminalSize, weight: TOKEN.terminalWeight }
+    : { size: TOKEN.labelSize, weight: TOKEN.labelWeight };
+}
+
 /** Pulse-animation timing shared by the my-trip and train markers. */
 export const ANIM = {
   pulseDur: "2s",

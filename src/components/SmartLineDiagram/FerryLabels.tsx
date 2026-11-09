@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { getNextFerryDeparture } from "@/lib/scheduleUtils";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { FONT_FAMILY, TOKEN } from "./tokens";
+import { FONT_FAMILY, TOKEN, labelFont } from "./tokens";
 
 interface FerryLabelsProps {
   /** Ferry-glyph center, in viewBox units (pre-zoom). */
@@ -54,15 +54,15 @@ export function FerryLabels({
       ? t("mapDiagram.nextFerryBadge", { minutes: minsUntil })
       : t("mapDiagram.noMoreFerries");
 
-  const nameBaseSize = isTerminal ? TOKEN.terminalSize : TOKEN.labelSize;
-  const nameSize = nameBaseSize / screenScale;
+  const nameFont = labelFont(isTerminal);
+  const nameSize = nameFont.size / screenScale;
   const etaSize = TOKEN.ferryEtaSize / screenScale;
   // Glyph radius scales with zoom; gap + font are constant CSS px.
   const ferryR = TOKEN.terminalR + 2;
   const cx = x * scale + tx;
   const cy = y * scale + ty;
   const nameY =
-    cy + ferryR * scale + (TOKEN.ferryNameGapPx + nameBaseSize) / screenScale;
+    cy + ferryR * scale + (TOKEN.ferryNameGapPx + nameFont.size) / screenScale;
   const etaY =
     nameY + (TOKEN.ferryEtaGapPx + TOKEN.ferryEtaSize) / screenScale;
 
@@ -73,7 +73,7 @@ export function FerryLabels({
         y={nameY}
         textAnchor="middle"
         fontSize={nameSize}
-        fontWeight={isTerminal ? TOKEN.terminalWeight : TOKEN.labelWeight}
+        fontWeight={nameFont.weight}
         className="fill-foreground"
         pointerEvents={onClick ? "auto" : "none"}
         style={{ fontFamily: FONT_FAMILY, cursor: onClick ? "pointer" : "default" }}

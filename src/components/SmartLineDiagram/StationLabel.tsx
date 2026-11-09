@@ -1,5 +1,5 @@
 import type { Station } from "@/types/smartSchedule";
-import { FONT_FAMILY, MULTILINE_LABELS, TOKEN } from "./tokens";
+import { FONT_FAMILY, MULTILINE_LABELS, TOKEN, labelFont } from "./tokens";
 
 interface StationLabelProps {
   station: Station;
@@ -40,9 +40,8 @@ export function StationLabel({
   onClick,
   labelSide = "right",
 }: StationLabelProps) {
-  const baseSize = isTerminal ? TOKEN.terminalSize : TOKEN.labelSize;
-  const fontSize = baseSize / screenScale;
-  const fontWeight = isTerminal ? TOKEN.terminalWeight : TOKEN.labelWeight;
+  const font = labelFont(isTerminal);
+  const fontSize = font.size / screenScale;
   const wrapped = MULTILINE_LABELS[station];
   const r = isTerminal ? TOKEN.terminalR : TOKEN.stationR;
 
@@ -61,7 +60,7 @@ export function StationLabel({
       dominantBaseline="central"
       pointerEvents={onClick ? "auto" : "none"}
       fontSize={fontSize}
-      fontWeight={fontWeight}
+      fontWeight={font.weight}
       className="fill-foreground"
       style={{ fontFamily: FONT_FAMILY, cursor: onClick ? "pointer" : "default" }}
       onClick={

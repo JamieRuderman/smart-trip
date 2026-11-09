@@ -349,6 +349,7 @@ export function SmartLineDiagram({
             tx={tx}
             ty={ty}
             scale={scale}
+            isTerminal={enlargedStations?.has(SAN_FRANCISCO) ?? false}
             muted={ferryMuted}
             inbound={fromStation === SAN_FRANCISCO}
             onClick={onFerryClick}

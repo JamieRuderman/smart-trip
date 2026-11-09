@@ -33,7 +33,6 @@ export const TOKEN = {
   terminalSize: 17,
   zoneLabelSize: 18,
   ferryEtaSize: 11,
-  ferryNameSize: 17,
   /** Train number text lives inside the marker group, which scales with zoom,
    *  so this stays in viewBox units (no screenScale division). */
   trainNumberSize: 18,
@@ -41,7 +40,6 @@ export const TOKEN = {
   terminalWeight: 700,
   zoneLabelWeight: 700,
   trainNumberWeight: 900,
-  ferryNameWeight: 800,
   ferryEtaWeight: 600,
   labelTracking: "0.01em",
   ferryEtaTracking: "0.06em",

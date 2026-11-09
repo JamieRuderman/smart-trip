@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { getNextFerryDeparture } from "@/lib/scheduleUtils";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { FONT_FAMILY, TOKEN } from "./tokens";
+import { FONT_FAMILY, TOKEN, labelFont } from "./tokens";
 
 interface FerryLabelsProps {
   /** Ferry-glyph center, in viewBox units (pre-zoom). */
@@ -12,8 +12,10 @@ interface FerryLabelsProps {
   tx: number;
   ty: number;
   scale: number;
-  /** When true (a trip is selected that doesn't ride the ferry), dim "San
-   *  Francisco" to match the muted track. */
+  /** Styles "San Francisco" like a terminal station's name — a picked trip end. */
+  isTerminal?: boolean;
+  /** When true (a trip is selected that doesn't ride the ferry), dim the
+   *  next-ferry badge to match the muted track. */
   muted?: boolean;
   /** Count down to the next ferry leaving San Francisco rather than Larkspur —
    *  for a trip that starts there. */
@@ -36,6 +38,7 @@ export function FerryLabels({
   tx,
   ty,
   scale,
+  isTerminal = false,
   muted = false,
   inbound = false,
   onClick,
@@ -51,14 +54,15 @@ export function FerryLabels({
       ? t("mapDiagram.nextFerryBadge", { minutes: minsUntil })
       : t("mapDiagram.noMoreFerries");
 
-  const nameSize = TOKEN.ferryNameSize / screenScale;
+  const nameFont = labelFont(isTerminal);
+  const nameSize = nameFont.size / screenScale;
   const etaSize = TOKEN.ferryEtaSize / screenScale;
   // Glyph radius scales with zoom; gap + font are constant CSS px.
   const ferryR = TOKEN.terminalR + 2;
   const cx = x * scale + tx;
   const cy = y * scale + ty;
   const nameY =
-    cy + ferryR * scale + (TOKEN.ferryNameGapPx + TOKEN.ferryNameSize) / screenScale;
+    cy + ferryR * scale + (TOKEN.ferryNameGapPx + nameFont.size) / screenScale;
   const etaY =
     nameY + (TOKEN.ferryEtaGapPx + TOKEN.ferryEtaSize) / screenScale;
 
@@ -69,9 +73,8 @@ export function FerryLabels({
         y={nameY}
         textAnchor="middle"
         fontSize={nameSize}
-        fontWeight={TOKEN.ferryNameWeight}
-        fill={muted ? TOKEN.mutedTrack : undefined}
-        className={muted ? undefined : "fill-foreground"}
+        fontWeight={nameFont.weight}
+        className="fill-foreground"
         pointerEvents={onClick ? "auto" : "none"}
         style={{ fontFamily: FONT_FAMILY, cursor: onClick ? "pointer" : "default" }}
         onClick={

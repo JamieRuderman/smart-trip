@@ -253,6 +253,7 @@
   },
   "focusedTrip": {
     "go": "Take this train",
+    "goViaFerry": "Take this trip",
     "going": "Going",
     "myTrip": "My Trip",
     "departsOn": "Departs {{day}}",

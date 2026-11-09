@@ -340,6 +340,24 @@ export function adjacentFerry(
 }
 
 /**
+ * The train an SF → Larkspur `ferry` is timed for: the first on to Windsor
+ * that takes it as its connection. Null when no train does.
+ */
+export function inboundFerryTrain(
+  ferry: FerryConnection,
+  scheduleType: ScheduleType,
+): ProcessedTrip | null {
+  return (
+    getFilteredTrips(
+      FERRY_CONSTANTS.FERRY_STATION,
+      stations[0],
+      scheduleType,
+      true,
+    ).find((trip) => trip.inboundFerry?.depart === ferry.depart) ?? null
+  );
+}
+
+/**
  * Effective schedule overrides — starts from the build-time bundled map and
  * is swapped wholesale when `setScheduleData` receives a fresh payload (so
  * the same daily refresh that updates timetables also picks up new holidays).

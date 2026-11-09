@@ -2,15 +2,21 @@ import { Ship } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
+import { useStationSelection } from "@/contexts/stationSelection";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { SAN_FRANCISCO, type Place } from "@/lib/places";
-import { upcomingFerries } from "@/lib/scheduleUtils";
+import {
+  getTodayScheduleType,
+  inboundFerryTrain,
+  upcomingFerries,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
 import { stationTrackColor } from "@/lib/stationUtils";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { stateCardStyle } from "@/lib/tripTheme";
-import { cn } from "@/lib/utils";
+import { myTripCardStyle, stateCardStyle } from "@/lib/tripTheme";
 import { FerryScheduleLink } from "./FerryLeg";
-import { PlaceSheet } from "./StationInfoSheet";
+import { PlaceSheet, PlaceSheetRow } from "./StationInfoSheet";
 
 const MAX_FERRIES = 6;
 
@@ -24,6 +30,9 @@ export interface FerryTerminalSheetProps {
   onSetTo?: (place: Place) => void;
   onClearFrom?: () => void;
   onClearTo?: () => void;
+  /** Open the trip sheet for the train a ferry is timed for: its run from
+   *  Larkspur, carrying the ferry, to the end of the line. */
+  onFerryClick?: (trip: ProcessedTrip) => void;
 }
 
 /**
@@ -41,10 +50,13 @@ export function FerryTerminalSheet({
   onSetTo,
   onClearFrom,
   onClearTo,
+  onFerryClick,
 }: FerryTerminalSheetProps) {
   const { t } = useTranslation();
+  const { focusedTrip } = useStationSelection();
   const nowMinutes = minutesOfDay(currentTime);
   const ferries = upcomingFerries(currentTime, true).slice(0, MAX_FERRIES);
+  const scheduleType = getTodayScheduleType(currentTime);
 
   return (
     <PlaceSheet
@@ -70,13 +82,26 @@ export function FerryTerminalSheet({
         <ul className="flex flex-col gap-2">
           {ferries.map((ferry) => {
             const etaMinutes = parseTimeToMinutes(ferry.depart) - nowMinutes;
+            const train = inboundFerryTrain(ferry, scheduleType);
+            // Blue when the row opens the "My Trip" sheet, as on a station's sheet.
+            const isFocused =
+              train != null &&
+              isFocusedTrainToday(focusedTrip, train.trip, false, currentTime);
+            const open =
+              train && onFerryClick
+                ? {
+                    onClick: () => onFerryClick(train),
+                    ariaLabel: t("stationInfo.openTripAria", {
+                      trip: train.trip,
+                      terminus: train.toStation,
+                    }),
+                  }
+                : {};
             return (
-              <li
+              <PlaceSheetRow
                 key={ferry.depart}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg border",
-                  stateCardStyle.future,
-                )}
+                tone={isFocused ? myTripCardStyle : stateCardStyle.future}
+                {...open}
               >
                 <Ship className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="flex-1 min-w-0 leading-tight">
@@ -106,7 +131,7 @@ export function FerryTerminalSheet({
                     })}
                   </div>
                 </div>
-              </li>
+              </PlaceSheetRow>
             );
           })}
         </ul>

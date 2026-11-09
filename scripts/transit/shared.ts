@@ -57,6 +57,8 @@ export type TrainSchedulesOutput = Record<ScheduleType, TrainScheduleOutput>;
 export type FerryTrip = {
   depart: string;
   arrive: string;
+  /** Ferry Building gate letter at the SF end, e.g. "C". */
+  sfGate?: string;
 };
 
 export type FerrySchedulesOutput = {
@@ -694,9 +696,13 @@ export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
   // Classify them by latitude — Larkspur is ~20 km north of SF, so the
   // northernmost stop is always Larkspur.
   const stopLatById = new Map<string, number>();
+  const sfGateByStopId = new Map<string, string>();
   for (const s of feed.stops) {
     const lat = Number(s.stop_lat);
     if (Number.isFinite(lat)) stopLatById.set(s.stop_id, lat);
+    // GGF names each Ferry Building berth "San Francisco-Gate X".
+    const gate = /\bGate\s+([A-Z])\b/i.exec(s.stop_name)?.[1];
+    if (gate) sfGateByStopId.set(s.stop_id, gate.toUpperCase());
   }
   const stopRoleMap = new Map<string, "larkspur" | "sf">();
   const stopTimesByTrip = groupStopTimesByTrip(feed.stopTimes);
@@ -761,11 +767,14 @@ export function buildFerrySchedules(feed: GtfsFeed): FerrySchedulesOutput {
 
     const depart = toTimeString(departureTimeRaw);
     const arrive = toTimeString(arrivalTimeRaw);
+    const sfGate = sfGateByStopId.get(sfStop.stopTime.stop_id ?? "");
 
     const key: keyof FerrySchedulesOutput = isInbound
       ? `${serviceType}InboundFerries`
       : `${serviceType}Ferries`;
-    ferrySchedules[key].push({ depart, arrive });
+    ferrySchedules[key].push(
+      sfGate ? { depart, arrive, sfGate } : { depart, arrive },
+    );
   }
 
   for (const key of Object.keys(

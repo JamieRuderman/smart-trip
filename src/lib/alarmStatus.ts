@@ -11,6 +11,9 @@ export type AlarmPhase =
 
 export interface AlarmStatusInput {
   minutesUntilDeparture: number;
+  /** The departure counted down is the SF ferry the trip starts with, not the
+   *  train. */
+  departsByFerry?: boolean;
   minutesUntilArrival: number;
   minutesAfterArrival: number;
   /** Minutes until the armed leave reminder fires (departure − lead), or null
@@ -42,6 +45,8 @@ export interface AlarmStatusSelection {
   tone?: "default" | "muted";
   minutesUntilLeave?: number;
   minutesUntilDeparture?: number;
+  /** A departure countdown to the SF ferry rather than the train. */
+  byFerry?: boolean;
   minutesUntilArrival?: number;
 }
 
@@ -112,6 +117,7 @@ export function selectAlarmStatus(
 ): AlarmStatusSelection {
   const {
     minutesUntilDeparture,
+    departsByFerry = false,
     minutesUntilArrival,
     minutesAfterArrival,
     minutesUntilLeave = null,
@@ -169,7 +175,7 @@ export function selectAlarmStatus(
     };
   }
 
-  if (minutesUntilDeparture <= 2) {
+  if (minutesUntilDeparture <= 2 && !departsByFerry) {
     return {
       phase: "BOARDING_WINDOW",
       kind: "message",
@@ -181,5 +187,6 @@ export function selectAlarmStatus(
     phase: "PRE_DEPARTURE",
     kind: "departure-countdown",
     minutesUntilDeparture,
+    ...(departsByFerry ? { byFerry: true } : {}),
   };
 }

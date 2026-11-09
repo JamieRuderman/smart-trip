@@ -7,13 +7,17 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import type { Station } from "@/types/smartSchedule";
+import { isFerryLeg, placeStation, type Place } from "@/lib/places";
 import { getTodayScheduleType } from "@/lib/scheduleUtils";
 import { toLocalDateKey } from "@/lib/timeUtils";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { useFocusedTrip } from "@/hooks/useFocusedTrip";
 import { endTripActivity } from "@/lib/native/liveActivity";
-import { FOCUSED_TRIP_CHANGED_EVENT, loadFocusedTrip } from "@/lib/focusedTrip";
+import {
+  FOCUSED_TRIP_CHANGED_EVENT,
+  focusedPlaces,
+  loadFocusedTrip,
+} from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
   type StationSelection,
@@ -22,8 +26,8 @@ import {
 // --- Native state persistence ---
 
 interface PersistedState {
-  fromStation: Station;
-  toStation: Station;
+  fromStation: Place;
+  toStation: Place;
   scheduleType: "weekday" | "weekend";
   tripNumber: number | null;
   savedAt: number;
@@ -61,8 +65,8 @@ function loadPersistedState(): PersistedState | null {
 }
 
 function savePersistedState(
-  fromStation: Station,
-  toStation: Station,
+  fromStation: Place,
+  toStation: Place,
   scheduleType: "weekday" | "weekend",
   tripNumber: number | null,
 ): void {
@@ -83,6 +87,10 @@ function savePersistedState(
   }
 }
 
+function sameStation(a: Place | "", b: Place | ""): boolean {
+  return a !== "" && b !== "" && placeStation(a) === placeStation(b);
+}
+
 /** Params owned by this context — all others are preserved verbatim. */
 const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);
 
@@ -90,8 +98,8 @@ const todayScheduleType = (): "weekday" | "weekend" =>
   getTodayScheduleType();
 
 interface ProviderState {
-  fromStation: Station | "";
-  toStation: Station | "";
+  fromPlace: Place | "";
+  toPlace: Place | "";
   scheduleType: "weekday" | "weekend";
   scheduleCheckedOn: string;
   selectedTripNumber: number | null;
@@ -124,15 +132,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     // truly cold start, leaving the empty state.
     const persisted = loadPersistedState();
     const focusedOnMount = loadFocusedTrip();
+    const focusedOnMountPlaces = focusedOnMount ? focusedPlaces(focusedOnMount) : null;
     return {
-      fromStation:
-        (searchParams.get("from") as Station) ||
+      fromPlace:
+        (searchParams.get("from") as Place) ||
         (persisted ? persisted.fromStation : "") ||
-        (focusedOnMount ? focusedOnMount.fromStation : ""),
-      toStation:
-        (searchParams.get("to") as Station) ||
+        (focusedOnMountPlaces ? focusedOnMountPlaces.from : ""),
+      toPlace:
+        (searchParams.get("to") as Place) ||
         (persisted ? persisted.toStation : "") ||
-        (focusedOnMount ? focusedOnMount.toStation : ""),
+        (focusedOnMountPlaces ? focusedOnMountPlaces.to : ""),
       // Schedule type is derived from the calendar day, never restored from
       // persistence: a leg saved on a weekday must not force the weekday
       // schedule when reopened on a weekend (and vice-versa). Restoring it
@@ -173,16 +182,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     searchParamsRef.current.forEach((value, key) => {
       if (!MANAGED_PARAMS.has(key)) params[key] = value;
     });
-    if (state.fromStation) params.from = state.fromStation;
-    if (state.toStation) params.to = state.toStation;
+    if (state.fromPlace) params.from = state.fromPlace;
+    if (state.toPlace) params.to = state.toPlace;
     if (state.selectedTripNumber != null) {
       params.trip = String(state.selectedTripNumber);
       params.type = state.scheduleType;
     }
     setSearchParams(params, { replace: true });
   }, [
-    state.fromStation,
-    state.toStation,
+    state.fromPlace,
+    state.toPlace,
     state.selectedTripNumber,
     state.scheduleType,
     location.pathname,
@@ -198,45 +207,45 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       isInitialRender.current = false;
       return;
     }
-    if (!state.fromStation || !state.toStation) return;
+    if (!state.fromPlace || !state.toPlace) return;
     savePersistedState(
-      state.fromStation,
-      state.toStation,
+      state.fromPlace,
+      state.toPlace,
       state.scheduleType,
       state.selectedTripNumber,
     );
   }, [
-    state.fromStation,
-    state.toStation,
+    state.fromPlace,
+    state.toPlace,
     state.scheduleType,
     state.selectedTripNumber,
   ]);
 
-  // Setters. When one endpoint is set to a station that equals the other,
-  // drop the other so we never produce a zero-length trip — this turns a
-  // "swap origin & destination" gesture into a one-tap flow.
-  const setFromStation = useCallback((station: Station | "") => {
+  // Setters. When one end is set to a place on the same station as the other
+  // (San Francisco shares Larkspur's), drop the other so we never produce a
+  // zero-length trip — this turns a "swap origin & destination" gesture into a
+  // one-tap flow.
+  const setFromStation = useCallback((place: Place | "") => {
     setState((prev) => ({
       ...prev,
-      fromStation: station,
-      toStation: station && prev.toStation === station ? "" : prev.toStation,
+      fromPlace: place,
+      toPlace: sameStation(place, prev.toPlace) ? "" : prev.toPlace,
     }));
   }, []);
 
-  const setToStation = useCallback((station: Station | "") => {
+  const setToStation = useCallback((place: Place | "") => {
     setState((prev) => ({
       ...prev,
-      toStation: station,
-      fromStation:
-        station && prev.fromStation === station ? "" : prev.fromStation,
+      toPlace: place,
+      fromPlace: sameStation(place, prev.fromPlace) ? "" : prev.fromPlace,
     }));
   }, []);
 
   const swapStations = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      fromStation: prev.toStation,
-      toStation: prev.fromStation,
+      fromPlace: prev.toPlace,
+      toPlace: prev.fromPlace,
     }));
   }, []);
 
@@ -339,8 +348,11 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
 
   const value = useMemo<StationSelection>(
     () => ({
-      fromStation: state.fromStation,
-      toStation: state.toStation,
+      fromPlace: state.fromPlace,
+      toPlace: state.toPlace,
+      fromStation: state.fromPlace && placeStation(state.fromPlace),
+      toStation: state.toPlace && placeStation(state.toPlace),
+      viaFerry: isFerryLeg(state.fromPlace, state.toPlace),
       scheduleType: state.scheduleType,
       scheduleCheckedOn: state.scheduleCheckedOn,
       confirmScheduleCheckedOn,
@@ -364,8 +376,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       clearFocusedTrip,
     }),
     [
-      state.fromStation,
-      state.toStation,
+      state.fromPlace,
+      state.toPlace,
       state.scheduleType,
       state.scheduleCheckedOn,
       confirmScheduleCheckedOn,

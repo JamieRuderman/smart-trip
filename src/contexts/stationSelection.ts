@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Station } from "@/types/smartSchedule";
+import type { Place } from "@/lib/places";
 import type { FocusedTrip } from "@/lib/focusedTrip";
 import type {
   FocusTripInput,
@@ -8,16 +9,23 @@ import type {
 } from "@/hooks/useFocusedTrip";
 
 export interface StationSelection {
+  /** The ends the rider picked, San Francisco included. */
+  fromPlace: Place | "";
+  toPlace: Place | "";
+  /** The SMART stations the train leg runs between (Larkspur for San
+   *  Francisco). */
   fromStation: Station | "";
   toStation: Station | "";
+  /** One end is San Francisco, so the leg rides the ferry at Larkspur. */
+  viaFerry: boolean;
   scheduleType: "weekday" | "weekend";
   /** Local date ("YYYY-MM-DD") the schedule type was last picked, chosen or
    *  confirmed, so the switch prompt asks at most once a day. */
   scheduleCheckedOn: string;
   confirmScheduleCheckedOn: (date: string) => void;
   selectedTripNumber: number | null;
-  setFromStation: (station: Station | "") => void;
-  setToStation: (station: Station | "") => void;
+  setFromStation: (place: Place | "") => void;
+  setToStation: (place: Place | "") => void;
   swapStations: () => void;
   setScheduleType: (type: "weekday" | "weekend") => void;
   setSelectedTrip: (tripNumber: number | null) => void;

@@ -10,7 +10,9 @@
 import {
   FOCUSED_TRIP_CHANGED_EVENT,
   focusedArrivalInstant,
+  focusedBoardingInstant,
   focusedDepartureInstant,
+  focusedPlaces,
   loadFocusedTrip,
   reconstructFocusedTrip,
   sameFocusIdentity,
@@ -218,10 +220,11 @@ function attributesFor(
   saved: FocusedTrip,
   timelineStartEpochMs: number,
 ): TripActivityAttributes {
+  const places = focusedPlaces(saved);
   return {
     tripNumber: saved.tripNumber,
-    fromStation: saved.fromStation,
-    toStation: saved.toStation,
+    fromStation: places.from,
+    toStation: places.to,
     routeName: "SMART",
     direction: isSouthbound(saved.fromStation, saved.toStation)
       ? "southbound"
@@ -238,7 +241,7 @@ function attributesFor(
  * reminder moved the instant and the pending activity needs replacing.
  */
 export function focusedActivityStartAt(focused: FocusedTrip): number | null {
-  const departureAt = focusedDepartureInstant(focused);
+  const departureAt = focusedBoardingInstant(focused);
   if (departureAt == null) return null;
   return liveActivityStartAt({
     reminderEpochMs: focused.reminder?.reminderAt ?? null,
@@ -261,6 +264,7 @@ function buildRegistrationForFocus(
   const departureAt = focusedDepartureInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (!trip || departureAt == null || arrivalAt == null) return null;
+  const ferryBoardingAt = trip.inboundFerry ? focusedBoardingInstant(saved) : null;
   const southbound = isSouthbound(saved.fromStation, saved.toStation);
   const originStartTime = originStartTimeFor(trip, southbound);
   return {
@@ -276,6 +280,7 @@ function buildRegistrationForFocus(
     arrivalEpochMs: arrivalAt,
     ...(originStartTime ? { originStartTime } : {}),
     ...(trip.tripId ? { tripId: trip.tripId } : {}),
+    ...(ferryBoardingAt != null ? { boardingEpochMs: ferryBoardingAt } : {}),
     // Carry the armed reminder's lead so the server can keep the leave-alarm
     // countdown alive across its locked-screen delay pushes (otherwise every
     // push would drop the "Leave in" stage back to "Departs in").
@@ -313,7 +318,7 @@ export async function reRegisterPushForFocus(focused: FocusedTrip): Promise<void
  * LATEST record so a concurrently armed reminder isn't clobbered.
  */
 async function startActivityForFocus(saved: FocusedTrip): Promise<void> {
-  const departureAt = focusedDepartureInstant(saved);
+  const departureAt = focusedBoardingInstant(saved);
   const arrivalAt = focusedArrivalInstant(saved);
   if (departureAt == null || arrivalAt == null) return;
   // Not showtime yet — a focus pinned hours out shouldn't park a countdown on
@@ -426,7 +431,9 @@ async function scheduleActivityForFocus(
     // the activity appears. Module code, so the global i18n instance (same as
     // armAndPersistReminder's alarm button labels).
     alert: {
-      title: i18n.t("focusedTrip.activityStartTitle", { station: saved.fromStation }),
+      title: i18n.t("focusedTrip.activityStartTitle", {
+        station: focusedPlaces(saved).from,
+      }),
       body: i18n.t("focusedTrip.activityStartBody", { trip: saved.tripNumber }),
     },
     enablePush,
@@ -562,7 +569,7 @@ async function sendActivityContent(
  */
 async function refreshActivityContent(focused: FocusedTrip): Promise<void> {
   if (!focused.liveActivityId) return;
-  const departureAt = focusedDepartureInstant(focused);
+  const departureAt = focusedBoardingInstant(focused);
   const arrivalAt = focusedArrivalInstant(focused);
   if (departureAt == null || arrivalAt == null) return;
   const content = buildContentState({

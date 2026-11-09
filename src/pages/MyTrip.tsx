@@ -3,6 +3,7 @@ import { Calendar, ChevronLeft, Clock, MapPin, Ticket } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
+import { focusedPlaces } from "@/lib/focusedTrip";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { MyTripState } from "@/hooks/useMyTrip";
@@ -11,7 +12,7 @@ import {
   AlarmStatusIcon,
   AlarmStatusLabel,
 } from "@/components/AlarmStatusLabel";
-import { FerryConnection } from "@/components/FerryConnection";
+import { FerryLeg } from "@/components/FerryLeg";
 import { FocusedTripReminderRow } from "@/components/FocusedTripReminderRow";
 import { LiveTimePair } from "@/components/LiveTimePair";
 import { MyTripGate } from "@/components/MyTripGate";
@@ -74,13 +75,13 @@ function MyTripView({
     isFutureService,
     serviceDayLabel,
     clockTime,
-    showFerry,
     progress,
     model,
     accentBg,
     accentColor,
   } = state;
   const { fromStation, toStation } = focusedTrip;
+  const places = focusedPlaces(focusedTrip);
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -116,11 +117,11 @@ function MyTripView({
           {/* Each station name is an unbreakable unit so a long name wraps
               as a whole rather than mid-name. */}
           <p className="flex flex-wrap items-center gap-x-1.5 text-base font-semibold leading-snug">
-            <span className="whitespace-nowrap">{fromStation}</span>
+            <span className="whitespace-nowrap">{places.from}</span>
             <span className="font-normal text-white/60" aria-hidden="true">
               →
             </span>
-            <span className="whitespace-nowrap">{toStation}</span>
+            <span className="whitespace-nowrap">{places.to}</span>
           </p>
 
           <div className="mt-4 flex items-end gap-4">
@@ -233,6 +234,21 @@ function MyTripView({
           )}
         </SectionCard>
 
+        {trip.inboundFerry && (
+          <SectionCard className="p-4 md:p-5">
+            {model.hasQuickConnection && !model.isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={model.trainOption} />
+            )}
+            <FerryLeg
+              ferry={trip.inboundFerry}
+              trainTime={model.departureTime}
+              scheduleType={focusedTrip.scheduleType}
+              timeFormat={TIME_FORMAT}
+              inbound
+            />
+          </SectionCard>
+        )}
+
         {/* Every stop on the leg, with the train's current stop highlighted. */}
         <SectionCard className="p-4 md:p-5">
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -251,28 +267,17 @@ function MyTripView({
           />
         </SectionCard>
 
-        {((showFerry && trip.outboundFerry) || model.showInboundFerry) && (
+        {trip.outboundFerry && (
           <SectionCard className="p-4 md:p-5">
             {model.hasQuickConnection && !model.isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={model.trainOption} />
             )}
-            {showFerry && trip.outboundFerry && (
-              <FerryConnection
-                ferry={trip.outboundFerry}
-                trainArrivalTime={model.arrivalTime}
-                timeFormat={TIME_FORMAT}
-                fullLeg
-              />
-            )}
-            {model.showInboundFerry && trip.inboundFerry && (
-              <FerryConnection
-                ferry={trip.inboundFerry}
-                trainDepartureTime={model.departureTime}
-                timeFormat={TIME_FORMAT}
-                inbound
-                fullLeg
-              />
-            )}
+            <FerryLeg
+              ferry={trip.outboundFerry}
+              trainTime={model.arrivalTime}
+              scheduleType={focusedTrip.scheduleType}
+              timeFormat={TIME_FORMAT}
+            />
           </SectionCard>
         )}
 

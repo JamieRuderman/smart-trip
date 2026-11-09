@@ -5,200 +5,247 @@ import type { FerryConnection } from "@/types/smartSchedule";
 export const weekdayFerries: FerryConnection[] = [
   {
     "depart": "05:45",
-    "arrive": "06:20"
+    "arrive": "06:20",
+    "sfGate": "C"
   },
   {
     "depart": "06:30",
-    "arrive": "07:05"
+    "arrive": "07:05",
+    "sfGate": "C"
   },
   {
     "depart": "07:15",
-    "arrive": "07:50"
+    "arrive": "07:50",
+    "sfGate": "C"
   },
   {
     "depart": "07:55",
-    "arrive": "08:30"
+    "arrive": "08:30",
+    "sfGate": "C"
   },
   {
     "depart": "08:40",
-    "arrive": "09:15"
+    "arrive": "09:15",
+    "sfGate": "C"
   },
   {
     "depart": "09:25",
-    "arrive": "10:00"
+    "arrive": "10:00",
+    "sfGate": "C"
   },
   {
     "depart": "10:10",
-    "arrive": "10:45"
+    "arrive": "10:45",
+    "sfGate": "C"
   },
   {
     "depart": "11:50",
-    "arrive": "12:25"
+    "arrive": "12:25",
+    "sfGate": "C"
   },
   {
     "depart": "13:00",
-    "arrive": "13:35"
+    "arrive": "13:35",
+    "sfGate": "C"
   },
   {
     "depart": "14:10",
-    "arrive": "14:45"
+    "arrive": "14:45",
+    "sfGate": "C"
   },
   {
     "depart": "15:05",
-    "arrive": "15:40"
+    "arrive": "15:40",
+    "sfGate": "C"
   },
   {
     "depart": "15:45",
-    "arrive": "16:20"
+    "arrive": "16:20",
+    "sfGate": "C"
   },
   {
     "depart": "16:35",
-    "arrive": "17:10"
+    "arrive": "17:10",
+    "sfGate": "C"
   },
   {
     "depart": "17:15",
-    "arrive": "17:50"
+    "arrive": "17:50",
+    "sfGate": "C"
   },
   {
     "depart": "18:10",
-    "arrive": "18:45"
+    "arrive": "18:45",
+    "sfGate": "C"
   },
   {
     "depart": "19:15",
-    "arrive": "19:50"
+    "arrive": "19:50",
+    "sfGate": "C"
   }
 ];
 
 export const weekendFerries: FerryConnection[] = [
   {
     "depart": "09:00",
-    "arrive": "09:55"
+    "arrive": "09:55",
+    "sfGate": "C"
   },
   {
     "depart": "10:00",
-    "arrive": "10:35"
+    "arrive": "10:35",
+    "sfGate": "C"
   },
   {
     "depart": "11:30",
-    "arrive": "12:05"
+    "arrive": "12:05",
+    "sfGate": "C"
   },
   {
     "depart": "13:30",
-    "arrive": "14:05"
+    "arrive": "14:05",
+    "sfGate": "C"
   },
   {
     "depart": "15:00",
-    "arrive": "15:35"
+    "arrive": "15:35",
+    "sfGate": "C"
   },
   {
     "depart": "16:30",
-    "arrive": "17:05"
+    "arrive": "17:05",
+    "sfGate": "C"
   },
   {
     "depart": "18:00",
-    "arrive": "18:35"
+    "arrive": "18:35",
+    "sfGate": "C"
   }
 ];
 
 export const weekdayInboundFerries: FerryConnection[] = [
   {
     "depart": "06:30",
-    "arrive": "07:05"
+    "arrive": "07:05",
+    "sfGate": "C"
   },
   {
     "depart": "07:15",
-    "arrive": "07:45"
+    "arrive": "07:45",
+    "sfGate": "C"
   },
   {
     "depart": "08:00",
-    "arrive": "08:30"
+    "arrive": "08:30",
+    "sfGate": "C"
   },
   {
     "depart": "08:40",
-    "arrive": "09:15"
+    "arrive": "09:15",
+    "sfGate": "C"
   },
   {
     "depart": "09:25",
-    "arrive": "10:00"
+    "arrive": "10:00",
+    "sfGate": "C"
   },
   {
     "depart": "10:10",
-    "arrive": "10:45"
+    "arrive": "10:45",
+    "sfGate": "C"
   },
   {
     "depart": "11:50",
-    "arrive": "12:25"
+    "arrive": "12:25",
+    "sfGate": "C"
   },
   {
     "depart": "12:35",
-    "arrive": "13:10"
+    "arrive": "13:10",
+    "sfGate": "C"
   },
   {
     "depart": "13:45",
-    "arrive": "14:20"
+    "arrive": "14:20",
+    "sfGate": "C"
   },
   {
     "depart": "14:55",
-    "arrive": "15:30"
+    "arrive": "15:30",
+    "sfGate": "C"
   },
   {
     "depart": "15:50",
-    "arrive": "16:25"
+    "arrive": "16:25",
+    "sfGate": "C"
   },
   {
     "depart": "16:30",
-    "arrive": "17:05"
+    "arrive": "17:05",
+    "sfGate": "C"
   },
   {
     "depart": "17:25",
-    "arrive": "18:00"
+    "arrive": "18:00",
+    "sfGate": "C"
   },
   {
     "depart": "18:00",
-    "arrive": "18:35"
+    "arrive": "18:35",
+    "sfGate": "C"
   },
   {
     "depart": "18:55",
-    "arrive": "19:25"
+    "arrive": "19:25",
+    "sfGate": "C"
   },
   {
     "depart": "20:00",
-    "arrive": "20:30"
+    "arrive": "20:30",
+    "sfGate": "C"
   }
 ];
 
 export const weekendInboundFerries: FerryConnection[] = [
   {
     "depart": "10:45",
-    "arrive": "11:20"
+    "arrive": "11:20",
+    "sfGate": "C"
   },
   {
     "depart": "12:15",
-    "arrive": "12:50"
+    "arrive": "12:50",
+    "sfGate": "C"
   },
   {
     "depart": "14:15",
-    "arrive": "14:50"
+    "arrive": "14:50",
+    "sfGate": "C"
   },
   {
     "depart": "15:45",
-    "arrive": "16:20"
+    "arrive": "16:20",
+    "sfGate": "C"
   },
   {
     "depart": "17:15",
-    "arrive": "17:50"
+    "arrive": "17:50",
+    "sfGate": "C"
   },
   {
     "depart": "18:00",
-    "arrive": "18:55"
+    "arrive": "18:55",
+    "sfGate": "C"
   },
   {
     "depart": "18:45",
-    "arrive": "19:20"
+    "arrive": "19:20",
+    "sfGate": "C"
   },
   {
     "depart": "19:50",
-    "arrive": "20:45"
+    "arrive": "20:45",
+    "sfGate": "C"
   }
 ];
 

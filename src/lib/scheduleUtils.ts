@@ -1,13 +1,19 @@
 import stations from "@/data/stations";
 import {
   bundledSchedulePayload,
+  type FerrySchedules,
   type ScheduleOverrides,
   type SchedulePayload,
 } from "@/data/scheduleData";
 import bundledScheduleOverrides from "@/data/scheduleOverrides";
 import type { ScheduleType } from "@/data/trainSchedules";
 import { stationIndexMap, calculateZonesBetweenStations } from "./stationUtils";
-import { parseTimeToMinutes, isTimeInPast, toLocalDateKey } from "./timeUtils";
+import {
+  calculateTimeDifference,
+  parseTimeToMinutes,
+  isTimeInPast,
+  toLocalDateKey,
+} from "./timeUtils";
 import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type {
@@ -25,7 +31,9 @@ export interface ProcessedTrip {
   trip: number;
   tripId?: string;
   times: string[];
+  /** The ferry on to SF after the train — only on a leg the rider continues to SF. */
   outboundFerry?: FerryConnection;
+  /** The ferry from SF before the train — only on a leg the rider starts in SF. */
   inboundFerry?: FerryConnection;
   departureTime: string;
   arrivalTime: string;
@@ -41,8 +49,12 @@ interface StationPair {
   isSouthbound: boolean;
 }
 
+/** Keyed by "fromStation-toStation-scheduleType". */
 interface ScheduleCache {
-  [key: string]: ProcessedTrip[]; // key: "fromStation-toStation-scheduleType"
+  trips: Record<string, ProcessedTrip[]>;
+  /** Larkspur legs continued by ferry to or from SF: only the trains with a
+   *  connection, each carrying its ferry. */
+  ferryTrips: Record<string, ProcessedTrip[]>;
 }
 
 // Note: stationIndexMap is now imported from stationUtils
@@ -66,7 +78,7 @@ stations.forEach((fromStation, fromIndex) => {
 
 // Pre-process schedule data
 function processScheduleData(payload: SchedulePayload): ScheduleCache {
-  const cache: ScheduleCache = {};
+  const cache: ScheduleCache = { trips: {}, ferryTrips: {} };
   const { trainSchedules, ferrySchedules } = payload;
 
   // Validate that train schedules data is loaded
@@ -160,34 +172,31 @@ function processScheduleData(payload: SchedulePayload): ScheduleCache {
 
                 if (isValid) {
                   const key = `${fromStation}-${toStation}-${scheduleType}`;
-                  if (!cache[key]) cache[key] = [];
-
-                  const larkspurTime = getTimeForStation(
-                    trip.times,
-                    FERRY_CONSTANTS.FERRY_STATION
-                  );
-                  const hasLarkspurTime = !larkspurTime.includes("~~");
-
-                  cache[key].push({
+                  const processed: ProcessedTrip = {
                     trip: trip.trip,
                     tripId: trip.tripId,
                     times: trip.times,
-                    outboundFerry:
-                      toStation === FERRY_CONSTANTS.FERRY_STATION &&
-                      hasLarkspurTime
-                        ? findOutboundFerry(larkspurTime, outboundFerries)
-                        : undefined,
-                    inboundFerry:
-                      fromStation === FERRY_CONSTANTS.FERRY_STATION &&
-                      hasLarkspurTime
-                        ? findInboundFerry(larkspurTime, inboundFerries)
-                        : undefined,
                     departureTime,
                     arrivalTime,
                     fromStation,
                     toStation,
                     isValid: true,
-                  });
+                  };
+                  if (!cache.trips[key]) cache.trips[key] = [];
+                  cache.trips[key].push(processed);
+
+                  let withFerry: ProcessedTrip | null = null;
+                  if (toStation === FERRY_CONSTANTS.FERRY_STATION) {
+                    const ferry = findOutboundFerry(arrivalTime, outboundFerries);
+                    if (ferry) withFerry = { ...processed, outboundFerry: ferry };
+                  } else if (fromStation === FERRY_CONSTANTS.FERRY_STATION) {
+                    const ferry = findInboundFerry(departureTime, inboundFerries);
+                    if (ferry) withFerry = { ...processed, inboundFerry: ferry };
+                  }
+                  if (withFerry) {
+                    if (!cache.ferryTrips[key]) cache.ferryTrips[key] = [];
+                    cache.ferryTrips[key].push(withFerry);
+                  }
                 }
               }
             }
@@ -220,7 +229,7 @@ try {
   scheduleCache = processScheduleData(bundledSchedulePayload);
 } catch (error) {
   console.error("[ScheduleUtils] Error processing schedule data:", error);
-  scheduleCache = {};
+  scheduleCache = { trips: {}, ferryTrips: {} };
 }
 
 /**
@@ -268,47 +277,66 @@ export function getScheduleVersion(): number {
   return scheduleMeta.version;
 }
 
-/**
- * Next outbound ferry departure from Larkspur, after `now`. Derived from
- * the processed southbound trips' `outboundFerry` — dedup'd by depart time
- * so repeated connections from back-to-back trains collapse to one entry.
- * Returns null when no more ferries today.
- *
- * Sorted list is cached per schedule type; re-scanning the full trip array
- * every diagram tick (once per second) is wasteful when the timetable is
- * static.
- */
-type FerryCache = { scheduleType: ScheduleType; sorted: FerryConnection[] };
-let ferryCache: FerryCache | null = null;
-
-function sortedFerries(scheduleType: ScheduleType): FerryConnection[] {
-  if (ferryCache && ferryCache.scheduleType === scheduleType) {
-    return ferryCache.sorted;
-  }
-  const windsor = stations[0];
-  const larkspur = stations[stations.length - 1];
-  const seen = new Set<string>();
-  const ferries: FerryConnection[] = [];
-  for (const trip of getFilteredTrips(windsor, larkspur, scheduleType)) {
-    const f = trip.outboundFerry;
-    if (!f || seen.has(f.depart)) continue;
-    seen.add(f.depart);
-    ferries.push(f);
-  }
-  ferries.sort(
-    (a, b) => parseTimeToMinutes(a.depart) - parseTimeToMinutes(b.depart),
+/** The rest of today's ferries from Larkspur to SF, or from SF to Larkspur
+ *  when `inbound`, in departure order. */
+export function upcomingFerries(now: Date, inbound = false): FerryConnection[] {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return ferryRuns(getTodayScheduleType(now), inbound).filter(
+    (f) => parseTimeToMinutes(f.depart) >= nowMinutes,
   );
-  ferryCache = { scheduleType, sorted: ferries };
-  return ferries;
 }
 
-export function getNextFerryDeparture(now: Date): FerryConnection | null {
-  const scheduleType = getTodayScheduleType(now);
-  const ferries = sortedFerries(scheduleType);
+/** The next ferry from Larkspur — or from SF when `inbound` — or null once
+ *  the day's last has left. */
+export function getNextFerryDeparture(
+  now: Date,
+  inbound = false,
+): FerryConnection | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return (
-    ferries.find((f) => parseTimeToMinutes(f.depart) >= nowMinutes) ?? null
+    ferryRuns(getTodayScheduleType(now), inbound).find(
+      (f) => parseTimeToMinutes(f.depart) >= nowMinutes,
+    ) ?? null
   );
+}
+
+/** Ferry timetables from the currently-applied payload. */
+let activeFerrySchedules: FerrySchedules = bundledSchedulePayload.ferrySchedules;
+
+/** The day's Larkspur → SF runs, or SF → Larkspur when `inbound`, in
+ *  departure order. */
+export function ferryRuns(
+  scheduleType: ScheduleType,
+  inbound: boolean,
+): FerryConnection[] {
+  const key: keyof FerrySchedules = inbound
+    ? `${scheduleType}InboundFerries`
+    : `${scheduleType}Ferries`;
+  return activeFerrySchedules[key];
+}
+
+/**
+ * The run beside `ferry` on the Larkspur ↔ SF timetable: the next departure
+ * after it for an outbound (Larkspur → SF) run — the fallback if the train runs
+ * late — or the one before it for an inbound run, which allows a longer
+ * transfer. Null when `ferry` is the day's last outbound or first inbound run.
+ */
+export function adjacentFerry(
+  ferry: FerryConnection,
+  inbound: boolean,
+  scheduleType: ScheduleType,
+): FerryConnection | null {
+  const runs = ferryRuns(scheduleType, inbound);
+  const departMinutes = parseTimeToMinutes(ferry.depart);
+  if (!inbound) {
+    return (
+      runs.find((f) => parseTimeToMinutes(f.depart) > departMinutes) ?? null
+    );
+  }
+  const earlier = runs.filter(
+    (f) => parseTimeToMinutes(f.depart) < departMinutes,
+  );
+  return earlier[earlier.length - 1] ?? null;
 }
 
 /**
@@ -393,8 +421,7 @@ export function setScheduleData(
     activeScheduleOverrides = payload.scheduleOverrides
       ? { ...payload.scheduleOverrides }
       : { ...bundledScheduleOverrides };
-    // Downstream caches were built from the previous payload — evict them.
-    ferryCache = null;
+    activeFerrySchedules = payload.ferrySchedules;
     scheduleMeta = {
       version: scheduleMeta.version + 1,
       source,
@@ -415,15 +442,19 @@ export { getStationIndex } from "./stationUtils";
  * @param fromStation - Origin station
  * @param toStation - Destination station
  * @param scheduleType - Type of schedule (weekday or weekend)
+ * @param viaFerry - The leg's Larkspur end continues by ferry to or from SF:
+ *   only trains with a ferry connection, each carrying it. Otherwise no trip
+ *   carries a ferry.
  * @returns Array of processed trips for the route
  */
 export function getFilteredTrips(
   fromStation: Station,
   toStation: Station,
-  scheduleType: ScheduleType
+  scheduleType: ScheduleType,
+  viaFerry = false
 ): ProcessedTrip[] {
   const key = `${fromStation}-${toStation}-${scheduleType}`;
-  return scheduleCache[key] || [];
+  return (viaFerry ? scheduleCache.ferryTrips : scheduleCache.trips)[key] || [];
 }
 
 /**
@@ -436,9 +467,10 @@ export function tripServesLeg(
   tripNumber: number,
   fromStation: Station,
   toStation: Station,
-  scheduleType: ScheduleType
+  scheduleType: ScheduleType,
+  viaFerry = false
 ): boolean {
-  return getFilteredTrips(fromStation, toStation, scheduleType).some(
+  return getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).some(
     (trip) => trip.trip === tripNumber
   );
 }
@@ -501,6 +533,57 @@ export function effectiveArrivalTime(
   );
 }
 
+/**
+ * A trip's two ends as the rider sees them: the SF ferry's time at an end the
+ * trip starts or ends with one — it runs to its own timetable and has no live
+ * feed — else the train's time there, live when `status` has it. `live*` says
+ * which end shows a live time.
+ */
+export function tripEnds(
+  trip: Pick<ProcessedTrip, "departureTime" | "arrivalTime" | "inboundFerry" | "outboundFerry">,
+  status?: TripRealtimeStatus | null
+): { start: string; end: string; liveStart: boolean; liveEnd: boolean } {
+  const liveDeparture = trip.inboundFerry ? undefined : status?.liveDepartureTime;
+  const liveArrival = trip.outboundFerry ? undefined : status?.liveArrivalTime;
+  return {
+    start: trip.inboundFerry?.depart ?? liveDeparture ?? trip.departureTime,
+    end: trip.outboundFerry?.arrive ?? liveArrival ?? trip.arrivalTime,
+    liveStart: liveDeparture != null,
+    liveEnd: liveArrival != null,
+  };
+}
+
+/**
+ * A trip's ferry and the minutes between it and the train at Larkspur, against
+ * the train's live time there when `status` has it; null on a trip with no ferry.
+ */
+export function ferryTransfer(
+  trip: Pick<ProcessedTrip, "departureTime" | "arrivalTime" | "inboundFerry" | "outboundFerry">,
+  status?: TripRealtimeStatus | null
+): { ferry: FerryConnection; inbound: boolean; minutes: number } | null {
+  if (trip.inboundFerry) {
+    return {
+      ferry: trip.inboundFerry,
+      inbound: true,
+      minutes: calculateTimeDifference(
+        trip.inboundFerry.arrive,
+        status?.liveDepartureTime ?? trip.departureTime
+      ),
+    };
+  }
+  if (trip.outboundFerry) {
+    return {
+      ferry: trip.outboundFerry,
+      inbound: false,
+      minutes: calculateTimeDifference(
+        status?.liveArrivalTime ?? trip.arrivalTime,
+        trip.outboundFerry.depart
+      ),
+    };
+  }
+  return null;
+}
+
 // Fast next trip calculation
 /**
  * Finds the index of the first trip that hasn't departed yet, in schedule
@@ -521,9 +604,8 @@ export function getNextTripIndex(
   realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    if (
-      !isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap))
-    ) {
+    const { start } = tripEnds(trips[i], realtimeStatusMap?.get(trips[i].departureTime));
+    if (!isTimeInPast(currentTime, start)) {
       return i;
     }
   }
@@ -543,10 +625,8 @@ export function getFirstInProgressTripIndex(
   realtimeStatusMap?: Map<string, TripRealtimeStatus>
 ): number {
   for (let i = 0; i < trips.length; i++) {
-    if (
-      isTimeInPast(currentTime, effectiveDepartureTime(trips[i], realtimeStatusMap)) &&
-      !isTimeInPast(currentTime, effectiveArrivalTime(trips[i], realtimeStatusMap))
-    ) {
+    const { start, end } = tripEnds(trips[i], realtimeStatusMap?.get(trips[i].departureTime));
+    if (isTimeInPast(currentTime, start) && !isTimeInPast(currentTime, end)) {
       return i;
     }
   }

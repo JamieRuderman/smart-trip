@@ -369,6 +369,42 @@ describe("planTick", () => {
     );
   });
 
+  it("counts down to a fixed ferry boarding, not the train's live departure", () => {
+    const boarding = SCHED_DEP_MS - 40 * 60_000; // ferry leaves SF at 07:50
+    const liveDep = SCHED_DEP_MS + 10 * 60_000;
+    const plan = planTick({
+      reg: { ...REG_WITH_REMINDER, boardingEpochMs: boarding },
+      token: "tok",
+      lastSent: null,
+      updates: boardingFeed(liveDep / 1000),
+      now: boarding - 30 * 60_000,
+    });
+    const values = contentValues(plan);
+    expect(values.departureEpochMs).toBe(String(boarding));
+    expect(values.reminderEpochMs).toBe(
+      String(boarding - REMINDER_LEAD_MIN * 60_000),
+    );
+  });
+
+  it("holds the train's delay until the ferry has left", () => {
+    const boarding = SCHED_DEP_MS - 40 * 60_000;
+    const updates = boardingFeed((SCHED_DEP_MS + 10 * 60_000) / 1000);
+    const tick = (now: number) =>
+      planTick({
+        reg: { ...REG, boardingEpochMs: boarding },
+        token: "tok",
+        lastSent: null,
+        updates,
+        now,
+      });
+    const waiting = contentValues(tick(boarding - 10 * 60_000));
+    expect(waiting.delayMinutes).toBe("0");
+    expect(waiting.statusText).toBe("On time");
+    const aboard = contentValues(tick(boarding + 5 * 60_000));
+    expect(aboard.delayMinutes).toBe("10");
+    expect(aboard.statusText).toBe("Delayed");
+  });
+
   it("keeps and shifts the leave-in countdown when a delay update is pushed", () => {
     // A delay surfaces while the leave alarm is still pending: the push must say
     // "Delayed" AND keep the "Leave in" stage, with the leave instant shifted by

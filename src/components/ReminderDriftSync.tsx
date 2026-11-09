@@ -2,14 +2,13 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
-  anchorLiveTime,
-  focusedDepartureInstant,
+  focusedBoardingInstant,
   focusedTripKey,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
-import { formatClockTime } from "@/lib/timeUtils";
+import { buildReminderText } from "@/lib/reminderText";
 
 /**
  * Invisible app-level worker that keeps an ARMED leave-reminder aligned with
@@ -46,17 +45,15 @@ function ReminderDriftSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
 
   // Shared focused-trip realtime derivation (same lookup as My Trip
   // and LiveActivitySync, so all surfaces track the same live departure).
-  const { live } = useFocusedTripLive(focusedTrip, now);
+  const { trip, live } = useFocusedTripLive(focusedTrip, now);
+  const byFerry = trip?.inboundFerry != null;
 
-  const staticDepartureAt = useMemo(
-    () => focusedDepartureInstant(focusedTrip),
-    [focusedTrip],
-  );
   // live ?? static — mirrors DepartureReminder exactly (see doc comment).
-  const departureAt =
-    staticDepartureAt != null && live?.liveDepartureTime
-      ? anchorLiveTime(staticDepartureAt, live.liveDepartureTime)
-      : staticDepartureAt;
+  const liveDepartureTime = live?.liveDepartureTime;
+  const departureAt = useMemo(
+    () => focusedBoardingInstant(focusedTrip, liveDepartureTime),
+    [focusedTrip, liveDepartureTime],
+  );
 
   const reminder = focusedTrip.reminder;
   const reminderAt = reminder?.reminderAt ?? null;
@@ -71,22 +68,23 @@ function ReminderDriftSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
     // comparison non-deterministic and spin a re-arm loop.
     const expected = departureAt - leadMinutes * 60_000;
     if (expected === reminderAt) return;
-    void rescheduleReminder(departureAt, {
-      title: t("departureReminder.notificationTitle", {
-        station: focusedTrip.fromStation,
-      }),
-      body: t("departureReminder.notificationBody", {
+    void rescheduleReminder(
+      departureAt,
+      buildReminderText(t, i18n.language, {
         leadMinutes,
-        station: focusedTrip.fromStation,
+        departureAt,
+        fromStation: focusedTrip.fromStation,
+        tripNumber: focusedTrip.tripNumber,
+        byFerry,
         // The app renders 12h everywhere today (see TrainScheduleApp).
-        time: formatClockTime(departureAt, "12h", i18n.language),
-        trip: focusedTrip.tripNumber,
+        timeFormat: "12h",
       }),
-    });
+    );
   }, [
     departureAt,
     reminderAt,
     leadMinutes,
+    byFerry,
     focusedTrip.fromStation,
     focusedTrip.tripNumber,
     rescheduleReminder,

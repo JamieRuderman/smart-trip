@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
-  anchorLiveTime,
-  focusedDepartureInstant,
+  focusedBoardingInstant,
+  focusedTripKey,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
@@ -45,17 +45,14 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
   const currentTime = useMemo(() => new Date(now), [now]);
 
   // Shared focused-trip realtime derivation (same lookup as My Trip).
-  const { live } = useFocusedTripLive(focusedTrip, now);
+  const { trip, live } = useFocusedTripLive(focusedTrip, now);
 
-  // Live-anchored boarding departure on the focused trip's own service date.
-  const staticDepartureAt = useMemo(
-    () => focusedDepartureInstant(focusedTrip),
-    [focusedTrip],
+  // When the rider sets off, on the focused trip's own service date.
+  const liveDepartureTime = live?.liveDepartureTime;
+  const departureAt = useMemo(
+    () => focusedBoardingInstant(focusedTrip, liveDepartureTime),
+    [focusedTrip, liveDepartureTime],
   );
-  const departureAt =
-    staticDepartureAt != null && live?.liveDepartureTime
-      ? anchorLiveTime(staticDepartureAt, live.liveDepartureTime)
-      : staticDepartureAt;
 
   if (departureAt == null) return null;
 
@@ -63,11 +60,12 @@ function ReminderDialogHostInner({ focusedTrip }: { focusedTrip: FocusedTrip }) 
     <ReminderDialog
       // "Take this train" opens the dialog before the new focus lands; remounting
       // per trip reseeds the slider, which otherwise kept the previous trip's lead.
-      key={`${focusedTrip.tripNumber}-${focusedTrip.serviceDate}-${focusedTrip.fromStation}`}
+      key={focusedTripKey(focusedTrip)}
       open={reminderDialogOpen}
       onClose={closeReminderDialog}
       departureAt={departureAt}
       fromStation={focusedTrip.fromStation}
+      byFerry={trip?.inboundFerry != null}
       tripNumber={focusedTrip.tripNumber}
       currentTime={currentTime}
       timeFormat="12h"

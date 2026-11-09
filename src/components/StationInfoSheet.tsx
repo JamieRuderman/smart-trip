@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { X, ArrowUp, ArrowDown, MapPin, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -22,6 +22,7 @@ import { TripIcon } from "@/components/icons/TripIcon";
 import { TimeDisplay, formatTime } from "@/components/TimeDisplay";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
+import { placeStation, type Place } from "@/lib/places";
 import {
   cardTripState,
   stateCardStyle,
@@ -66,13 +67,13 @@ export interface StationInfoSheetProps {
   station: Station;
   currentTime: Date;
   /** Currently-selected origin (for the active trip). */
-  fromStation?: Station | null;
+  fromStation?: Place | null;
   /** Currently-selected destination (for the active trip). */
-  toStation?: Station | null;
+  toStation?: Place | null;
   /** Set the tapped station as the trip origin. */
-  onSetFrom?: (station: Station) => void;
+  onSetFrom?: (place: Place) => void;
   /** Set the tapped station as the trip destination. */
-  onSetTo?: (station: Station) => void;
+  onSetTo?: (place: Place) => void;
   /** Clear the trip origin — called when tapping the From button while this
    *  station is already the origin. */
   onClearFrom?: () => void;
@@ -128,8 +129,8 @@ export function StationInfoSheet({
   // the wrong way aren't actionable from the station they tapped.
   const directionFilter = useMemo<"southbound" | "northbound" | null>(() => {
     if (!fromStation || !toStation) return null;
-    const a = stationIndexMap[fromStation];
-    const b = stationIndexMap[toStation];
+    const a = stationIndexMap[placeStation(fromStation)];
+    const b = stationIndexMap[placeStation(toStation)];
     if (a == null || b == null) return null;
     return a < b ? "southbound" : "northbound";
   }, [fromStation, toStation]);
@@ -187,7 +188,7 @@ export function StationInfoSheet({
           // train; otherwise fall back to the train's end-of-line terminus.
           const destinationStation: Station =
             directionFilter && toStation && (directionFilter === "southbound") === isSouthbound
-              ? toStation
+              ? placeStation(toStation)
               : terminus;
           let destinationTime: string | null = null;
           if (destinationStation !== station) {
@@ -248,16 +249,104 @@ export function StationInfoSheet({
   const zoneColor = ZONE_TRACK_COLORS[zone];
 
   return (
-    <AppSheet
+    <PlaceSheet
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel={t("stationInfo.stationInfoAria", { station })}
+      color={zoneColor}
+      eyebrow={t("stationInfo.zoneLabel", { zone })}
+      place={station}
+      fromStation={fromStation}
+      toStation={toStation}
+      onSetFrom={onSetFrom}
+      onSetTo={onSetTo}
+      onClearFrom={onClearFrom}
+      onClearTo={onClearTo}
+      heading={t("stationInfo.nextArrivals")}
+    >
+      {arrivals.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          {t("stationInfo.noUpcoming")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {arrivals.map((a) => {
+            // Highlight the user's focused ("Go") train blue here too,
+            // matching the diagram's marker and the sheet the row opens.
+            const isFocused = isFocusedTrainToday(
+              focusedTrip,
+              a.tripNumber,
+              a.isSouthbound,
+              currentTime,
+            );
+            return (
+              <ArrivalRow
+                key={`${a.tripNumber}-${a.isSouthbound}`}
+                arrival={a}
+                isFocused={isFocused}
+                onClick={
+                  onArrivalClick
+                    ? () => onArrivalClick(a.trip, station, a.terminus)
+                    : undefined
+                }
+              />
+            );
+          })}
+        </ul>
+      )}
+    </PlaceSheet>
+  );
+}
+
+/**
+ * The frame of a place's sheet on the line map — a station's, or San
+ * Francisco's: a coloured title band, the From/To buttons that pick it as a
+ * trip end (tapping the current one clears it), and a headed, scrolling list.
+ */
+export function PlaceSheet({
+  isOpen,
+  onClose,
+  ariaLabel,
+  color,
+  eyebrow,
+  place,
+  fromStation,
+  toStation,
+  onSetFrom,
+  onSetTo,
+  onClearFrom,
+  onClearTo,
+  heading,
+  children,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  ariaLabel: string;
+  color: string;
+  /** Small caps line above the place's name. */
+  eyebrow: string;
+  place: Place;
+  fromStation: Place | null;
+  toStation: Place | null;
+  onSetFrom?: (place: Place) => void;
+  onSetTo?: (place: Place) => void;
+  onClearFrom?: () => void;
+  onClearTo?: () => void;
+  heading: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <AppSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={ariaLabel}
       handleSlot={
-        // Colored drag-handle band keyed off the station's zone color, so
-        // handle and the colored title row below read as one continuous band.
+        // Colored drag-handle band, so handle and the colored title row below
+        // read as one continuous band.
         <div
           className="flex justify-center pt-3 pb-1 shrink-0"
-          style={{ backgroundColor: zoneColor }}
+          style={{ backgroundColor: color }}
         >
           <div className="w-10 h-1 rounded-full bg-white/40" />
         </div>
@@ -265,27 +354,15 @@ export function StationInfoSheet({
     >
       <div
         className="px-5 pt-2 pb-4 flex items-start justify-between gap-4 shrink-0"
-        style={{ backgroundColor: zoneColor }}
+        style={{ backgroundColor: color }}
       >
         <div className="min-w-0">
           <p className="text-xs font-bold tracking-widest uppercase text-white/80">
-            {t("stationInfo.zoneLabel", { zone })}
+            {eyebrow}
           </p>
-          <h2 className="mt-0.5 text-2xl font-bold text-white">{station}</h2>
+          <h2 className="mt-0.5 text-2xl font-bold text-white">{place}</h2>
           {fromStation && toStation && (
-            // Route summary — mirrors the My Trip view's header. The current
-            // station collapses to "Here" so the user can see at a glance
-            // whether they're looking at their origin, destination, or an
-            // intermediate stop.
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
-              <span className="whitespace-nowrap">
-                {fromStation === station ? t("stationInfo.here") : fromStation}
-              </span>
-              <span className="font-normal text-white/60">→</span>
-              <span className="whitespace-nowrap">
-                {toStation === station ? t("stationInfo.here") : toStation}
-              </span>
-            </p>
+            <RouteSummary from={fromStation} to={toStation} here={place} />
           )}
         </div>
         <button
@@ -303,20 +380,18 @@ export function StationInfoSheet({
           {onSetFrom && (
             <FromToColumn
               role="from"
-              isCurrent={fromStation === station}
+              isCurrent={fromStation === place}
               onClick={() =>
-                fromStation === station
-                  ? onClearFrom?.()
-                  : onSetFrom(station)
+                fromStation === place ? onClearFrom?.() : onSetFrom(place)
               }
             />
           )}
           {onSetTo && (
             <FromToColumn
               role="to"
-              isCurrent={toStation === station}
+              isCurrent={toStation === place}
               onClick={() =>
-                toStation === station ? onClearTo?.() : onSetTo(station)
+                toStation === place ? onClearTo?.() : onSetTo(place)
               }
             />
           )}
@@ -330,40 +405,38 @@ export function StationInfoSheet({
         data-sheet-scroll-area="true"
       >
         <h3 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">
-          {t("stationInfo.nextArrivals")}
+          {heading}
         </h3>
-        {arrivals.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">
-            {t("stationInfo.noUpcoming")}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {arrivals.map((a) => {
-              // Highlight the user's focused ("Go") train blue here too,
-              // matching the diagram's marker and the sheet the row opens.
-              const isFocused = isFocusedTrainToday(
-                focusedTrip,
-                a.tripNumber,
-                a.isSouthbound,
-                currentTime,
-              );
-              return (
-                <ArrivalRow
-                  key={`${a.tripNumber}-${a.isSouthbound}`}
-                  arrival={a}
-                  isFocused={isFocused}
-                  onClick={
-                    onArrivalClick
-                      ? () => onArrivalClick(a.trip, station, a.terminus)
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </ul>
-        )}
+        {children}
       </div>
     </AppSheet>
+  );
+}
+
+/** Route summary under a sheet's title — mirrors the My Trip view's header.
+ *  The sheet's own place collapses to "Here" so the user can see at a glance
+ *  whether they're looking at their origin, destination, or an intermediate
+ *  stop. */
+function RouteSummary({
+  from,
+  to,
+  here,
+}: {
+  from: Place;
+  to: Place;
+  here: Place;
+}) {
+  const { t } = useTranslation();
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-white/90">
+      <span className="whitespace-nowrap">
+        {from === here ? t("stationInfo.here") : from}
+      </span>
+      <span className="font-normal text-white/60">→</span>
+      <span className="whitespace-nowrap">
+        {to === here ? t("stationInfo.here") : to}
+      </span>
+    </p>
   );
 }
 

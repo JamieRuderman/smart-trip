@@ -10,10 +10,12 @@ import {
   migrateLegacyReminders,
   reconstructFocusedTrip,
   focusedArrivalInstant,
+  focusedBoardingInstant,
   focusedDepartureInstant,
   focusedTripClearInstant,
   focusedTripIsLeg,
   isFocusedTrainToday,
+  keepsFerry,
   replacementRun,
   FOCUSED_TRIP_STORAGE_KEY,
   type FocusedTrip,
@@ -202,6 +204,55 @@ describe("focusedArrivalInstant / focusedDepartureInstant", () => {
 
   it("returns null when the trip is no longer in the schedule", () => {
     expect(focusedArrivalInstant(makeFocused({ tripNumber: 999999 }))).toBeNull();
+  });
+});
+
+describe("trips that start or end with the SF ferry", () => {
+  beforeEach(() => localStorage.clear());
+
+  const FROM_SF = getFilteredTrips(TO, FROM, "weekday", true)[0];
+  const focusFromSf = makeFocused({
+    tripNumber: FROM_SF.trip,
+    fromStation: TO,
+    toStation: FROM,
+    viaFerry: true,
+  });
+
+  it("boards a trip from SF at its ferry, whatever the train's live time", () => {
+    const [h, m] = FROM_SF.inboundFerry!.depart.split(":").map(Number);
+    const ferryAt = new Date(2099, 0, 1, h, m).getTime();
+    expect(focusedBoardingInstant(focusFromSf)).toBe(ferryAt);
+    expect(focusedBoardingInstant(focusFromSf, "23:59")).toBe(ferryAt);
+  });
+
+  it("boards any other trip at the train, moved to its live departure", () => {
+    const f = makeFocused();
+    const scheduled = focusedDepartureInstant(f)!;
+    expect(focusedBoardingInstant(f)).toBe(scheduled);
+    expect(focusedBoardingInstant(f, "23:59")).toBe(anchorLiveTime(scheduled, "23:59"));
+  });
+
+  it("rebuilds the trip with its ferry only on a ferry leg", () => {
+    expect(reconstructFocusedTrip(focusFromSf)?.inboundFerry).toEqual(FROM_SF.inboundFerry);
+    expect(
+      reconstructFocusedTrip({ ...focusFromSf, viaFerry: undefined })?.inboundFerry,
+    ).toBeUndefined();
+  });
+
+  it("round-trips the ferry flag and rejects any other value", () => {
+    saveFocusedTrip(focusFromSf);
+    expect(loadFocusedTrip()).toEqual(focusFromSf);
+    localStorage.setItem(
+      FOCUSED_TRIP_STORAGE_KEY,
+      JSON.stringify({ ...focusFromSf, viaFerry: false }),
+    );
+    expect(loadFocusedTrip()).toBeNull();
+  });
+
+  it("tells a ferry leg apart from the same stations without it", () => {
+    expect(focusedTripIsLeg(focusFromSf, TO, FROM, "weekday", true)).toBe(true);
+    expect(focusedTripIsLeg(focusFromSf, TO, FROM, "weekday")).toBe(false);
+    expect(focusedTripIsLeg(makeFocused(), FROM, TO, "weekday", true)).toBe(false);
   });
 });
 
@@ -617,5 +668,33 @@ describe("replacementRun", () => {
     expect(
       replacementRun(run, "Larkspur", "Santa Rosa Downtown", instant("23:59")),
     ).toBeNull();
+  });
+});
+
+describe("correcting the boarding station of a trip to SF", () => {
+  const toSf = {
+    tripNumber: getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday", true)[0].trip,
+    fromStation: "Petaluma Downtown" as Station,
+    toStation: "Larkspur" as Station,
+    viaFerry: true as const,
+    scheduleType: "weekday" as const,
+    serviceDate: "2099-01-05",
+  };
+
+  it("keeps SF when leaving from another station, not when swapping ends", () => {
+    expect(keepsFerry(toSf, "Petaluma North", "Larkspur")).toBe(true);
+    expect(keepsFerry(toSf, "Larkspur", "Petaluma Downtown")).toBe(false);
+    expect(
+      keepsFerry({ ...toSf, viaFerry: undefined }, "Petaluma North", "Larkspur"),
+    ).toBe(false);
+  });
+
+  it("replaces it with a train that still meets a ferry", () => {
+    const next = replacementRun(toSf, "Petaluma North", "Larkspur", 0, {
+      target: new Date(2099, 0, 5, 12, 0).getTime(),
+    });
+    expect(next?.run.viaFerry).toBe(true);
+    const ferryTrains = getFilteredTrips("Petaluma North", "Larkspur", "weekday", true);
+    expect(ferryTrains.some((t) => t.trip === next?.run.tripNumber)).toBe(true);
   });
 });

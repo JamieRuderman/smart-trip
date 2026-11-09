@@ -12,6 +12,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { DEFAULT_LEAD_MINUTES, reminderLeadRange } from "@/lib/reminderLead";
+import { buildReminderText } from "@/lib/reminderText";
 import { formatClockTime } from "@/lib/timeUtils";
 import { cn } from "@/lib/utils";
 import type { Station } from "@/types/smartSchedule";
@@ -23,10 +24,13 @@ const CLOSE_TO_DEPARTURE_THRESHOLD = 3;
 interface ReminderDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Live-anchored departure instant of the focused trip's boarding station. */
+  /** When the rider sets off: the live-anchored train departure, or the SF
+   *  ferry's on a trip that starts with one. */
   departureAt: number;
   /** Boarding station, named in the notification copy. */
   fromStation: Station;
+  /** The trip starts with the SF ferry. */
+  byFerry: boolean;
   tripNumber: number;
   currentTime: Date;
   timeFormat: "12h" | "24h";
@@ -53,6 +57,7 @@ export function ReminderDialog({
   onClose,
   departureAt,
   fromStation,
+  byFerry,
   tripNumber,
   currentTime,
   timeFormat,
@@ -92,16 +97,16 @@ export function ReminderDialog({
   const alarmAtLabel = formatClockTime(alarmAt, timeFormat, i18n.language);
 
   const buildText = useCallback(
-    (lead: number) => ({
-      title: t("departureReminder.notificationTitle", { station: fromStation }),
-      body: t("departureReminder.notificationBody", {
+    (lead: number) =>
+      buildReminderText(t, i18n.language, {
         leadMinutes: lead,
-        station: fromStation,
-        time: formatClockTime(departureAt, timeFormat, i18n.language),
-        trip: tripNumber,
+        departureAt,
+        fromStation,
+        tripNumber,
+        byFerry,
+        timeFormat,
       }),
-    }),
-    [departureAt, fromStation, i18n.language, t, timeFormat, tripNumber],
+    [byFerry, departureAt, fromStation, i18n.language, t, timeFormat, tripNumber],
   );
 
   const handleSet = useCallback(async () => {
@@ -165,7 +170,11 @@ export function ReminderDialog({
                 {t("departureReminder.tooLateTitle")}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {t("departureReminder.tooLateBody")}
+                {t(
+                  byFerry
+                    ? "departureReminder.ferryTooLateBody"
+                    : "departureReminder.tooLateBody",
+                )}
               </p>
             </div>
           </div>
@@ -230,7 +239,12 @@ export function ReminderDialog({
                     {t("departureReminder.warningTitle")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {t("departureReminder.warningBody", { count: clamped })}
+                    {t(
+                      byFerry
+                        ? "departureReminder.ferryWarningBody"
+                        : "departureReminder.warningBody",
+                      { count: clamped },
+                    )}
                   </p>
                 </div>
               </div>

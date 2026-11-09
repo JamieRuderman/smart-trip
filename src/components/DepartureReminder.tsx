@@ -17,16 +17,18 @@ import {
   tripServesLeg,
 } from "@/lib/scheduleUtils";
 import {
-  anchorLiveTime,
-  focusedDepartureInstant,
+  focusedBoardingInstant,
+  focusedPlaces,
   isFocusedTripToday,
+  keepsFerry,
   replacementRun,
   sameFocusIdentity,
   type FocusedRun,
 } from "@/lib/focusedTrip";
+import { SAN_FRANCISCO, legPlaces } from "@/lib/places";
 import { reminderLeadRange } from "@/lib/reminderLead";
+import { buildReminderText } from "@/lib/reminderText";
 import {
-  formatClockTime,
   parseServiceDate,
   parseTimeToMinutes,
   toLocalDateKey,
@@ -41,6 +43,8 @@ interface DepartureReminderProps {
   tripNumber: number;
   fromStation: Station;
   toStation: Station;
+  /** The leg's Larkspur end continues by ferry to or from San Francisco. */
+  viaFerry: boolean;
   /** Scheduled departure time as "HH:MM". */
   departureTime: string;
   /** Live override; takes precedence over the scheduled time when set. */
@@ -113,6 +117,7 @@ export function DepartureReminder({
   tripNumber,
   fromStation,
   toStation,
+  viaFerry,
   departureTime,
   liveDepartureTime,
   arrivalTime,
@@ -138,7 +143,25 @@ export function DepartureReminder({
     [otherDayServiceDate, currentTime],
   );
 
-  const effectiveTime = liveDepartureTime ?? departureTime;
+  const legTrip = useMemo(
+    () =>
+      getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).find(
+        (trip) => trip.trip === tripNumber,
+      ),
+    [fromStation, toStation, scheduleType, viaFerry, tripNumber],
+  );
+
+  // Whether this view's departureTime is the train's departure from
+  // fromStation. The line map shows a train from a mid-corridor station (the
+  // one it last served, or a tapped arrival's) but keeps the corridor origin's
+  // times, so there departureAt is NOT a departure from fromStation.
+  const viewLeavesFromStation = legTrip?.departureTime === departureTime;
+
+  const ferryDepartureTime = viewLeavesFromStation
+    ? legTrip?.inboundFerry?.depart
+    : undefined;
+
+  const effectiveTime = ferryDepartureTime ?? liveDepartureTime ?? departureTime;
   const departureAt = useMemo(
     () => buildDepartureTimestamp(anchorTime, effectiveTime),
     [anchorTime, effectiveTime]
@@ -147,6 +170,7 @@ export function DepartureReminder({
   const {
     fromStation: homeFromStation,
     toStation: homeToStation,
+    viaFerry: homeViaFerry,
     focusedTrip,
     focusTrip,
     rescheduleReminder,
@@ -162,18 +186,6 @@ export function DepartureReminder({
   // control always agrees with the sheet's "My Trip" header.
   const thisFocus = isFocused ? focusedTrip : null;
   const isThisTripFocused = thisFocus != null;
-
-  // Whether this view's departureTime is the train's departure from
-  // fromStation. The line map shows a train from a mid-corridor station (the
-  // one it last served, or a tapped arrival's) but keeps the corridor origin's
-  // times, so there departureAt is NOT a departure from fromStation.
-  const viewLeavesFromStation = useMemo(
-    () =>
-      getFilteredTrips(fromStation, toStation, scheduleType).find(
-        (trip) => trip.trip === tripNumber,
-      )?.departureTime === departureTime,
-    [fromStation, toStation, scheduleType, tripNumber, departureTime],
-  );
 
   // When the displayed schedule is today's service, anchor to the
   // (rollover-aware) displayed departure date. When it's a different service
@@ -205,7 +217,7 @@ export function DepartureReminder({
       thisFocus &&
       (otherDayServiceDate != null || !isFocusedTripToday(thisFocus, currentTime))
     ) {
-      return focusedDepartureInstant(thisFocus) ?? departureAt;
+      return focusedBoardingInstant(thisFocus) ?? departureAt;
     }
     return departureAt;
   }, [thisFocus, otherDayServiceDate, departureAt, currentTime]);
@@ -224,13 +236,30 @@ export function DepartureReminder({
     if (
       homeFromStation &&
       homeToStation &&
-      (homeFromStation !== fromStation || homeToStation !== toStation) &&
-      tripServesLeg(tripNumber, homeFromStation, homeToStation, scheduleType)
+      (homeFromStation !== fromStation ||
+        homeToStation !== toStation ||
+        homeViaFerry !== viaFerry) &&
+      tripServesLeg(tripNumber, homeFromStation, homeToStation, scheduleType, homeViaFerry)
     ) {
-      return { ...run, fromStation: homeFromStation, toStation: homeToStation };
+      return {
+        ...run,
+        fromStation: homeFromStation,
+        toStation: homeToStation,
+        ...(homeViaFerry ? { viaFerry: true as const } : {}),
+      };
     }
-    return { ...run, fromStation, toStation };
-  }, [homeFromStation, homeToStation, fromStation, toStation, tripNumber, scheduleType, serviceDate]);
+    return { ...run, fromStation, toStation, ...(viaFerry ? { viaFerry: true as const } : {}) };
+  }, [
+    homeFromStation,
+    homeToStation,
+    homeViaFerry,
+    fromStation,
+    toStation,
+    viaFerry,
+    tripNumber,
+    scheduleType,
+    serviceDate,
+  ]);
 
   // When focusRun leaves its boarding station: this view's live time when it
   // starts there on today's service; else the run's scheduled time on its
@@ -240,15 +269,20 @@ export function DepartureReminder({
   // today.
   const focusRunDepartureAt = useMemo(() => {
     const today = !otherDayServiceDate;
-    if (today && viewLeavesFromStation && focusRun.fromStation === fromStation) {
+    if (
+      today &&
+      viewLeavesFromStation &&
+      focusRun.fromStation === fromStation &&
+      (focusRun.viaFerry === true) === viaFerry
+    ) {
       return departureAt;
     }
-    const scheduled = focusedDepartureInstant(focusRun);
     const live = today ? liveStopDepartures?.[focusRun.fromStation] : undefined;
-    return scheduled != null && live ? anchorLiveTime(scheduled, live) : scheduled;
+    return focusedBoardingInstant(focusRun, live);
   }, [
     focusRun,
     fromStation,
+    viaFerry,
     viewLeavesFromStation,
     otherDayServiceDate,
     departureAt,
@@ -257,13 +291,16 @@ export function DepartureReminder({
 
   // Check the rider's location against the boarding station before focusing —
   // only for their own journey (the line map's corridor view starts at a
-  // terminus most riders don't board at).
+  // terminus most riders don't board at), and not when it starts with the
+  // ferry, which they board in San Francisco.
   const isHomeLeg =
     focusRun.fromStation === homeFromStation && focusRun.toStation === homeToStation;
+  const startsByFerry = focusedPlaces(focusRun).from === SAN_FRANCISCO;
   const boardingCheck = useBoardingLocationCheck({
     from: focusRun.fromStation,
     to: focusRun.toStation,
-    departureAt: !isHomeLeg || isThisTripFocused ? null : focusRunDepartureAt,
+    departureAt:
+      !isHomeLeg || isThisTripFocused || startsByFerry ? null : focusRunDepartureAt,
     now: currentTime.getTime(),
     active: sheetOpen,
   });
@@ -315,8 +352,9 @@ export function DepartureReminder({
   };
 
   const switchStations = ({ from, to }: Leg) => {
-    setFromStation(from);
-    setToStation(to);
+    const places = legPlaces(from, to, keepsFerry(focusRun, from, to));
+    setFromStation(places.from);
+    setToStation(places.to);
   };
 
   // Commit to `next`: switch to its stations, if any, then focus it.
@@ -364,17 +402,18 @@ export function DepartureReminder({
     onClose();
   };
 
+  const byFerry = ferryDepartureTime != null;
   const buildText = useCallback(
-    (leadMinutes: number) => ({
-      title: t("departureReminder.notificationTitle", { station: fromStation }),
-      body: t("departureReminder.notificationBody", {
+    (leadMinutes: number) =>
+      buildReminderText(t, i18n.language, {
         leadMinutes,
-        station: fromStation,
-        time: formatClockTime(reminderDepartureAt, timeFormat, i18n.language),
-        trip: tripNumber,
+        departureAt: reminderDepartureAt,
+        fromStation,
+        tripNumber,
+        byFerry,
+        timeFormat,
       }),
-    }),
-    [reminderDepartureAt, fromStation, i18n.language, t, timeFormat, tripNumber]
+    [reminderDepartureAt, fromStation, byFerry, i18n.language, t, timeFormat, tripNumber]
   );
 
   // Live drift: when this focused trip has a reminder and the live departure
@@ -401,6 +440,7 @@ export function DepartureReminder({
       ...confirmSwitch.run,
       fromStation: focusedTrip.fromStation,
       toStation: focusedTrip.toStation,
+      viaFerry: focusedTrip.viaFerry,
     });
 
   // The "switch trains?" confirm dialog. Portals out of the gutter row. Cancel
@@ -413,10 +453,10 @@ export function DepartureReminder({
         switchesLegOnly && focusedTrip
           ? t("focusedTrip.switchLegBody", {
               trip: focusedTrip.tripNumber,
-              from: focusedTrip.fromStation,
-              to: focusedTrip.toStation,
-              nextFrom: confirmSwitch.run.fromStation,
-              nextTo: confirmSwitch.run.toStation,
+              from: focusedPlaces(focusedTrip).from,
+              to: focusedPlaces(focusedTrip).to,
+              nextFrom: focusedPlaces(confirmSwitch.run).from,
+              nextTo: focusedPlaces(confirmSwitch.run).to,
             })
           : t("focusedTrip.switchBody", {
               current: focusedTrip?.tripNumber,

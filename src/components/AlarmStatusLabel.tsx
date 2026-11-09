@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Clock, MapPin } from "lucide-react";
+import { Clock, MapPin, Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CountdownLabel } from "./CountdownLabel";
 import { LeaveLabel } from "./LeaveLabel";
@@ -31,7 +31,12 @@ export function AlarmStatusLabel({
       status.kind === "departure-countdown" &&
       status.minutesUntilDeparture != null
     ) {
-      return <CountdownLabel minutesUntil={status.minutesUntilDeparture} />;
+      return (
+        <CountdownLabel
+          minutesUntil={status.minutesUntilDeparture}
+          ferry={status.byFerry}
+        />
+      );
     }
 
     if (
@@ -59,8 +64,8 @@ export function AlarmStatusLabel({
   );
 }
 
-/** The glyph that leads an alarm status: walk (leave), train (departs), pin
- *  (arrives), or a clock for the message states. */
+/** The glyph that leads an alarm status: walk (leave), train or ferry
+ *  (departs), pin (arrives), or a clock for the message states. */
 export function AlarmStatusIcon({
   status,
   className,
@@ -72,7 +77,9 @@ export function AlarmStatusIcon({
     status.kind === "leave-countdown"
       ? WalkIcon
       : status.kind === "departure-countdown"
-        ? TripIcon
+        ? status.byFerry
+          ? Ship
+          : TripIcon
         : status.kind === "arrival-countdown"
           ? MapPin
           : Clock;

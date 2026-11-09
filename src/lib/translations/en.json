@@ -22,6 +22,7 @@
     "startStation": "Departing",
     "endStation": "Arriving",
     "nearYou": "Near you",
+    "viaLarkspurFerry": "via Larkspur ferry",
     "useMyLocation": "Use my location"
   },
   "scheduleDaySwitch": {
@@ -133,7 +134,17 @@
     "inbound": "Inbound",
     "outbound": "Outbound",
     "larkspur": "Lark",
-    "sanFrancisco": "SF"
+    "sanFrancisco": "SF",
+    "toSanFrancisco": "Ferry to San Francisco",
+    "fromSanFrancisco": "Ferry from San Francisco",
+    "sfTerminal": "SF Ferry Building",
+    "larkspurTerminal": "Larkspur Ferry Terminal",
+    "gate": "Gate {{gate}}",
+    "rideMinutes": "{{minutes}} min ride",
+    "nextFerry": "Next ferry",
+    "earlierFerry": "Earlier ferry",
+    "lastFerry": "Last ferry of the day",
+    "goldenGateSchedule": "Golden Gate Ferry schedule"
   },
   "tripCard": {
     "nextTrain": "Next train",
@@ -192,12 +203,18 @@
     "setStation": "Set",
     "clearStation": "Clear",
     "inMinutes": "in {{minutes}} min",
+    "inHoursMinutes": "in {{hours}}h {{minutes}}m",
     "nowArriving": "now",
     "setAsDepartureAria": "Set as departure",
     "setAsDestinationAria": "Set as destination",
     "clearDepartureAria": "Clear departure",
     "clearDestinationAria": "Clear destination",
-    "openTripAria": "Open trip {{trip}} to {{terminus}}"
+    "openTripAria": "Open trip {{trip}} to {{terminus}}",
+    "ferryLabel": "Golden Gate Ferry",
+    "ferryTerminalAria": "San Francisco ferry terminal info",
+    "nextFerries": "Next ferries to Larkspur",
+    "noMoreFerries": "No more ferries today.",
+    "arrivesLarkspur": "arrives Larkspur {{time}}"
   },
   "departureReminder": {
     "setReminder": "Add reminder",
@@ -225,8 +242,12 @@
     "warningBody_other": "Only {{count}} min before the train leaves — make sure that's enough time to get there.",
     "tooLateTitle": "Too close to departure",
     "tooLateBody": "This train leaves too soon to set a reminder.",
+    "ferryWarningBody_one": "Only {{count}} min before the ferry leaves — make sure that's enough time to get there.",
+    "ferryWarningBody_other": "Only {{count}} min before the ferry leaves — make sure that's enough time to get there.",
+    "ferryTooLateBody": "This ferry leaves too soon to set a reminder.",
     "notificationTitle": "Leave for {{station}}",
     "notificationBody": "Train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before).",
+    "ferryNotificationBody": "The ferry for train {{trip}} departs at {{time}} — leave now to catch it ({{leadMinutes}} min before).",
     "alarmStop": "Stop",
     "alarmViewTrip": "View trip"
   },
@@ -280,6 +301,8 @@
   "tracker": {
     "departsInHoursMinutes": "Departs in {{hours}}h {{minutes}}m",
     "departsInMinutes": "Departs in {{minutes}} min",
+    "ferryDepartsInMinutes": "Ferry departs in {{minutes}} min",
+    "ferryDepartsInHoursMinutes": "Ferry departs in {{hours}}h {{minutes}}m",
     "leaveInHoursMinutes": "Leave in {{hours}}h {{minutes}}m",
     "leaveInMinutes": "Leave in {{minutes}} min",
     "leaveNow": "Leave now",

@@ -52,6 +52,7 @@ export function useFocusedTrip() {
         tripNumber: input.tripNumber,
         fromStation: input.fromStation,
         toStation: input.toStation,
+        ...(input.viaFerry ? { viaFerry: true as const } : {}),
         scheduleType: input.scheduleType,
         serviceDate: input.serviceDate,
         reminder: null,

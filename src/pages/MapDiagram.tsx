@@ -6,7 +6,8 @@ import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
-import { validStation, getClosestStation } from "@/lib/stationUtils";
+import { getClosestStation } from "@/lib/stationUtils";
+import { SAN_FRANCISCO, validPlace, type Place } from "@/lib/places";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
@@ -22,6 +23,7 @@ import {
 } from "@/components/MapTripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import { StationInfoSheet } from "@/components/StationInfoSheet";
+import { FerryTerminalSheet } from "@/components/FerryTerminalSheet";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
 
@@ -33,14 +35,14 @@ export default function MapDiagram() {
   const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
 
   const {
-    fromStation: fromSelection,
-    toStation: toSelection,
+    fromPlace: fromSelection,
+    toPlace: toSelection,
     setFromStation,
     setToStation,
     focusedTrip,
   } = useStationSelection();
-  const fromStation = validStation(fromSelection);
-  const toStation = validStation(toSelection);
+  const fromStation = validPlace(fromSelection);
+  const toStation = validPlace(toSelection);
 
   const { lat: userLat, lng: userLng } = useGeolocation({
     watch: true,
@@ -87,7 +89,7 @@ export default function MapDiagram() {
   }, []);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [stationSheet, setStationSheet] = useState<Station | null>(null);
+  const [stationSheet, setStationSheet] = useState<Place | null>(null);
   const [stationSheetOpen, setStationSheetOpen] = useState(false);
   const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -147,8 +149,8 @@ export default function MapDiagram() {
     }, SHEET_TRANSITION_MS);
   }, []);
 
-  const handleStationClick = useCallback((station: Station) => {
-    setStationSheet(station);
+  const handleStationClick = useCallback((place: Place) => {
+    setStationSheet(place);
   }, []);
 
   useEffect(() => {
@@ -192,7 +194,7 @@ export default function MapDiagram() {
   // The context setters already drop the other endpoint when the new one
   // collides — see StationSelectionContext.
   const handleSetFrom = useCallback(
-    (s: Station) => {
+    (s: Place) => {
       setFromStation(s);
       closeStationSheet();
     },
@@ -200,7 +202,7 @@ export default function MapDiagram() {
   );
 
   const handleSetTo = useCallback(
-    (s: Station) => {
+    (s: Place) => {
       setToStation(s);
       closeStationSheet();
     },
@@ -250,7 +252,21 @@ export default function MapDiagram() {
         </div>
       </MapDiagramFrame>
 
-      {stationSheet && (
+      {stationSheet === SAN_FRANCISCO && (
+        <FerryTerminalSheet
+          isOpen={stationSheetOpen}
+          onClose={closeStationSheet}
+          currentTime={currentTime}
+          fromStation={fromStation}
+          toStation={toStation}
+          onSetFrom={handleSetFrom}
+          onSetTo={handleSetTo}
+          onClearFrom={handleClearFrom}
+          onClearTo={handleClearTo}
+        />
+      )}
+
+      {stationSheet && stationSheet !== SAN_FRANCISCO && (
         <StationInfoSheet
           isOpen={stationSheetOpen}
           onClose={closeStationSheet}

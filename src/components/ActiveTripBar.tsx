@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useOpenTripView } from "@/hooks/useTripViewNavigation";
+import { focusedPlaces } from "@/lib/focusedTrip";
 import { AlarmStatusIcon, AlarmStatusLabel } from "./AlarmStatusLabel";
 import { MyTripGate } from "./MyTripGate";
 
@@ -19,6 +20,7 @@ export function ActiveTripBar({ currentTime }: { currentTime: Date }) {
   const { focusedTrip } = useStationSelection();
   const openTripView = useOpenTripView();
   if (!focusedTrip) return null;
+  const places = focusedPlaces(focusedTrip);
 
   return (
     <MyTripGate focusedTrip={focusedTrip} currentTime={currentTime}>
@@ -68,7 +70,7 @@ export function ActiveTripBar({ currentTime }: { currentTime: Date }) {
                   {" · "}
                   {t("myTrip.trainNumber", { trip: trip.trip })}
                   {" · "}
-                  {focusedTrip.fromStation} → {focusedTrip.toStation}
+                  {places.from} → {places.to}
                 </span>
               </span>
               <ChevronRight

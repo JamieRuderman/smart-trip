@@ -9,7 +9,7 @@ This project is not affiliated with Sonoma-Marin Area Rail Transit.
 - Static SMART train schedules with weekday and weekend service views
 - Live trip updates from SMART GTFS-Realtime data, including delays, cancellations, and skipped stops when available
 - Live SMART service alerts with unread state stored locally on-device
-- Ferry connections for Larkspur trips
+- San Francisco trips via the Larkspur ferry, with ferry times and transfers
 - Closest-station selection using device location
 - Trip detail sheets with GPS-assisted distance-to-stop messaging and better in-motion progress inference
 - A full-page My Trip view for the train you're taking: live position along your leg, leave/departs/arrives countdowns, reminders, and every stop — opened by "Take this train" and on launch, with an in-progress bar on the schedule to get back to it

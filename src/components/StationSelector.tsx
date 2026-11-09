@@ -3,6 +3,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -15,71 +16,57 @@ import {
   LocateFixed,
   Loader2,
 } from "lucide-react";
-import { getAllStations, hasFerryConnection } from "@/lib/stationUtils";
+import { getAllStations, getStationIndex } from "@/lib/stationUtils";
+import { SAN_FRANCISCO, placeStation, type Place } from "@/lib/places";
 import type { Station } from "@/types/smartSchedule";
 import { PillBadge } from "./PillBadge";
 import { useTranslation } from "react-i18next";
 
 export type StationSelectorProps = {
-  fromStation: Station | "";
-  toStation: Station | "";
-  onFromStationChange: (station: Station) => void;
-  onToStationChange: (station: Station) => void;
+  fromStation: Place | "";
+  toStation: Place | "";
+  onFromStationChange: (place: Place) => void;
+  onToStationChange: (place: Place) => void;
   onSwapStations: () => void;
   closestStation?: Station | null;
   locationLoading?: boolean;
   onRequestLocation?: () => void;
 };
 
-// Reusable component for displaying station name with ferry icon
-const StationWithFerry = ({
-  station,
-  direction,
-}: {
-  station: string;
-  direction: "southbound" | "northbound";
-}) => (
+const PlaceName = ({ place }: { place: Place }) => (
   <div className="flex items-center gap-2">
-    <span>{station}</span>
-    {hasFerryConnection(station) && (
-      <>
-        <span className="text-muted-foreground">
-          {direction === "southbound" ? "←" : "→"}
-        </span>
-        <Ship className="h-4 w-4 ml-1" />
-      </>
-    )}
+    <span>{place}</span>
+    {place === SAN_FRANCISCO && <Ship className="h-4 w-4" aria-hidden="true" />}
   </div>
 );
 
-// Custom SelectItem that handles ferry stations properly
-const StationSelectItem = ({
-  station,
-  direction,
+const PlaceSelectItem = ({
+  place,
+  ferryHint,
   badge,
   gutterIcon,
   ...props
 }: {
-  station: string;
-  direction: "southbound" | "northbound";
+  place: Place;
+  /** Subtitle under San Francisco. */
+  ferryHint: string;
   badge?: React.ReactNode;
   gutterIcon?: React.ReactNode;
-} & React.ComponentProps<typeof SelectItem>) => (
-  <SelectItem {...props}>
+} & Omit<React.ComponentProps<typeof SelectItem>, "value">) => (
+  <SelectItem value={place} {...props}>
     {gutterIcon && (
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
         {gutterIcon}
       </span>
     )}
     <div className="flex items-center w-full">
-      <span>{station}</span>
-      {hasFerryConnection(station) && (
-        <>
-          <span className="text-muted-foreground ml-2">
-            {direction === "southbound" ? "←" : "→"}
-          </span>
-          <Ship className="h-4 w-4 ml-2" />
-        </>
+      {place === SAN_FRANCISCO ? (
+        <span className="flex flex-col">
+          <PlaceName place={place} />
+          <span className="text-xs text-muted-foreground">{ferryHint}</span>
+        </span>
+      ) : (
+        <span>{place}</span>
       )}
       {badge}
     </div>
@@ -99,22 +86,66 @@ export function StationSelector({
   // Show location button whenever a handler is provided — on all platforms
   const showLocationButton = !!onRequestLocation;
   const { t } = useTranslation();
-  const stations = getAllStations();
+  const places: Place[] = getAllStations();
+  const ferryHint = t("header.viaLarkspurFerry");
+  const lineIndex = (place: Place | "") =>
+    place ? getStationIndex(placeStation(place)) : -1;
 
-  // Clear the other station if it's selected in this dropdown
-  const handleFromStationChange = (station: Station) => {
-    onFromStationChange(station);
-    if (station === toStation) {
-      onToStationChange("" as Station);
-    }
-  };
+  const item = (
+    place: Place,
+    other: Place | "",
+    otherLabel: string,
+    otherIcon: React.ReactNode,
+  ) => (
+    <PlaceSelectItem
+      key={place}
+      place={place}
+      ferryHint={ferryHint}
+      role="option"
+      className={place === other ? "text-primary" : ""}
+      gutterIcon={place === other ? otherIcon : undefined}
+      badge={
+        <>
+          {place === other && (
+            <PillBadge label={otherLabel} color="ontime" className="ml-2" />
+          )}
+          {place === closestStation && (
+            <PillBadge
+              label={t("header.nearYou")}
+              color="ontime"
+              className="ml-2"
+            />
+          )}
+        </>
+      }
+    />
+  );
 
-  const handleToStationChange = (station: Station) => {
-    onToStationChange(station);
-    if (station === fromStation) {
-      onFromStationChange("" as Station);
-    }
-  };
+  const fromItem = (place: Place) =>
+    item(
+      place,
+      toStation,
+      t("header.endStation"),
+      lineIndex(toStation) > lineIndex(fromStation) ? (
+        <CornerDownRight
+          className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
+          style={{ strokeWidth: 3 }}
+        />
+      ) : (
+        <CornerUpRight
+          className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
+          style={{ strokeWidth: 3 }}
+        />
+      ),
+    );
+
+  const toItem = (place: Place) =>
+    item(
+      place,
+      fromStation,
+      t("header.startStation"),
+      <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />,
+    );
 
   return (
     <div className="flex items-center gap-3 mb-2">
@@ -130,13 +161,13 @@ export function StationSelector({
 
       {/* Station Selectors */}
       <div className="flex-1 min-w-0 space-y-3">
-        <Select value={fromStation} onValueChange={handleFromStationChange}>
+        <Select value={fromStation} onValueChange={onFromStationChange}>
           <SelectTrigger
             className="h-11"
             aria-label={t("header.selectDepartureStation")}
           >
             {fromStation ? (
-              <StationWithFerry station={fromStation} direction="southbound" />
+              <PlaceName place={fromStation} />
             ) : (
               <SelectValue placeholder={t("header.departure")} />
             )}
@@ -145,60 +176,19 @@ export function StationSelector({
             role="listbox"
             aria-label={t("header.availableStations")}
           >
-            {stations.map((station) => (
-              <StationSelectItem
-                key={station}
-                station={station}
-                value={station}
-                role="option"
-                direction="southbound"
-                className={station === toStation ? "text-primary" : ""}
-                gutterIcon={
-                  station === toStation ? (
-                    stations.indexOf(toStation as Station) >
-                    stations.indexOf(fromStation as Station) ? (
-                      <CornerDownRight
-                        className="mt-1 ml-1 h-3 w-3 flex-shrink-0"
-                        style={{ strokeWidth: 3 }}
-                      />
-                    ) : (
-                      <CornerUpRight
-                        className="mt-2 ml-1 h-3 w-3 flex-shrink-0"
-                        style={{ strokeWidth: 3 }}
-                      />
-                    )
-                  ) : undefined
-                }
-                badge={
-                  <>
-                    {station === toStation && (
-                      <PillBadge
-                        label={t("header.endStation")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                    {station === closestStation && (
-                      <PillBadge
-                        label={t("header.nearYou")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                  </>
-                }
-              />
-            ))}
+            {places.map(fromItem)}
+            <SelectSeparator />
+            {fromItem(SAN_FRANCISCO)}
           </SelectContent>
         </Select>
 
-        <Select value={toStation} onValueChange={handleToStationChange}>
+        <Select value={toStation} onValueChange={onToStationChange}>
           <SelectTrigger
             className="h-11"
             aria-label={t("header.selectArrivalStation")}
           >
             {toStation ? (
-              <StationWithFerry station={toStation} direction="northbound" />
+              <PlaceName place={toStation} />
             ) : (
               <SelectValue placeholder={t("header.destination")} />
             )}
@@ -207,39 +197,9 @@ export function StationSelector({
             role="listbox"
             aria-label={t("header.availableStations")}
           >
-            {stations.map((station) => (
-              <StationSelectItem
-                key={station}
-                station={station}
-                value={station}
-                role="option"
-                direction="northbound"
-                className={station === fromStation ? "text-primary" : ""}
-                gutterIcon={
-                  station === fromStation ? (
-                    <MapPin className="mt-1 ml-1.5 h-5 w-5 mr-1.5 flex-shrink-0" />
-                  ) : undefined
-                }
-                badge={
-                  <>
-                    {station === fromStation && (
-                      <PillBadge
-                        label={t("header.startStation")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                    {station === closestStation && (
-                      <PillBadge
-                        label={t("header.nearYou")}
-                        color="ontime"
-                        className="ml-2"
-                      />
-                    )}
-                  </>
-                }
-              />
-            ))}
+            {places.map(toItem)}
+            <SelectSeparator />
+            {toItem(SAN_FRANCISCO)}
           </SelectContent>
         </Select>
       </div>

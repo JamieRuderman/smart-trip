@@ -15,7 +15,7 @@ import { AT_STOP_THRESHOLD_MI } from "@/lib/tripConstants";
 import { useNow } from "@/hooks/useNow";
 import { useTripDetailModel } from "@/hooks/useTripDetailModel";
 import { StopTimeline } from "./StopTimeline";
-import { FerryConnection } from "./FerryConnection";
+import { FerryLeg } from "./FerryLeg";
 import { GutterRow } from "./GutterRow";
 import { LiveTimePair } from "./LiveTimePair";
 import { QuickConnectionWarning } from "./QuickConnectionWarning";
@@ -36,7 +36,6 @@ export interface TripDetailContentProps {
   realtimeStatus?: TripRealtimeStatus | null;
   timeFormat: "12h" | "24h";
   isNextTrip: boolean;
-  showFerry: boolean;
   /** Whether the hosting sheet is open — false while it animates closed. */
   isOpen: boolean;
   onClose: () => void;
@@ -68,7 +67,6 @@ export function TripDetailContent({
   lastUpdated,
   realtimeStatus,
   timeFormat,
-  showFerry,
   isOpen,
   onClose,
   progress,
@@ -119,7 +117,6 @@ export function TripDetailContent({
     speedMph,
     hasQuickConnection,
     trainOption,
-    showInboundFerry,
     alarmStatus,
     isAtDestination: alarmAtDestination,
   } = useTripDetailModel({
@@ -129,7 +126,6 @@ export function TripDetailContent({
     currentTime,
     lastUpdated,
     realtimeStatus,
-    showFerry,
     progress,
     isFocused,
   });
@@ -364,6 +360,7 @@ export function TripDetailContent({
             tripNumber={trip.trip}
             fromStation={fromStation}
             toStation={toStation}
+            viaFerry={trip.inboundFerry != null || trip.outboundFerry != null}
             departureTime={trip.departureTime}
             liveDepartureTime={realtimeStatus?.liveDepartureTime ?? null}
             arrivalTime={trip.arrivalTime}
@@ -386,6 +383,24 @@ export function TripDetailContent({
         data-sheet-scroll-area="true"
         className="flex-1 overflow-y-auto overscroll-contain px-4 pt-1 pb-6"
       >
+        {trip.inboundFerry && (
+          <div className="mb-3 pb-3 border-b border-border">
+            {/* Tight ferry → train transfer ("take a later train"). A leg can't
+                both start and end at the terminal, so this never doubles the
+                outbound warning below. */}
+            {hasQuickConnection && !isCanceledOrSkipped && (
+              <QuickConnectionWarning trainOption={trainOption} />
+            )}
+            <FerryLeg
+              ferry={trip.inboundFerry}
+              trainTime={departureTime}
+              scheduleType={scheduleType}
+              timeFormat={timeFormat}
+              inbound
+            />
+          </div>
+        )}
+
         <StopTimeline
           trip={trip}
           fromStation={fromStation}
@@ -400,34 +415,17 @@ export function TripDetailContent({
           isFocused={isFocused}
         />
 
-        {showFerry && trip.outboundFerry && (
+        {trip.outboundFerry && (
           <div className="mt-3 pt-3 border-t border-border">
             {/* Quick connection warning — sits between the divider and ferry times */}
             {hasQuickConnection && !isCanceledOrSkipped && (
               <QuickConnectionWarning trainOption={trainOption} />
             )}
-            <FerryConnection
+            <FerryLeg
               ferry={trip.outboundFerry}
-              trainArrivalTime={arrivalTime}
+              trainTime={arrivalTime}
+              scheduleType={scheduleType}
               timeFormat={timeFormat}
-              fullLeg
-            />
-          </div>
-        )}
-        {showInboundFerry && trip.inboundFerry && (
-          <div className="mt-3 pt-3 border-t border-border">
-            {/* Tight ferry → train transfer ("take a later train"). A leg can't
-                both start and end at the terminal, so this never doubles the
-                outbound warning above. */}
-            {hasQuickConnection && !isCanceledOrSkipped && (
-              <QuickConnectionWarning trainOption={trainOption} />
-            )}
-            <FerryConnection
-              ferry={trip.inboundFerry}
-              trainDepartureTime={departureTime}
-              timeFormat={timeFormat}
-              inbound
-              fullLeg
             />
           </div>
         )}

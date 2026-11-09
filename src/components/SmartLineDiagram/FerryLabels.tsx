@@ -12,9 +12,14 @@ interface FerryLabelsProps {
   tx: number;
   ty: number;
   scale: number;
-  /** When true (Larkspur is outside the selected range), dim "San Francisco"
-   *  to match Larkspur's muted state. */
+  /** When true (a trip is selected that doesn't ride the ferry), dim "San
+   *  Francisco" to match the muted track. */
   muted?: boolean;
+  /** Count down to the next ferry leaving San Francisco rather than Larkspur —
+   *  for a trip that starts there. */
+  inbound?: boolean;
+  /** Makes "San Francisco" tappable, like a station label. */
+  onClick?: () => void;
 }
 
 /**
@@ -32,9 +37,11 @@ export function FerryLabels({
   ty,
   scale,
   muted = false,
+  inbound = false,
+  onClick,
 }: FerryLabelsProps) {
   const { t } = useTranslation();
-  const ferry = getNextFerryDeparture(now);
+  const ferry = getNextFerryDeparture(now, inbound);
   const nowMinutes = minutesOfDay(now);
   const minsUntil = ferry
     ? Math.max(0, parseTimeToMinutes(ferry.depart) - nowMinutes)
@@ -65,7 +72,16 @@ export function FerryLabels({
         fontWeight={TOKEN.ferryNameWeight}
         fill={muted ? TOKEN.mutedTrack : undefined}
         className={muted ? undefined : "fill-foreground"}
-        style={{ fontFamily: FONT_FAMILY }}
+        pointerEvents={onClick ? "auto" : "none"}
+        style={{ fontFamily: FONT_FAMILY, cursor: onClick ? "pointer" : "default" }}
+        onClick={
+          onClick
+            ? (e) => {
+                e.stopPropagation();
+                onClick();
+              }
+            : undefined
+        }
       >
         {t("mapDiagram.sanFrancisco")}
       </text>

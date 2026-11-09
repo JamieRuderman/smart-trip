@@ -9,6 +9,8 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import { armWebTimer } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
+import { FERRY_CONSTANTS } from "@/lib/fareConstants";
+import { legPlaces, type Place } from "@/lib/places";
 import { parseTimeToMinutes, toLocalDateKey } from "@/lib/timeUtils";
 import { FOCUS_ARRIVAL_EVICT_GRACE_MIN } from "@/lib/tripConstants";
 
@@ -38,6 +40,9 @@ export interface FocusedTrip {
   tripNumber: number;
   fromStation: Station;
   toStation: Station;
+  /** The rider picked San Francisco for the leg's Larkspur end, so the trip
+   *  starts or ends with the ferry there. */
+  viaFerry?: true;
   scheduleType: "weekday" | "weekend";
   /** "YYYY-MM-DD" — the run's service day. The only stored temporal anchor;
    *  departure/arrival are derived from static schedule + this date. */
@@ -86,13 +91,20 @@ export function focusedTripIsLeg(
   fromStation: Station,
   toStation: Station,
   scheduleType: "weekday" | "weekend",
+  viaFerry = false,
 ): focused is FocusedTrip {
   return (
     focused != null &&
     focused.fromStation === fromStation &&
     focused.toStation === toStation &&
+    (focused.viaFerry === true) === viaFerry &&
     focused.scheduleType === scheduleType
   );
+}
+
+/** The ends the rider picked for a run — San Francisco at a ferry end. */
+export function focusedPlaces(focused: FocusedRun): { from: Place; to: Place } {
+  return legPlaces(focused.fromStation, focused.toStation, focused.viaFerry === true);
 }
 
 /**
@@ -100,7 +112,7 @@ export function focusedTripIsLeg(
  * `key` so per-trip state (refs, latches) resets when the user switches trips.
  */
 export function focusedTripKey(focused: FocusedTrip): string {
-  return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}`;
+  return `${focused.tripNumber}-${focused.serviceDate}-${focused.fromStation}-${focused.toStation}${focused.viaFerry ? "-ferry" : ""}`;
 }
 
 /** Whether two runs are the same focus (train, service day, leg and schedule —
@@ -118,6 +130,7 @@ export function sameFocusIdentity(
     a.serviceDate === b.serviceDate &&
     a.fromStation === b.fromStation &&
     a.toStation === b.toStation &&
+    (a.viaFerry === true) === (b.viaFerry === true) &&
     a.scheduleType === b.scheduleType
   );
 }
@@ -181,6 +194,7 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.tripNumber === "number" &&
     typeof r.fromStation === "string" &&
     typeof r.toStation === "string" &&
+    (r.viaFerry === undefined || r.viaFerry === true) &&
     (r.scheduleType === "weekday" || r.scheduleType === "weekend") &&
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
@@ -236,7 +250,7 @@ function arrivalInstant(focused: FocusedTrip, trip: ProcessedTrip): number {
  *  read, so they also work for a leg that hasn't been focused yet. */
 export type FocusedRun = Pick<
   FocusedTrip,
-  "tripNumber" | "fromStation" | "toStation" | "scheduleType" | "serviceDate"
+  "tripNumber" | "fromStation" | "toStation" | "viaFerry" | "scheduleType" | "serviceDate"
 >;
 
 /**
@@ -249,6 +263,7 @@ export function reconstructFocusedTrip(focused: FocusedRun): ProcessedTrip | nul
     focused.fromStation,
     focused.toStation,
     focused.scheduleType,
+    focused.viaFerry === true,
   );
   return trips.find((t) => t.trip === focused.tripNumber) ?? null;
 }
@@ -264,6 +279,39 @@ export function focusedDepartureInstant(focused: FocusedRun): number | null {
   const trip = reconstructFocusedTrip(focused);
   if (!trip) return null;
   return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));
+}
+
+/**
+ * When the rider sets off on a focused trip (or a run about to be focused): the
+ * SF ferry's departure when the trip starts with one — fixed, since the ferry
+ * won't wait for a late train — else the train's departure, moved to
+ * `liveDepartureTime` when the feed has one. The instant leave reminders and the
+ * departure countdown anchor to. Null if the trip can't be reconstructed.
+ */
+export function focusedBoardingInstant(
+  focused: FocusedRun,
+  liveDepartureTime?: string | null,
+): number | null {
+  const trip = reconstructFocusedTrip(focused);
+  if (!trip) return null;
+  if (trip.inboundFerry) {
+    return serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.inboundFerry.depart));
+  }
+  const scheduled = serviceDateInstant(focused.serviceDate, hhmmToMinutes(trip.departureTime));
+  return liveDepartureTime ? anchorLiveTime(scheduled, liveDepartureTime) : scheduled;
+}
+
+/**
+ * Whether `run`'s San Francisco end survives a correction to `from → to`: it
+ * rides the ferry and its Larkspur end stays where it was — leaving from
+ * another station for SF, but not swapping ends.
+ */
+export function keepsFerry(run: FocusedRun, from: Station, to: Station): boolean {
+  if (run.viaFerry !== true) return false;
+  return (
+    (run.toStation === FERRY_CONSTANTS.FERRY_STATION && to === run.toStation) ||
+    (run.fromStation === FERRY_CONSTANTS.FERRY_STATION && from === run.fromStation)
+  );
 }
 
 /**
@@ -294,12 +342,20 @@ export function replacementRun(
   // same-direction leg can carry the same train.
   const sameDirection =
     isSouthbound(from, to) === isSouthbound(run.fromStation, run.toStation);
-  const onLeg = (tripNumber: number, departureAt: number) => ({
-    run: { ...run, tripNumber, fromStation: from, toStation: to },
+  const viaFerry = keepsFerry(run, from, to);
+  const onLeg = (tripNumber: number, departureAt: number): { run: FocusedRun; departureAt: number } => ({
+    run: {
+      tripNumber,
+      fromStation: from,
+      toStation: to,
+      ...(viaFerry ? { viaFerry: true as const } : {}),
+      scheduleType: run.scheduleType,
+      serviceDate: run.serviceDate,
+    },
     departureAt,
   });
   let best: { tripNumber: number; gap: number; at: number } | null = null;
-  for (const trip of getFilteredTrips(from, to, run.scheduleType)) {
+  for (const trip of getFilteredTrips(from, to, run.scheduleType, viaFerry)) {
     const live = liveStatus(trip);
     if (live?.isCanceled || live?.isOriginSkipped || live?.isDestinationSkipped) {
       continue;

@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  adjacentFerry,
+  ferryTransfer,
   futureServiceDate,
+  getFilteredTrips,
   getFirstInProgressTripIndex,
+  getNextFerryDeparture,
   getNextTripIndex,
   getScheduleMeta,
   getTodayScheduleType,
@@ -16,6 +20,7 @@ import {
   type SchedulePayload,
 } from "@/data/scheduleData";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import { parseTimeToMinutes } from "@/lib/timeUtils";
 
 /** Minimal ProcessedTrip — these helpers only read departure/arrival times. */
 function trip(departureTime: string, arrivalTime: string): ProcessedTrip {
@@ -53,6 +58,86 @@ describe("getNextTripIndex", () => {
       ["08:30", { liveDepartureTime: "09:10" } as TripRealtimeStatus],
     ]);
     expect(getNextTripIndex(trips, now, live)).toBe(1);
+  });
+});
+
+describe("trips that start or end with the SF ferry", () => {
+  const ferry = (depart: string, arrive: string) => ({ depart, arrive });
+  // 09:00 local.
+  const now = new Date(2026, 5, 18, 9, 0);
+
+  it("judges a trip from SF departed once its ferry has left", () => {
+    const trips = [
+      { departureTime: "09:20", arrivalTime: "10:00", inboundFerry: ferry("08:40", "09:15") },
+      { departureTime: "10:20", arrivalTime: "11:00", inboundFerry: ferry("09:40", "10:15") },
+    ] as ProcessedTrip[];
+    expect(getNextTripIndex(trips, now)).toBe(1);
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(0);
+  });
+
+  it("keeps a trip to SF in progress until its ferry arrives", () => {
+    const trips = [
+      { departureTime: "08:00", arrivalTime: "08:45", outboundFerry: ferry("08:50", "09:25") },
+    ] as ProcessedTrip[];
+    expect(getFirstInProgressTripIndex(trips, now)).toBe(0);
+  });
+
+  it("times the Larkspur transfer against the train's live time", () => {
+    const toSf = { departureTime: "08:00", arrivalTime: "08:45", outboundFerry: ferry("09:00", "09:35") };
+    const fromSf = { departureTime: "09:22", arrivalTime: "10:00", inboundFerry: ferry("08:40", "09:15") };
+    const minutes = (t: Partial<ProcessedTrip>, status?: Partial<TripRealtimeStatus>) =>
+      ferryTransfer(t as ProcessedTrip, status as TripRealtimeStatus)?.minutes;
+    expect(minutes(toSf)).toBe(15);
+    expect(minutes(toSf, { liveArrivalTime: "08:53" })).toBe(7);
+    expect(minutes(fromSf)).toBe(7);
+    expect(minutes(fromSf, { liveDepartureTime: "09:30" })).toBe(15);
+    expect(ferryTransfer(fromSf)?.inbound).toBe(true);
+    expect(ferryTransfer(trip("08:00", "08:45"))).toBeNull();
+  });
+});
+
+describe("getFilteredTrips viaFerry", () => {
+  afterEach(() => {
+    setScheduleData(bundledSchedulePayload);
+  });
+
+  const run = (depart: string, arrive: string) => ({ depart, arrive });
+  const toLarkspur = () => getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday");
+  const fromLarkspur = () => getFilteredTrips("Larkspur", "Petaluma Downtown", "weekday");
+
+  it("gives a plain Larkspur leg no ferry", () => {
+    expect(toLarkspur().length).toBeGreaterThan(0);
+    expect(toLarkspur().some((t) => t.outboundFerry || t.inboundFerry)).toBe(false);
+    expect(fromLarkspur().some((t) => t.outboundFerry || t.inboundFerry)).toBe(false);
+  });
+
+  it("keeps only the trains with a ferry connection on a leg to or from SF", () => {
+    setScheduleData({
+      ...bundledSchedulePayload,
+      ferrySchedules: {
+        weekdayFerries: [run("12:00", "12:35")],
+        weekendFerries: [],
+        weekdayInboundFerries: [run("12:00", "12:35")],
+        weekendInboundFerries: [],
+      },
+    });
+    const noon = 12 * 60;
+
+    const toSf = getFilteredTrips("Petaluma Downtown", "Larkspur", "weekday", true);
+    expect(toSf.map((t) => t.trip)).toEqual(
+      toLarkspur()
+        .filter((t) => parseTimeToMinutes(t.arrivalTime) <= noon)
+        .map((t) => t.trip),
+    );
+    expect(toSf.every((t) => t.outboundFerry?.depart === "12:00" && !t.inboundFerry)).toBe(true);
+
+    const fromSf = getFilteredTrips("Larkspur", "Petaluma Downtown", "weekday", true);
+    expect(fromSf.map((t) => t.trip)).toEqual(
+      fromLarkspur()
+        .filter((t) => parseTimeToMinutes(t.departureTime) > noon + 35)
+        .map((t) => t.trip),
+    );
+    expect(fromSf.every((t) => t.inboundFerry?.depart === "12:00" && !t.outboundFerry)).toBe(true);
   });
 });
 
@@ -303,5 +388,59 @@ describe("futureServiceDate", () => {
       // Browsing the weekend schedule on that Monday is today's schedule.
       expect(futureServiceDate(new Date(2099, 4, 25, 9, 0), "weekend")).toBeNull();
     });
+  });
+});
+
+describe("adjacentFerry", () => {
+  afterEach(() => {
+    setScheduleData(bundledSchedulePayload);
+  });
+
+  const run = (depart: string, arrive: string) => ({ depart, arrive });
+
+  function useFerries(outbound: string[][], inbound: string[][]) {
+    setScheduleData({
+      ...bundledSchedulePayload,
+      ferrySchedules: {
+        weekdayFerries: outbound.map(([d, a]) => run(d, a)),
+        weekendFerries: [],
+        weekdayInboundFerries: inbound.map(([d, a]) => run(d, a)),
+        weekendInboundFerries: [],
+      },
+    });
+  }
+
+  it("finds the next outbound run after the one the train meets", () => {
+    useFerries(
+      [["15:45", "16:20"], ["16:30", "17:05"], ["18:00", "18:35"]],
+      [],
+    );
+    expect(adjacentFerry(run("16:30", "17:05"), false, "weekday")).toEqual(
+      run("18:00", "18:35"),
+    );
+    expect(adjacentFerry(run("18:00", "18:35"), false, "weekday")).toBeNull();
+  });
+
+  it("finds the inbound run before the one that meets the train", () => {
+    useFerries(
+      [],
+      [["15:00", "15:35"], ["15:45", "16:20"], ["17:00", "17:35"]],
+    );
+    expect(adjacentFerry(run("15:45", "16:20"), true, "weekday")).toEqual(
+      run("15:00", "15:35"),
+    );
+    expect(adjacentFerry(run("15:00", "15:35"), true, "weekday")).toBeNull();
+  });
+
+  it("finds the next ferry leaving San Francisco from the inbound timetable", () => {
+    useFerries([["12:30", "13:05"]], [["11:45", "12:20"], ["13:15", "13:50"]]);
+    const tuesdayNoon = new Date(2099, 4, 26, 12, 0);
+    expect(getNextFerryDeparture(tuesdayNoon, true)).toEqual(run("13:15", "13:50"));
+    expect(getNextFerryDeparture(new Date(2099, 4, 26, 14, 0), true)).toBeNull();
+  });
+
+  it("reads the timetable of the schedule type it's given", () => {
+    useFerries([["16:30", "17:05"], ["18:00", "18:35"]], []);
+    expect(adjacentFerry(run("16:30", "17:05"), false, "weekend")).toBeNull();
   });
 });

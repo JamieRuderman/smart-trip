@@ -502,11 +502,12 @@ export function DepartureReminder({
   // (see focusAndOpen) — so it must NOT be gated on that, or the user couldn't
   // re-focus a train shortly before departure (e.g. after tapping Stop).
   if (arrivalAt <= Date.now()) return null;
+  const goLabel = t(focusRun.viaFerry ? "focusedTrip.goViaFerry" : "focusedTrip.go");
   return (
     <GutterRow>
       <Button
         onClick={() => void boardingCheck.guard(proceedWithGo)}
-        aria-label={t("focusedTrip.go")}
+        aria-label={goLabel}
         aria-busy={boardingCheck.checking}
         className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-[hsl(220_13%_18%)] text-white shadow-sm hover:bg-[hsl(220_13%_18%)]/90 active:bg-[hsl(220_13%_18%)]/90"
       >
@@ -515,7 +516,7 @@ export function DepartureReminder({
         ) : (
           <TripIcon className="h-5 w-5" aria-hidden="true" />
         )}
-        <span>{t("focusedTrip.go")}</span>
+        <span>{goLabel}</span>
       </Button>
       {switchDialog}
       {boardingCheck.warning && fixLeg && (

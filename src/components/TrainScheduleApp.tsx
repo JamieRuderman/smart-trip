@@ -233,7 +233,7 @@ export function TrainScheduleApp() {
 
         {/* Fare Section */}
         {fromStation && toStation && (
-          <FareSection fromStation={fromStation} toStation={toStation} />
+          <FareSection from={fromPlace} to={toPlace} />
         )}
 
         {/* Geographic map — secondary; lives below the trip-planning content

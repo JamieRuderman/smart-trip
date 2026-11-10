@@ -14,7 +14,7 @@ import {
   isTimeInPast,
   toLocalDateKey,
 } from "./timeUtils";
-import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES } from "./fareConstants";
+import { FARE_CONSTANTS, FERRY_CONSTANTS, FARE_TYPES, FERRY_FARES } from "./fareConstants";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type {
   Station,
@@ -659,6 +659,7 @@ export { getStationZone, calculateZonesBetweenStations } from "./stationUtils";
  * @param fromStation - Origin station
  * @param toStation - Destination station  
  * @param fareType - Type of fare (adult, youth, senior, etc.)
+ * @param viaFerry - The trip also rides the Larkspur ferry, whose fare is added
  * @param paymentMethod - Payment method (defaults to "clipper")
  * @returns Complete fare information including price and description
  */
@@ -666,20 +667,23 @@ export function calculateFare(
   fromStation: Station,
   toStation: Station,
   fareType: FareType,
+  viaFerry = false,
   paymentMethod: PaymentMethod = "clipper"
 ): FareInfo {
   const zones = calculateZonesBetweenStations(fromStation, toStation);
   const fareConfig = FARE_TYPES[fareType];
 
-  const price = fareConfig.isFree
+  const trainPrice = fareConfig.isFree
     ? 0
     : zones * FARE_CONSTANTS.ADULT_FARE_PER_ZONE * fareConfig.multiplier;
+  const ferryPrice = viaFerry ? FERRY_FARES[fareType] : null;
 
   return {
     fareType,
     paymentMethod,
     zones,
-    price,
+    price: trainPrice + (ferryPrice ?? 0),
+    ferryPrice,
     description: fareConfig.description,
   };
 }
@@ -688,11 +692,13 @@ export function calculateFare(
  * Gets all available fare options for a route
  * @param fromStation - Origin station
  * @param toStation - Destination station
+ * @param viaFerry - The trip also rides the Larkspur ferry
  * @returns Array of all fare options with pricing information
  */
 export function getAllFareOptions(
   fromStation: Station,
-  toStation: Station
+  toStation: Station,
+  viaFerry = false
 ): FareInfo[] {
   const fareTypes: FareType[] = [
     "adult",
@@ -702,6 +708,6 @@ export function getAllFareOptions(
     "clipper-start",
   ];
   return fareTypes.map((fareType) =>
-    calculateFare(fromStation, toStation, fareType)
+    calculateFare(fromStation, toStation, fareType, viaFerry)
   );
 }

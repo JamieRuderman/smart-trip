@@ -69,9 +69,18 @@
     "disabled": "Discapacitado/Medicare -50%",
     "clipperStart": "Clipper START -50%",
     "faresZoneBased": "Las tarifas se basan en zonas (${{price}} por zona para adultos)",
-    "youthSeniorsFree": "Jóvenes (0-18) y adultos mayores (65+) viajan gratis",
+    "youthSeniorsFree": "Jóvenes (0-18) y adultos mayores (65+) viajan gratis en el tren",
     "discountsAvailable": "Descuentos para discapacitados/Medicare y bajos ingresos",
-    "paymentOptions": "Para pago y pases, visita"
+    "paymentOptions": "Para pago y pases, visita",
+    "and": "y",
+    "trainPlusFerry": "Tren {{train}} + ferry {{ferry}}",
+    "ferryFares": "Los precios incluyen el Golden Gate Ferry: ${{adult}} para adultos con Clipper (${{ticket}} con boleto de papel), ${{reduced}} para jóvenes, adultos mayores y personas con discapacidad. Niños de 4 años o menos viajan gratis",
+    "transferDiscount": "Pagar ambos con Clipper puede darte un descuento por transbordo",
+    "ferry": {
+      "youth": "Joven (5-18)",
+      "senior": "Adulto Mayor (65+)",
+      "disabled": "Discapacitado/Medicare"
+    }
   },
   "bottomInfo": {
     "dataProvidedBy": "Datos proporcionados por",

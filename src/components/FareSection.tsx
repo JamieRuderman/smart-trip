@@ -3,40 +3,51 @@ import { SectionCard } from "@/components/ui/section-card";
 import { Button } from "@/components/ui/button";
 import { calculateFare, getAllFareOptions } from "@/lib/scheduleUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { FARE_CONSTANTS } from "@/lib/fareConstants";
-import type { Station, FareType } from "@/types/smartSchedule";
+import { FARE_CONSTANTS, FERRY_CONSTANTS, FERRY_FARES } from "@/lib/fareConstants";
+import { isFerryLeg, placeStation, type Place } from "@/lib/places";
+import type { FareType } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 
 interface FareSectionProps {
-  fromStation: Station | "";
-  toStation: Station | "";
+  from: Place | "";
+  to: Place | "";
 }
 
-export function FareSection({ fromStation, toStation }: FareSectionProps) {
+const linkClass =
+  "text-foreground underline-offset-2 hover:underline hover:text-primary transition-colors";
+
+export function FareSection({ from, to }: FareSectionProps) {
   const { preferences, updateSelectedFareType } = useUserPreferences();
   const { t } = useTranslation();
   const selectedFareType = preferences.selectedFareType;
 
+  // Don't render if stations aren't selected
+  if (!from || !to) {
+    return null;
+  }
+
+  const viaFerry = isFerryLeg(from, to);
+  const fromStation = placeStation(from);
+  const toStation = placeStation(to);
+
   const getFareDescription = (fareType: FareType): string => {
     const keyMap: Record<FareType, string> = {
       adult: "fare.adult",
-      youth: "fare.youth",
-      senior: "fare.senior",
-      disabled: "fare.disabled",
+      youth: viaFerry ? "fare.ferry.youth" : "fare.youth",
+      senior: viaFerry ? "fare.ferry.senior" : "fare.senior",
+      disabled: viaFerry ? "fare.ferry.disabled" : "fare.disabled",
       "clipper-start": "fare.clipperStart",
     };
     return t(keyMap[fareType]);
   };
 
-  // Don't render if stations aren't selected
-  if (!fromStation || !toStation) {
-    return null;
-  }
+  const formatPrice = (price: number): string =>
+    price === 0 ? t("common.free") : `$${price.toFixed(2)}`;
 
-  const fareOptions = getAllFareOptions(fromStation, toStation);
+  const fareOptions = getAllFareOptions(fromStation, toStation, viaFerry);
   const currentFare =
     selectedFareType !== "none"
-      ? calculateFare(fromStation, toStation, selectedFareType)
+      ? calculateFare(fromStation, toStation, selectedFareType, viaFerry)
       : null;
 
   const handleFareSelect = (fareType: FareType) => {
@@ -73,14 +84,20 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
                     {currentFare.zones === 1
                       ? t("common.zone")
                       : t("common.zones")}{" "}
-                    • {fromStation} → {toStation}
+                    • {from} → {to}
                   </p>
+                  {currentFare.ferryPrice != null && (
+                    <p className="text-sm text-muted-foreground">
+                      {t("fare.trainPlusFerry", {
+                        train: formatPrice(currentFare.price - currentFare.ferryPrice),
+                        ferry: formatPrice(currentFare.ferryPrice),
+                      })}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-primary">
-                    {currentFare.price === 0
-                      ? t("common.free")
-                      : `$${currentFare.price.toFixed(2)}`}
+                    {formatPrice(currentFare.price)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {t("common.oneWay")}
@@ -112,9 +129,7 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
                   {getFareDescription(option.fareType)}
                 </span>
                 <span className="font-semibold text-lg group-hover:text-primary transition-colors">
-                  {option.price === 0
-                    ? t("common.free")
-                    : `$${option.price.toFixed(2)}`}
+                  {formatPrice(option.price)}
                 </span>
               </Button>
             ))}
@@ -131,16 +146,43 @@ export function FareSection({ fromStation, toStation }: FareSectionProps) {
           </p>
           <p>• {t("fare.youthSeniorsFree")}</p>
           <p>• {t("fare.discountsAvailable")}</p>
+          {viaFerry && (
+            <>
+              <p>
+                •{" "}
+                {t("fare.ferryFares", {
+                  adult: FERRY_FARES.adult.toFixed(2),
+                  ticket: FERRY_CONSTANTS.ADULT_PAPER_TICKET_FARE.toFixed(2),
+                  reduced: FERRY_FARES.youth.toFixed(2),
+                })}
+              </p>
+              <p>• {t("fare.transferDiscount")}</p>
+            </>
+          )}
           <p>
             • {t("fare.paymentOptions")}{" "}
             <a
               href="https://sonomamarintrain.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-foreground underline-offset-2 hover:underline hover:text-primary transition-colors"
+              className={linkClass}
             >
               sonomamarintrain.org
             </a>
+            {viaFerry && (
+              <>
+                {" "}
+                {t("fare.and")}{" "}
+                <a
+                  href={FERRY_CONSTANTS.FARES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={linkClass}
+                >
+                  goldengate.org
+                </a>
+              </>
+            )}
           </p>
         </div>
       </CardContent>

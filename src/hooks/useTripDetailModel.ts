@@ -145,16 +145,22 @@ export function useTripDetailModel({
         })
       : t("tracker.durationMinutes", { minutes: tripDurationMinutes });
 
+  const transfer = ferryTransfer(trip, realtimeStatus);
+
   const fareInfo =
     preferences.selectedFareType !== "none"
-      ? calculateFare(fromStation, toStation, preferences.selectedFareType)
+      ? calculateFare(
+          fromStation,
+          toStation,
+          preferences.selectedFareType,
+          transfer != null,
+        )
       : null;
 
   const fromIdx = stationIndexMap[fromStation];
   const toIdx = stationIndexMap[toStation];
   const stopCount = Math.abs(toIdx - fromIdx);
 
-  const transfer = ferryTransfer(trip, realtimeStatus);
   const hasQuickConnection = transfer != null && isQuickConnection(transfer.minutes);
   const trainOption = transfer?.inbound
     ? t("quickConnection.laterTrain")

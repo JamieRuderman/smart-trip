@@ -9,7 +9,7 @@ to the iOS app or the live webapp via a JS-detected CTA.
 ```
 src/data/generated/*.ts  ──┐
 src/lib/translations/*.json ┤
-src/seo/<Template>.tsx     ─┼─► scripts/seo/prerender.ts ─► dist/<path>/index.html × 50
+src/seo/<Template>.tsx     ─┼─► scripts/seo/prerender.ts ─► dist/<path>/index.html × 114
 src/seo/shell.ts           ─┤                              ► dist/sitemap.xml
 src/seo/jsonld.ts          ─┘                              ► dist/robots.txt (Sitemap line)
 ```
@@ -17,19 +17,27 @@ src/seo/jsonld.ts          ─┘                              ► dist/robots.t
 Runs at the end of `npm run build`. **Not** run by `npm run build-native` —
 Capacitor iOS/Android bundles ship without any of this.
 
-## Page inventory (50 pages)
+## Page inventory (114 pages)
 
 - 14 stations × 2 langs = 28 pages at `/stations/<slug>/`
-- 10 route pairs × 2 langs = 20 pages at `/routes/<from>-to-<to>/`
+- 42 route pairs × 2 langs = 84 pages at `/routes/<from>-to-<to>/`
 - 1 ferry connection × 2 langs = 2 pages at `/ferry-connection/`
 
-Top route pairs are hand-picked in `scripts/seo/prerender.ts` (`TOP_ROUTE_PAIRS`).
+Route pairs come from `src/seo/routes.ts`. `TOP_ROUTE_PAIRS` holds the
+hand-picked trips the homepage footer links to. Some of them end in San
+Francisco and show ferry + train connections. `ROUTE_PAIRS` adds the reverse
+of each top pair and every station-to-neighbor pair, because the station
+pages link to those.
+
+The prerender fails the build if a page links to a `/stations/`, `/routes/`
+or `/ferry-connection/` page that wasn't built. Such a link would fall through
+to the SPA homepage with a 200 status, which search engines index as a soft 404.
 
 ## Adding pages
 
 - **New station** → automatic. New entries in `STATION_ORDER` (regenerated daily
   from GTFS) flow through with no code changes.
-- **New route pair** → add to `TOP_ROUTE_PAIRS` in `scripts/seo/prerender.ts`.
+- **New route pair** → add to `TOP_ROUTE_PAIRS` in `src/seo/routes.ts`.
 - **New page type** → write a pure component in `src/seo/<NewPage>.tsx`, add a
   builder function in `scripts/seo/prerender.ts`, append a `SitemapEntry`.
 
@@ -65,13 +73,13 @@ add `PLAY_STORE_URL` + a third `data-cta="android"` block in `src/seo/cta.ts`
 ## Auto-update cadence
 
 `update-transit.yml` runs daily, regenerates GTFS-derived data, commits,
-pushes. Cloudflare Workers Builds auto-deploys → `npm run build` runs → all 50
+pushes. Cloudflare Workers Builds auto-deploys → `npm run build` runs → all 114
 pages regenerate from fresh data. No additional cron needed.
 
 ## Verification
 
 ```bash
-npm run build                                       # 50 pages + sitemap
+npm run build                                       # 114 pages + sitemap
 curl https://smarttraintrip.com/stations/larkspur/  # full HTML, no JS needed
 xmllint --noout dist/sitemap.xml                    # valid XML
 ```

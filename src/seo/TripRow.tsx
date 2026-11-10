@@ -84,6 +84,8 @@ interface TripRowProps {
    * column heading scrolls off-screen on mobile.
    */
   direction?: "north" | "south";
+  /** Small line under the trip number, e.g. the ferry leg of the trip. */
+  detail?: string;
 }
 
 export function TripRow({
@@ -93,7 +95,14 @@ export function TripRow({
   trailing,
   muted = false,
   direction,
+  detail,
 }: TripRowProps) {
+  const tripBadge = (
+    <div className="flex items-center gap-1.5 text-smart-train-green shrink-0">
+      <TripIcon className="h-5 w-5" aria-hidden="true" />
+      <span className="text-xl font-semibold tabular-nums">{tripNumber}</span>
+    </div>
+  );
   return (
     <div
       className={cn(
@@ -107,10 +116,14 @@ export function TripRow({
           className="h-4 w-4 text-muted-foreground shrink-0"
         />
       ) : null}
-      <div className="flex items-center gap-1.5 text-smart-train-green shrink-0">
-        <TripIcon className="h-5 w-5" aria-hidden="true" />
-        <span className="text-xl font-semibold tabular-nums">{tripNumber}</span>
-      </div>
+      {detail ? (
+        <div className="shrink-0">
+          {tripBadge}
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </div>
+      ) : (
+        tripBadge
+      )}
       {/* Times right-aligned via ml-auto so the column reads as a vertical
           stack of monospace times regardless of the row's left content. */}
       <div className="ml-auto flex items-center gap-2 font-mono text-sm tabular-nums">

@@ -7,9 +7,9 @@
  * one HTML file per output path into dist/.
  *
  * Pages produced:
- *   /stations/<slug>/index.html        × 14 stations × 2 langs = 28
- *   /routes/<from>-to-<to>/index.html  × ~7 pairs × 2 langs    = ~14
- *   /ferry-connection/index.html       × 1 × 2 langs           = 2
+ *   /stations/<slug>/index.html        × 14 stations × 2 langs
+ *   /routes/<from>-to-<to>/index.html  × ROUTE_PAIRS × 2 langs
+ *   /ferry-connection/index.html       × 1 × 2 langs
  *   /sitemap.xml                       × 1
  *   /robots.txt                        rewritten with Sitemap line
  *
@@ -28,9 +28,16 @@ import {
   STATION_ORDER,
   type Station,
 } from "../../src/data/generated/stations.generated.ts";
+import { isFerryLeg, type Place } from "../../src/lib/places.ts";
 import { StationLandingPage } from "../../src/seo/StationLandingPage.tsx";
 import { RoutePairLandingPage } from "../../src/seo/RoutePairLandingPage.tsx";
 import { FerryConnectionLandingPage } from "../../src/seo/FerryConnectionLandingPage.tsx";
+import { ferryFaq } from "../../src/seo/ferryFaq.ts";
+import {
+  ROUTE_PAIRS,
+  TOP_ROUTE_PAIRS,
+  placePath,
+} from "../../src/seo/routes.ts";
 import {
   renderShell,
   hreflangFor,
@@ -57,22 +64,6 @@ import { stationSlug, routePairSlug } from "./slugify.ts";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
 const distDir = path.join(repoRoot, "dist");
-
-// ---------------------------------------------------------------------------
-// Top route pairs (per the approved plan).
-// ---------------------------------------------------------------------------
-const TOP_ROUTE_PAIRS: Array<readonly [Station, Station]> = [
-  ["Larkspur", "Santa Rosa Downtown"],
-  ["Santa Rosa Downtown", "Larkspur"],
-  ["Larkspur", "Petaluma Downtown"],
-  ["Petaluma Downtown", "Larkspur"],
-  ["Larkspur", "San Rafael"],
-  ["San Rafael", "Larkspur"],
-  ["Larkspur", "Novato Downtown"],
-  ["Novato Downtown", "Larkspur"],
-  ["Larkspur", "Sonoma County Airport"],
-  ["San Rafael", "Santa Rosa Downtown"],
-];
 
 // ---------------------------------------------------------------------------
 // Locate hashed assets Vite produced for the main SPA entry.
@@ -127,6 +118,8 @@ function readScheduleGeneratedAt(): string {
 // ---------------------------------------------------------------------------
 // Write a single page: render template → wrap in shell → write to disk.
 // ---------------------------------------------------------------------------
+const writtenPages: string[] = [];
+
 function writePage(opts: {
   outputPath: string; // relative to dist/, e.g. "stations/larkspur/index.html"
   html: string;
@@ -134,6 +127,26 @@ function writePage(opts: {
   const fullPath = path.join(distDir, opts.outputPath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, opts.html, "utf8");
+  writtenPages.push(fullPath);
+}
+
+// A link to a landing page that wasn't built falls through to the SPA
+// homepage with a 200, which search engines index as a soft 404.
+function assertLandingLinksResolve(): void {
+  const linkPattern =
+    /href="((?:\/es)?\/(?:stations|routes|ferry-connection)\/[^"#?]*)"/g;
+  const broken = new Set<string>();
+  for (const page of [...writtenPages, path.join(distDir, "index.html")]) {
+    if (!fs.existsSync(page)) continue;
+    for (const [, href] of fs.readFileSync(page, "utf8").matchAll(linkPattern)) {
+      if (!fs.existsSync(path.join(distDir, href, "index.html"))) broken.add(href);
+    }
+  }
+  if (broken.size > 0) {
+    throw new Error(
+      `Landing pages link to pages that weren't built:\n  ${[...broken].join("\n  ")}`,
+    );
+  }
 }
 
 function substituteStylesheet(html: string, stylesheetHref: string): string {
@@ -201,8 +214,8 @@ function buildStationPage(
 }
 
 function buildRoutePairPage(
-  from: Station,
-  to: Station,
+  from: Place,
+  to: Place,
   lang: Lang,
   scheduleGeneratedAt: string,
   stylesheetHref: string,
@@ -221,13 +234,21 @@ function buildRoutePairPage(
   );
 
   const pathOnSite = `${LANG_PATH_PREFIX[lang]}/routes/${slug}/`;
-  const title = t("seo.route.title", { from, to, site: SITE_NAME });
-  const description = t("seo.route.description", { from, to });
+  const viaFerry = isFerryLeg(from, to);
+  const title = t(viaFerry ? "seo.route.ferryTitle" : "seo.route.title", {
+    from,
+    to,
+    site: SITE_NAME,
+  });
+  const description = t(
+    viaFerry ? "seo.route.ferryDescription" : "seo.route.description",
+    { from, to },
+  );
 
   const jsonLd = [
     breadcrumbList([
       { name: SITE_NAME, path: `${LANG_PATH_PREFIX[lang]}/` },
-      { name: from, path: `${LANG_PATH_PREFIX[lang]}/stations/${stationSlug(from)}/` },
+      { name: from, path: `${LANG_PATH_PREFIX[lang]}${placePath(from)}` },
       { name: to, path: pathOnSite },
     ]),
   ];
@@ -269,6 +290,7 @@ function buildFerryPage(
       { name: SITE_NAME, path: `${LANG_PATH_PREFIX[lang]}/` },
       { name: t("seo.ferry.breadcrumb"), path: pathOnSite },
     ]),
+    faqPage(ferryFaq(lang)),
   ];
 
   const html = renderShell({
@@ -433,7 +455,7 @@ function main(): void {
   }
 
   // Route-pair pages
-  for (const [from, to] of TOP_ROUTE_PAIRS) {
+  for (const [from, to] of ROUTE_PAIRS) {
     for (const lang of LANGUAGES) {
       const slug = routePairSlug(from, to);
       const html = buildRoutePairPage(
@@ -496,6 +518,8 @@ function main(): void {
 
   // SPA homepage hygiene
   enhanceSpaIndexHtml();
+
+  assertLandingLinksResolve();
 
   console.log(
     `[seo/prerender] Wrote ${pageCount} static pages + sitemap.xml. Stylesheet: ${stylesheetHref}`,

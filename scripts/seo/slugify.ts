@@ -1,4 +1,4 @@
-import type { Station } from "@/data/generated/stations.generated";
+import type { Place } from "@/lib/places";
 
 /**
  * Deterministic slug for a station name. Used both for URL paths
@@ -10,7 +10,7 @@ import type { Station } from "@/data/generated/stations.generated";
  *   "Larkspur"              -> "larkspur"
  *   "Santa Rosa Downtown"   -> "santa-rosa-downtown"
  */
-export function stationSlug(station: Station): string {
+export function stationSlug(station: Place): string {
   return station
     .toLowerCase()
     .normalize("NFD")
@@ -24,6 +24,6 @@ export function stationSlug(station: Station): string {
  * presents one direction of travel; we deliberately do *not* canonicalise the
  * order alphabetically.
  */
-export function routePairSlug(from: Station, to: Station): string {
+export function routePairSlug(from: Place, to: Place): string {
   return `${stationSlug(from)}-to-${stationSlug(to)}`;
 }

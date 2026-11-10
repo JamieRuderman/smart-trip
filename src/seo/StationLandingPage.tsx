@@ -21,7 +21,13 @@ import {
   trainSchedules,
   type ScheduleType,
 } from "@/data/generated/trainSchedules.generated";
-import { FARE_CONSTANTS } from "@/lib/fareConstants";
+import {
+  FARE_CONSTANTS,
+  FERRY_CONSTANTS,
+  FERRY_FARES,
+} from "@/lib/fareConstants";
+import { SAN_FRANCISCO } from "@/lib/places";
+import { calculateFare } from "@/lib/scheduleUtils";
 import {
   CardContent,
   CardHeader,
@@ -29,7 +35,8 @@ import {
   SectionCard,
   PillBadge,
 } from "./ui";
-import { stationSlug } from "../../scripts/seo/slugify";
+import { stationSlug, routePairSlug } from "../../scripts/seo/slugify";
+import { hasRoutePage } from "./routes";
 import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
@@ -274,6 +281,23 @@ export function StationLandingPage({
                 </a>
               </li>
             )}
+            {hasRoutePage(station, SAN_FRANCISCO) && (
+              <li>
+                <a
+                  href={linkTo(
+                    lang,
+                    `/routes/${routePairSlug(station, SAN_FRANCISCO)}/`,
+                  )}
+                  className="inline-flex items-center gap-2 hover:underline"
+                >
+                  <span>{t("seo.station.toSanFrancisco", { station })}</span>
+                  <PillBadge
+                    label={`$${calculateFare(station, FERRY_CONSTANTS.FERRY_STATION, "adult", true).price.toFixed(2)}`}
+                    color="ontime"
+                  />
+                </a>
+              </li>
+            )}
           </ul>
         </CardContent>
       </SectionCard>
@@ -287,6 +311,7 @@ export function StationLandingPage({
           <CardContent>
             <p>
               {t("seo.station.ferryBody")}{" "}
+              {t("seo.station.ferryFare", { adult: FERRY_FARES.adult.toFixed(2) })}{" "}
               <a
                 href={linkTo(lang, "/ferry-connection/")}
                 className="font-semibold hover:underline text-smart-train-green"

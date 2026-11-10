@@ -469,10 +469,10 @@ describe("calculateFare", () => {
   it("adds the ferry for a trip that rides it", () => {
     const fare = (type: FareType) =>
       calculateFare("Petaluma Downtown", "Larkspur", type, true);
-    expect(fare("adult")).toMatchObject({ price: 14, ferryPrice: 9.5 });
-    expect(fare("youth")).toMatchObject({ price: 7, ferryPrice: 7 });
-    expect(fare("disabled")).toMatchObject({ price: 9.25, ferryPrice: 7 });
-    expect(fare("clipper-start")).toMatchObject({ price: 7, ferryPrice: 4.75 });
+    expect(fare("adult")).toMatchObject({ price: 14, trainPrice: 4.5, ferryPrice: 9.5 });
+    expect(fare("youth")).toMatchObject({ price: 7, trainPrice: 0, ferryPrice: 7 });
+    expect(fare("disabled")).toMatchObject({ price: 9.25, trainPrice: 2.25, ferryPrice: 7 });
+    expect(fare("clipper-start")).toMatchObject({ price: 7, trainPrice: 2.25, ferryPrice: 4.75 });
   });
 
   it("prices every fare type on a ferry trip", () => {

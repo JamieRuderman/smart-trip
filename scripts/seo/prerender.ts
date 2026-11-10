@@ -37,6 +37,7 @@ import {
   ROUTE_PAIRS,
   TOP_ROUTE_PAIRS,
   placePath,
+  routePath,
 } from "../../src/seo/routes.ts";
 import {
   renderShell,
@@ -221,7 +222,6 @@ function buildRoutePairPage(
   stylesheetHref: string,
   smartLogoHref: string,
 ): string {
-  const slug = routePairSlug(from, to);
   const t = translator(lang);
   const body = renderToStaticMarkup(
     createElement(RoutePairLandingPage, {
@@ -233,7 +233,7 @@ function buildRoutePairPage(
     }),
   );
 
-  const pathOnSite = `${LANG_PATH_PREFIX[lang]}/routes/${slug}/`;
+  const pathOnSite = `${LANG_PATH_PREFIX[lang]}${routePath(from, to)}`;
   const viaFerry = isFerryLeg(from, to);
   const title = t(viaFerry ? "seo.route.ferryTitle" : "seo.route.title", {
     from,
@@ -258,7 +258,7 @@ function buildRoutePairPage(
     title,
     description,
     canonicalPath: pathOnSite,
-    hreflang: hreflangFor(`/routes/${slug}/`),
+    hreflang: hreflangFor(routePath(from, to)),
     jsonLd,
     bodyHtml: body,
   });
@@ -328,7 +328,7 @@ function buildSiteLinksFooter(): string {
 
   const routeLinks = TOP_ROUTE_PAIRS.map(
     ([from, to]) =>
-      `<a href="/routes/${routePairSlug(from, to)}/">${from} → ${to}</a>`,
+      `<a href="${routePath(from, to)}">${from} → ${to}</a>`,
   ).join('<span class="sep"> · </span>');
 
   // Self-contained styles (scoped by id) so the block doesn't depend on the
@@ -420,7 +420,6 @@ function main(): void {
   const smartLogoHref = findSmartLogoHref();
   const scheduleGeneratedAt = readScheduleGeneratedAt();
 
-  let pageCount = 0;
   const sitemapEntries: SitemapEntry[] = [
     { path: "/", hasLangVariants: false, priority: 1.0, changefreq: "daily" },
   ];
@@ -445,7 +444,6 @@ function main(): void {
         ),
         html,
       });
-      pageCount++;
     }
     sitemapEntries.push({
       path: `/stations/${stationSlug(station)}/`,
@@ -475,10 +473,9 @@ function main(): void {
         ),
         html,
       });
-      pageCount++;
     }
     sitemapEntries.push({
-      path: `/routes/${routePairSlug(from, to)}/`,
+      path: routePath(from, to),
       priority: 0.6,
       changefreq: "weekly",
     });
@@ -500,7 +497,6 @@ function main(): void {
       ),
       html,
     });
-    pageCount++;
   }
   sitemapEntries.push({
     path: "/ferry-connection/",
@@ -522,7 +518,7 @@ function main(): void {
   assertLandingLinksResolve();
 
   console.log(
-    `[seo/prerender] Wrote ${pageCount} static pages + sitemap.xml. Stylesheet: ${stylesheetHref}`,
+    `[seo/prerender] Wrote ${writtenPages.length} static pages + sitemap.xml. Stylesheet: ${stylesheetHref}`,
   );
 }
 

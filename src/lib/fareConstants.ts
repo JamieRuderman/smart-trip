@@ -78,6 +78,13 @@ export const FERRY_CONSTANTS = {
   ADULT_PAPER_TICKET_FARE: 14,
 } as const;
 
+/** The ferry fares as the `{{adult}}`, `{{ticket}}` and `{{reduced}}` translation params. */
+export const FERRY_FARE_PARAMS = {
+  adult: FERRY_FARES.adult.toFixed(2),
+  ticket: FERRY_CONSTANTS.ADULT_PAPER_TICKET_FARE.toFixed(2),
+  reduced: FERRY_FARES.youth.toFixed(2),
+};
+
 /**
  * App configuration constants
  */

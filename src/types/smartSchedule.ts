@@ -19,6 +19,8 @@ export interface FareInfo {
   zones: number;
   /** The whole one-way fare, the ferry included when the trip rides it. */
   price: number;
+  /** The SMART train's part of `price`. */
+  trainPrice: number;
   /** The Larkspur ferry's part of `price`, or null when the trip doesn't ride it. */
   ferryPrice: number | null;
   description: string;

@@ -4,11 +4,12 @@
 
 import React from "react";
 void React; // tsx (classic JSX) needs React in scope; tsc would flag unused.
-import { STATION_ORDER } from "@/data/generated/stations.generated";
+import type { Station } from "@/data/generated/stations.generated";
 import type { ScheduleType } from "@/data/generated/trainSchedules.generated";
-import { FERRY_CONSTANTS, FERRY_FARES } from "@/lib/fareConstants";
+import { FERRY_CONSTANTS, FERRY_FARE_PARAMS } from "@/lib/fareConstants";
 import { SAN_FRANCISCO, isFerryLeg, placeStation, type Place } from "@/lib/places";
 import { calculateFare, getFilteredTrips, tripEnds } from "@/lib/scheduleUtils";
+import { getTripDirection, type TrainDirection } from "@/lib/stationUtils";
 import {
   CardContent,
   CardHeader,
@@ -16,8 +17,7 @@ import {
   SectionCard,
   PillBadge,
 } from "./ui";
-import { routePairSlug } from "../../scripts/seo/slugify";
-import { placePath } from "./routes";
+import { placePath, routePath } from "./routes";
 import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
@@ -57,27 +57,24 @@ function formatDuration(mins: number, lang: Lang): string {
 }
 
 interface RouteScheduleCardProps {
-  from: Place;
-  to: Place;
-  direction: "northbound" | "southbound";
+  fromStation: Station;
+  toStation: Station;
+  viaFerry: boolean;
+  direction: TrainDirection;
   type: ScheduleType;
   lang: Lang;
 }
 
 function RouteScheduleCard({
-  from,
-  to,
+  fromStation,
+  toStation,
+  viaFerry,
   direction,
   type,
   lang,
 }: RouteScheduleCardProps) {
   const t = translator(lang);
-  const trips = getFilteredTrips(
-    placeStation(from),
-    placeStation(to),
-    type,
-    isFerryLeg(from, to),
-  ).map((trip) => {
+  const trips = getFilteredTrips(fromStation, toStation, type, viaFerry).map((trip) => {
     const { start, end } = tripEnds(trip);
     const ferry = trip.inboundFerry ?? trip.outboundFerry;
     return {
@@ -139,23 +136,18 @@ export function RoutePairLandingPage({
   const fromStation = placeStation(from);
   const toStation = placeStation(to);
   const viaFerry = isFerryLeg(from, to);
-  // STATION_ORDER goes north → south, so a higher index is further south.
-  // Travelling from south (higher index) to north (lower index) = northbound.
-  const direction: "northbound" | "southbound" =
-    STATION_ORDER.indexOf(fromStation) > STATION_ORDER.indexOf(toStation)
-      ? "northbound"
-      : "southbound";
+  const direction = getTripDirection(fromStation, toStation);
   const fare = calculateFare(fromStation, toStation, "adult", viaFerry);
   const webappQuery = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const touchesLarkspur =
-    viaFerry ||
-    fromStation === FERRY_CONSTANTS.FERRY_STATION ||
-    toStation === FERRY_CONSTANTS.FERRY_STATION;
+  const touchesLarkspur = [fromStation, toStation].includes(
+    FERRY_CONSTANTS.FERRY_STATION,
+  );
+  const scheduleCard = { fromStation, toStation, viaFerry, direction, lang };
 
   return (
     <Layout
       lang={lang}
-      alternateLangPath={`/routes/${routePairSlug(from, to)}/`}
+      alternateLangPath={routePath(from, to)}
       scheduleGeneratedAt={scheduleGeneratedAt}
       smartLogoHref={smartLogoHref}
     >
@@ -214,9 +206,9 @@ export function RoutePairLandingPage({
           <p className="text-muted-foreground">
             {t("seo.route.ferryFare", {
               total: fare.price.toFixed(2),
-              train: (fare.price - fare.ferryPrice).toFixed(2),
+              train: fare.trainPrice.toFixed(2),
               ferry: fare.ferryPrice.toFixed(2),
-              reduced: FERRY_FARES.youth.toFixed(2),
+              reduced: FERRY_FARE_PARAMS.reduced,
             })}
           </p>
         )}
@@ -230,20 +222,8 @@ export function RoutePairLandingPage({
       />
 
       {/* Schedules */}
-      <RouteScheduleCard
-        from={from}
-        to={to}
-        direction={direction}
-        type="weekday"
-        lang={lang}
-      />
-      <RouteScheduleCard
-        from={from}
-        to={to}
-        direction={direction}
-        type="weekend"
-        lang={lang}
-      />
+      <RouteScheduleCard {...scheduleCard} type="weekday" />
+      <RouteScheduleCard {...scheduleCard} type="weekend" />
 
       {/* Related */}
       <SectionCard>
@@ -276,7 +256,7 @@ export function RoutePairLandingPage({
             )}
             <li>
               <a
-                href={linkTo(lang, `/routes/${routePairSlug(to, from)}/`)}
+                href={linkTo(lang, routePath(to, from))}
                 className="hover:underline"
               >
                 {t("seo.route.viewReverse", { from: to, to: from })}

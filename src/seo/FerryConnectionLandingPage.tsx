@@ -15,19 +15,20 @@ import {
   FERRY_CONSTANTS,
   FERRY_FARES,
 } from "@/lib/fareConstants";
-import { SAN_FRANCISCO } from "@/lib/places";
+import { isFerryLeg } from "@/lib/places";
 import {
   CardContent,
   CardHeader,
   CardTitle,
   SectionCard,
+  FaqCard,
 } from "./ui";
-import { stationSlug, routePairSlug } from "../../scripts/seo/slugify";
+import { stationSlug } from "../../scripts/seo/slugify";
 import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
 import { Layout } from "./Layout";
-import { ROUTE_PAIRS } from "./routes";
+import { ROUTE_PAIRS, routePath } from "./routes";
 import { ferryFaq } from "./ferryFaq";
 
 export interface FerryConnectionLandingPageProps {
@@ -216,21 +217,7 @@ export function FerryConnectionLandingPage({
         </CardContent>
       </SectionCard>
 
-      <SectionCard>
-        <CardHeader>
-          <CardTitle>{t("seo.ferry.faqHeading")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-4">
-            {ferryFaq(lang).map(({ question, answer }) => (
-              <div key={question}>
-                <dt className="font-semibold">{question}</dt>
-                <dd className="text-muted-foreground mt-1">{answer}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </SectionCard>
+      <FaqCard heading={t("seo.ferry.faqHeading")} items={ferryFaq(lang)} />
 
       {/* Related */}
       <SectionCard>
@@ -247,13 +234,10 @@ export function FerryConnectionLandingPage({
                 {t("seo.ferry.larkspurLink")}
               </a>
             </li>
-            {ROUTE_PAIRS.filter((pair) => pair.includes(SAN_FRANCISCO)).map(
+            {ROUTE_PAIRS.filter(([from, to]) => isFerryLeg(from, to)).map(
               ([from, to]) => (
                 <li key={`${from}-${to}`}>
-                  <a
-                    href={linkTo(lang, `/routes/${routePairSlug(from, to)}/`)}
-                    className="hover:underline"
-                  >
+                  <a href={linkTo(lang, routePath(from, to))} className="hover:underline">
                     {t("seo.route.ferryH1", { from, to })}
                   </a>
                 </li>

@@ -683,6 +683,7 @@ export function calculateFare(
     paymentMethod,
     zones,
     price: trainPrice + (ferryPrice ?? 0),
+    trainPrice,
     ferryPrice,
     description: fareConfig.description,
   };

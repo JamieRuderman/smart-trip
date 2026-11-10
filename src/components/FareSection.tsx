@@ -3,14 +3,14 @@ import { SectionCard } from "@/components/ui/section-card";
 import { Button } from "@/components/ui/button";
 import { calculateFare, getAllFareOptions } from "@/lib/scheduleUtils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { FARE_CONSTANTS, FERRY_CONSTANTS, FERRY_FARES } from "@/lib/fareConstants";
+import { FARE_CONSTANTS, FERRY_CONSTANTS, FERRY_FARE_PARAMS } from "@/lib/fareConstants";
 import { isFerryLeg, placeStation, type Place } from "@/lib/places";
 import type { FareType } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 
 interface FareSectionProps {
-  from: Place | "";
-  to: Place | "";
+  from: Place;
+  to: Place;
 }
 
 const linkClass =
@@ -21,21 +21,17 @@ export function FareSection({ from, to }: FareSectionProps) {
   const { t } = useTranslation();
   const selectedFareType = preferences.selectedFareType;
 
-  // Don't render if stations aren't selected
-  if (!from || !to) {
-    return null;
-  }
-
   const viaFerry = isFerryLeg(from, to);
   const fromStation = placeStation(from);
   const toStation = placeStation(to);
 
   const getFareDescription = (fareType: FareType): string => {
+    const riderLabels = viaFerry ? "fare.ferry" : "fare";
     const keyMap: Record<FareType, string> = {
       adult: "fare.adult",
-      youth: viaFerry ? "fare.ferry.youth" : "fare.youth",
-      senior: viaFerry ? "fare.ferry.senior" : "fare.senior",
-      disabled: viaFerry ? "fare.ferry.disabled" : "fare.disabled",
+      youth: `${riderLabels}.youth`,
+      senior: `${riderLabels}.senior`,
+      disabled: `${riderLabels}.disabled`,
       "clipper-start": "fare.clipperStart",
     };
     return t(keyMap[fareType]);
@@ -89,7 +85,7 @@ export function FareSection({ from, to }: FareSectionProps) {
                   {currentFare.ferryPrice != null && (
                     <p className="text-sm text-muted-foreground">
                       {t("fare.trainPlusFerry", {
-                        train: formatPrice(currentFare.price - currentFare.ferryPrice),
+                        train: formatPrice(currentFare.trainPrice),
                         ferry: formatPrice(currentFare.ferryPrice),
                       })}
                     </p>
@@ -150,11 +146,7 @@ export function FareSection({ from, to }: FareSectionProps) {
             <>
               <p>
                 •{" "}
-                {t("fare.ferryFares", {
-                  adult: FERRY_FARES.adult.toFixed(2),
-                  ticket: FERRY_CONSTANTS.ADULT_PAPER_TICKET_FARE.toFixed(2),
-                  reduced: FERRY_FARES.youth.toFixed(2),
-                })}
+                {t("fare.ferryFares", FERRY_FARE_PARAMS)}
               </p>
               <p>• {t("fare.transferDiscount")}</p>
             </>

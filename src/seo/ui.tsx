@@ -128,3 +128,29 @@ export function PillBadge({
     </span>
   );
 }
+
+export function FaqCard({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: { question: string; answer: string }[];
+}) {
+  return (
+    <SectionCard>
+      <CardHeader>
+        <CardTitle>{heading}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="space-y-4">
+          {items.map(({ question, answer }) => (
+            <div key={question}>
+              <dt className="font-semibold">{question}</dt>
+              <dd className="text-muted-foreground mt-1">{answer}</dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </SectionCard>
+  );
+}

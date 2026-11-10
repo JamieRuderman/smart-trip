@@ -11,21 +11,76 @@ import {
 } from "@/data/generated/ferrySchedule.generated";
 import type { FerryConnection } from "@/types/smartSchedule";
 import {
+  FARE_CONSTANTS,
+  FERRY_CONSTANTS,
+  FERRY_FARES,
+} from "@/lib/fareConstants";
+import { isFerryLeg } from "@/lib/places";
+import {
   CardContent,
   CardHeader,
   CardTitle,
   SectionCard,
+  FaqCard,
 } from "./ui";
 import { stationSlug } from "../../scripts/seo/slugify";
 import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
 import { Layout } from "./Layout";
+import { ROUTE_PAIRS, routePath } from "./routes";
+import { ferryFaq } from "./ferryFaq";
 
 export interface FerryConnectionLandingPageProps {
   lang: Lang;
   scheduleGeneratedAt: string;
   smartLogoHref: string;
+}
+
+const usd = (price: number): string => `$${price.toFixed(2)}`;
+
+function FareTable({ lang }: { lang: Lang }) {
+  const t = translator(lang);
+  const rows: Array<[string, string]> = [
+    [t("seo.ferry.fares.adultClipper"), usd(FERRY_FARES.adult)],
+    [t("seo.ferry.fares.adultTicket"), usd(FERRY_CONSTANTS.ADULT_PAPER_TICKET_FARE)],
+    [t("seo.ferry.fares.reduced"), usd(FERRY_FARES.youth)],
+    [t("seo.ferry.fares.clipperStart"), usd(FERRY_FARES["clipper-start"])],
+    [t("seo.ferry.fares.kids"), t("common.free")],
+  ];
+  return (
+    <SectionCard>
+      <CardHeader>
+        <CardTitle>{t("seo.ferry.faresHeading")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ul className="space-y-1.5 list-none p-0">
+          {rows.map(([label, price]) => (
+            <li
+              key={label}
+              className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border bg-card"
+            >
+              <span className="text-sm">{label}</span>
+              <span className="font-semibold tabular-nums">{price}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted-foreground">
+          {t("seo.ferry.faresNote", {
+            perZone: FARE_CONSTANTS.ADULT_FARE_PER_ZONE.toFixed(2),
+          })}
+        </p>
+        <p className="text-sm">
+          <a
+            href={FERRY_CONSTANTS.FARES_URL}
+            className="font-semibold hover:underline text-smart-train-green"
+          >
+            {t("seo.ferry.faresLink")}
+          </a>
+        </p>
+      </CardContent>
+    </SectionCard>
+  );
 }
 
 const linkTo = (lang: Lang, path: string): string =>
@@ -118,6 +173,8 @@ export function FerryConnectionLandingPage({
         }}
       />
 
+      <FareTable lang={lang} />
+
       {/* Weekday */}
       <SectionCard>
         <CardHeader>
@@ -160,6 +217,8 @@ export function FerryConnectionLandingPage({
         </CardContent>
       </SectionCard>
 
+      <FaqCard heading={t("seo.ferry.faqHeading")} items={ferryFaq(lang)} />
+
       {/* Related */}
       <SectionCard>
         <CardHeader>
@@ -175,6 +234,15 @@ export function FerryConnectionLandingPage({
                 {t("seo.ferry.larkspurLink")}
               </a>
             </li>
+            {ROUTE_PAIRS.filter(([from, to]) => isFerryLeg(from, to)).map(
+              ([from, to]) => (
+                <li key={`${from}-${to}`}>
+                  <a href={linkTo(lang, routePath(from, to))} className="hover:underline">
+                    {t("seo.route.ferryH1", { from, to })}
+                  </a>
+                </li>
+              ),
+            )}
           </ul>
         </CardContent>
       </SectionCard>

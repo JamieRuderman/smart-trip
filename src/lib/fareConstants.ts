@@ -1,3 +1,5 @@
+import type { FareType } from "@/types/smartSchedule";
+
 /**
  * Fare calculation constants
  * These represent the current SMART train fare structure
@@ -50,6 +52,18 @@ export const FARE_TYPES = {
 } as const;
 
 /**
+ * Golden Gate Ferry one-way fares between Larkspur and San Francisco with
+ * Clipper, by rider type (goldengate.org, effective July 1, 2026).
+ */
+export const FERRY_FARES = {
+  adult: 9.5,
+  youth: 7,
+  senior: 7,
+  disabled: 7,
+  "clipper-start": 4.75,
+} as const satisfies Record<FareType, number>;
+
+/**
  * Ferry-specific constants
  */
 export const FERRY_CONSTANTS = {
@@ -58,7 +72,18 @@ export const FERRY_CONSTANTS = {
 
   SCHEDULE_URL:
     "https://www.goldengate.org/ferry/route-schedule/larkspur-san-francisco/",
+
+  FARES_URL: "https://www.goldengate.org/ferry/ferry-fares-payment/",
+
+  ADULT_PAPER_TICKET_FARE: 14,
 } as const;
+
+/** The ferry fares as the `{{adult}}`, `{{ticket}}` and `{{reduced}}` translation params. */
+export const FERRY_FARE_PARAMS = {
+  adult: FERRY_FARES.adult.toFixed(2),
+  ticket: FERRY_CONSTANTS.ADULT_PAPER_TICKET_FARE.toFixed(2),
+  reduced: FERRY_FARES.youth.toFixed(2),
+};
 
 /**
  * App configuration constants

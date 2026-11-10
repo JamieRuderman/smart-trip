@@ -21,15 +21,19 @@ import {
   trainSchedules,
   type ScheduleType,
 } from "@/data/generated/trainSchedules.generated";
-import { FARE_CONSTANTS } from "@/lib/fareConstants";
+import { FERRY_FARE_PARAMS } from "@/lib/fareConstants";
+import { SAN_FRANCISCO, placeStation, type Place } from "@/lib/places";
+import { calculateFare } from "@/lib/scheduleUtils";
 import {
   CardContent,
   CardHeader,
   CardTitle,
   SectionCard,
   PillBadge,
+  FaqCard,
 } from "./ui";
 import { stationSlug } from "../../scripts/seo/slugify";
+import { SF_ROUTE_STATIONS, routePath } from "./routes";
 import { LANG_PATH_PREFIX, type Lang } from "./constants";
 import { translator } from "./i18n";
 import { renderCta } from "./cta";
@@ -62,11 +66,6 @@ const neighbors = (station: Station) => {
 
 const zoneOf = (station: Station): number =>
   STATION_ZONES.find((z) => z.station === station)?.zone ?? 0;
-
-const fareBetween = (fromZone: number, toZone: number): number => {
-  const zones = Math.abs(fromZone - toZone) + 1;
-  return zones * FARE_CONSTANTS.ADULT_FARE_PER_ZONE;
-};
 
 const linkTo = (lang: Lang, path: string): string =>
   `${LANG_PATH_PREFIX[lang]}${path}`;
@@ -174,6 +173,10 @@ export function StationLandingPage({
   const zone = zoneOf(station);
   const pos = directionOf(station);
   const isLarkspur = station === "Larkspur";
+  const fareDestinations: Place[] = [north, south].filter(
+    (place): place is Station => place != null,
+  );
+  if (SF_ROUTE_STATIONS.includes(station)) fareDestinations.push(SAN_FRANCISCO);
 
   return (
     <Layout
@@ -240,40 +243,24 @@ export function StationLandingPage({
         <CardContent className="space-y-3">
           <p>{t("seo.station.fareZone", { station, zone })}</p>
           <ul className="space-y-2 list-none p-0">
-            {north && (
-              <li>
+            {fareDestinations.map((to) => (
+              <li key={to}>
                 <a
-                  href={linkTo(
-                    lang,
-                    `/routes/${stationSlug(station)}-to-${stationSlug(north)}/`,
-                  )}
+                  href={linkTo(lang, routePath(station, to))}
                   className="inline-flex items-center gap-2 hover:underline"
                 >
-                  <span>{station} → {north}</span>
+                  <span>
+                    {to === SAN_FRANCISCO
+                      ? t("seo.station.toSanFrancisco", { station })
+                      : `${station} → ${to}`}
+                  </span>
                   <PillBadge
-                    label={`$${fareBetween(zone, zoneOf(north)).toFixed(2)}`}
+                    label={`$${calculateFare(station, placeStation(to), "adult", to === SAN_FRANCISCO).price.toFixed(2)}`}
                     color="ontime"
                   />
                 </a>
               </li>
-            )}
-            {south && (
-              <li>
-                <a
-                  href={linkTo(
-                    lang,
-                    `/routes/${stationSlug(station)}-to-${stationSlug(south)}/`,
-                  )}
-                  className="inline-flex items-center gap-2 hover:underline"
-                >
-                  <span>{station} → {south}</span>
-                  <PillBadge
-                    label={`$${fareBetween(zone, zoneOf(south)).toFixed(2)}`}
-                    color="ontime"
-                  />
-                </a>
-              </li>
-            )}
+            ))}
           </ul>
         </CardContent>
       </SectionCard>
@@ -287,6 +274,7 @@ export function StationLandingPage({
           <CardContent>
             <p>
               {t("seo.station.ferryBody")}{" "}
+              {t("seo.station.ferryFare", FERRY_FARE_PARAMS)}{" "}
               <a
                 href={linkTo(lang, "/ferry-connection/")}
                 className="font-semibold hover:underline text-smart-train-green"
@@ -299,25 +287,13 @@ export function StationLandingPage({
       ) : null}
 
       {/* FAQ */}
-      <SectionCard>
-        <CardHeader>
-          <CardTitle>{t("seo.station.faqHeading")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-4">
-            {(["cost", "firstTrain", "parking"] as const).map((key) => (
-              <div key={key}>
-                <dt className="font-semibold">
-                  {t(`seo.station.faq.${key}.q`, { station })}
-                </dt>
-                <dd className="text-muted-foreground mt-1">
-                  {t(`seo.station.faq.${key}.a`, { station, zone })}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </SectionCard>
+      <FaqCard
+        heading={t("seo.station.faqHeading")}
+        items={(["cost", "firstTrain", "parking"] as const).map((key) => ({
+          question: t(`seo.station.faq.${key}.q`, { station }),
+          answer: t(`seo.station.faq.${key}.a`, { station, zone }),
+        }))}
+      />
 
       {/* Cross-discovery: other stations */}
       <SectionCard>

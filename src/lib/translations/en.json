@@ -69,9 +69,18 @@
     "disabled": "Disabled/Medicare - 50% off",
     "clipperStart": "Clipper START - 50% off",
     "faresZoneBased": "Fares are zone-based (${{price}} per zone for adults)",
-    "youthSeniorsFree": "Youth (0-18) and seniors (65+) ride free",
+    "youthSeniorsFree": "Youth (0-18) and seniors (65+) ride the train free",
     "discountsAvailable": "Discounts for disabled / Medicare and low-income riders",
-    "paymentOptions": "For payment options and passes, visit"
+    "paymentOptions": "For payment options and passes, visit",
+    "and": "and",
+    "trainPlusFerry": "Train {{train}} + ferry {{ferry}}",
+    "ferryFares": "Prices include the Golden Gate Ferry: ${{adult}} for adults with Clipper (${{ticket}} paper ticket), ${{reduced}} for youth, seniors and riders with disabilities. Kids 4 and under ride free",
+    "transferDiscount": "Paying for both with Clipper may earn a transfer discount",
+    "ferry": {
+      "youth": "Youth (5-18)",
+      "senior": "Senior (65+)",
+      "disabled": "Disabled/Medicare"
+    }
   },
   "bottomInfo": {
     "dataProvidedBy": "Data provided by",
@@ -386,6 +395,8 @@
       "ferryHeading": "Ferry Connection",
       "ferryBody": "Larkspur SMART station connects directly to the Larkspur Ferry Terminal with onward service to San Francisco.",
       "ferryLink": "See ferry schedule and connection details →",
+      "ferryFare": "The ferry is ${{adult}} one way for adults with Clipper.",
+      "toSanFrancisco": "{{station}} → San Francisco by ferry",
       "faqHeading": "Frequently Asked Questions",
       "faq": {
         "cost": {
@@ -433,13 +444,45 @@
       "zonesPill": "{{zones}} zones",
       "relatedHeading": "Related Pages",
       "viewStation": "{{station}} station schedule",
-      "viewReverse": "Reverse trip: {{from}} to {{to}}"
+      "viewReverse": "Reverse trip: {{from}} to {{to}}",
+      "ferryTitle": "{{from}} to {{to}} by Ferry & SMART Train | {{site}}",
+      "ferryDescription": "Golden Gate Ferry and SMART train schedule from {{from}} to {{to}}: weekday and weekend connections, trip times, and fares.",
+      "ferryH1": "Ferry + SMART Train: {{from}} to {{to}}",
+      "ferryIntro": {
+        "fromSf": "Take the Golden Gate Ferry from the San Francisco Ferry Building to Larkspur, then the SMART train north to {{to}}. Each trip pairs a ferry with the train it meets, timed from the ferry leaving San Francisco to the train reaching {{to}}.",
+        "toSf": "Take the SMART train from {{from}} to Larkspur, then the Golden Gate Ferry to the San Francisco Ferry Building. Each trip pairs a train with the ferry it meets, timed from the train leaving {{from}} to the ferry reaching San Francisco."
+      },
+      "ferryFare": "Adult one-way fare with Clipper: ${{total}} (train ${{train}} + ferry ${{ferry}}). Youth and seniors ride the train free and pay ${{reduced}} for the ferry.",
+      "ferryPill": "Ferry + train",
+      "ferryLeg": "Ferry {{depart}} → {{arrive}}",
+      "ferryLink": "Larkspur ferry schedule and fares"
     },
     "ferry": {
-      "title": "Larkspur Ferry Connection | {{site}}",
-      "description": "Ferry schedule connecting the Larkspur SMART station to San Francisco. Weekday and weekend departures.",
+      "title": "Larkspur Ferry to San Francisco: Schedule & Fares | {{site}}",
+      "description": "Golden Gate Ferry schedule and fares between the Larkspur SMART station and San Francisco's Ferry Building. Weekday and weekend departures.",
       "h1": "Larkspur Ferry Connection",
-      "intro": "The Larkspur SMART station connects directly to the Larkspur Ferry Terminal with regular service to San Francisco's Ferry Building. Combined ticketing options are available via Clipper.",
+      "intro": "The Larkspur SMART station connects directly to the Larkspur Ferry Terminal with regular service to San Francisco's Ferry Building. Pay for the train and the ferry with the same Clipper card.",
+      "faresHeading": "Ferry Fares",
+      "fares": {
+        "adultClipper": "Adult (19-64), Clipper or contactless card",
+        "adultTicket": "Adult paper ticket",
+        "reduced": "Youth (5-18), seniors (65+), disabled or Medicare",
+        "clipperStart": "Clipper START",
+        "kids": "Kids 4 and under"
+      },
+      "faresNote": "One-way fares between Larkspur and San Francisco. Youth, senior and disability discounts need Clipper or a paper ticket. Add the SMART train fare (${{perZone}} per zone for adults; youth and seniors ride the train free). Paying for both with Clipper may earn a transfer discount.",
+      "faresLink": "All Golden Gate Ferry fares →",
+      "faqHeading": "Frequently Asked Questions",
+      "faq": {
+        "cost": {
+          "q": "How much is the ferry from Larkspur to San Francisco?",
+          "a": "A one-way Golden Gate Ferry ride between Larkspur and San Francisco is ${{adult}} for adults paying with Clipper or a contactless card, or ${{ticket}} with a paper ticket. Youth, seniors and riders with disabilities pay ${{reduced}}, and kids 4 and under ride free."
+        },
+        "smart": {
+          "q": "Can I take the SMART train to San Francisco?",
+          "a": "Yes. Ride SMART to Larkspur, then take the Golden Gate Ferry from the Larkspur Ferry Terminal to the San Francisco Ferry Building, usually a {{minutes}}-minute crossing."
+        }
+      },
       "breadcrumb": "Ferry Connection",
       "weekdayHeading": "Weekday Ferries",
       "weekendHeading": "Weekend Ferries",

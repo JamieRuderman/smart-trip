@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   adjacentFerry,
+  calculateFare,
   ferryTransfer,
   futureServiceDate,
+  getAllFareOptions,
   getFilteredTrips,
   getFirstInProgressTripIndex,
   getNextFerryDeparture,
@@ -21,6 +23,7 @@ import {
   type SchedulePayload,
 } from "@/data/scheduleData";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
+import type { FareType } from "@/types/smartSchedule";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
 
 /** Minimal ProcessedTrip — these helpers only read departure/arrival times. */
@@ -451,5 +454,30 @@ describe("adjacentFerry", () => {
   it("reads the timetable of the schedule type it's given", () => {
     useFerries([["16:30", "17:05"], ["18:00", "18:35"]], []);
     expect(adjacentFerry(run("16:30", "17:05"), false, "weekend")).toBeNull();
+  });
+});
+
+describe("calculateFare", () => {
+  it("charges only the train between stations", () => {
+    expect(calculateFare("Larkspur", "Petaluma Downtown", "adult")).toMatchObject({
+      zones: 3,
+      price: 4.5,
+      ferryPrice: null,
+    });
+  });
+
+  it("adds the ferry for a trip that rides it", () => {
+    const fare = (type: FareType) =>
+      calculateFare("Petaluma Downtown", "Larkspur", type, true);
+    expect(fare("adult")).toMatchObject({ price: 14, trainPrice: 4.5, ferryPrice: 9.5 });
+    expect(fare("youth")).toMatchObject({ price: 7, trainPrice: 0, ferryPrice: 7 });
+    expect(fare("disabled")).toMatchObject({ price: 9.25, trainPrice: 2.25, ferryPrice: 7 });
+    expect(fare("clipper-start")).toMatchObject({ price: 7, trainPrice: 2.25, ferryPrice: 4.75 });
+  });
+
+  it("prices every fare type on a ferry trip", () => {
+    expect(
+      getAllFareOptions("Larkspur", "Windsor", true).map((f) => f.ferryPrice),
+    ).toEqual([9.5, 7, 7, 7, 4.75]);
   });
 });

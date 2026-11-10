@@ -9,7 +9,7 @@ import { calculateTimeDifference } from "@/lib/timeUtils";
 import type { Lang } from "./constants";
 import { translator } from "./i18n";
 
-function typicalCrossingMinutes(): number {
+function typicalCrossingMinutes(): number | null {
   const counts = new Map<number, number>();
   for (const { depart, arrive } of [
     ...weekdayFerries,
@@ -20,20 +20,29 @@ function typicalCrossingMinutes(): number {
     const minutes = calculateTimeDifference(depart, arrive);
     counts.set(minutes, (counts.get(minutes) ?? 0) + 1);
   }
-  return [...counts].reduce((best, entry) => (entry[1] > best[1] ? entry : best))[0];
+  let typical: number | null = null;
+  for (const [minutes, count] of counts) {
+    if (typical == null || count > counts.get(typical)!) typical = minutes;
+  }
+  return typical;
 }
 
 /** Google only honors FAQPage markup that matches the FAQ shown on the page. */
 export function ferryFaq(lang: Lang): { question: string; answer: string }[] {
   const t = translator(lang);
+  const minutes = typicalCrossingMinutes();
   return [
     {
       question: t("seo.ferry.faq.cost.q"),
       answer: t("seo.ferry.faq.cost.a", FERRY_FARE_PARAMS),
     },
-    {
-      question: t("seo.ferry.faq.smart.q"),
-      answer: t("seo.ferry.faq.smart.a", { minutes: typicalCrossingMinutes() }),
-    },
+    ...(minutes == null
+      ? []
+      : [
+          {
+            question: t("seo.ferry.faq.smart.q"),
+            answer: t("seo.ferry.faq.smart.a", { minutes }),
+          },
+        ]),
   ];
 }

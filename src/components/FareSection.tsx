@@ -24,6 +24,7 @@ export function FareSection({ from, to }: FareSectionProps) {
   const viaFerry = isFerryLeg(from, to);
   const fromStation = placeStation(from);
   const toStation = placeStation(to);
+  if (fromStation === toStation) return null;
 
   const getFareDescription = (fareType: FareType): string => {
     const riderLabels = viaFerry ? "fare.ferry" : "fare";

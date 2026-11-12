@@ -1,4 +1,5 @@
 import { REMINDER_FIRE_BUFFER_MS } from "./focusedTrip";
+import { isReminderSupported } from "./notificationScheduler";
 
 /** Default lead time pre-selected when the reminder picker opens. */
 export const DEFAULT_LEAD_MINUTES = 15;
@@ -54,4 +55,10 @@ export function reminderLeadRange(
     // disables "Set" here.
     tooLate: maxLeadRaw < MIN_LEAD_MINUTES,
   };
+}
+
+/** Whether "Take this train" should pop the reminder modal for a departure:
+ *  notifications are supported and there's still lead left to schedule one. */
+export function canOfferReminder(departureAt: number, now: number): boolean {
+  return isReminderSupported() && !reminderLeadRange(departureAt, now).tooLate;
 }

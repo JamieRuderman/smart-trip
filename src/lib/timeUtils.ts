@@ -185,6 +185,12 @@ function agencyParts(epochMs: number): Record<string, number> {
   return out;
 }
 
+/** The calendar date at SMART's stations, even on a device in another zone. */
+export function agencyDateKey(date: Date): string {
+  const { year, month, day } = agencyParts(date.getTime());
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** Agency-zone (America/Los_Angeles) offset in minutes at a given instant. */
 function agencyOffsetMinutes(epochMs: number): number {
   const p = agencyParts(epochMs);
@@ -206,8 +212,8 @@ export function agencyClockHHMM(epochSeconds: number): string {
  * Convert a scheduled agency-zone wall time ("YYYYMMDD" + "HH:MM") to an epoch
  * (seconds), independent of the device timezone. The previous device-local
  * conversion produced wrong delays on a phone set to a non-Pacific zone, since
- * the static timetable is Pacific wall time. (One offset correction; exact
- * except inside the twice-yearly DST transition hour, which has no service.)
+ * the static timetable is Pacific wall time. Recheck the offset at the resolved
+ * instant for morning runs on the day the clocks change.
  */
 export function agencyWallTimeToEpochSeconds(
   yyyymmdd: string,
@@ -218,8 +224,9 @@ export function agencyWallTimeToEpochSeconds(
   const day = Number(yyyymmdd.slice(6, 8));
   const [h, m] = hhmm.split(":").map(Number);
   const utcGuess = Date.UTC(year, month - 1, day, h, m);
-  const offsetMin = agencyOffsetMinutes(utcGuess);
-  return Math.floor((utcGuess - offsetMin * 60_000) / 1000);
+  const firstGuess = utcGuess - agencyOffsetMinutes(utcGuess) * 60_000;
+  const corrected = utcGuess - agencyOffsetMinutes(firstGuess) * 60_000;
+  return Math.floor(corrected / 1000);
 }
 
 /**

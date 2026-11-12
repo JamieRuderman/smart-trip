@@ -1,3 +1,4 @@
+import { isSharedTripPath } from "@/lib/sharedTrip";
 import {
   useCallback,
   useEffect,
@@ -106,8 +107,10 @@ interface ProviderState {
 }
 
 export function StationSelectionProvider({ children }: { children: ReactNode }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [urlParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const isTripPreview = isSharedTripPath(location.pathname);
+  const searchParams = isTripPreview ? new URLSearchParams() : urlParams;
 
   // Detect shared-link mode on init: URL has both ?trip=N and ?type=T.
   // In shared mode we honour the URL type so the recipient sees the same
@@ -178,6 +181,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   const searchParamsRef = useRef(searchParams);
   searchParamsRef.current = searchParams;
   useEffect(() => {
+    if (isTripPreview) return;
     const params: Record<string, string> = {};
     searchParamsRef.current.forEach((value, key) => {
       if (!MANAGED_PARAMS.has(key)) params[key] = value;
@@ -195,6 +199,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     state.selectedTripNumber,
     state.scheduleType,
     location.pathname,
+    isTripPreview,
     setSearchParams,
   ]);
 

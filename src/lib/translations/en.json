@@ -260,6 +260,24 @@
     "alarmStop": "Stop",
     "alarmViewTrip": "View trip"
   },
+  "shareTrip": {
+    "share": "Share trip",
+    "title": "SMART trip itinerary",
+    "message": "{{from}} → {{to}} · {{date}} · {{departure}}–{{arrival}} Pacific time · {{service}} (scheduled)",
+    "pacificDate": "{{date}} · Pacific time",
+    "train": "Train {{train}}",
+    "trainAndFerry": "Train {{train}} + ferry",
+    "loading": "Checking the schedule…",
+    "unavailable": "This trip link is invalid or the departure is no longer in the schedule.",
+    "take": "Take this trip",
+    "switchBody": "Change your active trip to Train {{train}} from {{from}} to {{to}} on {{date}}?",
+    "openApp": "Open in SMART trip",
+    "copyDescription": "Copy this link to send the itinerary.",
+    "link": "Trip link",
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "copyManually": "Use your browser’s Copy command on the selected link."
+  },
   "focusedTrip": {
     "go": "Take this train",
     "goViaFerry": "Take this trip",

@@ -17,6 +17,8 @@ PODS:
     - Capacitor
   - CapacitorLocalNotifications (8.3.1):
     - Capacitor
+  - CapacitorShare (8.0.3):
+    - Capacitor
   - CapacitorSplashScreen (8.0.2):
     - Capacitor
   - CapacitorStatusBar (8.0.3):
@@ -33,6 +35,7 @@ DEPENDENCIES:
   - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
   - CapacitorLiveActivity (from `../../node_modules/capacitor-live-activity`)
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
+  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
 
@@ -59,6 +62,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/capacitor-live-activity"
   CapacitorLocalNotifications:
     :path: "../../node_modules/@capacitor/local-notifications"
+  CapacitorShare:
+    :path: "../../node_modules/@capacitor/share"
   CapacitorSplashScreen:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
@@ -74,10 +79,11 @@ SPEC CHECKSUMS:
   CapacitorKeyboard: b6b0744890cdb1d9a96e2cafcc9253fdcc55de3b
   CapacitorLiveActivity: 7b84904a7230327780949e50ea98bbb3f0ee31cc
   CapacitorLocalNotifications: e0747a329ddde3074d52dc74a003688af90e42be
+  CapacitorShare: 5b5e53347556bee89ae6163ed20b5b3c25fe75f1
   CapacitorSplashScreen: 7bf61c2001557ff9e195e601c6b87344480d3c65
   CapacitorStatusBar: eca7bc2b58d9f886f1ef9edb66e57a9b29c121af
   IONGeolocationLib: 6a7b6f76063fb1b01cfb14fae7d0f526e3c9b271
 
-PODFILE CHECKSUM: 4a2df9ee665def3767c5126ff8b7dce2d045890b
+PODFILE CHECKSUM: 69b109318c5db03666e65b613d6bf5552d376185
 
 COCOAPODS: 1.16.2

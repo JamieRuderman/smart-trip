@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["6YH3537ZY9.smart.trip"],
+        "components": [{ "/": "/share/trip" }]
+      }
+    ]
+  }
+}

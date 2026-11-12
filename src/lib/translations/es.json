@@ -260,6 +260,24 @@
     "alarmStop": "Detener",
     "alarmViewTrip": "Ver viaje"
   },
+  "shareTrip": {
+    "share": "Compartir viaje",
+    "title": "Itinerario de SMART trip",
+    "message": "{{from}} → {{to}} · {{date}} · {{departure}}–{{arrival}} hora del Pacífico · {{service}} (horario programado)",
+    "pacificDate": "{{date}} · hora del Pacífico",
+    "train": "Tren {{train}}",
+    "trainAndFerry": "Tren {{train}} + ferry",
+    "loading": "Consultando el horario…",
+    "unavailable": "Este enlace no es válido o la salida ya no figura en el horario.",
+    "take": "Tomar este viaje",
+    "switchBody": "¿Cambiar tu viaje activo al tren {{train}} de {{from}} a {{to}} el {{date}}?",
+    "openApp": "Abrir en SMART trip",
+    "copyDescription": "Copia este enlace para enviar el itinerario.",
+    "link": "Enlace del viaje",
+    "copy": "Copiar enlace",
+    "copied": "Enlace copiado",
+    "copyManually": "Usa la opción Copiar del navegador en el enlace seleccionado."
+  },
   "focusedTrip": {
     "go": "Tomar este tren",
     "goViaFerry": "Tomar este viaje",

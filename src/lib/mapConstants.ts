@@ -1,3 +1,4 @@
+import type { Feature, LineString } from "geojson";
 import { STATION_COORDINATES } from "@/data/stations";
 import type { Station } from "@/types/smartSchedule";
 import stations from "@/data/stations";
@@ -7,7 +8,7 @@ import { SMART_RAIL_COORDINATES } from "@/data/generated/railGeometry.generated"
 export const STATION_ORDER: Station[] = stations;
 
 /** Route line as GeoJSON following the actual SMART rail corridor (from Sonoma County GIS). */
-export const ROUTE_GEOJSON: GeoJSON.Feature<GeoJSON.LineString> = {
+export const ROUTE_GEOJSON: Feature<LineString> = {
   type: "Feature",
   properties: {},
   geometry: {

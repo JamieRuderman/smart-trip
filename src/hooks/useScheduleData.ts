@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import {
   isSchedulePayload,
   type SchedulePayload,
@@ -48,66 +48,75 @@ function storeCachedPayload(payload: SchedulePayload): void {
   }
 }
 
-export function useScheduleData(): ScheduleDataState {
-  const meta = useSyncExternalStore(subscribeSchedule, getScheduleMeta, getScheduleMeta);
-  const mountedRef = useRef(true);
-  const inFlightRefreshRef = useRef<Promise<void> | null>(null);
+let inFlightRefresh: Promise<void> | null = null;
+// True until the first remote check settles, so a shared link to a newly added
+// trip reads as loading rather than missing.
+let refreshing = true;
+const refreshingListeners = new Set<() => void>();
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+function setRefreshing(value: boolean): void {
+  if (refreshing === value) return;
+  refreshing = value;
+  refreshingListeners.forEach((listener) => listener());
+}
 
-  const refreshSchedulePayload = useCallback((): Promise<void> => {
-    if (inFlightRefreshRef.current) {
-      return inFlightRefreshRef.current;
-    }
+function subscribeRefreshing(listener: () => void): () => void {
+  refreshingListeners.add(listener);
+  return () => {
+    refreshingListeners.delete(listener);
+  };
+}
 
-    const refreshPromise = fetch(scheduleUrl, { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (!mountedRef.current || !data || !isSchedulePayload(data)) return;
-        // setScheduleData publishes cache + meta atomically and notifies
-        // subscribers; useSyncExternalStore picks up the new snapshot.
-        setScheduleData(data, "remote");
-        storeCachedPayload(data);
-      })
-      .catch(() => {
-        // Ignore network errors and keep bundled or cached data.
-      })
-      .finally(() => {
-        inFlightRefreshRef.current = null;
-      });
+function getRefreshing(): boolean {
+  return refreshing;
+}
 
-    inFlightRefreshRef.current = refreshPromise;
-    return refreshPromise;
-  }, []);
+function refreshSchedulePayload(): Promise<void> {
+  if (inFlightRefresh) return inFlightRefresh;
 
+  setRefreshing(true);
+  inFlightRefresh = fetch(scheduleUrl, { cache: "no-store" })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => {
+      if (!data || !isSchedulePayload(data)) return;
+      // setScheduleData publishes cache + meta atomically and notifies
+      // subscribers; useSyncExternalStore picks up the new snapshot.
+      setScheduleData(data, "remote");
+      storeCachedPayload(data);
+    })
+    .catch(() => {
+      // Ignore network errors and keep bundled or cached data.
+    })
+    .finally(() => {
+      inFlightRefresh = null;
+      setRefreshing(false);
+    });
+  return inFlightRefresh;
+}
+
+/** Mount once at the app root: applies the cached payload, then refreshes on
+ *  launch and on every app refresh (foreground, focus, reconnect). */
+export function useScheduleSync(): void {
   useEffect(() => {
     const cached = loadCachedPayload();
-    if (cached) {
-      setScheduleData(cached, "cached");
-    }
-
+    if (cached) setScheduleData(cached, "cached");
     void refreshSchedulePayload();
-  }, [refreshSchedulePayload]);
-
-  useEffect(() => {
-    const onAppRefresh = () => {
-      void refreshSchedulePayload();
-    };
-
-    window.addEventListener(APP_REFRESH_EVENT, onAppRefresh);
+    window.addEventListener(APP_REFRESH_EVENT, refreshSchedulePayload);
     return () => {
-      window.removeEventListener(APP_REFRESH_EVENT, onAppRefresh);
+      window.removeEventListener(APP_REFRESH_EVENT, refreshSchedulePayload);
     };
-  }, [refreshSchedulePayload]);
+  }, []);
+}
 
+export function useScheduleData(): ScheduleDataState {
+  const meta = useSyncExternalStore(subscribeSchedule, getScheduleMeta, getScheduleMeta);
   return {
     version: String(meta.version),
     source: meta.source,
     generatedAt: meta.generatedAt,
   };
+}
+
+export function useScheduleRefreshing(): boolean {
+  return useSyncExternalStore(subscribeRefreshing, getRefreshing, getRefreshing);
 }

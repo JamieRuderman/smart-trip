@@ -9,7 +9,6 @@ import {
   findRealtimeStatus,
   useTripRealtimeStatusMap,
 } from "@/hooks/useTripUpdates";
-import { isReminderSupported } from "@/lib/notificationScheduler";
 import { correctedLeg, type Leg } from "@/lib/boardingLocation";
 import {
   futureServiceDate,
@@ -26,7 +25,7 @@ import {
   type FocusedRun,
 } from "@/lib/focusedTrip";
 import { SAN_FRANCISCO, legPlaces } from "@/lib/places";
-import { reminderLeadRange } from "@/lib/reminderLead";
+import { canOfferReminder } from "@/lib/reminderLead";
 import { buildReminderText } from "@/lib/reminderText";
 import {
   parseServiceDate,
@@ -343,10 +342,7 @@ export function DepartureReminder({
     // supported, or when there's too little lead left to schedule a useful
     // reminder — there's nothing worth configuring in either case. Focusing
     // itself is still allowed right up to arrival.
-    if (
-      isReminderSupported() &&
-      !reminderLeadRange(runDepartureAt, currentTime.getTime()).tooLate
-    ) {
+    if (canOfferReminder(runDepartureAt, currentTime.getTime())) {
       openReminderDialog();
     }
   };

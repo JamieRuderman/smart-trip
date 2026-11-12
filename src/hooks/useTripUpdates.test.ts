@@ -159,6 +159,29 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     expect(result.status.delayMinutes).toBe(3);
     expect(result.status.liveDepartureTime).toBe("09:47");
     expect(result.status.liveArrivalTime).toBe("11:08");
+    expect(result.status.isStopSkipped).toBe(false);
+  });
+
+  it("flags a SKIPPED destination before the train leaves", () => {
+    const result = deriveStatus(
+      update([
+        {
+          stopId: stopIdFor("Larkspur", "northbound"),
+          departureTime: wall("09:44"),
+          scheduleRelationship: "SCHEDULED",
+        },
+        { stopId: stopIdFor("Windsor", "northbound"), scheduleRelationship: "SKIPPED" },
+      ]),
+      FROM,
+      TO,
+      "northbound",
+      "09:44",
+      "11:05",
+      SCHED_TIMES,
+    );
+    expect(result.kind).toBe("primary");
+    if (result.kind !== "primary") return;
+    expect(result.status.isStopSkipped).toBe(true);
   });
 });
 

@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type { Station } from "@/types/smartSchedule";
 import type { Place } from "@/lib/places";
 import type { FocusedTrip } from "@/lib/focusedTrip";
+import type { syncFocusedActivityContent } from "@/lib/liveActivityController";
 import type {
   FocusTripInput,
   ReminderText,
@@ -51,15 +52,7 @@ export interface StationSelection {
   rescheduleReminder: (departureAt: number, text: ReminderText) => Promise<void>;
   /** Push live departure/arrival/delay into the focused trip's iOS Live
    *  Activity (no-op when none is running — non-iOS, unsupported, off). */
-  updateLiveActivity: (args: {
-    departureAt: number;
-    arrivalAt: number;
-    delayMinutes: number | null;
-    nextStop?: string | null;
-    remainingStops?: number | null;
-    isCanceled?: boolean;
-    isStopSkipped?: boolean;
-  }) => Promise<void>;
+  updateLiveActivity: typeof syncFocusedActivityContent;
   clearFocusedTrip: () => Promise<void>;
 }
 

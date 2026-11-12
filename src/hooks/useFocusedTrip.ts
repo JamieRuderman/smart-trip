@@ -174,18 +174,7 @@ export function useFocusedTrip() {
    * running, and deduped against the last sent content so the RT poll / clock
    * tick can call this freely.
    */
-  const updateLiveActivity = useCallback(
-    (args: {
-      departureAt: number;
-      arrivalAt: number;
-      delayMinutes: number | null;
-      nextStop?: string | null;
-      remainingStops?: number | null;
-      isCanceled?: boolean;
-      isStopSkipped?: boolean;
-    }): Promise<void> => syncFocusedActivityContent(args),
-    [],
-  );
+  const updateLiveActivity = syncFocusedActivityContent;
 
   const clearFocusedTrip = useCallback(() => replaceFocus(null), []);
 

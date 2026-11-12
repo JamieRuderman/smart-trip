@@ -108,8 +108,8 @@ export function StopTimeline({
           const showStopDelay = perStopDelayMin > 0 && !isPast;
           const isStopDelayProminent = showStopDelay && tripIsDelayed;
 
-          const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
-          const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
+          const showLiveFrom = isFrom && !isSkippedStop && realtimeStatus?.liveDepartureTime;
+          const showLiveTo = isTo && !isFrom && !isSkippedStop && realtimeStatus?.liveArrivalTime;
 
           // Per-stop semantic state — drives all colours for this row
           const accent: TripState = isCanceled

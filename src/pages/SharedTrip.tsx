@@ -12,7 +12,13 @@ import { useScheduleData, useScheduleRefreshing } from "@/hooks/useScheduleData"
 import { useTripProgress } from "@/hooks/useTripProgress";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { findRealtimeStatus, useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
-import { reconstructFocusedTrip, sameFocusIdentity } from "@/lib/focusedTrip";
+import {
+  focusedBoardingInstant,
+  reconstructFocusedTrip,
+  sameFocusIdentity,
+} from "@/lib/focusedTrip";
+import { isReminderSupported } from "@/lib/notificationScheduler";
+import { reminderLeadRange } from "@/lib/reminderLead";
 import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
 import {
   androidSharedTripIntent,
@@ -73,8 +79,9 @@ function SharedItinerary({ shared, trip, onBack }: {
   onBack: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { focusedTrip, focusTrip, setSelectedTrip } = useStationSelection();
+  const { focusedTrip, focusTrip, setSelectedTrip, openReminderDialog } = useStationSelection();
   const [confirmSwitch, setConfirmSwitch] = useState(false);
   const now = useMinuteClock();
   const { run, from, to } = shared;
@@ -117,11 +124,31 @@ function SharedItinerary({ shared, trip, onBack }: {
     trackVehicle: today,
   });
 
+  const openMyTrip = () => {
+    setSelectedTrip(null);
+    const inAppHistory = hasInAppHistory(location.key);
+    // A link opened in a fresh tab has nothing in-app behind it, so My Trip's
+    // Back would leave the site; put the schedule there instead.
+    if (!inAppHistory) navigate("/", { replace: true });
+    navigate(TRIP_VIEW_PATH, { replace: inAppHistory });
+  };
+
   const take = () => {
     if (!canTake) return;
-    if (!alreadyTaking) void focusTrip(run);
-    setSelectedTrip(null);
-    navigate(TRIP_VIEW_PATH, { replace: true });
+    if (alreadyTaking) {
+      openMyTrip();
+      return;
+    }
+    void focusTrip(run);
+    openMyTrip();
+    const departureAt = focusedBoardingInstant(run, live?.liveDepartureTime);
+    if (
+      departureAt != null &&
+      isReminderSupported() &&
+      !reminderLeadRange(departureAt, Date.now()).tooLate
+    ) {
+      openReminderDialog();
+    }
   };
 
   const actions = (canTake || android) ? (

@@ -151,8 +151,7 @@ type DerivedStatusResult =
 
 const CANCELED_STATUS: TripRealtimeStatus = {
   isCanceled: true,
-  isOriginSkipped: false,
-  isDestinationSkipped: false,
+  isStopSkipped: false,
 };
 
 /**
@@ -238,9 +237,12 @@ function deriveEnRouteStatus(
   }
 
   const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
+  const isStopSkipped = isOriginSkipped || toUpdate?.scheduleRelationship === "SKIPPED";
   // Nothing usable on this leg's direction (e.g. only the opposite leg of a
   // round-trip-encoded GTFS trip remains) — don't key an empty status.
-  if (!hasRealtimeStopData && liveArrivalTime == null) return { kind: "none" };
+  if (!hasRealtimeStopData && liveArrivalTime == null && !isStopSkipped) {
+    return { kind: "none" };
+  }
 
   return {
     kind: "primary",
@@ -249,8 +251,7 @@ function deriveEnRouteStatus(
       isCanceled: false,
       liveArrivalTime,
       arrivalDelayMinutes,
-      isOriginSkipped,
-      isDestinationSkipped: toUpdate?.scheduleRelationship === "SKIPPED",
+      isStopSkipped,
       allStopLiveDepartures,
       allStopDelayMinutes,
       hasRealtimeStopData,
@@ -286,8 +287,9 @@ function deriveScheduledStatus(
     );
   }
 
-  const isOriginSkipped = fromUpdate.scheduleRelationship === "SKIPPED";
-  const isDestinationSkipped = toUpdate?.scheduleRelationship === "SKIPPED";
+  const isStopSkipped =
+    fromUpdate.scheduleRelationship === "SKIPPED" ||
+    toUpdate?.scheduleRelationship === "SKIPPED";
 
   // Use departure.time per SMART spec — manually adjusted for holds/delays.
   const liveDepartureTime = unixToTimeString(fromUpdate.departureTime);
@@ -351,8 +353,7 @@ function deriveScheduledStatus(
       liveArrivalTime,
       delayMinutes,
       arrivalDelayMinutes,
-      isOriginSkipped: !!isOriginSkipped,
-      isDestinationSkipped: !!isDestinationSkipped,
+      isStopSkipped,
       allStopLiveDepartures,
       allStopDelayMinutes,
       hasRealtimeStopData,

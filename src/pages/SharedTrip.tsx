@@ -96,7 +96,7 @@ function SharedItinerary({ shared, trip, onBack }: {
     run.serviceDate.replace(/-/g, ""),
   );
   const live = today ? findRealtimeStatus(statusMap, trip) : null;
-  const { isCanceledOrSkipped } = useTripStatus(live);
+  const { isCanceledOrSkipped } = useTripStatus(live, run.fromStation, run.toStation);
   const arrivalAt = sharedTripArrival(run.serviceDate, tripEnds(trip), tripEnds(trip, live).end);
   const minutesUntilArrival = Math.ceil((arrivalAt - now.getTime()) / 60_000);
   const alreadyTaking = sameFocusIdentity(focusedTrip, run);

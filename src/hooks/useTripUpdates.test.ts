@@ -109,10 +109,10 @@ describe("deriveStatus — en-route (boarding stop pruned from the feed)", () =>
     );
     expect(result.kind).toBe("primary");
     if (result.kind !== "primary") return;
-    expect(result.status.isStopSkipped).toBe(true);
+    expect(result.status.skippedStations).toEqual(["Windsor"]);
   });
 
-  it("records a skipped stop between the rider's stops without flagging their leg", () => {
+  it("records a skipped stop between the rider's stops, on this direction only", () => {
     const result = deriveStatus(
       update([
         { stopId: stopIdFor("Novato Downtown", "northbound"), scheduleRelationship: "SKIPPED" },
@@ -128,7 +128,6 @@ describe("deriveStatus — en-route (boarding stop pruned from the feed)", () =>
     expect(result.kind).toBe("primary");
     if (result.kind !== "primary") return;
     expect(result.status.skippedStations).toEqual(["Novato Downtown"]);
-    expect(result.status.isStopSkipped).toBe(false);
   });
 
   it("returns none when only opposite-direction stops remain (round-trip GTFS encoding)", () => {
@@ -178,7 +177,7 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     expect(result.status.delayMinutes).toBe(3);
     expect(result.status.liveDepartureTime).toBe("09:47");
     expect(result.status.liveArrivalTime).toBe("11:08");
-    expect(result.status.isStopSkipped).toBe(false);
+    expect(result.status.skippedStations).toEqual([]);
   });
 
   it("flags a SKIPPED destination before the train leaves", () => {
@@ -200,7 +199,6 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     );
     expect(result.kind).toBe("primary");
     if (result.kind !== "primary") return;
-    expect(result.status.isStopSkipped).toBe(true);
     expect(result.status.skippedStations).toEqual(["Windsor"]);
   });
 });
@@ -249,7 +247,6 @@ describe("matchUpdatesToTrips", () => {
 describe("findRealtimeStatus", () => {
   const status = (over: Partial<TripRealtimeStatus> = {}): TripRealtimeStatus => ({
     isCanceled: false,
-    isStopSkipped: false,
     ...over,
   });
   const trip = { departureTime: "08:10", times: ["07:30", "07:50", "08:10", "08:40"] };

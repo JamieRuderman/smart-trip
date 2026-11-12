@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { isLegSkipped } from "@/lib/legSkip";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { TripState } from "@/lib/tripTheme";
@@ -12,11 +13,13 @@ import type { TripState } from "@/lib/tripTheme";
  */
 export function useTripStatus(
   realtimeStatus: TripRealtimeStatus | null | undefined,
+  fromStation: string,
+  toStation: string,
 ) {
   const { t } = useTranslation();
 
   const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const isStopSkipped = realtimeStatus?.isStopSkipped ?? false;
+  const isStopSkipped = isLegSkipped(realtimeStatus, fromStation, toStation);
   const isCanceledOrSkipped = isCanceled || isStopSkipped;
   // Departure delay, else en-route arrival delay — a train can depart on
   // time and still arrive late, and must not read "On time" meanwhile.

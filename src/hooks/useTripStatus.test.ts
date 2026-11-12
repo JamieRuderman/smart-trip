@@ -6,8 +6,9 @@ vi.mock("react-i18next", () => ({
 }));
 
 describe("useTripStatus", () => {
-  it("reads a skipped boarding or destination stop as skipped on the rider's leg", () => {
-    expect(useTripStatus({ isCanceled: false, isStopSkipped: true })).toMatchObject({
+  it("reads a skipped boarding or destination stop as skipped on the shown leg", () => {
+    const live = { isCanceled: false, skippedStations: ["Larkspur"] };
+    expect(useTripStatus(live, "Santa Rosa North", "Larkspur")).toMatchObject({
       isCanceled: false,
       isStopSkipped: true,
       isCanceledOrSkipped: true,
@@ -15,5 +16,6 @@ describe("useTripStatus", () => {
       statusLabel: "tripCard.stopSkipped",
       statusColor: "canceled",
     });
+    expect(useTripStatus(live, "Santa Rosa North", "San Rafael").isStopSkipped).toBe(false);
   });
 });

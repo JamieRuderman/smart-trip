@@ -135,8 +135,6 @@ export interface TripRealtimeStatus {
    *  Computed independently of the departure delay, so it is set for a trip
    *  that left its origin on time but fell behind en route. */
   arrivalDelayMinutes?: number;
-  /** The train runs but skips the rider's boarding or destination stop. */
-  isStopSkipped: boolean;
   /**
    * Live departure times for all known stops on this trip, keyed by station name.
    * Populated from the full stop_time_updates array. A stop present here with a

@@ -11,6 +11,7 @@ import { reminderIdFor } from "@/lib/notificationId";
 import { isSouthbound } from "@/lib/stationUtils";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { legPlaces, type Place } from "@/lib/places";
+import { isLegSkipped } from "@/lib/legSkip";
 import { parseTimeToMinutes, toLocalDateKey } from "@/lib/timeUtils";
 import { FOCUS_ARRIVAL_EVICT_GRACE_MIN } from "@/lib/tripConstants";
 
@@ -357,7 +358,7 @@ export function replacementRun(
   let best: { tripNumber: number; gap: number; at: number } | null = null;
   for (const trip of getFilteredTrips(from, to, run.scheduleType, viaFerry)) {
     const live = liveStatus(trip);
-    if (live?.isCanceled || live?.isStopSkipped) {
+    if (live?.isCanceled || isLegSkipped(live, from, to)) {
       continue;
     }
     const scheduled = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));

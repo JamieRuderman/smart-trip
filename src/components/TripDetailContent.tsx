@@ -157,7 +157,7 @@ export function TripDetailContent({
   const shareButton = (
     <ShareTripButton
       trip={trip}
-      serviceDate={shared?.serviceDate ?? sharedTripServiceDate(currentTime, scheduleType)}
+      serviceDate={shared?.serviceDate ?? futureServiceDate ?? sharedTripServiceDate(currentTime, scheduleType)}
       scheduleType={scheduleType}
       timeFormat={timeFormat}
       className={headerActionClass}

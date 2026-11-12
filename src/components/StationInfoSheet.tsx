@@ -60,9 +60,6 @@ interface Arrival {
   skipsStation: boolean;
   /** The train passes {@link destinationStation} without stopping. */
   skipsDestination: boolean;
-  /** The row is of no use to the rider: it skips this station, or the
-   *  destination they picked. Greyed out rather than hidden. */
-  isSkipped: boolean;
   /** Underlying schedule trip — handed back to the caller when the row is
    *  tapped so they can open the trip detail sheet. */
   trip: ProcessedTrip;
@@ -160,7 +157,6 @@ export function StationInfoSheet({
 
           const rt = statusMaps.statusMap.get(trip.departureTime) ?? null;
           const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-          const skipped = rt?.skippedStations ?? [];
 
           // allStopLiveDepartures/allStopDelayMinutes are built from each
           // stop's live DEPARTURE — the feed usually has no departure for
@@ -194,15 +190,10 @@ export function StationInfoSheet({
 
           // Prefer the user's selected destination if direction matches the
           // train; otherwise fall back to the train's end-of-line terminus.
-          const toUserDestination =
-            directionFilter != null &&
-            toStation != null &&
-            (directionFilter === "southbound") === isSouthbound;
           const destinationStation: Station =
-            toUserDestination && toStation ? placeStation(toStation) : terminus;
-          const skipsStation = skipped.includes(station);
-          const skipsDestination =
-            destinationStation !== station && skipped.includes(destinationStation);
+            directionFilter && toStation && (directionFilter === "southbound") === isSouthbound
+              ? placeStation(toStation)
+              : terminus;
           let destinationTime: string | null = null;
           if (destinationStation !== station) {
             const destIdx = stationIndexMap[destinationStation];
@@ -227,9 +218,8 @@ export function StationInfoSheet({
                 ? delayMinutes
                 : null,
             isCanceled: rt?.isCanceled === true,
-            skipsStation,
-            skipsDestination,
-            isSkipped: skipsStation || (toUserDestination && skipsDestination),
+            skipsStation: rt?.skippedStations?.includes(station) ?? false,
+            skipsDestination: rt?.skippedStations?.includes(destinationStation) ?? false,
             trip,
           } satisfies Arrival;
         })
@@ -528,7 +518,8 @@ function ArrivalRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
-  const isDelayed = !arrival.isSkipped && isTrainDelayed(arrival);
+  const isSkipped = arrival.skipsStation || arrival.skipsDestination;
+  const isDelayed = !isSkipped && isTrainDelayed(arrival);
 
   // Card state mirrors TripCard's semantics so the row reads in the same
   // visual language as the main schedule. No "next train" highlight here —
@@ -537,7 +528,8 @@ function ArrivalRow({
     isCanceledOrSkipped: arrival.isCanceled,
     isDelayed,
     isNextTrip: false,
-    isPastTrip: arrival.isSkipped,
+    // Grey like a departed train, not red: it still runs, just not for this row's journey.
+    isPastTrip: isSkipped,
   });
 
   const DirArrow = arrival.isSouthbound ? ArrowDown : ArrowUp;
@@ -547,7 +539,7 @@ function ArrivalRow({
 
   const etaCopy = arrival.isCanceled
     ? t("stationInfo.canceledSuffix").replace(/^·\s*/, "")
-    : arrival.isSkipped
+    : isSkipped
       ? t("tripCard.stopSkipped")
       : arrival.etaMinutes <= 0
       ? t("stationInfo.nowArriving")
@@ -599,7 +591,7 @@ function ArrivalRow({
           className={cn(
             "text-xl font-semibold tabular-nums",
             (arrival.isCanceled || arrival.skipsStation) && "line-through text-muted-foreground",
-            arrival.isSkipped && "text-muted-foreground",
+            isSkipped && stateText[cardState],
             isDelayed && "text-smart-gold",
           )}
         >

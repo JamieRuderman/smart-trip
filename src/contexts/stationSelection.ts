@@ -58,6 +58,7 @@ export interface StationSelection {
     nextStop?: string | null;
     remainingStops?: number | null;
     isCanceled?: boolean;
+    isStopSkipped?: boolean;
   }) => Promise<void>;
   clearFocusedTrip: () => Promise<void>;
 }

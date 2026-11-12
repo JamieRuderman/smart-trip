@@ -11,6 +11,7 @@ import {
 import { SAN_FRANCISCO } from "@/lib/places";
 import { useFocusedTripLive } from "@/hooks/useFocusedTripLive";
 import { useNow } from "@/hooks/useNow";
+import { useTripStatus } from "@/hooks/useTripStatus";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import { derivePhase } from "@/lib/native/liveActivity";
 
@@ -67,9 +68,7 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const countingToFerry =
     phase === "pre-departure" && focusedPlaces(focusedTrip).from === SAN_FRANCISCO;
   const delayMinutes = countingToFerry ? null : (effectiveDelayMinutes(live) ?? null);
-  // A skipped boarding stop is a cancellation as far as this user's leg is
-  // concerned — mirror useTripStatus's isCanceledOrSkipped.
-  const isCanceled = (live?.isCanceled ?? false) || (live?.isOriginSkipped ?? false);
+  const { isCanceledOrSkipped: isCanceled, isStopSkipped } = useTripStatus(live);
 
   const liveActivityId = focusedTrip.liveActivityId ?? null;
   // Re-push content (which carries reminderSet) when a reminder is armed/cleared
@@ -92,9 +91,9 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   // the (async) start commits the id.
   useEffect(() => {
     if (!liveActivityId || departureAt == null || arrivalAt == null) return;
-    void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled });
+    void updateLiveActivity({ departureAt, arrivalAt, delayMinutes, isCanceled, isStopSkipped });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, phase, reminderSet, alarmPending, scheduledFor, startDueTick]);
+  }, [liveActivityId, departureAt, arrivalAt, delayMinutes, isCanceled, isStopSkipped, phase, reminderSet, alarmPending, scheduledFor, startDueTick]);
 
   // Post-arrival cleanup (ending the activity + clearing the focus) is owned by
   // FocusedTripAutoClear, which fires a short, delay-aware grace after arrival on

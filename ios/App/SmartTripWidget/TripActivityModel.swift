@@ -24,6 +24,9 @@ struct TripActivityModel {
     let reminderDate: Date?
     let delayMinutes: Int
     let isCanceled: Bool
+    /// What to call the cancelled state: the pushed status text, which reads
+    /// "Stop skipped" when the train runs but skips the rider's stop.
+    let canceledLabel: String
     let isEnded: Bool
     let reminderSet: Bool
 
@@ -42,6 +45,8 @@ struct TripActivityModel {
         reminderDate = Self.epochMsDate(state["reminderEpochMs"])
         delayMinutes = Int(state["delayMinutes"] ?? "") ?? 0
         isCanceled = state["isCanceled"] == "true"
+        let statusText = state["statusText"] ?? ""
+        canceledLabel = statusText.isEmpty ? "Cancelled" : statusText
         isEnded = state["isEnded"] == "true"
         reminderSet = state["reminderSet"] == "true"
     }

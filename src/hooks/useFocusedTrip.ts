@@ -182,6 +182,7 @@ export function useFocusedTrip() {
       nextStop?: string | null;
       remainingStops?: number | null;
       isCanceled?: boolean;
+      isStopSkipped?: boolean;
     }): Promise<void> => syncFocusedActivityContent(args),
     [],
   );

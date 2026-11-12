@@ -19,6 +19,8 @@ import {
 } from "@/lib/focusedTrip";
 import { canOfferReminder } from "@/lib/reminderLead";
 import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
+import { isSouthbound } from "@/lib/stationUtils";
+import { isVehicleShortOfDestination } from "@/lib/tripProgress";
 import {
   androidSharedTripIntent,
   formatSharedServiceDate,
@@ -97,8 +99,6 @@ function SharedItinerary({ shared, trip, onBack }: {
   const { isCanceledOrSkipped } = useTripStatus(live);
   const arrivalAt = sharedTripArrival(run.serviceDate, tripEnds(trip), tripEnds(trip, live).end);
   const minutesUntilArrival = Math.ceil((arrivalAt - now.getTime()) / 60_000);
-  const ended = now.getTime() >= arrivalAt;
-  const canTake = !ended && !isCanceledOrSkipped;
   const alreadyTaking = sameFocusIdentity(focusedTrip, run);
   const android = !Capacitor.isNativePlatform() && /Android/i.test(navigator.userAgent);
 
@@ -121,6 +121,14 @@ function SharedItinerary({ shared, trip, onBack }: {
     isNextTrip: false,
     trackVehicle: today,
   });
+  const ended =
+    now.getTime() >= arrivalAt &&
+    !isVehicleShortOfDestination(
+      progress.vehiclePosition,
+      run.toStation,
+      isSouthbound(run.fromStation, run.toStation),
+    );
+  const canTake = !ended && !isCanceledOrSkipped;
 
   const take = () => {
     if (!canTake) return;

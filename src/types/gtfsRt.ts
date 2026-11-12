@@ -144,6 +144,9 @@ export interface TripRealtimeStatus {
    * absent from the feed has likely already been served (or has no RT data).
    */
   allStopLiveDepartures?: Partial<Record<string, string>>; // station name → "HH:MM"
+  /** Stations this run passes without stopping (SKIPPED in the feed), on this
+   *  trip's direction. */
+  skippedStations?: string[];
   /**
    * Per-stop delay in minutes, keyed by station name. Computed by diffing the
    * GTFS-RT absolute departure timestamp against the app's own static schedule

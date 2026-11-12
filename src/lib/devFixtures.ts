@@ -157,6 +157,7 @@ export function getDevFixture(scenario: string): DevFixture | null {
         realtimeStatus: {
           isCanceled: false,
           isStopSkipped: true,
+          skippedStations: [TO],
         },
       };
     }

@@ -112,6 +112,25 @@ describe("deriveStatus — en-route (boarding stop pruned from the feed)", () =>
     expect(result.status.isStopSkipped).toBe(true);
   });
 
+  it("records a skipped stop between the rider's stops without flagging their leg", () => {
+    const result = deriveStatus(
+      update([
+        { stopId: stopIdFor("Novato Downtown", "northbound"), scheduleRelationship: "SKIPPED" },
+        { stopId: stopIdFor("Novato Downtown", "southbound"), scheduleRelationship: "SKIPPED" },
+      ]),
+      FROM,
+      TO,
+      "northbound",
+      "09:44",
+      "11:05",
+      SCHED_TIMES,
+    );
+    expect(result.kind).toBe("primary");
+    if (result.kind !== "primary") return;
+    expect(result.status.skippedStations).toEqual(["Novato Downtown"]);
+    expect(result.status.isStopSkipped).toBe(false);
+  });
+
   it("returns none when only opposite-direction stops remain (round-trip GTFS encoding)", () => {
     const result = deriveStatus(
       update([
@@ -182,6 +201,7 @@ describe("deriveStatus — boarding stop still present (unchanged path)", () => 
     expect(result.kind).toBe("primary");
     if (result.kind !== "primary") return;
     expect(result.status.isStopSkipped).toBe(true);
+    expect(result.status.skippedStations).toEqual(["Windsor"]);
   });
 });
 

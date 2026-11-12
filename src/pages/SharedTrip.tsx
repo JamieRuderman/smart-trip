@@ -8,7 +8,7 @@ import { TripDetailContent } from "@/components/TripDetailContent";
 import { Button } from "@/components/ui/button";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
-import { useScheduleData } from "@/hooks/useScheduleData";
+import { useScheduleData, useScheduleRefreshing } from "@/hooks/useScheduleData";
 import { useTripProgress } from "@/hooks/useTripProgress";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { findRealtimeStatus, useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
@@ -31,7 +31,8 @@ export default function SharedTrip() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const schedule = useScheduleData();
+  useScheduleData();
+  const scheduleRefreshing = useScheduleRefreshing();
   const shared = parseSharedTrip(location.search);
   const trip = shared ? reconstructFocusedTrip(shared.run) : null;
 
@@ -59,7 +60,7 @@ export default function SharedTrip() {
             </Button>
             <h1 className="text-xl font-semibold">{t("shareTrip.title")}</h1>
           </header>
-          <p role="status">{t(shared && schedule.isRefreshing ? "shareTrip.loading" : "shareTrip.unavailable")}</p>
+          <p role="status">{t(shared && scheduleRefreshing ? "shareTrip.loading" : "shareTrip.unavailable")}</p>
         </div>
       )}
     </main>

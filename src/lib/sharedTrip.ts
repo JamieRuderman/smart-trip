@@ -14,6 +14,8 @@ import { SITE_URL } from "@/seo/constants";
 
 export const SHARED_TRIP_PATH = "/share/trip";
 const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_DAYS_AHEAD = 14;
+const DAY_MS = 86_400_000;
 
 export interface SharedTrip {
   run: FocusedRun;
@@ -49,7 +51,7 @@ export function sharedTripUrl(
   return url;
 }
 
-export function parseSharedTrip(search: string): SharedTrip | null {
+export function parseSharedTrip(search: string, now: Date = new Date()): SharedTrip | null {
   const params = new URLSearchParams(search);
   const number = params.get("train") ?? "";
   const tripNumber = Number(number);
@@ -73,6 +75,8 @@ export function parseSharedTrip(search: string): SharedTrip | null {
   if (Number.isNaN(isoDate.getTime()) || isoDate.toISOString().slice(0, 10) !== serviceDate) {
     return null;
   }
+  const today = Date.parse(`${agencyDateKey(now)}T12:00:00Z`);
+  if (isoDate.getTime() - today > MAX_DAYS_AHEAD * DAY_MS) return null;
 
   return {
     from,
@@ -134,5 +138,5 @@ export function nativeSharedTripLocation(input: string): string | null {
 }
 
 export function androidSharedTripIntent(url: URL): string {
-  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=smart.trip;S.browser_fallback_url=${encodeURIComponent(url.href)};end`;
+  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=smart.trip;end`;
 }

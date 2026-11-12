@@ -152,6 +152,15 @@ describe("agency timezone conversions (Pacific, device-TZ independent)", () => {
     const epoch = agencyWallTimeToEpochSeconds("20260620", "17:45");
     expect(agencyClockHHMM(epoch)).toBe("17:45");
   });
+
+  it("converts morning times on the days the clocks change", () => {
+    expect(agencyWallTimeToEpochSeconds("20260308", "07:00")).toBe(
+      Date.UTC(2026, 2, 8, 14, 0) / 1000,
+    );
+    expect(agencyWallTimeToEpochSeconds("20261101", "08:00")).toBe(
+      Date.UTC(2026, 10, 1, 16, 0) / 1000,
+    );
+  });
 });
 
 describe("formatClockTime", () => {

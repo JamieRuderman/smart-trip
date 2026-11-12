@@ -6,22 +6,6 @@ import { nativeSharedTripLocation } from "@/lib/sharedTrip";
 
 const HANDLED_LINK_KEY = "smart-trip-handled-link";
 
-function handledLink(): string | null {
-  try {
-    return sessionStorage.getItem(HANDLED_LINK_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function rememberHandledLink(url: string): void {
-  try {
-    sessionStorage.setItem(HANDLED_LINK_KEY, url);
-  } catch {
-    // Ignore storage errors (private mode).
-  }
-}
-
 export function useNativeSharedTripLinks() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -32,24 +16,25 @@ export function useNativeSharedTripLinks() {
     if (!Capacitor.isNativePlatform()) return;
     let active = true;
     let receivedLink = false;
-    const openLink = (url: string, fromLaunch: boolean) => {
+    const openLink = (url: string) => {
       if (!active) return;
       const location = nativeSharedTripLocation(url);
       if (!location) return;
       receivedLink = true;
-      // getLaunchUrl keeps returning the last opened link for the life of the
-      // native process, so a WebView reload would otherwise replay it.
-      if (fromLaunch && handledLink() === url) return;
-      rememberHandledLink(url);
+      sessionStorage.setItem(HANDLED_LINK_KEY, url);
       if (router.current.location !== location) {
         router.current.location = location;
         router.current.navigate(location);
       }
     };
 
-    const listener = App.addListener("appUrlOpen", ({ url }) => openLink(url, false));
+    const listener = App.addListener("appUrlOpen", ({ url }) => openLink(url));
     void App.getLaunchUrl().then((launch) => {
-      if (launch && !receivedLink) openLink(launch.url, true);
+      // getLaunchUrl keeps returning the last opened link for the life of the
+      // native process, so a WebView reload would otherwise replay it.
+      if (launch && !receivedLink && launch.url !== sessionStorage.getItem(HANDLED_LINK_KEY)) {
+        openLink(launch.url);
+      }
     }).catch(() => {});
 
     return () => {

@@ -133,7 +133,7 @@ export function formatSharedServiceDate(serviceDate: string, locale: string): st
 export function nativeSharedTripLocation(input: string): string | null {
   try {
     const url = new URL(input);
-    return url.origin === SITE_URL && url.pathname === SHARED_TRIP_PATH
+    return url.origin === SITE_URL && isSharedTripPath(url.pathname)
       ? url.pathname + url.search
       : null;
   } catch {

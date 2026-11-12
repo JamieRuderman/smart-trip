@@ -17,8 +17,7 @@ import {
   reconstructFocusedTrip,
   sameFocusIdentity,
 } from "@/lib/focusedTrip";
-import { isReminderSupported } from "@/lib/notificationScheduler";
-import { reminderLeadRange } from "@/lib/reminderLead";
+import { canOfferReminder } from "@/lib/reminderLead";
 import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
 import {
   androidSharedTripIntent,
@@ -47,7 +46,7 @@ export default function SharedTrip() {
   }, [location.search]);
 
   const goBack = () => {
-    if (hasInAppHistory(location.key)) navigate(-1);
+    if (hasInAppHistory()) navigate(-1);
     else navigate("/", { replace: true });
   };
 
@@ -79,7 +78,6 @@ function SharedItinerary({ shared, trip, onBack }: {
   onBack: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const location = useLocation();
   const navigate = useNavigate();
   const { focusedTrip, focusTrip, setSelectedTrip, openReminderDialog } = useStationSelection();
   const [confirmSwitch, setConfirmSwitch] = useState(false);
@@ -124,29 +122,13 @@ function SharedItinerary({ shared, trip, onBack }: {
     trackVehicle: today,
   });
 
-  const openMyTrip = () => {
-    setSelectedTrip(null);
-    const inAppHistory = hasInAppHistory(location.key);
-    // A link opened in a fresh tab has nothing in-app behind it, so My Trip's
-    // Back would leave the site; put the schedule there instead.
-    if (!inAppHistory) navigate("/", { replace: true });
-    navigate(TRIP_VIEW_PATH, { replace: inAppHistory });
-  };
-
   const take = () => {
     if (!canTake) return;
-    if (alreadyTaking) {
-      openMyTrip();
-      return;
-    }
-    void focusTrip(run);
-    openMyTrip();
+    if (!alreadyTaking) void focusTrip(run);
+    setSelectedTrip(null);
+    navigate(TRIP_VIEW_PATH, { replace: true });
     const departureAt = focusedBoardingInstant(run, live?.liveDepartureTime);
-    if (
-      departureAt != null &&
-      isReminderSupported() &&
-      !reminderLeadRange(departureAt, Date.now()).tooLate
-    ) {
+    if (!alreadyTaking && departureAt != null && canOfferReminder(departureAt, now.getTime())) {
       openReminderDialog();
     }
   };

@@ -47,10 +47,12 @@ export function openTripViewOnLaunch(): void {
 
 /**
  * Whether going back from the current entry stays inside the app. React Router
- * keys only the initial history entry "default" — except the launch-time trip
- * view above, which is the initial entry to the router but sits on top of the
- * app's own home entry.
+ * numbers its entries in `history.state.idx` from 0, and unlike the location
+ * key that index survives a `replace` of the first entry. The launch-time trip
+ * view above is entry 0 to the router but sits on top of the app's own home
+ * entry.
  */
-export function hasInAppHistory(locationKey: string): boolean {
-  return locationKey !== "default" || launchedIntoTripView;
+export function hasInAppHistory(): boolean {
+  const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+  return idx > 0 || launchedIntoTripView;
 }

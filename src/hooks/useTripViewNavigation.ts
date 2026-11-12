@@ -22,10 +22,10 @@ export function useLeaveTripView(): () => void {
   const navigate = useNavigate();
   const location = useLocation();
   return useCallback(() => {
-    if (hasInAppHistory(location.key)) {
+    if (hasInAppHistory()) {
       navigate(-1);
     } else {
       navigate({ pathname: "/", search: location.search }, { replace: true });
     }
-  }, [navigate, location.key, location.search]);
+  }, [navigate, location.search]);
 }

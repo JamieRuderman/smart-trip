@@ -100,7 +100,7 @@ function SharedItinerary({ shared, trip, onBack }: {
   const arrivalAt = sharedTripArrival(run.serviceDate, tripEnds(trip), tripEnds(trip, live).end);
   const minutesUntilArrival = Math.ceil((arrivalAt - now.getTime()) / 60_000);
   const ended = now.getTime() >= arrivalAt;
-  const canTake = !ended && !isCanceledOrSkipped && !live?.isDestinationSkipped;
+  const canTake = !ended && !isCanceledOrSkipped;
   const alreadyTaking = sameFocusIdentity(focusedTrip, run);
   const android = !Capacitor.isNativePlatform() && /Android/i.test(navigator.userAgent);
 

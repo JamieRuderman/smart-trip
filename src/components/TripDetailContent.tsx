@@ -23,7 +23,6 @@ import { QuickConnectionWarning } from "./QuickConnectionWarning";
 import { AlarmStatusIcon, AlarmStatusLabel } from "./AlarmStatusLabel";
 import { ShareTripButton } from "./ShareTripButton";
 import { formatSharedServiceDate, sharedTripServiceDate } from "@/lib/sharedTrip";
-import { stateBg } from "@/lib/tripTheme";
 import { DepartureReminder } from "./DepartureReminder";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -122,7 +121,7 @@ export function TripDetailContent({
   const { hasStarted } = stopInference;
 
   const {
-    isCanceledOrSkipped: modelCanceledOrSkipped,
+    isCanceledOrSkipped,
     departureTime,
     arrivalTime,
     headerStatusLabel,
@@ -134,7 +133,7 @@ export function TripDetailContent({
     speedMph,
     hasQuickConnection,
     trainOption,
-    alarmStatus: modelAlarmStatus,
+    alarmStatus,
     isAtDestination: alarmAtDestination,
   } = useTripDetailModel({
     trip,
@@ -153,12 +152,6 @@ export function TripDetailContent({
   // whose arrival time already passed today would read "at destination" and
   // grey out its whole timeline.
   const isAtDestination = !isOtherDay && alarmAtDestination;
-  const destinationSkipped =
-    shared != null && realtimeStatus?.isDestinationSkipped === true && !realtimeStatus.isCanceled;
-  const isCanceledOrSkipped = modelCanceledOrSkipped || destinationSkipped;
-  const alarmStatus = destinationSkipped
-    ? { kind: "message", phase: "CANCELED_OR_SKIPPED", translationKey: "tripCard.stopSkipped" } as const
-    : modelAlarmStatus;
   const contentWidth = shared ? "mx-auto w-full max-w-2xl" : undefined;
 
   const shareButton = (
@@ -174,7 +167,7 @@ export function TripDetailContent({
   return (
     <div className={cn("flex flex-col flex-1 min-h-0", !shared && "overflow-hidden")}>
       {/* Header band */}
-      <div className={cn("shrink-0", destinationSkipped ? stateBg.canceled : headerBg)}>
+      <div className={cn("shrink-0", headerBg)}>
         {shared && (
           <div
             className={cn("flex items-center gap-3 px-4 text-white", contentWidth)}
@@ -210,10 +203,10 @@ export function TripDetailContent({
             <p
               className={cn(
                 "text-xs text-white/80 mb-0.5 font-medium",
-                !headerStatusLabel && !destinationSkipped && "invisible",
+                !headerStatusLabel && "invisible",
               )}
             >
-              {destinationSkipped ? t("tripCard.stopSkipped") : headerStatusLabel ?? "\u00a0"}
+              {headerStatusLabel ?? "\u00a0"}
               <span className="text-white/60"> · </span>
               {directionLabel}
             </p>

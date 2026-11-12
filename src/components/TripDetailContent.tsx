@@ -30,7 +30,7 @@ import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import type { TripProgressResult } from "@/hooks/useTripProgress";
 
-export const headerActionClass =
+const headerActionClass =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white";
 
 interface TripDetailContentProps {

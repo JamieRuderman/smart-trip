@@ -3,6 +3,7 @@ import { getFilteredTrips } from "./scheduleUtils";
 import { reconstructFocusedTrip } from "./focusedTrip";
 import {
   androidSharedTripIntent,
+  isSharedTripPath,
   matchesSharedDeparture,
   nativeSharedTripLocation,
   parseSharedTrip,
@@ -49,6 +50,12 @@ describe("shared trip links", () => {
     expect(parseSharedTrip(url("2026-11-26"), now)).not.toBeNull();
     expect(parseSharedTrip(url("2026-11-27"), now)).toBeNull();
     expect(parseSharedTrip(url("2099-06-05"), now)).toBeNull();
+  });
+
+  it("recognizes the share route with or without a trailing slash", () => {
+    expect(isSharedTripPath("/share/trip")).toBe(true);
+    expect(isSharedTripPath("/share/trip/")).toBe(true);
+    expect(isSharedTripPath("/share/trips")).toBe(false);
   });
 
   it("lets Android fall back to the store when the app isn't installed", () => {

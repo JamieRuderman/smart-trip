@@ -18,7 +18,7 @@ import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
 import { useNativeSharedTripLinks } from "@/hooks/useNativeSharedTripLinks";
-import { SHARED_TRIP_PATH } from "@/lib/sharedTrip";
+import { isSharedTripPath, SHARED_TRIP_PATH } from "@/lib/sharedTrip";
 import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import Index from "./pages/Index";
 import MyTrip from "./pages/MyTrip";
@@ -58,7 +58,7 @@ const RoutedApp = () => {
     const onAppOnlyRoute =
       location.pathname.startsWith("/map") ||
       location.pathname === TRIP_VIEW_PATH ||
-      location.pathname.replace(/\/+$/, "") === SHARED_TRIP_PATH;
+      isSharedTripPath(location.pathname);
     document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);
   }, [location.pathname]);
 

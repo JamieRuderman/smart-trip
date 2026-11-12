@@ -17,6 +17,10 @@ const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_DAYS_AHEAD = 14;
 const DAY_MS = 86_400_000;
 
+export function isSharedTripPath(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "") === SHARED_TRIP_PATH;
+}
+
 export interface SharedTrip {
   run: FocusedRun;
   from: Place;

@@ -1,4 +1,4 @@
-import { SHARED_TRIP_PATH } from "@/lib/sharedTrip";
+import { isSharedTripPath } from "@/lib/sharedTrip";
 import {
   useCallback,
   useEffect,
@@ -109,7 +109,7 @@ interface ProviderState {
 export function StationSelectionProvider({ children }: { children: ReactNode }) {
   const [urlParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const isTripPreview = location.pathname.replace(/\/+$/, "") === SHARED_TRIP_PATH;
+  const isTripPreview = isSharedTripPath(location.pathname);
   const searchParams = isTripPreview ? new URLSearchParams() : urlParams;
 
   // Detect shared-link mode on init: URL has both ?trip=N and ?type=T.

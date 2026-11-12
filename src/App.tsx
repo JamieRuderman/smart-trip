@@ -17,9 +17,12 @@ import { ReminderDriftSync } from "@/components/ReminderDriftSync";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
+import { useNativeSharedTripLinks } from "@/hooks/useNativeSharedTripLinks";
+import { SHARED_TRIP_PATH } from "@/lib/sharedTrip";
 import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import Index from "./pages/Index";
 import MyTrip from "./pages/MyTrip";
+import SharedTrip from "./pages/SharedTrip";
 import NotFound from "./pages/NotFound";
 // Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
 // schedule-only users never pay that cost. The home screen preloads these
@@ -41,6 +44,7 @@ const queryClient = new QueryClient({
  *  the fallback. Lives inside BrowserRouter so it can read `useLocation`. */
 const RoutedApp = () => {
   const location = useLocation();
+  useNativeSharedTripLinks();
 
   // The prerendered SEO sitelinks footer (#seo-sitelinks, injected into
   // dist/index.html by scripts/seo/prerender.ts and living OUTSIDE #root, so
@@ -53,7 +57,8 @@ const RoutedApp = () => {
   useEffect(() => {
     const onAppOnlyRoute =
       location.pathname.startsWith("/map") ||
-      location.pathname === TRIP_VIEW_PATH;
+      location.pathname === TRIP_VIEW_PATH ||
+      location.pathname.replace(/\/+$/, "") === SHARED_TRIP_PATH;
     document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);
   }, [location.pathname]);
 
@@ -85,6 +90,7 @@ const RoutedApp = () => {
                 main bundle (no heavy deps) so "Take this train" and a launch
                 into it render without a loading flash. */}
             <Route path={TRIP_VIEW_PATH} element={<MyTrip />} />
+            <Route path={SHARED_TRIP_PATH} caseSensitive element={<SharedTrip />} />
             <Route path="/map" element={<Map />} />
             {/* Per-route fallback: the line-diagram frame (green bar + blank
                 container) renders instantly while the code chunk loads, so the

@@ -17,6 +17,7 @@ import { FocusedTripReminderRow } from "@/components/FocusedTripReminderRow";
 import { LiveTimePair } from "@/components/LiveTimePair";
 import { MyTripGate } from "@/components/MyTripGate";
 import { QuickConnectionWarning } from "@/components/QuickConnectionWarning";
+import { ShareTripButton } from "@/components/ShareTripButton";
 import { StopTimeline } from "@/components/StopTimeline";
 import { TripPositionCard } from "@/components/TripPositionCard";
 
@@ -105,6 +106,13 @@ function MyTripView({
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
             {t("focusedTrip.myTrip")}
           </h1>
+          <ShareTripButton
+            trip={trip}
+            serviceDate={focusedTrip.serviceDate}
+            scheduleType={focusedTrip.scheduleType}
+            timeFormat={TIME_FORMAT}
+            className="bg-white/15 hover:bg-white/25"
+          />
         </div>
       </div>
 

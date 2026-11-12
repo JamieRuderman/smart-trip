@@ -24,6 +24,10 @@ export interface TripDetailModelInput {
   fromStation: Station;
   toStation: Station;
   currentTime: Date;
+  /** Actual time for feed freshness when currentTime carries Pacific clock fields. */
+  realtimeClock?: Date;
+  /** Whole itinerary arrival, including a ferry after the train. */
+  itineraryMinutesUntilArrival?: number;
   lastUpdated: Date | null;
   realtimeStatus?: TripRealtimeStatus | null;
   /** All trip progress state, computed once by the caller. */
@@ -70,6 +74,8 @@ export function useTripDetailModel({
   fromStation,
   toStation,
   currentTime,
+  realtimeClock = currentTime,
+  itineraryMinutesUntilArrival,
   lastUpdated,
   realtimeStatus,
   progress,
@@ -204,7 +210,7 @@ export function useTripDetailModel({
     minutesUntilDeparture: departsByFerry ? minutesUntil : minutesUntilTrain,
     departsByFerry,
     minutesUntilArrival:
-      minutesUntilArrival ??
+      itineraryMinutesUntilArrival ?? minutesUntilArrival ??
       parseTimeToMinutes(arrivalTime) - minutesOfDay(currentTime),
     minutesAfterArrival,
     minutesUntilLeave,
@@ -221,7 +227,7 @@ export function useTripDetailModel({
     hasLivePosition: vehiclePosition != null,
     stillApproachingDestination,
     lastUpdated,
-    currentTime,
+    currentTime: realtimeClock,
   });
 
   // Build the trip stats line: duration, remaining/total stops, fare

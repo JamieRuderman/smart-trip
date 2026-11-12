@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   isSchedulePayload,
   type SchedulePayload,
@@ -17,6 +17,7 @@ const STORAGE_KEY = "smart-schedule-payload";
 export type { ScheduleSource };
 
 export interface ScheduleDataState {
+  isRefreshing: boolean;
   /** Refresh token. Stable when nothing has changed; advances whenever the
    *  underlying schedule cache is rebuilt. Other hooks key memos off this. */
   version: string;
@@ -50,6 +51,7 @@ function storeCachedPayload(payload: SchedulePayload): void {
 
 export function useScheduleData(): ScheduleDataState {
   const meta = useSyncExternalStore(subscribeSchedule, getScheduleMeta, getScheduleMeta);
+  const [isRefreshing, setIsRefreshing] = useState(true);
   const mountedRef = useRef(true);
   const inFlightRefreshRef = useRef<Promise<void> | null>(null);
 
@@ -65,6 +67,7 @@ export function useScheduleData(): ScheduleDataState {
       return inFlightRefreshRef.current;
     }
 
+    setIsRefreshing(true);
     const refreshPromise = fetch(scheduleUrl, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
@@ -79,6 +82,7 @@ export function useScheduleData(): ScheduleDataState {
       })
       .finally(() => {
         inFlightRefreshRef.current = null;
+        if (mountedRef.current) setIsRefreshing(false);
       });
 
     inFlightRefreshRef.current = refreshPromise;
@@ -106,6 +110,7 @@ export function useScheduleData(): ScheduleDataState {
   }, [refreshSchedulePayload]);
 
   return {
+    isRefreshing,
     version: String(meta.version),
     source: meta.source,
     generatedAt: meta.generatedAt,

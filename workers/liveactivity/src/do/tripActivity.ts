@@ -55,6 +55,8 @@ export interface LastSent {
   phase: "pre-departure" | "en-route";
   isEnded: boolean;
   isCanceled: boolean;
+  /** Optional: records persisted before stop-skip tracking lack it. */
+  isStopSkipped?: boolean;
   /** Arrival instant the widget is currently counting down to (the last value we
    *  pushed). The `end` dismisses to THIS, not the latest feed arrival, so iOS
    *  removes the activity exactly when the on-screen countdown reaches 0:00. */
@@ -184,6 +186,7 @@ export function planTick(input: TickInput): TickPlan {
           arrivalEpochMs: displayedArrivalEpochMs,
           delayMinutes: Math.max(0, lastSent?.delayMinutes ?? 0),
           isCanceled: lastSent?.isCanceled ?? false,
+          isStopSkipped: lastSent?.isStopSkipped ?? false,
           isEnded: true,
         }
       : null;
@@ -252,6 +255,7 @@ export function planTick(input: TickInput): TickPlan {
     nextStop: null,
     remainingStops: null,
     isCanceled: status.isCanceled,
+    isStopSkipped: status.isStopSkipped,
     isEnded: action === "end",
     reminderSet: reminderEpochMs != null,
     reminderEpochMs,
@@ -275,6 +279,7 @@ export function planTick(input: TickInput): TickPlan {
       phase,
       isEnded: false,
       isCanceled: status.isCanceled,
+      isStopSkipped: status.isStopSkipped,
       arrivalEpochMs: status.arrivalEpochMs,
       alarmPending,
     },

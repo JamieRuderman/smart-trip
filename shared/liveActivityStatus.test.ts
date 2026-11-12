@@ -143,6 +143,76 @@ describe("computeLiveTripStatus", () => {
     expect(status!.delayMinutes).toBe(0);
   });
 
+  it("treats a SKIPPED destination on a running train as a skipped stop", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: [
+        {
+          scheduleRelationship: "SCHEDULED",
+          stopTimeUpdates: [
+            { stopId: FROM_STOP, departureTime: SCHED_DEP_MS / 1000 },
+            { stopId: TO_STOP, scheduleRelationship: "SKIPPED" },
+          ],
+        },
+      ],
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(status).toMatchObject({ isCanceled: true, isStopSkipped: true, isEnded: false });
+  });
+
+  it("treats a SKIPPED boarding stop as a skipped stop once the run is identified", () => {
+    const status = computeLiveTripStatus({
+      reg: { ...REG, originStartTime: "08:10" },
+      updates: [
+        {
+          scheduleRelationship: "SCHEDULED",
+          startTime: "08:10:00",
+          stopTimeUpdates: [
+            { stopId: FROM_STOP, scheduleRelationship: "SKIPPED" },
+            { stopId: TO_STOP, arrivalTime: SCHED_ARR_MS / 1000 },
+          ],
+        },
+      ],
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(status).toMatchObject({ isCanceled: true, isStopSkipped: true });
+  });
+
+  it("keeps a cancelled run cancelled even when its stops are marked SKIPPED", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: [
+        {
+          scheduleRelationship: "CANCELED",
+          stopTimeUpdates: [
+            { stopId: FROM_STOP, departureTime: SCHED_DEP_MS / 1000, scheduleRelationship: "SKIPPED" },
+            { stopId: TO_STOP, scheduleRelationship: "SKIPPED" },
+          ],
+        },
+      ],
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(status).toMatchObject({ isCanceled: true, isStopSkipped: false });
+  });
+
+  it("ignores SKIPPED stops outside the rider's leg", () => {
+    const status = computeLiveTripStatus({
+      reg: REG,
+      updates: [
+        {
+          scheduleRelationship: "SCHEDULED",
+          stopTimeUpdates: [
+            { stopId: FROM_STOP, departureTime: SCHED_DEP_MS / 1000 },
+            { stopId: "71012", scheduleRelationship: "SKIPPED" },
+            { stopId: TO_STOP, arrivalTime: SCHED_ARR_MS / 1000 },
+          ],
+        },
+      ],
+      now: SCHED_DEP_MS - 60_000,
+    });
+    expect(status).toMatchObject({ isCanceled: false, isStopSkipped: false });
+  });
+
   it("does not count an early live departure as negative delay", () => {
     const earlyDep = SCHED_DEP_MS / 1000 - 2 * 60;
     const status = computeLiveTripStatus({
@@ -544,6 +614,7 @@ describe("decidePushAction", () => {
     arrivalEpochMs: SCHED_ARR_MS,
     delayMinutes: 0,
     isCanceled: false,
+    isStopSkipped: false,
     isEnded: false,
   };
 
@@ -607,6 +678,16 @@ describe("decidePushAction", () => {
         now: SCHED_DEP_MS - 60_000,
       }).action,
     ).toBe("none");
+  });
+
+  it("pushes update when a skipped stop replaces a cancellation", () => {
+    expect(
+      decidePushAction({
+        status: { ...base, isCanceled: true, isStopSkipped: true },
+        lastSent: { delayMinutes: 0, phase: "pre-departure", isEnded: false, isCanceled: true },
+        now: SCHED_DEP_MS - 60_000,
+      }).action,
+    ).toBe("update");
   });
 
   it("treats a legacy lastSent without isCanceled as not-cancelled", () => {

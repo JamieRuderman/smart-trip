@@ -125,7 +125,10 @@ export interface LiveTripStatus {
   arrivalEpochMs: number;
   /** Whole minutes late at boarding; 0 when on time/early. */
   delayMinutes: number;
+  /** The run is cancelled, or it skips the rider's boarding or destination stop. */
   isCanceled: boolean;
+  /** With `isCanceled`: the run itself still operates; only the stop is skipped. */
+  isStopSkipped: boolean;
   isEnded: boolean;
 }
 
@@ -222,6 +225,7 @@ export function computeLiveTripStatus(args: {
       arrivalEpochMs: reg.arrivalEpochMs,
       delayMinutes: 0,
       isCanceled: false,
+      isStopSkipped: false,
       isEnded: true,
     };
   }
@@ -279,7 +283,7 @@ function statusFromTrip(
   );
   if (from?.departureTime != null) return statusFromBoarding(reg, update, from, now);
 
-  const isCanceled = update.scheduleRelationship === "CANCELED";
+  const { isCanceled, isStopSkipped } = legCancellation(reg, update);
   const to = findDestination(reg, update);
   if (to?.arrivalTime != null) {
     const liveArrivalMs = to.arrivalTime * 1000;
@@ -291,6 +295,7 @@ function statusFromTrip(
       arrivalEpochMs: liveArrivalMs,
       delayMinutes: delayMinutesBetween(liveArrivalMs, reg.arrivalEpochMs),
       isCanceled,
+      isStopSkipped,
       isEnded: now >= liveArrivalMs,
     };
   }
@@ -302,6 +307,7 @@ function statusFromTrip(
     arrivalEpochMs: reg.arrivalEpochMs,
     delayMinutes: 0,
     isCanceled: true,
+    isStopSkipped,
     isEnded: now >= reg.arrivalEpochMs,
   };
 }
@@ -315,7 +321,7 @@ function statusFromBoarding(
   from: FeedStopTimeUpdate,
   now: number,
 ): LiveTripStatus {
-  const isCanceled = update.scheduleRelationship === "CANCELED";
+  const { isCanceled, isStopSkipped } = legCancellation(reg, update);
   const liveDepartureMs = from.departureTime! * 1000;
   // Only count lateness past the on-time threshold; an early/on-time/sub-minute
   // live time keeps the scheduled target so the widget agrees with the app.
@@ -346,8 +352,27 @@ function statusFromBoarding(
         arrivalDelayMinutes: arrivalDelayMinutes || undefined,
       }) ?? 0,
     isCanceled,
+    isStopSkipped,
     isEnded: now >= arrivalEpochMs,
   };
+}
+
+/** Whether the run is out of use for this rider: cancelled outright, or
+ *  SKIPPED at their boarding or destination stop while it otherwise runs. */
+function legCancellation(
+  reg: LiveActivityRegistration,
+  update: FeedTripUpdate,
+): { isCanceled: boolean; isStopSkipped: boolean } {
+  if (update.scheduleRelationship === "CANCELED") {
+    return { isCanceled: true, isStopSkipped: false };
+  }
+  const isStopSkipped = update.stopTimeUpdates.some(
+    (s) =>
+      s.scheduleRelationship === "SKIPPED" &&
+      (resolveStation(s.stopId, reg.fromStation, reg.direction) ||
+        resolveStation(s.stopId, reg.toStation, reg.direction)),
+  );
+  return { isCanceled: isStopSkipped, isStopSkipped };
 }
 
 /** The destination stop_time_update for this registration (resolves to
@@ -381,6 +406,7 @@ export function decidePushAction(args: {
     /** Older records (pre-cancellation tracking) may lack this; treated as
      *  "not cancelled" so a cancellation still triggers exactly one update. */
     isCanceled?: boolean;
+    isStopSkipped?: boolean;
   } | null;
   now: number;
 }): { action: PushAction; phase: "pre-departure" | "en-route" } {
@@ -394,7 +420,8 @@ export function decidePushAction(args: {
     args.lastSent != null &&
     args.lastSent.delayMinutes === args.status.delayMinutes &&
     args.lastSent.phase === phase &&
-    (args.lastSent.isCanceled ?? false) === args.status.isCanceled
+    (args.lastSent.isCanceled ?? false) === args.status.isCanceled &&
+    (args.lastSent.isStopSkipped ?? false) === args.status.isStopSkipped
   ) {
     return { action: "none", phase };
   }

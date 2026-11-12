@@ -88,6 +88,7 @@ export const DEV_FIXTURE_IDS = [
   "boarding",
   "delayed",
   "canceled",
+  "destination-skipped",
   "mid-trip",
   "arriving",
   "late-arriving",
@@ -148,6 +149,17 @@ export function getDevFixture(scenario: string): DevFixture | null {
           isCanceled: true,
           isOriginSkipped: false,
           isDestinationSkipped: false,
+        },
+      };
+    }
+
+    case "destination-skipped": {
+      return {
+        trip: makeTrip(106, 10),
+        realtimeStatus: {
+          isCanceled: false,
+          isOriginSkipped: false,
+          isDestinationSkipped: true,
         },
       };
     }

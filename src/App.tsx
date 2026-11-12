@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import NativeUiManager from "@/components/NativeUiManager";
 import { useAppForegroundRefresh } from "@/hooks/useAppForegroundRefresh";
+import { useScheduleSync } from "@/hooks/useScheduleData";
 import { emitAppRefreshEvent } from "@/lib/refreshEvents";
 import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/lib/liveActivityController";
@@ -113,6 +114,7 @@ const RoutedApp = () => {
 };
 
 const App = () => {
+  useScheduleSync();
   useAppForegroundRefresh(async () => {
     emitAppRefreshEvent();
     // Re-read the focused trip so a reminder that fired while we were away

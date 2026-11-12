@@ -48,7 +48,6 @@ function storeCachedPayload(payload: SchedulePayload): void {
   }
 }
 
-let cachedPayloadApplied = false;
 let inFlightRefresh: Promise<void> | null = null;
 // True until the first remote check settles, so a shared link to a newly added
 // trip reads as loading rather than missing.
@@ -95,29 +94,22 @@ function refreshSchedulePayload(): Promise<void> {
   return inFlightRefresh;
 }
 
+/** Mount once at the app root: applies the cached payload, then refreshes on
+ *  launch and on every app refresh (foreground, focus, reconnect). */
+export function useScheduleSync(): void {
+  useEffect(() => {
+    const cached = loadCachedPayload();
+    if (cached) setScheduleData(cached, "cached");
+    void refreshSchedulePayload();
+    window.addEventListener(APP_REFRESH_EVENT, refreshSchedulePayload);
+    return () => {
+      window.removeEventListener(APP_REFRESH_EVENT, refreshSchedulePayload);
+    };
+  }, []);
+}
+
 export function useScheduleData(): ScheduleDataState {
   const meta = useSyncExternalStore(subscribeSchedule, getScheduleMeta, getScheduleMeta);
-
-  useEffect(() => {
-    if (!cachedPayloadApplied) {
-      cachedPayloadApplied = true;
-      const cached = loadCachedPayload();
-      if (cached) setScheduleData(cached, "cached");
-    }
-    void refreshSchedulePayload();
-  }, []);
-
-  useEffect(() => {
-    const onAppRefresh = () => {
-      void refreshSchedulePayload();
-    };
-
-    window.addEventListener(APP_REFRESH_EVENT, onAppRefresh);
-    return () => {
-      window.removeEventListener(APP_REFRESH_EVENT, onAppRefresh);
-    };
-  }, []);
-
   return {
     version: String(meta.version),
     source: meta.source,

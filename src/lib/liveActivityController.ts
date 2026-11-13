@@ -876,6 +876,7 @@ export async function syncFocusedActivityContent(args: {
   nextStop?: string | null;
   remainingStops?: number | null;
   isCanceled?: boolean;
+  isStopSkipped?: boolean;
 }): Promise<void> {
   const current = loadFocusedTrip();
   if (!current?.liveActivityId) return;
@@ -892,6 +893,7 @@ export async function syncFocusedActivityContent(args: {
     nextStop: args.nextStop ?? null,
     remainingStops: args.remainingStops ?? null,
     isCanceled: args.isCanceled ?? false,
+    isStopSkipped: args.isStopSkipped,
     isEnded: false,
     reminderSet: current.reminder != null,
     reminderEpochMs: current.reminder?.reminderAt ?? null,

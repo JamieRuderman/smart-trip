@@ -609,13 +609,12 @@ describe("replacementRun", () => {
   const livePicked =
     (status: Partial<TripRealtimeStatus>) => (trip: { trip: number }) =>
       trip.trip === picked.trip
-        ? { isCanceled: false, isOriginSkipped: false, isDestinationSkipped: false, ...status }
+        ? { isCanceled: false, isStopSkipped: false, ...status }
         : null;
 
   it.each([
     { label: "canceled", status: { isCanceled: true } },
-    { label: "skipping the new boarding station", status: { isOriginSkipped: true } },
-    { label: "skipping the destination", status: { isDestinationSkipped: true } },
+    { label: "skipping the new boarding station or destination", status: { isStopSkipped: true } },
   ])("skips a train $label live, even the same one", ({ status }) => {
     const now = instant(pickedAtNorth.departureTime) - 10 * 60_000;
     const next = replacementRun(

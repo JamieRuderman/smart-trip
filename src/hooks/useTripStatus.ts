@@ -16,8 +16,8 @@ export function useTripStatus(
   const { t } = useTranslation();
 
   const isCanceled = realtimeStatus?.isCanceled ?? false;
-  const isOriginSkipped = realtimeStatus?.isOriginSkipped ?? false;
-  const isCanceledOrSkipped = isCanceled || isOriginSkipped;
+  const isStopSkipped = realtimeStatus?.isStopSkipped ?? false;
+  const isCanceledOrSkipped = isCanceled || isStopSkipped;
   // Departure delay, else en-route arrival delay — a train can depart on
   // time and still arrive late, and must not read "On time" meanwhile.
   const displayDelayMinutes = effectiveDelayMinutes(realtimeStatus);
@@ -29,7 +29,7 @@ export function useTripStatus(
 
   const statusLabel: string | null = isCanceled
     ? t("tripCard.canceled")
-    : isOriginSkipped
+    : isStopSkipped
     ? t("tripCard.stopSkipped")
     : isDelayed
     ? t("tripCard.delayed", { minutes: delayDisplay })
@@ -45,7 +45,7 @@ export function useTripStatus(
 
   return {
     isCanceled,
-    isOriginSkipped,
+    isStopSkipped,
     isCanceledOrSkipped,
     isDelayed,
     statusLabel,

@@ -140,6 +140,7 @@ describe("planTick", () => {
       phase: "pre-departure",
       isEnded: false,
       isCanceled: false,
+      isStopSkipped: false,
       arrivalEpochMs: SCHED_ARR_MS,
       alarmPending: false,
     });
@@ -403,6 +404,29 @@ describe("planTick", () => {
     const aboard = contentValues(tick(boarding + 5 * 60_000));
     expect(aboard.delayMinutes).toBe("10");
     expect(aboard.statusText).toBe("Delayed");
+  });
+
+  it("pushes a red 'Stop skipped' update when the feed skips the rider's destination", () => {
+    const plan = planTick({
+      reg: REG,
+      token: "tok",
+      lastSent: PRE_DEPARTURE_SENT,
+      updates: [
+        {
+          scheduleRelationship: "SCHEDULED",
+          startTime: "08:10:00",
+          stopTimeUpdates: [
+            { stopId: FROM_STOP, departureTime: SCHED_DEP_MS / 1000 },
+            { stopId: TO_STOP, scheduleRelationship: "SKIPPED" },
+          ],
+        },
+      ],
+      now: SCHED_DEP_MS - 30 * 60_000,
+    });
+    const values = contentValues(plan);
+    expect(values.isCanceled).toBe("true");
+    expect(values.statusText).toBe("Stop skipped");
+    expect(plan.lastSent).toMatchObject({ isCanceled: true, isStopSkipped: true });
   });
 
   it("keeps and shifts the leave-in countdown when a delay update is pushed", () => {

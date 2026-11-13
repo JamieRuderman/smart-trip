@@ -88,6 +88,7 @@ export const DEV_FIXTURE_IDS = [
   "boarding",
   "delayed",
   "canceled",
+  "destination-skipped",
   "mid-trip",
   "arriving",
   "late-arriving",
@@ -126,8 +127,7 @@ export function getDevFixture(scenario: string): DevFixture | null {
           liveDepartureTime: addMin(now, depOffset + delayMin),
           liveArrivalTime: addMin(now, depOffset + DURATION + delayMin),
           delayMinutes: delayMin,
-          isOriginSkipped: false,
-          isDestinationSkipped: false,
+          isStopSkipped: false,
           hasRealtimeStopData: true,
           allStopLiveDepartures: makeLiveDepartures(depOffset, delayMin, now),
         },
@@ -146,8 +146,17 @@ export function getDevFixture(scenario: string): DevFixture | null {
         trip: makeTrip(105, 10), // departs in 10 min
         realtimeStatus: {
           isCanceled: true,
-          isOriginSkipped: false,
-          isDestinationSkipped: false,
+          isStopSkipped: false,
+        },
+      };
+    }
+
+    case "destination-skipped": {
+      return {
+        trip: makeTrip(106, 10),
+        realtimeStatus: {
+          isCanceled: false,
+          isStopSkipped: true,
         },
       };
     }
@@ -159,8 +168,7 @@ export function getDevFixture(scenario: string): DevFixture | null {
         trip: makeTrip(107, -20),
         realtimeStatus: {
           isCanceled: false,
-          isOriginSkipped: false,
-          isDestinationSkipped: false,
+          isStopSkipped: false,
           hasRealtimeStopData: false,
         },
         vehiclePosition: {

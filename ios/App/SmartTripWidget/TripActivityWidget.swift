@@ -666,7 +666,7 @@ private struct ActiveEventTimingRow: View {
         HStack(alignment: .center, spacing: 6) {
             Group {
                 if model.isCanceled {
-                    Text("Cancelled")
+                    Text(model.statusText)
                 } else if isArrived(model) {
                     Text("Arrived")
                 } else {

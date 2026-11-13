@@ -326,6 +326,11 @@ describe("deriveStatusText", () => {
     expect(deriveStatusText({ delayMinutes: 5, isCanceled: false, isEnded: true })).toBe("Arrived");
     expect(deriveStatusText({ delayMinutes: 4, isCanceled: false, isEnded: false })).toBe("Delayed");
   });
+  it("names a skipped stop instead of a cancellation when the run still operates", () => {
+    expect(
+      deriveStatusText({ delayMinutes: 0, isCanceled: true, isStopSkipped: true, isEnded: false }),
+    ).toBe("Stop skipped");
+  });
   it("is 'On time' when not late", () => {
     expect(deriveStatusText({ delayMinutes: 0, isCanceled: false, isEnded: false })).toBe("On time");
     expect(deriveStatusText({ delayMinutes: null, isCanceled: false, isEnded: false })).toBe("On time");

@@ -89,7 +89,8 @@ export function useStopInference({
 
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
-  const isCanceled = realtimeStatus?.isCanceled ?? false;
+  const isCanceledOrSkipped =
+    (realtimeStatus?.isCanceled ?? false) || (realtimeStatus?.isStopSkipped ?? false);
   // Departure delay, else en-route arrival delay (shared precedence rule) —
   // the header accent must not stay green while the live arrival slips.
   const tripDelayMinutes = effectiveDelayMinutes(realtimeStatus) ?? 0;
@@ -162,7 +163,7 @@ export function useStopInference({
     // Trip-level delay (at the user's origin) wins over per-stop delay so the
     // header reads orange whenever the trip is starting late, even before the
     // current stop has been resolved (currentIndex === -1).
-    const currentAccent: TripState = isCanceled
+    const currentAccent: TripState = isCanceledOrSkipped
       ? "canceled"
       : tripDelayMinutes > 0 || perStopDelayMin > 0
       ? "delayed"
@@ -185,7 +186,7 @@ export function useStopInference({
     allStopLiveDepartures,
     allStopDelayMinutes,
     nowMinutes,
-    isCanceled,
+    isCanceledOrSkipped,
     tripDelayMinutes,
     progressHint,
   ]);

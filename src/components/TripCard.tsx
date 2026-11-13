@@ -53,7 +53,7 @@ export const TripCard = memo(function TripCard({
 }: TripCardProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const { isCanceled, isOriginSkipped, isCanceledOrSkipped, isDelayed } =
+  const { isCanceled, isStopSkipped, isCanceledOrSkipped, isDelayed } =
     useTripStatus(realtimeStatus);
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -156,7 +156,7 @@ export const TripCard = memo(function TripCard({
     `departs ${startTime}`,
     `arrives ${endTime}`,
     isCanceled ? t("tripCard.canceled") : null,
-    isOriginSkipped ? t("tripCard.stopSkipped") : null,
+    isStopSkipped ? t("tripCard.stopSkipped") : null,
     isNextTrip ? t("tripCard.nextTrain") : null,
     isPastTrip ? t("tripCard.departed") : null,
     hasQuickConnection
@@ -192,7 +192,7 @@ export const TripCard = memo(function TripCard({
           isNextTrip={isNextTrip}
           isPastTrip={isPastTrip}
           isCanceled={isCanceled}
-          isSkipped={isOriginSkipped}
+          isSkipped={isStopSkipped}
           isDelayed={isDelayed}
         />
         {isMobile ? (

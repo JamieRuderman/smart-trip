@@ -357,7 +357,7 @@ export function replacementRun(
   let best: { tripNumber: number; gap: number; at: number } | null = null;
   for (const trip of getFilteredTrips(from, to, run.scheduleType, viaFerry)) {
     const live = liveStatus(trip);
-    if (live?.isCanceled || live?.isOriginSkipped || live?.isDestinationSkipped) {
+    if (live?.isCanceled || live?.isStopSkipped) {
       continue;
     }
     const scheduled = serviceDateInstant(run.serviceDate, hhmmToMinutes(trip.departureTime));

@@ -24,6 +24,7 @@ struct TripActivityModel {
     let reminderDate: Date?
     let delayMinutes: Int
     let isCanceled: Bool
+    let statusText: String
     let isEnded: Bool
     let reminderSet: Bool
 
@@ -42,6 +43,7 @@ struct TripActivityModel {
         reminderDate = Self.epochMsDate(state["reminderEpochMs"])
         delayMinutes = Int(state["delayMinutes"] ?? "") ?? 0
         isCanceled = state["isCanceled"] == "true"
+        statusText = state["statusText"] ?? ""
         isEnded = state["isEnded"] == "true"
         reminderSet = state["reminderSet"] == "true"
     }

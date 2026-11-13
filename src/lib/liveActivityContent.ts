@@ -217,15 +217,19 @@ export function derivePhase(args: {
 
 /**
  * Humanized status pill from the realtime/derived flags. Pure. Precedence:
- * cancelled > ended > delayed > on-time. The widget's colour theme (blue /
- * orange / red) keys off these same flags, never off parsing this text.
+ * cancelled (or a skipped stop on the rider's leg) > ended > delayed > on-time.
+ * The widget's colour theme (blue / orange / red) keys off these same flags,
+ * never off parsing this text.
  */
 export function deriveStatusText(args: {
   delayMinutes: number | null;
   isCanceled: boolean;
+  /** With `isCanceled`: the train runs but skips the rider's boarding or
+   *  destination stop. */
+  isStopSkipped?: boolean;
   isEnded: boolean;
 }): string {
-  if (args.isCanceled) return "Cancelled";
+  if (args.isCanceled) return args.isStopSkipped ? "Stop skipped" : "Cancelled";
   if (args.isEnded) return "Arrived";
   if (args.delayMinutes != null && args.delayMinutes > 0) return "Delayed";
   return "On time";
@@ -247,6 +251,7 @@ export function buildContentState(args: {
   nextStop: string | null;
   remainingStops: number | null;
   isCanceled: boolean;
+  isStopSkipped?: boolean;
   isEnded: boolean;
   reminderSet?: boolean;
   /** Absolute fire instant of the armed leave alarm (epoch ms), if any. */
@@ -272,6 +277,7 @@ export function buildContentState(args: {
     statusText: deriveStatusText({
       delayMinutes,
       isCanceled: args.isCanceled,
+      isStopSkipped: args.isStopSkipped,
       isEnded: args.isEnded,
     }),
     isCanceled: args.isCanceled,

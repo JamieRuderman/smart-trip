@@ -56,6 +56,10 @@ interface Arrival {
   destinationTime: string | null;
   delayMinutes: number | null;
   isCanceled: boolean;
+  /** The train passes this station without stopping. */
+  skipsStation: boolean;
+  /** The train passes {@link destinationStation} without stopping. */
+  skipsDestination: boolean;
   /** Underlying schedule trip — handed back to the caller when the row is
    *  tapped so they can open the trip detail sheet. */
   trip: ProcessedTrip;
@@ -214,6 +218,8 @@ export function StationInfoSheet({
                 ? delayMinutes
                 : null,
             isCanceled: rt?.isCanceled === true,
+            skipsStation: rt?.skippedStations?.includes(station) ?? false,
+            skipsDestination: rt?.skippedStations?.includes(destinationStation) ?? false,
             trip,
           } satisfies Arrival;
         })
@@ -512,7 +518,8 @@ function ArrivalRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation();
-  const isDelayed = isTrainDelayed(arrival);
+  const isSkipped = arrival.skipsStation || arrival.skipsDestination;
+  const isDelayed = !isSkipped && isTrainDelayed(arrival);
 
   // Card state mirrors TripCard's semantics so the row reads in the same
   // visual language as the main schedule. No "next train" highlight here —
@@ -521,7 +528,8 @@ function ArrivalRow({
     isCanceledOrSkipped: arrival.isCanceled,
     isDelayed,
     isNextTrip: false,
-    isPastTrip: false,
+    // Grey like a departed train, not red: it still runs, just not for this row's journey.
+    isPastTrip: isSkipped,
   });
 
   const DirArrow = arrival.isSouthbound ? ArrowDown : ArrowUp;
@@ -531,7 +539,9 @@ function ArrivalRow({
 
   const etaCopy = arrival.isCanceled
     ? t("stationInfo.canceledSuffix").replace(/^·\s*/, "")
-    : arrival.etaMinutes <= 0
+    : isSkipped
+      ? t("tripCard.stopSkipped")
+      : arrival.etaMinutes <= 0
       ? t("stationInfo.nowArriving")
       : t("stationInfo.inMinutes", { minutes: arrival.etaMinutes });
 
@@ -580,7 +590,8 @@ function ArrivalRow({
         <div
           className={cn(
             "text-xl font-semibold tabular-nums",
-            arrival.isCanceled && "line-through text-muted-foreground",
+            (arrival.isCanceled || arrival.skipsStation) && "line-through text-muted-foreground",
+            isSkipped && stateText[cardState],
             isDelayed && "text-smart-gold",
           )}
         >
@@ -590,7 +601,7 @@ function ArrivalRow({
           <div
             className={cn(
               "text-xs tabular-nums mt-0.5 text-muted-foreground",
-              arrival.isCanceled && "line-through",
+              (arrival.isCanceled || arrival.skipsDestination) && "line-through",
             )}
           >
             {t("stationInfo.arrivingAt", {

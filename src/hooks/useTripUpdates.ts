@@ -121,16 +121,19 @@ function buildStopRealtimeData(
 ): {
   allStopLiveDepartures: Partial<Record<string, string>>;
   allStopDelayMinutes: Partial<Record<string, number>>;
+  skippedStations: string[];
 } {
   const allStopLiveDepartures: Partial<Record<string, string>> = {};
   const allStopDelayMinutes: Partial<Record<string, number>> = {};
+  const skippedStations: string[] = [];
 
   for (const stu of stopTimeUpdates) {
-    if (!stu.departureTime) continue;
     if (minStopSequence != null && stu.stopSequence != null && stu.stopSequence < minStopSequence) continue;
     const platform = resolvePlatform(stu);
     if (!platform || platform.direction !== direction) continue;
     const { station } = platform;
+    if (stu.scheduleRelationship === "SKIPPED") skippedStations.push(station);
+    if (!stu.departureTime) continue;
 
     allStopLiveDepartures[station] = unixToTimeString(stu.departureTime);
 
@@ -141,7 +144,7 @@ function buildStopRealtimeData(
     }
   }
 
-  return { allStopLiveDepartures, allStopDelayMinutes };
+  return { allStopLiveDepartures, allStopDelayMinutes, skippedStations };
 }
 
 type DerivedStatusResult =
@@ -151,7 +154,6 @@ type DerivedStatusResult =
 
 const CANCELED_STATUS: TripRealtimeStatus = {
   isCanceled: true,
-  isStopSkipped: false,
 };
 
 /**
@@ -210,13 +212,12 @@ function deriveEnRouteStatus(
   scheduledDepartureParam: string | null,
   scheduledArrivalParam: string | null,
   scheduledTimesByStation: Partial<Record<string, string>>,
-  isOriginSkipped: boolean,
 ): DerivedStatusResult {
   // No static match → no stable key for the status map; a station-only match
   // could attach this run's data to the wrong trip.
   if (!scheduledDepartureParam) return { kind: "none" };
 
-  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+  const { allStopLiveDepartures, allStopDelayMinutes, skippedStations } = buildStopRealtimeData(
     update.stopTimeUpdates,
     scheduledTimesByStation,
     update.startDate,
@@ -237,10 +238,9 @@ function deriveEnRouteStatus(
   }
 
   const hasRealtimeStopData = Object.keys(allStopLiveDepartures).length > 0;
-  const isStopSkipped = isOriginSkipped || toUpdate?.scheduleRelationship === "SKIPPED";
   // Nothing usable on this leg's direction (e.g. only the opposite leg of a
   // round-trip-encoded GTFS trip remains) — don't key an empty status.
-  if (!hasRealtimeStopData && liveArrivalTime == null && !isStopSkipped) {
+  if (!hasRealtimeStopData && liveArrivalTime == null && skippedStations.length === 0) {
     return { kind: "none" };
   }
 
@@ -251,9 +251,9 @@ function deriveEnRouteStatus(
       isCanceled: false,
       liveArrivalTime,
       arrivalDelayMinutes,
-      isStopSkipped,
       allStopLiveDepartures,
       allStopDelayMinutes,
+      skippedStations,
       hasRealtimeStopData,
     },
   };
@@ -283,13 +283,8 @@ function deriveScheduledStatus(
       scheduledDepartureParam,
       scheduledArrivalParam,
       scheduledTimesByStation,
-      fromUpdate?.scheduleRelationship === "SKIPPED",
     );
   }
-
-  const isStopSkipped =
-    fromUpdate.scheduleRelationship === "SKIPPED" ||
-    toUpdate?.scheduleRelationship === "SKIPPED";
 
   // Use departure.time per SMART spec — manually adjusted for holds/delays.
   const liveDepartureTime = unixToTimeString(fromUpdate.departureTime);
@@ -335,7 +330,7 @@ function deriveScheduledStatus(
     }
   }
 
-  const { allStopLiveDepartures, allStopDelayMinutes } = buildStopRealtimeData(
+  const { allStopLiveDepartures, allStopDelayMinutes, skippedStations } = buildStopRealtimeData(
     update.stopTimeUpdates,
     scheduledTimesByStation,
     update.startDate,
@@ -353,9 +348,9 @@ function deriveScheduledStatus(
       liveArrivalTime,
       delayMinutes,
       arrivalDelayMinutes,
-      isStopSkipped,
       allStopLiveDepartures,
       allStopDelayMinutes,
+      skippedStations,
       hasRealtimeStopData,
     },
   };

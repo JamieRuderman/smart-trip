@@ -68,7 +68,11 @@ function LiveActivitySyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const countingToFerry =
     phase === "pre-departure" && focusedPlaces(focusedTrip).from === SAN_FRANCISCO;
   const delayMinutes = countingToFerry ? null : (effectiveDelayMinutes(live) ?? null);
-  const { isCanceledOrSkipped: isCanceled, isStopSkipped } = useTripStatus(live);
+  const { isCanceledOrSkipped: isCanceled, isStopSkipped } = useTripStatus(
+    live,
+    focusedTrip.fromStation,
+    focusedTrip.toStation,
+  );
 
   const liveActivityId = focusedTrip.liveActivityId ?? null;
   // Re-push content (which carries reminderSet) when a reminder is armed/cleared

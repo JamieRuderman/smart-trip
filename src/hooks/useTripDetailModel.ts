@@ -112,7 +112,7 @@ export function useTripDetailModel({
     );
 
   const { isCanceled, isCanceledOrSkipped, isDelayed, statusLabel } =
-    useTripStatus(realtimeStatus);
+    useTripStatus(realtimeStatus, fromStation, toStation);
 
   const departureTime = realtimeStatus?.liveDepartureTime ?? trip.departureTime;
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;

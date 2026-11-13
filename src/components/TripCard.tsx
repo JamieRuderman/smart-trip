@@ -54,7 +54,7 @@ export const TripCard = memo(function TripCard({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const { isCanceled, isStopSkipped, isCanceledOrSkipped, isDelayed } =
-    useTripStatus(realtimeStatus);
+    useTripStatus(realtimeStatus, fromStation, toStation);
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);

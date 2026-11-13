@@ -69,6 +69,7 @@ export function StopTimeline({
 
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceled = realtimeStatus?.isCanceled ?? false;
+  const skippedStations = realtimeStatus?.skippedStations;
 
   // Once ended — or once the rider has reached their destination — all stops are
   // forced to "past" so nothing stays highlighted as the current stop.
@@ -91,9 +92,10 @@ export function StopTimeline({
           const isFirst = i === 0;
           const isLast = i === displayStops.length - 1;
 
+          const isSkippedStop = skippedStations?.includes(station) ?? false;
           const { liveTime: liveStopTime, staticTime } = statusByStop[i];
           const showLiveStopTime =
-            liveStopTime && !isCanceled && hasTime && liveStopTime !== time;
+            liveStopTime && !isCanceled && !isSkippedStop && hasTime && liveStopTime !== time;
 
           // Per-stop delay handling. The upstream feed sometimes reports a
           // delay block at intermediate stops that recovers by the destination
@@ -106,12 +108,14 @@ export function StopTimeline({
           const showStopDelay = perStopDelayMin > 0 && !isPast;
           const isStopDelayProminent = showStopDelay && tripIsDelayed;
 
-          const showLiveFrom = isFrom && realtimeStatus?.liveDepartureTime;
-          const showLiveTo = isTo && !isFrom && realtimeStatus?.liveArrivalTime;
+          const showLiveFrom = isFrom && !isSkippedStop && realtimeStatus?.liveDepartureTime;
+          const showLiveTo = isTo && !isFrom && !isSkippedStop && realtimeStatus?.liveArrivalTime;
 
           // Per-stop semantic state — drives all colours for this row
           const accent: TripState = isCanceled
             ? "canceled"
+            : isSkippedStop
+            ? "past"
             : isStopDelayProminent
             ? "delayed"
             : isCurrent
@@ -133,7 +137,9 @@ export function StopTimeline({
 
           // Delay pill — orange "X min delay" when the trip itself is delayed,
           // muted "+N" indicator when only a mid-trip wobble is reported.
-          const pill = !showStopDelay
+          const pill = isSkippedStop
+            ? { label: t("tripCard.stopSkipped"), cls: "bg-muted text-muted-foreground" }
+            : !showStopDelay
             ? null
             : isStopDelayProminent
             ? {
@@ -297,7 +303,7 @@ export function StopTimeline({
                         format={timeFormat}
                         className={cn(
                           "text-sm",
-                          isCanceled && "line-through",
+                          (isCanceled || isSkippedStop) && "line-through",
                           accentText,
                         )}
                       />

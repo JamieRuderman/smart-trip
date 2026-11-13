@@ -5,6 +5,7 @@ import {
   isSouthbound as isSouthboundFn,
 } from "@/lib/stationUtils";
 import { parseTimeToMinutes } from "@/lib/timeUtils";
+import { isLegSkipped } from "@/lib/legSkip";
 import { effectiveDelayMinutes } from "@/lib/tripDelay";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -90,7 +91,7 @@ export function useStopInference({
   const allStopLiveDepartures = realtimeStatus?.allStopLiveDepartures;
   const allStopDelayMinutes = realtimeStatus?.allStopDelayMinutes;
   const isCanceledOrSkipped =
-    (realtimeStatus?.isCanceled ?? false) || (realtimeStatus?.isStopSkipped ?? false);
+    (realtimeStatus?.isCanceled ?? false) || isLegSkipped(realtimeStatus, fromStation, toStation);
   // Departure delay, else en-route arrival delay (shared precedence rule) —
   // the header accent must not stay green while the live arrival slips.
   const tripDelayMinutes = effectiveDelayMinutes(realtimeStatus) ?? 0;

@@ -4,6 +4,7 @@ import { LanguageToggle } from "./LanguageToggle";
 import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
 import { APP_STORE_URL } from "@/seo/constants";
+import { cn } from "@/lib/utils";
 
 export function BottomInfoBar() {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export function BottomInfoBar() {
     <div className="container max-w-4xl mx-auto px-3 md:px-0 pb-safe space-y-3">
       <div className="pt-12 mt-6 md:px-8 md:py-4 text-sm text-muted-foreground border-t md:border-t-0">
         <div className="flex items-start justify-between gap-3">
-          {showAppPrompt ? (
+          {showAppPrompt && (
             <a
               href={APP_STORE_URL}
               target="_blank"
@@ -30,10 +31,8 @@ export function BottomInfoBar() {
                 className="h-10 w-auto block"
               />
             </a>
-          ) : (
-            <div />
           )}
-          <div className="-mb-4 flex items-center gap-2 shrink-0">
+          <div className={cn("flex items-center gap-2 shrink-0", showAppPrompt && "-mb-4")}>
             <LanguageToggle />
             <ThemeToggle />
           </div>

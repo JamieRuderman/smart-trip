@@ -75,6 +75,7 @@ export const TripCard = memo(function TripCard({
   const [isDetailOpen, setIsDetailOpen] = useState(isOpen);
   const [isDetailMounted, setIsDetailMounted] = useState(isOpen);
   const isFirstRender = useRef(true);
+  const openedByKeyboardRef = useRef(false);
 
   const transfer = ferryTransfer(trip, realtimeStatus);
   const hasQuickConnection = transfer != null && isQuickConnection(transfer.minutes);
@@ -132,9 +133,12 @@ export const TripCard = memo(function TripCard({
       setIsDetailOpen(false);
       closeTimerRef.current = window.setTimeout(() => {
         setIsDetailMounted(false);
-        requestAnimationFrame(() => {
-          cardRef.current?.focus({ preventScroll: true });
-        });
+        if (openedByKeyboardRef.current) {
+          openedByKeyboardRef.current = false;
+          requestAnimationFrame(() => {
+            cardRef.current?.focus({ preventScroll: true });
+          });
+        }
         closeTimerRef.current = null;
       }, SHEET_TRANSITION_MS);
     }
@@ -179,10 +183,14 @@ export const TripCard = memo(function TripCard({
         role="listitem"
         aria-label={ariaParts.join(", ")}
         tabIndex={0}
-        onClick={handleCardClick}
+        onClick={() => {
+          openedByKeyboardRef.current = false;
+          handleCardClick();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
+            openedByKeyboardRef.current = true;
             handleCardClick();
           }
         }}

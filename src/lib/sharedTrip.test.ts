@@ -8,6 +8,7 @@ import {
   nativeSharedTripLocation,
   parseSharedTrip,
   sharedTripArrival,
+  sharedTripDaysAhead,
   sharedTripServiceDate,
   sharedTripUrl,
 } from "./sharedTrip";
@@ -29,6 +30,16 @@ describe("shared trip links", () => {
     expect(matchesSharedDeparture(shared, trip)).toBe(true);
     expect(matchesSharedDeparture({ ...shared, departure: "00:01" }, trip)).toBe(false);
     expect(matchesSharedDeparture({ ...shared, ferryDeparture: "00:01" }, trip)).toBe(false);
+  });
+
+  it("counts days ahead by the Pacific calendar", () => {
+    // Friday 9 PM in Pacific time, already Saturday in UTC.
+    const now = new Date("2026-11-14T05:00:00Z");
+    expect(sharedTripDaysAhead("2026-11-13", now)).toBe(0);
+    expect(sharedTripDaysAhead("2026-11-14", now)).toBe(1);
+    expect(sharedTripDaysAhead("2026-11-20", now)).toBe(7);
+    // Across the March DST change.
+    expect(sharedTripDaysAhead("2027-03-15", new Date("2027-03-13T20:00:00Z"))).toBe(2);
   });
 
   it("rejects impossible dates and inherited station keys", () => {

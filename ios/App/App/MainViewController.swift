@@ -9,5 +9,7 @@ import Capacitor
 class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(LeaveAlarmPlugin())
+        // Capacitor turns the WebView's rubber-band bounce off; restore the native scroll feel.
+        webView?.scrollView.bounces = true
     }
 }

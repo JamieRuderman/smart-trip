@@ -5,12 +5,14 @@ import { Share as ShareIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ScheduleType } from "@/data/trainSchedules";
 import { legPlaces } from "@/lib/places";
-import { formatSharedServiceDate, sharedTripUrl } from "@/lib/sharedTrip";
+import { formatSharedServiceDate, sharedTripDaysAhead, sharedTripUrl } from "@/lib/sharedTrip";
 import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { cn } from "@/lib/utils";
 import { formatTime } from "./TimeDisplay";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+
+const SHORT_DATE: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
 
 interface ShareTripButtonProps {
   trip: ProcessedTrip;
@@ -37,18 +39,18 @@ export function ShareTripButton({
     const native = Capacitor.isNativePlatform();
     const previewOrigin = import.meta.env.DEV && !native ? window.location.origin : undefined;
     const url = sharedTripUrl(trip, scheduleType, serviceDate, previewOrigin).href;
-    const { start, end } = tripEnds(trip);
-    const viaFerry = !!(trip.inboundFerry || trip.outboundFerry);
-    const { from, to } = legPlaces(trip.fromStation, trip.toStation, viaFerry);
+    const { to } = legPlaces(trip.fromStation, trip.toStation, !!(trip.inboundFerry || trip.outboundFerry));
+    const daysAhead = sharedTripDaysAhead(serviceDate, new Date());
     const title = t("shareTrip.title");
-    const text = t("shareTrip.message", {
-      from,
-      to,
-      date: formatSharedServiceDate(serviceDate, i18n.language),
-      departure: formatTime(start, timeFormat),
-      arrival: formatTime(end, timeFormat),
-      service: t(viaFerry ? "shareTrip.trainAndFerry" : "shareTrip.train", { train: trip.trip }),
-    });
+    const text = t(
+      daysAhead <= 0 ? "shareTrip.message" : daysAhead === 1 ? "shareTrip.messageTomorrow" : "shareTrip.messageLater",
+      {
+        to,
+        departure: formatTime(tripEnds(trip).start, timeFormat),
+        date: formatSharedServiceDate(serviceDate, i18n.language, SHORT_DATE),
+        emoji: trip.inboundFerry ? "⛴️" : "🚆",
+      },
+    );
     try {
       const data = { title, text, url };
       if (native) {

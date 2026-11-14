@@ -134,6 +134,7 @@ export const TripCard = memo(function TripCard({
       closeTimerRef.current = window.setTimeout(() => {
         setIsDetailMounted(false);
         if (openedByKeyboardRef.current) {
+          openedByKeyboardRef.current = false;
           requestAnimationFrame(() => {
             cardRef.current?.focus({ preventScroll: true });
           });

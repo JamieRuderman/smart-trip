@@ -263,10 +263,10 @@
   "shareTrip": {
     "share": "Compartir viaje",
     "title": "Itinerario de SMART trip",
-    "message": "{{from}} → {{to}} · {{date}} · {{departure}}–{{arrival}} hora del Pacífico · {{service}} (horario programado)",
+    "message": "Voy en el de las {{departure}} a {{to}} {{emoji}} ¡Sígueme!",
+    "messageTomorrow": "Mañana voy en el de las {{departure}} a {{to}} {{emoji}}",
+    "messageLater": "El {{date}} voy en el de las {{departure}} a {{to}} {{emoji}}",
     "pacificDate": "{{date}} · hora del Pacífico",
-    "train": "Tren {{train}}",
-    "trainAndFerry": "Tren {{train}} + ferry",
     "loading": "Consultando el horario…",
     "unavailable": "Este enlace no es válido o la salida ya no figura en el horario.",
     "take": "Tomar este viaje",

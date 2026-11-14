@@ -263,10 +263,10 @@
   "shareTrip": {
     "share": "Share trip",
     "title": "SMART trip itinerary",
-    "message": "{{from}} → {{to}} · {{date}} · {{departure}}–{{arrival}} Pacific time · {{service}} (scheduled)",
+    "message": "Catching the {{departure}} to {{to}} {{emoji}} Follow along!",
+    "messageTomorrow": "Catching the {{departure}} to {{to}} tomorrow {{emoji}}",
+    "messageLater": "Catching the {{departure}} to {{to}} on {{date}} {{emoji}}",
     "pacificDate": "{{date}} · Pacific time",
-    "train": "Train {{train}}",
-    "trainAndFerry": "Train {{train}} + ferry",
     "loading": "Checking the schedule…",
     "unavailable": "This trip link is invalid or the departure is no longer in the schedule.",
     "take": "Take this trip",

@@ -79,8 +79,7 @@ export function parseSharedTrip(search: string, now: Date = new Date()): SharedT
   if (Number.isNaN(isoDate.getTime()) || isoDate.toISOString().slice(0, 10) !== serviceDate) {
     return null;
   }
-  const today = Date.parse(`${agencyDateKey(now)}T12:00:00Z`);
-  if (isoDate.getTime() - today > MAX_DAYS_AHEAD * DAY_MS) return null;
+  if (sharedTripDaysAhead(serviceDate, now) > MAX_DAYS_AHEAD) return null;
 
   return {
     from,
@@ -123,11 +122,18 @@ export function sharedTripArrival(
   return agencyWallTimeToEpochSeconds(day.toISOString().slice(0, 10).replace(/-/g, ""), cleanTimeString(liveEnd)) * 1000;
 }
 
-export function formatSharedServiceDate(serviceDate: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "full",
-    timeZone: AGENCY_TIME_ZONE,
-  }).format(new Date(`${serviceDate}T12:00:00Z`));
+export function sharedTripDaysAhead(serviceDate: string, now: Date): number {
+  const today = Date.parse(`${agencyDateKey(now)}T12:00:00Z`);
+  return Math.round((Date.parse(`${serviceDate}T12:00:00Z`) - today) / DAY_MS);
+}
+
+export function formatSharedServiceDate(
+  serviceDate: string,
+  locale: string,
+  style: Intl.DateTimeFormatOptions = { dateStyle: "full" },
+): string {
+  return new Intl.DateTimeFormat(locale, { ...style, timeZone: AGENCY_TIME_ZONE })
+    .format(new Date(`${serviceDate}T12:00:00Z`));
 }
 
 export function nativeSharedTripLocation(input: string): string | null {

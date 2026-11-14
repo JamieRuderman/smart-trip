@@ -645,7 +645,7 @@ export function PlaceSheetRow({
           onClick={onClick}
           className={cn(
             className,
-            "w-full text-left touch-manipulation cursor-pointer focus:outline-none",
+            "w-full text-left touch-manipulation cursor-pointer outline-none",
           )}
           aria-label={ariaLabel}
         >

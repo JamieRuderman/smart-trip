@@ -175,7 +175,7 @@ export const TripCard = memo(function TripCard({
         className={cn(
           "relative flex items-center px-4 py-2 rounded-lg border transition-all",
           "touch-manipulation cursor-pointer",
-          "focus:outline-none",
+          "outline-none",
           // Blue == "you're taking this train" and overrides the semantic
           // state colour (green/gold/red) for the user-focused ("Go") trip.
           isFocused ? myTripCardStyle : stateCardStyle[cardState],

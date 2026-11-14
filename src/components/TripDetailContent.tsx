@@ -219,7 +219,7 @@ export function TripDetailContent({
           </div>
 
           {!shared && (
-            <div className="-mr-2 -mt-3.5 flex shrink-0 items-center gap-1">
+            <div className="-mr-px -mt-3.5 flex shrink-0 items-center gap-1">
               {shareButton}
               {showCloseButton && (
                 <button

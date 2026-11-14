@@ -263,9 +263,9 @@
   "shareTrip": {
     "share": "Compartir viaje",
     "title": "Itinerario de SMART trip",
-    "message": "Voy en el de las {{departure}} a {{to}} {{emoji}} ¡Sígueme!",
-    "messageTomorrow": "Mañana voy en el de las {{departure}} a {{to}} {{emoji}}",
-    "messageLater": "El {{date}} voy en el de las {{departure}} a {{to}} {{emoji}}",
+    "message": "¡Rumbo a {{to}}! {{emoji}} Salida: {{departure}}. ¡Sígueme!",
+    "messageTomorrow": "¡Mañana rumbo a {{to}}! {{emoji}} Salida: {{departure}}",
+    "messageLater": "¡Rumbo a {{to}} el {{date}}! {{emoji}} Salida: {{departure}}",
     "pacificDate": "{{date}} · hora del Pacífico",
     "loading": "Consultando el horario…",
     "unavailable": "Este enlace no es válido o la salida ya no figura en el horario.",

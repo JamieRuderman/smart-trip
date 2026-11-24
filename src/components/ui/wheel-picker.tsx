@@ -14,7 +14,7 @@ interface WheelPickerProps {
   min: number;
   max: number;
   value: number;
-  /** Called once the wheel comes to rest on a new value. */
+  /** Called whenever the centred value changes. */
   onChange: (value: number) => void;
   format: (value: number) => string;
   ariaLabel: string;
@@ -78,7 +78,8 @@ export function WheelPicker({
   const handleScroll = () => {
     const el = ref.current;
     if (!el) return;
-    setCentered(min + indexAt(el));
+    const centeredNow = min + indexAt(el);
+    setCentered(centeredNow);
     // A CSS variable, not state: every scroll frame would otherwise re-render every row.
     el.style.setProperty("--wheel-pos", String(el.scrollTop / rowHeight));
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
@@ -91,6 +92,9 @@ export function WheelPicker({
       const next = min + index;
       if (next !== clamped) onChange(next);
     }, SETTLE_MS);
+    // Reported as it changes, not on settle: a "Set" tapped before the wheel
+    // settles otherwise saves the previous value.
+    if (centeredNow !== clamped) onChange(centeredNow);
   };
 
   const scrollToValue = useCallback(

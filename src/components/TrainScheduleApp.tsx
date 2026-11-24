@@ -31,6 +31,10 @@ import { ScheduleDaySwitchPrompt } from "./ScheduleDaySwitchPrompt";
 import { getDevFixture } from "@/lib/devFixtures";
 import { useOpenTripView } from "@/hooks/useTripViewNavigation";
 
+// Opening a train leaves this page, so component state would collapse the
+// earlier trains the rider expanded by the time they come back.
+let showAllTripsOnReturn = false;
+
 export function TrainScheduleApp() {
   const { version: scheduleDataVersion } = useScheduleData();
   const headerContainerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +66,10 @@ export function TrainScheduleApp() {
   // trip page reached again through history still shows it.
   useEffect(() => setPreviewTrip(null), [setPreviewTrip]);
 
-  const [showAllTrips, setShowAllTrips] = useState(false);
+  const [showAllTrips, setShowAllTrips] = useState(() => showAllTripsOnReturn);
+  useEffect(() => {
+    showAllTripsOnReturn = showAllTrips;
+  }, [showAllTrips]);
   const toggleShowAllTrips = useCallback(() => {
     setShowAllTrips((prev) => !prev);
   }, []);

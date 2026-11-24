@@ -357,7 +357,7 @@ function MapContents() {
         {!isOnline && (
           <div
             className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
-            style={{ top: 12 }}
+            style={{ top: 52 }}
           >
             <OfflineBanner />
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { FareType } from "@/types/smartSchedule";
 import { APP_CONSTANTS, FARE_TYPES } from "@/lib/fareConstants";
 import { logger } from "@/lib/logger";
@@ -13,29 +13,29 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 
 const STORAGE_KEY = APP_CONSTANTS.PREFERENCES_STORAGE_KEY;
 
+function loadPreferences(): UserPreferences {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as { selectedFareType?: string };
+      const fareType = parsed.selectedFareType;
+      // "none" was stored by the old "Show all fares" button.
+      if (fareType && Object.keys(FARE_TYPES).includes(fareType)) {
+        return { selectedFareType: fareType as FareType };
+      }
+    }
+  } catch (error) {
+    logger.warn("Failed to load user preferences", error);
+  }
+  return DEFAULT_PREFERENCES;
+}
+
 /**
  * Custom hook for managing user preferences with localStorage persistence
  */
 export function useUserPreferences() {
   const [preferences, setPreferences] =
-    useState<UserPreferences>(DEFAULT_PREFERENCES);
-
-  // Load preferences from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as { selectedFareType?: string };
-        const fareType = parsed.selectedFareType;
-        // "none" was stored by the old "Show all fares" button.
-        if (fareType && Object.keys(FARE_TYPES).includes(fareType)) {
-          setPreferences({ selectedFareType: fareType as FareType });
-        }
-      }
-    } catch (error) {
-      logger.warn("Failed to load user preferences", error);
-    }
-  }, []);
+    useState<UserPreferences>(loadPreferences);
 
   // Save preferences to localStorage whenever they change
   const savePreferences = useCallback(

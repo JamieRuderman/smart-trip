@@ -69,13 +69,10 @@ export function ReminderControl({
     async (pickedLead: number | null) => {
       if (departureAt == null) return;
       // The minute clock can be ~60s stale, which would put the max lead's alarm at "now".
+      const range = reminderLeadRange(departureAt, Date.now());
+      if (pickedLead != null && range.tooLate) return;
       const lead =
-        pickedLead == null
-          ? null
-          : Math.min(
-              pickedLead,
-              reminderLeadRange(departureAt, Date.now()).maxLeadMinutes
-            );
+        pickedLead == null ? null : Math.min(pickedLead, range.maxLeadMinutes);
       const text = buildReminderText(t, i18n.language, {
         leadMinutes: lead ?? 0,
         departureAt,

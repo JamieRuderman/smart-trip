@@ -58,7 +58,7 @@ export function MapDiagramFrame({
           <span className="truncate">{t("mapDiagram.tapHint")}</span>
         </div>
         {trainsCount != null && (
-          <span className="text-xs font-semibold bg-white/15 text-white rounded-full px-2.5 py-1 whitespace-nowrap">
+          <span className="text-xs font-semibold text-white whitespace-nowrap">
             {t("mapDiagram.trainsCount", { count: trainsCount })}
           </span>
         )}

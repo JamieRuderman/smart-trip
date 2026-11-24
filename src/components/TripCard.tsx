@@ -18,6 +18,7 @@ import {
   stateText,
   stateCardStyle,
   myTripCardStyle,
+  nextTripRingStyle,
   cardTripState,
 } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
@@ -116,7 +117,14 @@ export const TripCard = memo(function TripCard({
     <TripRow
       // Blue == "you're taking this train" and overrides the semantic
       // state colour (green/gold/red) for the user-focused ("Go") trip.
-      tone={isFocused ? myTripCardStyle : stateCardStyle[cardState]}
+      tone={
+        isFocused
+          ? myTripCardStyle
+          : cn(
+              stateCardStyle[cardState],
+              cardState === "ontime" && nextTripRingStyle
+            )
+      }
       ariaLabel={ariaParts.join(", ")}
       onClick={handleCardClick}
     >

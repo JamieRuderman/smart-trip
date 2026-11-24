@@ -227,9 +227,11 @@
     "arrivesLarkspur": "llega a Larkspur {{time}}"
   },
   "departureReminder": {
-    "remindMe": "Recordarme antes de la salida",
-    "lessLead": "Avisarme 1 minuto más tarde",
-    "moreLead": "Avisarme 1 minuto antes",
+    "remindMe": "Recordarme",
+    "reminderOn": "Recordatorio activado",
+    "atTime": "a las {{time}}",
+    "set": "Activar",
+    "minutesBeforeDeparture": "Minutos antes de la salida",
     "appCta": "Descarga la app para recordatorios",
     "minutesValue_one": "{{count}} min",
     "minutesValue_other": "{{count}} min",

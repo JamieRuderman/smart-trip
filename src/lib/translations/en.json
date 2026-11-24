@@ -227,9 +227,11 @@
     "arrivesLarkspur": "arrives Larkspur {{time}}"
   },
   "departureReminder": {
-    "remindMe": "Remind me before departure",
-    "lessLead": "Remind me 1 minute later",
-    "moreLead": "Remind me 1 minute earlier",
+    "remindMe": "Remind me",
+    "reminderOn": "Reminder set",
+    "atTime": "at {{time}}",
+    "set": "Set",
+    "minutesBeforeDeparture": "Minutes before departure",
     "appCta": "Get the app for reminders",
     "minutesValue_one": "{{count}} min",
     "minutesValue_other": "{{count}} min",

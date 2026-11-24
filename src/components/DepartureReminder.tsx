@@ -211,7 +211,9 @@ export function DepartureReminder({
   // row) rather than the full corridor.
   const focusRun = useMemo((): FocusedRun => {
     const run = { tripNumber, scheduleType, serviceDate };
+    // The trip page already chose the leg it shows (see useOpenTrainPage).
     if (
+      variant === "sheet" &&
       homeFromStation &&
       homeToStation &&
       (homeFromStation !== fromStation ||
@@ -237,6 +239,7 @@ export function DepartureReminder({
     tripNumber,
     scheduleType,
     serviceDate,
+    variant,
   ]);
 
   // When focusRun leaves its boarding station: this view's live time when it

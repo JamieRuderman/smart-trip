@@ -11,8 +11,8 @@ import {
 } from "@/lib/focusedTrip";
 import { isFerryLeg, placeStation } from "@/lib/places";
 import { validStation } from "@/lib/stationUtils";
-import { futureServiceDate, nextServiceDate } from "@/lib/scheduleUtils";
-import { buildDepartureTimestamp } from "@/lib/timeUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
+import { toLocalDateKey } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { MyTripState } from "@/hooks/useMyTrip";
@@ -94,14 +94,10 @@ function usePreviewRun(currentTime: Date): FocusedTrip | null {
       ...(isFerryLeg(from, to) ? { viaFerry: true as const } : {}),
       scheduleType,
     };
-    const trip = reconstructFocusedTrip({ ...run, serviceDate: "" });
-    if (!trip) return null;
+    if (!reconstructFocusedTrip({ ...run, serviceDate: "" })) return null;
+    // Today's schedule is today's runs, departed ones included, as in its list.
     const serviceDate =
-      futureServiceDate(currentTime, scheduleType) ??
-      nextServiceDate(
-        new Date(buildDepartureTimestamp(currentTime, trip.departureTime)),
-        scheduleType
-      );
+      futureServiceDate(currentTime, scheduleType) ?? toLocalDateKey(currentTime);
     return { source: "user", ...run, serviceDate, reminder: null };
   }, [previewTrip, currentTime]);
 }
@@ -167,9 +163,13 @@ function MyTripView({
           >
             <ChevronLeft className="h-5 w-5" aria-hidden="true" />
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
-            {!isPreview && t("focusedTrip.myTrip")}
-          </h1>
+          {isPreview ? (
+            <div className="min-w-0 flex-1" />
+          ) : (
+            <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
+              {t("focusedTrip.myTrip")}
+            </h1>
+          )}
           <ShareTripButton
             trip={trip}
             serviceDate={focusedTrip.serviceDate}

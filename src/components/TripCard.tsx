@@ -10,6 +10,7 @@ import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import type { Station } from "@/types/smartSchedule";
 import { TimeDisplay } from "./TimeDisplay";
 import { TrainBadge } from "./TrainBadge";
+import { TripRow } from "./TripRow";
 import { FerryConnection } from "./FerryConnection";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
@@ -112,25 +113,12 @@ export const TripCard = memo(function TripCard({
   ].filter(Boolean);
 
   return (
-    <div
-      className={cn(
-        "relative flex items-center px-4 py-2 rounded-lg transition-all",
-        "touch-manipulation cursor-pointer",
-        "outline-none",
-        // Blue == "you're taking this train" and overrides the semantic
-        // state colour (green/gold/red) for the user-focused ("Go") trip.
-        isFocused ? myTripCardStyle : stateCardStyle[cardState]
-      )}
-      role="listitem"
-      aria-label={ariaParts.join(", ")}
-      tabIndex={0}
+    <TripRow
+      // Blue == "you're taking this train" and overrides the semantic
+      // state colour (green/gold/red) for the user-focused ("Go") trip.
+      tone={isFocused ? myTripCardStyle : stateCardStyle[cardState]}
+      ariaLabel={ariaParts.join(", ")}
       onClick={handleCardClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleCardClick();
-        }
-      }}
     >
       <TrainBadge
         tripNumber={trip.trip}
@@ -271,6 +259,6 @@ export const TripCard = memo(function TripCard({
           )}
         </div>
       )}
-    </div>
+    </TripRow>
   );
 });

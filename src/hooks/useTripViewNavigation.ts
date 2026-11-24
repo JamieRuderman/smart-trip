@@ -7,7 +7,7 @@ import {
   tripServesLeg,
   type ProcessedTrip,
 } from "@/lib/scheduleUtils";
-import { isSouthbound } from "@/lib/stationUtils";
+import { isSouthbound, stationIndexMap } from "@/lib/stationUtils";
 import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
 
 /** Open the full-page My Trip view, keeping the current query params (the
@@ -40,7 +40,8 @@ export function useLeaveTripView(): () => void {
 
 /** Open the trip page for a train tapped on a map: My Trip when it's the
  *  rider's focused train, else a preview on their selected leg when the train
- *  serves it, else on the run the map shows. */
+ *  serves it and hasn't reached its start yet, else on the run the map shows
+ *  (from where the train is now). */
 export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
   const {
     fromPlace,
@@ -64,7 +65,10 @@ export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
         toPlace &&
         fromStation &&
         toStation &&
-        tripServesLeg(trip.trip, fromStation, toStation, scheduleType, viaFerry)
+        tripServesLeg(trip.trip, fromStation, toStation, scheduleType, viaFerry) &&
+        (southbound
+          ? stationIndexMap[trip.fromStation] <= stationIndexMap[fromStation]
+          : stationIndexMap[trip.fromStation] >= stationIndexMap[fromStation])
       ) {
         setPreviewTrip({ tripNumber: trip.trip, from: fromPlace, to: toPlace, scheduleType });
       } else {

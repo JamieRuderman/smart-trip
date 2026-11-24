@@ -210,7 +210,16 @@ export function TripPositionCard({
         ) : null}
       </div>
 
-      <p className="mt-2 text-lg font-semibold leading-snug">{headline}</p>
+      <p
+        className={cn(
+          "mt-2 leading-snug",
+          position.phase === "waiting"
+            ? "text-sm text-muted-foreground"
+            : "text-lg font-semibold",
+        )}
+      >
+        {headline}
+      </p>
       {details.length > 0 && (
         <p className="text-sm text-muted-foreground">{details.join(" · ")}</p>
       )}

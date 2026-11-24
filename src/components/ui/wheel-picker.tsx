@@ -24,6 +24,9 @@ interface WheelPickerProps {
   rowHeight?: number;
   /** Visible height; the rows above and below the value show in what's left. */
   height?: number;
+  /** How far the rows next to the value are drawn in toward it, so a short
+   *  wheel shows them whole, flush with its edges. */
+  neighborOffset?: number;
   /** Up/down buttons beside the wheel that step it by one. */
   stepLabels?: { previous: string; next: string };
 }
@@ -44,6 +47,7 @@ export function WheelPicker({
   className,
   rowHeight = 30,
   height = rowHeight * 3,
+  neighborOffset = 0,
   stepLabels,
 }: WheelPickerProps) {
   const spacer = (height - rowHeight) / 2;
@@ -51,6 +55,7 @@ export function WheelPicker({
   const settleTimer = useRef<number | null>(null);
   const clamped = Math.min(max, Math.max(min, value));
   const [centered, setCentered] = useState(clamped);
+  const [position, setPosition] = useState(clamped - min);
 
   const indexAt = (el: HTMLDivElement) =>
     Math.min(max - min, Math.max(0, Math.round(el.scrollTop / rowHeight)));
@@ -61,6 +66,7 @@ export function WheelPicker({
     if (indexAt(el) !== clamped - min)
       el.scrollTop = (clamped - min) * rowHeight;
     setCentered(clamped);
+    setPosition(clamped - min);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clamped, min, max, rowHeight]);
 
@@ -75,6 +81,7 @@ export function WheelPicker({
     const el = ref.current;
     if (!el) return;
     setCentered(min + indexAt(el));
+    setPosition(el.scrollTop / rowHeight);
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
@@ -116,7 +123,7 @@ export function WheelPicker({
       <div className="relative min-w-0 flex-1" style={{ height }}>
         <div
           className="pointer-events-none absolute inset-x-0 rounded-md bg-white/20"
-          style={{ top: spacer - 3, height: rowHeight + 6 }}
+          style={{ top: spacer, height: rowHeight }}
           aria-hidden="true"
         />
         <div
@@ -131,12 +138,6 @@ export function WheelPicker({
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
           className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-white [&::-webkit-scrollbar]:hidden"
-          style={{
-            maskImage:
-              "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
-            WebkitMaskImage:
-              "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
-          }}
         >
           <div style={{ height: spacer }} aria-hidden="true" />
           {values.map((v) => (
@@ -152,7 +153,15 @@ export function WheelPicker({
               style={{ height: rowHeight }}
               aria-hidden="true"
             >
-              {format(v)}
+              <span
+                style={{
+                  transform: `translateY(${
+                    Math.max(-1, Math.min(1, v - min - position)) * -neighborOffset
+                  }px)`,
+                }}
+              >
+                {format(v)}
+              </span>
             </div>
           ))}
           <div style={{ height: spacer }} aria-hidden="true" />

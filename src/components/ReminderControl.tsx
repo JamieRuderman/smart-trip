@@ -120,7 +120,7 @@ export function ReminderControl({
 
   return (
     <div>
-      <div className="flex items-center gap-3 rounded-lg bg-white/15 py-1 pl-3 pr-1.5 text-white">
+      <div className="flex h-[52px] items-center gap-3 overflow-hidden rounded-lg bg-white/15 pl-3 pr-1.5 text-white">
         <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-sm font-semibold">
@@ -141,8 +141,9 @@ export function ReminderControl({
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
             className="w-[6.5rem]"
-            rowHeight={20}
-            height={44}
+            rowHeight={26}
+            height={52}
+            neighborOffset={6}
             stepLabels={{
               previous: t("departureReminder.lessLead"),
               next: t("departureReminder.moreLead"),

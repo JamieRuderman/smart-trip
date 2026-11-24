@@ -119,7 +119,7 @@ export function WheelPicker({
   const values = [...Array(max - min + 1).keys()].map((i) => min + i);
 
   return (
-    <div className={cn("flex shrink-0 items-center gap-0.5", className)}>
+    <div className={cn("flex shrink-0 items-center gap-3", className)}>
       <div className="relative min-w-0 flex-1" style={{ height }}>
         <div
           className="pointer-events-none absolute inset-x-0 rounded-md bg-white/20"
@@ -176,7 +176,7 @@ export function WheelPicker({
             className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
             aria-label={stepLabels.previous}
           >
-            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+            <ChevronUp className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -185,7 +185,7 @@ export function WheelPicker({
             className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
             aria-label={stepLabels.next}
           >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            <ChevronDown className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
           </button>
         </div>
       )}

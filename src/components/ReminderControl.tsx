@@ -140,7 +140,7 @@ export function ReminderControl({
             onChange={(next) => (isSet ? void commit(next) : setDraftLead(next))}
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
-            className="w-[6.5rem]"
+            className="w-[7rem]"
             rowHeight={26}
             height={52}
             neighborOffset={6}

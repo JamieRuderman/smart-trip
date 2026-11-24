@@ -48,9 +48,9 @@ export function MapHeader({ view, trainsCount = null, onTrainsCountClick }: MapH
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
-      <div className="flex items-center gap-1.5 text-xs text-white/90 flex-1 min-w-0">
+      <div className="flex items-center gap-1.5 text-xs leading-tight text-white/90 flex-1 min-w-0">
         <Hand className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">
+        <span className="line-clamp-2">
           {t(view === "line" ? "mapDiagram.tapHint" : "mapDiagram.tapTrainHint")}
         </span>
       </div>
@@ -59,12 +59,12 @@ export function MapHeader({ view, trainsCount = null, onTrainsCountClick }: MapH
           <button
             type="button"
             onClick={onTrainsCountClick}
-            className="text-xs font-semibold text-white whitespace-nowrap rounded-md px-1 py-1 hover:bg-white/15"
+            className="mr-1 text-xs font-semibold text-white whitespace-nowrap rounded-md px-1 py-1 hover:bg-white/15"
           >
             {trainsLabel}
           </button>
         ) : (
-          <span className="text-xs font-semibold text-white whitespace-nowrap">
+          <span className="mr-2 text-xs font-semibold text-white whitespace-nowrap">
             {trainsLabel}
           </span>
         ))}

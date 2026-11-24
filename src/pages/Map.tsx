@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ChevronLeft, GitCommitVertical } from "lucide-react";
 import { mapboxToken } from "@/lib/env";
 import {
   STATION_ORDER,
@@ -18,6 +16,7 @@ import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MapLiveDataChip } from "@/components/MapLiveDataChip";
+import { MapHeader } from "@/components/MapHeader";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
@@ -88,12 +87,6 @@ export default function Map() {
 }
 
 function MapContents() {
-  const backToSchedule = useBackToSchedule();
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const showLineView = () =>
-    navigate({ pathname: "/map-diagram", search: location.search }, { replace: true });
   const { theme } = useTheme();
   const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
@@ -382,78 +375,42 @@ function MapContents() {
         };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
-      {/* Map container — leave room for the Android nav bar so the map and
-          Mapbox attribution don't render behind it. --safe-area-bottom is 0
-          on iOS so the map still reaches the screen edge there. */}
-      <div
-        ref={mapContainerRef}
-        className="absolute inset-x-0 top-0"
-        style={{
-          ...(cssVars as React.CSSProperties),
-          // mapbox-gl.css's `.mapboxgl-map { position: relative }` is injected
-          // after Tailwind (the lazy /map chunk loads it last) and, at equal
-          // specificity, wins on source order — overriding the `absolute` class
-          // above and collapsing this container to 0 height. Pin position inline
-          // so the inset offsets apply and the map fills the screen.
-          position: "absolute",
-          bottom: "var(--safe-area-bottom)",
-        }}
-      />
-
-      {/* Back button – top-left */}
-      <button
-        type="button"
-        onClick={backToSchedule}
-        className="absolute left-3 flex items-center gap-1 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
-        style={{ top: "calc(12px + var(--safe-area-top))" }}
-        aria-label="Back"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Back
-      </button>
-
-      <button
-        type="button"
-        onClick={showLineView}
-        className="absolute left-[5.75rem] flex items-center gap-1.5 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
-        style={{ top: "calc(12px + var(--safe-area-top))" }}
-        aria-label={t("map.showLineView")}
-      >
-        <GitCommitVertical className="w-4 h-4 text-smart-train-green" aria-hidden="true" />
-        {t("map.lineView")}
-      </button>
-
-      {/* Train count pill – top-right */}
-      <button
-        type="button"
-        onClick={handleFitTrains}
-        className="absolute right-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
-        style={{ top: "calc(12px + var(--safe-area-top))" }}
-        aria-label="Fit trains"
-      >
-        <span
-          className="inline-block w-2 h-2 rounded-full bg-smart-train-green"
-          aria-hidden="true"
-        />
-        {trains.length} {trains.length === 1 ? "train" : "trains"}
-      </button>
-
-      {/* Live-data freshness chip — beneath the train-count pill. Color and
-          copy mirror ScheduleHeader so the same "stale" mental model carries
-          over to the map. Only renders when we have a feed timestamp. */}
-      <MapLiveDataChip lastUpdated={lastUpdated} isUpstreamDown={isUpstreamDown} />
-
-      {/* Offline banner overlay — only renders when offline */}
-      {!isOnline && (
+    <div className="w-full h-screen overflow-hidden flex flex-col">
+      <MapHeader view="geo" trainsCount={trains.length} onTrainsCountClick={handleFitTrains} />
+      <div className="relative flex-1 min-h-0">
+        {/* Map container — leave room for the Android nav bar so the map and
+            Mapbox attribution don't render behind it. --safe-area-bottom is 0
+            on iOS so the map still reaches the screen edge there. */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
-          style={{ top: "calc(60px + var(--safe-area-top))" }}
-        >
-          <OfflineBanner />
-        </div>
-      )}
+          ref={mapContainerRef}
+          className="absolute inset-x-0 top-0"
+          style={{
+            ...(cssVars as React.CSSProperties),
+            // mapbox-gl.css's `.mapboxgl-map { position: relative }` is injected
+            // after Tailwind (the lazy /map chunk loads it last) and, at equal
+            // specificity, wins on source order — overriding the `absolute` class
+            // above and collapsing this container to 0 height. Pin position inline
+            // so the inset offsets apply and the map fills the screen.
+            position: "absolute",
+            bottom: "var(--safe-area-bottom)",
+          }}
+        />
 
+        {/* Live-data freshness chip. Color and
+            copy mirror ScheduleHeader so the same "stale" mental model carries
+            over to the map. Only renders when we have a feed timestamp. */}
+        <MapLiveDataChip lastUpdated={lastUpdated} isUpstreamDown={isUpstreamDown} />
+
+        {/* Offline banner overlay — only renders when offline */}
+        {!isOnline && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
+            style={{ top: 12 }}
+          >
+            <OfflineBanner />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -180,6 +180,7 @@
   },
   "mapDiagram": {
     "tapHint": "Toca una estación o tren para ver detalles",
+    "tapTrainHint": "Toca un tren para ver detalles",
     "zones": "Zonas",
     "toggleZones": "Alternar zonas tarifarias",
     "closeMap": "Cerrar mapa",

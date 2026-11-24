@@ -46,7 +46,7 @@ export function MapLiveDataChip({
         "absolute right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/95 backdrop-blur-sm shadow-md border border-border text-xs font-medium",
         isStale ? "text-smart-gold border-smart-gold/40" : "text-muted-foreground",
       )}
-      style={{ top: "calc(56px + var(--safe-area-top))" }}
+      style={{ top: 12 }}
       role={isStale ? "status" : undefined}
       aria-live={isStale ? "polite" : undefined}
     >

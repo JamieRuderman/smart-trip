@@ -180,6 +180,7 @@
   },
   "mapDiagram": {
     "tapHint": "Tap a station or train for details",
+    "tapTrainHint": "Tap a train for details",
     "zones": "Zones",
     "toggleZones": "Toggle fare zones",
     "closeMap": "Close map",

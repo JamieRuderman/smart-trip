@@ -18,7 +18,6 @@ interface WheelPickerProps {
   onChange: (value: number) => void;
   format: (value: number) => string;
   ariaLabel: string;
-  ariaValueText?: string;
   className?: string;
   /** Height of one row. */
   rowHeight?: number;
@@ -32,7 +31,7 @@ interface WheelPickerProps {
 }
 
 /**
- * A compact scroll wheel (three rows tall) for picking a number: flick or
+ * A compact scroll wheel for picking a number: flick or
  * drag it, scroll it with a mouse or trackpad, tap a neighbouring row, or use
  * the arrow keys.
  */
@@ -43,7 +42,6 @@ export function WheelPicker({
   onChange,
   format,
   ariaLabel,
-  ariaValueText,
   className,
   rowHeight = 30,
   height = rowHeight * 3,
@@ -55,7 +53,6 @@ export function WheelPicker({
   const settleTimer = useRef<number | null>(null);
   const clamped = Math.min(max, Math.max(min, value));
   const [centered, setCentered] = useState(clamped);
-  const [position, setPosition] = useState(clamped - min);
 
   const indexAt = (el: HTMLDivElement) =>
     Math.min(max - min, Math.max(0, Math.round(el.scrollTop / rowHeight)));
@@ -66,7 +63,7 @@ export function WheelPicker({
     if (indexAt(el) !== clamped - min)
       el.scrollTop = (clamped - min) * rowHeight;
     setCentered(clamped);
-    setPosition(clamped - min);
+    el.style.setProperty("--wheel-pos", String(clamped - min));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clamped, min, max, rowHeight]);
 
@@ -81,7 +78,8 @@ export function WheelPicker({
     const el = ref.current;
     if (!el) return;
     setCentered(min + indexAt(el));
-    setPosition(el.scrollTop / rowHeight);
+    // A CSS variable, not state: every scroll frame would otherwise re-render every row.
+    el.style.setProperty("--wheel-pos", String(el.scrollTop / rowHeight));
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
@@ -137,7 +135,7 @@ export function WheelPicker({
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={centered}
-          aria-valuetext={ariaValueText ?? format(centered)}
+          aria-valuetext={format(centered)}
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
           style={{
@@ -164,12 +162,15 @@ export function WheelPicker({
             >
               <span
                 className="inline-block"
-                style={{
-                  transform: `translateY(${
-                    Math.max(-1, Math.min(1, v - min - position)) *
-                    -neighborOffset
-                  }px)`,
-                }}
+                style={
+                  neighborOffset
+                    ? {
+                        transform: `translateY(calc(clamp(-1, ${
+                          v - min
+                        } - var(--wheel-pos), 1) * ${-neighborOffset}px))`,
+                      }
+                    : undefined
+                }
               >
                 {format(v)}
               </span>

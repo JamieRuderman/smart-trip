@@ -1,7 +1,7 @@
 import { Suspense, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, matchPath, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import NativeUiManager from "@/components/NativeUiManager";
@@ -23,13 +23,12 @@ import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import Index from "./pages/Index";
 import MyTrip from "./pages/MyTrip";
 import SharedTrip from "./pages/SharedTrip";
-import PlacePage from "./pages/Place";
 import { PLACE_PATH } from "@/lib/places";
 import NotFound from "./pages/NotFound";
 // Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
 // schedule-only users never pay that cost. The home screen preloads these
 // chunks while idle — see lazyPages / MapDiagramPreviewCard.
-import { Map, MapDiagram } from "./pages/lazyPages";
+import { Map, MapDiagram, PlacePage } from "./pages/lazyPages";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +58,7 @@ const RoutedApp = () => {
   useEffect(() => {
     const onAppOnlyRoute =
       location.pathname.startsWith("/map") ||
-      location.pathname.startsWith("/station/") ||
+      matchPath(PLACE_PATH, location.pathname) != null ||
       location.pathname === TRIP_VIEW_PATH ||
       isSharedTripPath(location.pathname);
     document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);

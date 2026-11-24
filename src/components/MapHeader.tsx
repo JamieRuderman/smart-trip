@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, GitCommitVertical, Hand, Map as MapIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useGoBack } from "@/hooks/useTripViewNavigation";
 
 interface MapHeaderProps {
   /** The map this header sits on; its button switches to the other one. */
@@ -18,13 +19,7 @@ export function MapHeader({ view, trainsCount = null, onTrainsCountClick }: MapH
   const location = useLocation();
   const { t } = useTranslation();
 
-  const backToSchedule = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  };
+  const backToSchedule = useGoBack("/");
 
   const switchView = () =>
     navigate(

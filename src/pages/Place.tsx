@@ -1,12 +1,12 @@
 import { useLayoutEffect, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, ChevronLeft, Flag, MapPin, Ship, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import { useStationArrivals, type Arrival } from "@/hooks/useStationArrivals";
-import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
+import { useGoBack, useOpenTrainPage } from "@/hooks/useTripViewNavigation";
 import { FERRY_CONSTANTS } from "@/lib/fareConstants";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { SAN_FRANCISCO, validPlace, type Place } from "@/lib/places";
@@ -18,7 +18,6 @@ import {
 } from "@/lib/scheduleUtils";
 import { stationTrackColor, stationZoneMap } from "@/lib/stationUtils";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { hasInAppHistory } from "@/lib/tripView";
 import {
   cardTripState,
   myTripCardStyle,
@@ -39,18 +38,13 @@ import type { Station } from "@/types/smartSchedule";
 export default function PlacePage() {
   const { t } = useTranslation();
   const params = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
   const place = validPlace((params.place ?? "") as Place);
 
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, [place]);
 
-  const goBack = () => {
-    if (hasInAppHistory()) navigate(-1);
-    else navigate({ pathname: "/map-diagram", search: location.search }, { replace: true });
-  };
+  const goBack = useGoBack("/map-diagram");
 
   if (!place) {
     return (

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { mapboxToken } from "@/lib/env";
@@ -11,7 +10,7 @@ import {
   MAPBOX_STYLE_DARK,
   MAP_FIT_PADDING,
 } from "@/lib/mapConstants";
-import stations, { STATION_COORDINATES } from "@/data/stations";
+import { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -19,9 +18,7 @@ import { MapLiveDataChip } from "@/components/MapLiveDataChip";
 import { MapHeader } from "@/components/MapHeader";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
-import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
+import { useGoBack, useOpenMapTrain } from "@/hooks/useTripViewNavigation";
 import {
   MARKER_COLOR,
   createStationElement,
@@ -29,10 +26,7 @@ import {
   createUserLocationElement,
   trainMarkerSignature,
 } from "@/lib/mapMarkers";
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
-const WINDSOR = stations[0];
-const LARKSPUR = stations[stations.length - 1];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,25 +39,10 @@ function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
 
 // ─── Map page component ───────────────────────────────────────────────────────
 
-/** Navigate back to the schedule, preferring history-back so query params
- *  and scroll position are preserved. Falls back to a direct navigate when
- *  the user landed on /map via a direct link. */
-function useBackToSchedule(): () => void {
-  const navigate = useNavigate();
-  const location = useLocation();
-  return useCallback(() => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  }, [navigate, location.search]);
-}
-
 /** Thin wrapper that swaps in a configuration-help screen when the Mapbox
  *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
 export default function Map() {
-  const backToSchedule = useBackToSchedule();
+  const backToSchedule = useGoBack("/");
   if (!mapboxToken) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
@@ -96,42 +75,15 @@ function MapContents() {
     autoRequestOnWeb: true,
   });
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const openTrainPage = useOpenTrainPage();
+  const openMapTrain = useOpenMapTrain();
 
-  const handleTrainClick = useCallback((train: MapTrain) => {
-    setSelectedTrainKey(train.key);
-
-    if (
-      train.tripNumber == null ||
-      train.directionId == null ||
-      train.startTime == null
-    ) {
-      return;
-    }
-
-    const isSouthbound = train.directionId === 0;
-    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-    const match = findFullCorridorTrip(
-      train.directionId,
-      train.startTime,
-      train.tripNumber,
-    );
-    if (!match) return;
-
-    const displayFrom = pickDisplayFromStation(train, isSouthbound);
-    // Override from/to so StopTimeline slices `times` to only upcoming stops;
-    // keep match's full-corridor departure/arrival times so the header still
-    // reads as the trip's origin → terminus (e.g. "11:31 AM → 12:55 PM"
-    // rather than a narrowed leg's times).
-    const displayTrip: ProcessedTrip = {
-      ...match,
-      fromStation: displayFrom,
-      toStation: terminus,
-    };
-    openTrainPage(displayTrip);
-  }, [openTrainPage]);
-
-
+  const handleTrainClick = useCallback(
+    (train: MapTrain) => {
+      setSelectedTrainKey(train.key);
+      openMapTrain(train);
+    },
+    [openMapTrain],
+  );
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);

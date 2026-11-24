@@ -3,24 +3,18 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 
-import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { getClosestStation } from "@/lib/stationUtils";
 import { placePath, validPlace, type Place } from "@/lib/places";
-import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
-import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
+import { useOpenMapTrain } from "@/hooks/useTripViewNavigation";
 import { ZoneKey } from "@/components/SmartLineDiagram/ZoneKey";
 import { useNow } from "@/hooks/useNow";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
 
-const WINDSOR = stations[0];
-const LARKSPUR = stations[stations.length - 1];
 
 export default function MapDiagram() {
   const { trains } = useMapTrains();
@@ -80,45 +74,22 @@ export default function MapDiagram() {
   }, []);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const openTrainPage = useOpenTrainPage();
+  const openMapTrain = useOpenMapTrain();
 
-  const handleTrainClick = useCallback((train: MapTrain) => {
-    setSelectedTrainKey(train.key);
-
-    if (
-      train.tripNumber == null ||
-      train.directionId == null ||
-      train.startTime == null
-    ) {
-      return;
-    }
-
-    const isSouthbound = train.directionId === 0;
-    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-    const match = findFullCorridorTrip(
-      train.directionId,
-      train.startTime,
-      train.tripNumber,
-    );
-    if (!match) return;
-
-    const displayFrom = pickDisplayFromStation(train, isSouthbound);
-    const displayTrip: ProcessedTrip = {
-      ...match,
-      fromStation: displayFrom,
-      toStation: terminus,
-    };
-    openTrainPage(displayTrip);
-  }, [openTrainPage]);
-
+  const handleTrainClick = useCallback(
+    (train: MapTrain) => {
+      setSelectedTrainKey(train.key);
+      openMapTrain(train);
+    },
+    [openMapTrain],
+  );
   const handleStationClick = useCallback(
     (place: Place) => navigate({ pathname: placePath(place), search: location.search }),
     [navigate, location.search],
   );
 
   return (
-    <>
-      <MapDiagramFrame
+    <MapDiagramFrame
         trainsCount={trains.length}
         onBackground={() => setSelectedTrainKey(null)}
         overlay={<ZoneKey />}
@@ -148,7 +119,6 @@ export default function MapDiagram() {
             className="min-h-full"
           />
         </div>
-      </MapDiagramFrame>
-    </>
+    </MapDiagramFrame>
   );
 }

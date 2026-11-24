@@ -19,7 +19,7 @@ export function ZoneKey() {
           <li key={zone} className="flex h-4 items-center gap-2 tabular-nums">
             <span
               className={cn(
-                "h-full w-1",
+                "h-full w-1.5",
                 i === 0 && "rounded-t-full",
                 i === ZONES.length - 1 && "rounded-b-full",
               )}

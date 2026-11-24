@@ -157,7 +157,7 @@ export function ReminderControl({
         {isSet ? (
           <button
             type="button"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md text-white transition-colors hover:bg-white/15"
+            className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-md text-white transition-colors hover:bg-white/15"
             onClick={() => void commit(null)}
             aria-label={t("departureReminder.cancel")}
           >

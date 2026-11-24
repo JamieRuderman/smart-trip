@@ -228,6 +228,8 @@
     "atTime": "a las {{time}}",
     "set": "Activar",
     "minutesBeforeDeparture": "Minutos antes de la salida",
+    "lessLead": "1 minuto menos",
+    "moreLead": "1 minuto más",
     "appCta": "Descarga la app para recordatorios",
     "minutesValue_one": "{{count}} min",
     "minutesValue_other": "{{count}} min",

@@ -228,6 +228,8 @@
     "atTime": "at {{time}}",
     "set": "Set",
     "minutesBeforeDeparture": "Minutes before departure",
+    "lessLead": "1 minute less",
+    "moreLead": "1 minute more",
     "appCta": "Get the app for reminders",
     "minutesValue_one": "{{count}} min",
     "minutesValue_other": "{{count}} min",

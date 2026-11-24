@@ -140,9 +140,13 @@ export function ReminderControl({
             onChange={(next) => (isSet ? void commit(next) : setDraftLead(next))}
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
-            className="w-20"
-            rowHeight={26}
+            className="w-[6.5rem]"
+            rowHeight={17}
             height={44}
+            stepLabels={{
+              previous: t("departureReminder.lessLead"),
+              next: t("departureReminder.moreLead"),
+            }}
           />
         ) : (
           <span className="text-sm font-semibold tabular-nums">{minutes(lead)}</span>

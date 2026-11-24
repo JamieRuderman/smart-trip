@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SETTLE_MS = 120;
@@ -17,6 +24,8 @@ interface WheelPickerProps {
   rowHeight?: number;
   /** Visible height; the rows above and below the value show in what's left. */
   height?: number;
+  /** Up/down buttons beside the wheel that step it by one. */
+  stepLabels?: { previous: string; next: string };
 }
 
 /**
@@ -35,6 +44,7 @@ export function WheelPicker({
   className,
   rowHeight = 30,
   height = rowHeight * 3,
+  stepLabels,
 }: WheelPickerProps) {
   const spacer = (height - rowHeight) / 2;
   const ref = useRef<HTMLDivElement>(null);
@@ -48,7 +58,8 @@ export function WheelPicker({
   useEffect(() => {
     const el = ref.current;
     if (!el || settleTimer.current != null) return;
-    if (indexAt(el) !== clamped - min) el.scrollTop = (clamped - min) * rowHeight;
+    if (indexAt(el) !== clamped - min)
+      el.scrollTop = (clamped - min) * rowHeight;
     setCentered(clamped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clamped, min, max, rowHeight]);
@@ -57,7 +68,7 @@ export function WheelPicker({
     () => () => {
       if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     },
-    [],
+    []
   );
 
   const handleScroll = () => {
@@ -79,12 +90,20 @@ export function WheelPicker({
         behavior: "smooth",
       });
     },
-    [min, max, rowHeight],
+    [min, max, rowHeight]
   );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step =
-      e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : e.key === "PageUp" ? -5 : e.key === "PageDown" ? 5 : 0;
+      e.key === "ArrowUp"
+        ? -1
+        : e.key === "ArrowDown"
+        ? 1
+        : e.key === "PageUp"
+        ? -5
+        : e.key === "PageDown"
+        ? 5
+        : 0;
     if (step === 0) return;
     e.preventDefault();
     scrollToValue(centered + step);
@@ -93,50 +112,74 @@ export function WheelPicker({
   const values = [...Array(max - min + 1).keys()].map((i) => min + i);
 
   return (
-    <div className={cn("relative shrink-0", className)} style={{ height: height }}>
-      <div
-        className="pointer-events-none absolute inset-x-0 rounded-md bg-white/20"
-        style={{ top: spacer, height: rowHeight }}
-        aria-hidden="true"
-      />
-      <div
-        ref={ref}
-        role="spinbutton"
-        tabIndex={0}
-        aria-label={ariaLabel}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={centered}
-        aria-valuetext={ariaValueText ?? format(centered)}
-        onScroll={handleScroll}
-        onKeyDown={handleKeyDown}
-        className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-white [&::-webkit-scrollbar]:hidden"
-        style={{
-          maskImage:
-            "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
-        }}
-      >
-        <div style={{ height: spacer }} aria-hidden="true" />
-        {values.map((v) => (
-          <div
-            key={v}
-            onClick={() => scrollToValue(v)}
-            className={cn(
-              "flex snap-center items-center justify-center tabular-nums transition-[font-size,opacity] select-none",
-              v === centered
-                ? "text-base font-semibold"
-                : "cursor-pointer text-sm opacity-60",
-            )}
-            style={{ height: rowHeight }}
-            aria-hidden="true"
-          >
-            {format(v)}
-          </div>
-        ))}
-        <div style={{ height: spacer }} aria-hidden="true" />
+    <div className={cn("flex shrink-0 items-center gap-0.5", className)}>
+      <div className="relative min-w-0 flex-1" style={{ height }}>
+        <div
+          className="pointer-events-none absolute inset-x-0 rounded-md bg-white/20"
+          style={{ top: spacer - 3, height: rowHeight + 6 }}
+          aria-hidden="true"
+        />
+        <div
+          ref={ref}
+          role="spinbutton"
+          tabIndex={0}
+          aria-label={ariaLabel}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={centered}
+          aria-valuetext={ariaValueText ?? format(centered)}
+          onScroll={handleScroll}
+          onKeyDown={handleKeyDown}
+          className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-white [&::-webkit-scrollbar]:hidden"
+          style={{
+            maskImage:
+              "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
+          }}
+        >
+          <div style={{ height: spacer }} aria-hidden="true" />
+          {values.map((v) => (
+            <div
+              key={v}
+              onClick={() => scrollToValue(v)}
+              className={cn(
+                "flex snap-center items-center justify-center leading-none tabular-nums transition-[font-size,opacity] select-none",
+                v === centered
+                  ? "text-base font-semibold"
+                  : "cursor-pointer text-xs opacity-70"
+              )}
+              style={{ height: rowHeight }}
+              aria-hidden="true"
+            >
+              {format(v)}
+            </div>
+          ))}
+          <div style={{ height: spacer }} aria-hidden="true" />
+        </div>
       </div>
+      {stepLabels && (
+        <div className="flex shrink-0 flex-col">
+          <button
+            type="button"
+            onClick={() => scrollToValue(centered - 1)}
+            disabled={centered <= min}
+            className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
+            aria-label={stepLabels.previous}
+          >
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToValue(centered + 1)}
+            disabled={centered >= max}
+            className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
+            aria-label={stepLabels.next}
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

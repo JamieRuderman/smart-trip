@@ -36,3 +36,10 @@ export function legPlaces(
     viaFerry && station === FERRY_CONSTANTS.FERRY_STATION ? SAN_FRANCISCO : station;
   return { from: place(fromStation), to: place(toStation) };
 }
+
+/** Route of a place's page: a station, or San Francisco's ferry terminal. */
+export const PLACE_PATH = "/station/:place";
+
+export function placePath(place: Place): string {
+  return `/station/${encodeURIComponent(place)}`;
+}

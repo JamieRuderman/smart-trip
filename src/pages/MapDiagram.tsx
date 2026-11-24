@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 
@@ -7,20 +8,14 @@ import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { getClosestStation } from "@/lib/stationUtils";
-import { SAN_FRANCISCO, validPlace, type Place } from "@/lib/places";
+import { placePath, validPlace, type Place } from "@/lib/places";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
 import { ZoneKey } from "@/components/SmartLineDiagram/ZoneKey";
-import {
-  SHEET_ENTER_DELAY_MS,
-  SHEET_TRANSITION_MS,
-} from "@/lib/animationConstants";
 import { useNow } from "@/hooks/useNow";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
-import { StationInfoSheet } from "@/components/StationInfoSheet";
-import { FerryTerminalSheet } from "@/components/FerryTerminalSheet";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
 
@@ -33,10 +28,10 @@ export default function MapDiagram() {
   const {
     fromPlace: fromSelection,
     toPlace: toSelection,
-    setFromStation,
-    setToStation,
     focusedTrip,
   } = useStationSelection();
+  const navigate = useNavigate();
+  const location = useLocation();
   const fromStation = validPlace(fromSelection);
   const toStation = validPlace(toSelection);
 
@@ -85,8 +80,6 @@ export default function MapDiagram() {
   }, []);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [stationSheet, setStationSheet] = useState<Place | null>(null);
-  const [stationSheetOpen, setStationSheetOpen] = useState(false);
   const openTrainPage = useOpenTrainPage();
 
   const handleTrainClick = useCallback((train: MapTrain) => {
@@ -118,67 +111,10 @@ export default function MapDiagram() {
     openTrainPage(displayTrip);
   }, [openTrainPage]);
 
-
-  const handleStationClick = useCallback((place: Place) => {
-    setStationSheet(place);
-  }, []);
-
-  useEffect(() => {
-    if (stationSheet) {
-      const id = window.setTimeout(
-        () => setStationSheetOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setStationSheetOpen(false);
-    }
-  }, [stationSheet]);
-
-  const closeStationSheet = useCallback(() => {
-    setStationSheetOpen(false);
-    setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
-  }, []);
-
-  // Tap an arrival row in a station sheet, or a ferry in San Francisco's →
-  // close that sheet and open the trip detail sheet for the train, with the
-  // tapped station (Larkspur for a ferry) as the displayed origin so only the
-  // upcoming portion of the trip shows.
-  const handleArrivalClick = useCallback(
-    (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
-      closeStationSheet();
-      openTrainPage({ ...trip, fromStation, toStation });
-    },
-    [closeStationSheet, openTrainPage],
+  const handleStationClick = useCallback(
+    (place: Place) => navigate({ pathname: placePath(place), search: location.search }),
+    [navigate, location.search],
   );
-
-  // The context setters already drop the other endpoint when the new one
-  // collides — see StationSelectionContext.
-  const handleSetFrom = useCallback(
-    (s: Place) => {
-      setFromStation(s);
-      closeStationSheet();
-    },
-    [setFromStation, closeStationSheet],
-  );
-
-  const handleSetTo = useCallback(
-    (s: Place) => {
-      setToStation(s);
-      closeStationSheet();
-    },
-    [setToStation, closeStationSheet],
-  );
-
-  const handleClearFrom = useCallback(() => {
-    setFromStation("");
-    closeStationSheet();
-  }, [setFromStation, closeStationSheet]);
-
-  const handleClearTo = useCallback(() => {
-    setToStation("");
-    closeStationSheet();
-  }, [setToStation, closeStationSheet]);
 
   return (
     <>
@@ -213,38 +149,6 @@ export default function MapDiagram() {
           />
         </div>
       </MapDiagramFrame>
-
-      {stationSheet === SAN_FRANCISCO && (
-        <FerryTerminalSheet
-          isOpen={stationSheetOpen}
-          onClose={closeStationSheet}
-          currentTime={currentTime}
-          fromStation={fromStation}
-          toStation={toStation}
-          onSetFrom={handleSetFrom}
-          onSetTo={handleSetTo}
-          onClearFrom={handleClearFrom}
-          onClearTo={handleClearTo}
-          onFerryClick={(trip) => handleArrivalClick(trip, trip.fromStation, trip.toStation)}
-        />
-      )}
-
-      {stationSheet && stationSheet !== SAN_FRANCISCO && (
-        <StationInfoSheet
-          isOpen={stationSheetOpen}
-          onClose={closeStationSheet}
-          station={stationSheet}
-          currentTime={currentTime}
-          fromStation={fromStation}
-          toStation={toStation}
-          onSetFrom={handleSetFrom}
-          onSetTo={handleSetTo}
-          onClearFrom={handleClearFrom}
-          onClearTo={handleClearTo}
-          onArrivalClick={handleArrivalClick}
-        />
-      )}
-
     </>
   );
 }

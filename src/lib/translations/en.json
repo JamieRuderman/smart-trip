@@ -197,15 +197,12 @@
     "resetZoom": "Reset zoom"
   },
   "stationInfo": {
-    "stationInfoAria": "{{station}} station info",
-    "close": "Close station info",
     "zoneLabel": "Zone {{zone}}",
     "nextArrivals": "Next arrivals",
     "noUpcoming": "No upcoming arrivals.",
     "toTerminus": "to {{terminus}}",
     "arrivingAt": "arriving {{time}}",
     "here": "Here",
-    "canceledSuffix": "· Canceled",
     "delaySuffix": "· +{{minutes}}m delay",
     "minUnit": "min",
     "departure": "Departure",
@@ -221,7 +218,6 @@
     "clearDestinationAria": "Clear destination",
     "openTripAria": "Open trip {{trip}} to {{terminus}}",
     "ferryLabel": "Golden Gate Ferry",
-    "ferryTerminalAria": "San Francisco ferry terminal info",
     "nextFerries": "Next ferries to Larkspur",
     "noMoreFerries": "No more ferries today.",
     "arrivesLarkspur": "arrives Larkspur {{time}}"

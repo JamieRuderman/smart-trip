@@ -23,6 +23,8 @@ import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import Index from "./pages/Index";
 import MyTrip from "./pages/MyTrip";
 import SharedTrip from "./pages/SharedTrip";
+import PlacePage from "./pages/Place";
+import { PLACE_PATH } from "@/lib/places";
 import NotFound from "./pages/NotFound";
 // Map routes are code-split (the /map route pulls in mapbox-gl, ~1.7 MB) so
 // schedule-only users never pay that cost. The home screen preloads these
@@ -57,6 +59,7 @@ const RoutedApp = () => {
   useEffect(() => {
     const onAppOnlyRoute =
       location.pathname.startsWith("/map") ||
+      location.pathname.startsWith("/station/") ||
       location.pathname === TRIP_VIEW_PATH ||
       isSharedTripPath(location.pathname);
     document.body.classList.toggle("seo-sitelinks-hidden", onAppOnlyRoute);
@@ -87,6 +90,7 @@ const RoutedApp = () => {
                 into it render without a loading flash. */}
             <Route path={TRIP_VIEW_PATH} element={<MyTrip />} />
             <Route path={SHARED_TRIP_PATH} caseSensitive element={<SharedTrip />} />
+            <Route path={PLACE_PATH} element={<PlacePage />} />
             <Route path="/map" element={<Map />} />
             {/* Per-route fallback: the line-diagram frame (green bar + blank
                 container) renders instantly while the code chunk loads, so the

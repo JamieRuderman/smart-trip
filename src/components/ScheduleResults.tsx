@@ -146,7 +146,7 @@ export function ScheduleResults({
           nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />
         )}
         <div
-          className="space-y-1"
+          className="space-y-2"
           role="list"
           aria-label="Train schedule results"
         >

@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import {
   stateText,
-  stateRowStyle,
+  stateCardStyle,
   myTripCardStyle,
   cardTripState,
 } from "@/lib/tripTheme";
@@ -119,7 +119,7 @@ export const TripCard = memo(function TripCard({
         "outline-none",
         // Blue == "you're taking this train" and overrides the semantic
         // state colour (green/gold/red) for the user-focused ("Go") trip.
-        isFocused ? myTripCardStyle : stateRowStyle[cardState]
+        isFocused ? myTripCardStyle : stateCardStyle[cardState]
       )}
       role="listitem"
       aria-label={ariaParts.join(", ")}

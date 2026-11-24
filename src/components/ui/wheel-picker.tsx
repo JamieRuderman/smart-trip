@@ -85,7 +85,10 @@ export function WheelPicker({
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
-      const next = min + indexAt(el);
+      const index = indexAt(el);
+      // Smooth scrolls can rest a couple of px past the snap point.
+      if (el.scrollTop !== index * rowHeight) el.scrollTop = index * rowHeight;
+      const next = min + index;
       if (next !== clamped) onChange(next);
     }, SETTLE_MS);
   };
@@ -103,13 +106,13 @@ export function WheelPicker({
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step =
       e.key === "ArrowUp"
-        ? -1
-        : e.key === "ArrowDown"
         ? 1
+        : e.key === "ArrowDown"
+        ? -1
         : e.key === "PageUp"
-        ? -5
-        : e.key === "PageDown"
         ? 5
+        : e.key === "PageDown"
+        ? -5
         : 0;
     if (step === 0) return;
     e.preventDefault();
@@ -137,6 +140,12 @@ export function WheelPicker({
           aria-valuetext={ariaValueText ?? format(centered)}
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
+          style={{
+            maskImage:
+              "linear-gradient(to bottom, transparent, black 16%, black 84%, transparent)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, transparent, black 16%, black 84%, transparent)",
+          }}
           className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-white [&::-webkit-scrollbar]:hidden"
         >
           <div style={{ height: spacer }} aria-hidden="true" />
@@ -154,9 +163,11 @@ export function WheelPicker({
               aria-hidden="true"
             >
               <span
+                className="inline-block"
                 style={{
                   transform: `translateY(${
-                    Math.max(-1, Math.min(1, v - min - position)) * -neighborOffset
+                    Math.max(-1, Math.min(1, v - min - position)) *
+                    -neighborOffset
                   }px)`,
                 }}
               >
@@ -171,21 +182,21 @@ export function WheelPicker({
         <div className="flex shrink-0 flex-col">
           <button
             type="button"
-            onClick={() => scrollToValue(centered - 1)}
-            disabled={centered <= min}
-            className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
-            aria-label={stepLabels.previous}
+            onClick={() => scrollToValue(centered + 1)}
+            disabled={centered >= max}
+            className="flex h-5 w-6 items-center justify-center rounded text-white hover:bg-white/15 disabled:opacity-30"
+            aria-label={stepLabels.next}
           >
-            <ChevronUp className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
             type="button"
-            onClick={() => scrollToValue(centered + 1)}
-            disabled={centered >= max}
-            className="flex h-5 w-6 items-center justify-center rounded text-white/80 hover:bg-white/15 disabled:opacity-30"
-            aria-label={stepLabels.next}
+            onClick={() => scrollToValue(centered - 1)}
+            disabled={centered <= min}
+            className="flex h-5 w-6 items-center justify-center rounded text-white hover:bg-white/15 disabled:opacity-30"
+            aria-label={stepLabels.previous}
           >
-            <ChevronDown className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )}

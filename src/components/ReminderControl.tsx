@@ -143,7 +143,7 @@ export function ReminderControl({
             className="w-[7rem]"
             rowHeight={26}
             height={52}
-            neighborOffset={6}
+            neighborOffset={3}
             stepLabels={{
               previous: t("departureReminder.lessLead"),
               next: t("departureReminder.moreLead"),
@@ -155,7 +155,7 @@ export function ReminderControl({
         {isSet ? (
           <button
             type="button"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-white transition-colors hover:bg-white/15"
             onClick={() => void commit(null)}
             aria-label={t("departureReminder.cancel")}
           >

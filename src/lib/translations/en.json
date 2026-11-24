@@ -41,6 +41,8 @@
     "noTrainsFound": "No trains found for this route."
   },
   "serviceAlert": {
+    "showMore": "More",
+    "showLess": "Less",
     "sectionTitle": "Service Alerts",
     "dismiss": "Dismiss alert",
     "dismissedNotice_one": "{{count}} dismissed service alert ·",
@@ -48,6 +50,8 @@
     "restore": "restore"
   },
   "schedule": {
+    "showWeekend": "Show weekend",
+    "showWeekday": "Show weekday",
     "southboundSchedule": "Southbound Schedule",
     "northboundSchedule": "Northbound Schedule",
     "showEarlierTrains": "Show earlier trains",
@@ -62,7 +66,7 @@
   "fare": {
     "fareInformation": "Fare Information",
     "selectYourFare": "Select your fare",
-    "showAllFares": "Show all fares",
+    "change": "Change",
     "adult": "Adult (19-64)",
     "youth": "Youth (0-18) - Free",
     "senior": "Senior (65+) - Free",
@@ -140,8 +144,6 @@
     "departs": "departs",
     "departed": "departed",
     "minTransfer": "min transfer",
-    "inbound": "Inbound",
-    "outbound": "Outbound",
     "larkspur": "Lark",
     "sanFrancisco": "SF",
     "toSanFrancisco": "Ferry to San Francisco",

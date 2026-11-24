@@ -31,6 +31,7 @@ interface ScheduleResultsProps {
   /** Schedule (weekday/weekend) these results belong to — forwarded to each
    *  row's trip sheet so the reminder/focus control uses it instead of today. */
   scheduleType: "weekday" | "weekend";
+  onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   selectedTripNumber: number | null;
   onSelectTrip: (tripNumber: number | null) => void;
   /** The user's focused ("Go") trip number when it belongs to the displayed
@@ -48,6 +49,7 @@ export function ScheduleResults({
   onToggleShowAllTrips,
   timeFormat,
   scheduleType,
+  onScheduleTypeChange,
   selectedTripNumber,
   onSelectTrip,
   focusedTripNumber = null,
@@ -135,6 +137,8 @@ export function ScheduleResults({
     <SectionCard>
       <ScheduleHeader
         direction={direction.direction}
+        scheduleType={scheduleType}
+        onScheduleTypeChange={onScheduleTypeChange}
         currentTime={currentTime}
         earlierTrainsToggle={earlierTrainsToggle}
         onToggleShowAllTrips={onToggleShowAllTrips}
@@ -152,7 +156,7 @@ export function ScheduleResults({
           nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />
         )}
         <div
-          className="space-y-3"
+          className="space-y-1"
           role="list"
           aria-label="Train schedule results"
         >

@@ -178,11 +178,9 @@ export function TrainScheduleApp() {
       <StickyHeader
         fromStation={fromPlace}
         toStation={toPlace}
-        scheduleType={scheduleType}
         headerHeights={headerHeights}
         onFromStationChange={setFromStation}
         onToStationChange={setToStation}
-        onScheduleTypeChange={setScheduleType}
         onSwapStations={swapStations}
         closestStation={closestStation}
         locationLoading={locationLoading}
@@ -221,6 +219,7 @@ export function TrainScheduleApp() {
             onToggleShowAllTrips={toggleShowAllTrips}
             timeFormat="12h"
             scheduleType={scheduleType}
+            onScheduleTypeChange={setScheduleType}
             selectedTripNumber={selectedTripNumber}
             onSelectTrip={setSelectedTrip}
             focusedTripNumber={focusedTripNumber}

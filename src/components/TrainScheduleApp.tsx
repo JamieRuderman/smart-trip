@@ -23,7 +23,6 @@ import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
 import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
-import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
 import { ActiveTripBar } from "./ActiveTripBar";
 import { EmptyState } from "./EmptyState";
@@ -233,11 +232,6 @@ export function TrainScheduleApp() {
 
         {/* Fare Section */}
         {fromPlace && toPlace && <FareSection from={fromPlace} to={toPlace} />}
-
-        {/* Geographic map — secondary; lives below the trip-planning content
-            since regulars rarely need it but newcomers may want geographic
-            context after they've picked a route. */}
-        <MapPreviewCard />
 
         {/* Bottom bar */}
         <BottomInfoBar />

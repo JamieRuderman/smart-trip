@@ -174,8 +174,10 @@
     "allTrainsDeparted": "All scheduled trains for today have departed"
   },
   "map": {
-    "previewTitle": "Live Map",
-    "previewSubtitle": "Geographic view of all trains"
+    "lineView": "Line",
+    "geoView": "Map",
+    "showLineView": "Show the line view",
+    "showGeoView": "Show the geographic map"
   },
   "mapDiagram": {
     "tapHint": "Tap a station or train for details",

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, GitCommitVertical } from "lucide-react";
 import { mapboxToken } from "@/lib/env";
 import {
   STATION_ORDER,
@@ -93,6 +94,11 @@ export default function Map() {
 
 function MapContents() {
   const backToSchedule = useBackToSchedule();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const showLineView = () =>
+    navigate({ pathname: "/map-diagram", search: location.search }, { replace: true });
   const { theme } = useTheme();
   const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
@@ -453,6 +459,17 @@ function MapContents() {
       >
         <ChevronLeft className="w-4 h-4" />
         Back
+      </button>
+
+      <button
+        type="button"
+        onClick={showLineView}
+        className="absolute left-[5.75rem] flex items-center gap-1.5 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
+        style={{ top: "calc(12px + var(--safe-area-top))" }}
+        aria-label={t("map.showLineView")}
+      >
+        <GitCommitVertical className="w-4 h-4 text-smart-train-green" aria-hidden="true" />
+        {t("map.lineView")}
       </button>
 
       {/* Train count pill – top-right */}

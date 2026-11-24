@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Hand } from "lucide-react";
+import { ChevronLeft, Hand, Map as MapIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface MapDiagramFrameProps {
@@ -62,6 +62,17 @@ export function MapDiagramFrame({
             {t("mapDiagram.trainsCount", { count: trainsCount })}
           </span>
         )}
+        <button
+          type="button"
+          onClick={() =>
+            navigate({ pathname: "/map", search: location.search }, { replace: true })
+          }
+          className="flex items-center gap-1.5 h-10 px-3 rounded-xl bg-white/15 text-white text-sm font-medium hover:bg-white/25"
+          aria-label={t("map.showGeoView")}
+        >
+          <MapIcon className="w-4 h-4" aria-hidden="true" />
+          {t("map.geoView")}
+        </button>
       </header>
 
       {/* Background tap clears the train selection; inner station/train clicks

@@ -11,8 +11,8 @@ import {
 } from "@/lib/focusedTrip";
 import { isFerryLeg, placeStation } from "@/lib/places";
 import { validStation } from "@/lib/stationUtils";
-import { futureServiceDate } from "@/lib/scheduleUtils";
-import { buildDepartureTimestamp, toLocalDateKey } from "@/lib/timeUtils";
+import { futureServiceDate, nextServiceDate } from "@/lib/scheduleUtils";
+import { buildDepartureTimestamp } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { MyTripState } from "@/hooks/useMyTrip";
@@ -100,8 +100,9 @@ function usePreviewRun(currentTime: Date): FocusedTrip | null {
     if (!trip) return null;
     const serviceDate =
       futureServiceDate(currentTime, scheduleType) ??
-      toLocalDateKey(
-        new Date(buildDepartureTimestamp(currentTime, trip.departureTime))
+      nextServiceDate(
+        new Date(buildDepartureTimestamp(currentTime, trip.departureTime)),
+        scheduleType
       );
     return { source: "user", ...run, serviceDate, reminder: null };
   }, [previewTrip, currentTime]);

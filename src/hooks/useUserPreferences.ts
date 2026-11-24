@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { FareType } from "@/types/smartSchedule";
-import { APP_CONSTANTS } from "@/lib/fareConstants";
+import { APP_CONSTANTS, FARE_TYPES } from "@/lib/fareConstants";
 import { logger } from "@/lib/logger";
 
 export interface UserPreferences {
@@ -26,9 +26,10 @@ export function useUserPreferences() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as { selectedFareType?: string };
+        const fareType = parsed.selectedFareType;
         // "none" was stored by the old "Show all fares" button.
-        if (parsed.selectedFareType && parsed.selectedFareType !== "none") {
-          setPreferences({ selectedFareType: parsed.selectedFareType as FareType });
+        if (fareType && Object.keys(FARE_TYPES).includes(fareType)) {
+          setPreferences({ selectedFareType: fareType as FareType });
         }
       }
     } catch (error) {

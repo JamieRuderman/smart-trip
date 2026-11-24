@@ -82,9 +82,8 @@ interface DepartureReminderProps {
   variant?: "sheet" | "page";
 }
 
-/** A run to take as the rider's trip, leaving its boarding station at
- *  `departureAt` — and, for the location warning's fix, the stations to switch
- *  to along with it. */
+/** A run to take as the rider's trip — and, for the location warning's fix,
+ *  the stations to switch to along with it. */
 interface Take {
   run: FocusedRun;
   leg?: Leg;
@@ -343,9 +342,7 @@ export function DepartureReminder({
     else commit(next);
   };
 
-  // "Take this train".
-  const proceedWithGo = () =>
-    take({ run: focusRun });
+  const proceedWithGo = () => take({ run: focusRun });
 
   // "Swap stations" / "Leave from …" on the location warning: take the
   // matching train on the corrected leg (the same one when it serves it, else
@@ -463,9 +460,9 @@ export function DepartureReminder({
   // planning a trip) there's no real destination to focus, so hide Go.
   if (!homeFromStation || !homeToStation) return null;
   // Offer "Go" right up until the trip actually finishes. Focusing ("I'm
-  // taking this train") doesn't need lead time — unlike the reminder modal
-  // (see focusAndOpen) — so it must NOT be gated on that, or the user couldn't
-  // re-focus a train shortly before departure (e.g. after tapping Stop).
+  // taking this train") doesn't need lead time — unlike a leave reminder — so
+  // it must NOT be gated on that, or the user couldn't re-focus a train
+  // shortly before departure (e.g. after tapping Stop).
   if (arrivalAt <= Date.now()) return null;
   const goLabel = t(focusRun.viaFerry ? "focusedTrip.goViaFerry" : "focusedTrip.go");
   const Wrapper = variant === "page" ? "div" : GutterRow;

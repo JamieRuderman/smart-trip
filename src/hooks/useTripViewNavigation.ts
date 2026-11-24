@@ -10,6 +10,7 @@ import {
 } from "@/lib/scheduleUtils";
 import { isSouthbound, stationIndexMap } from "@/lib/stationUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
+import { SAN_FRANCISCO } from "@/lib/places";
 import stations from "@/data/stations";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
@@ -82,8 +83,8 @@ export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
       } else {
         setPreviewTrip({
           tripNumber: trip.trip,
-          from: trip.fromStation,
-          to: trip.toStation,
+          from: trip.inboundFerry ? SAN_FRANCISCO : trip.fromStation,
+          to: trip.outboundFerry ? SAN_FRANCISCO : trip.toStation,
           scheduleType,
         });
       }

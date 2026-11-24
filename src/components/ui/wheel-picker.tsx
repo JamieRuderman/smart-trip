@@ -51,6 +51,7 @@ export function WheelPicker({
   const spacer = (height - rowHeight) / 2;
   const ref = useRef<HTMLDivElement>(null);
   const settleTimer = useRef<number | null>(null);
+  const target = useRef<number | null>(null);
   const clamped = Math.min(max, Math.max(min, value));
   const [centered, setCentered] = useState(clamped);
 
@@ -83,6 +84,7 @@ export function WheelPicker({
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
+      target.current = null;
       const index = indexAt(el);
       // Smooth scrolls can rest a couple of px past the snap point.
       if (el.scrollTop !== index * rowHeight) el.scrollTop = index * rowHeight;
@@ -93,13 +95,21 @@ export function WheelPicker({
 
   const scrollToValue = useCallback(
     (next: number) => {
-      ref.current?.scrollTo({
-        top: (Math.min(max, Math.max(min, next)) - min) * rowHeight,
-        behavior: "smooth",
-      });
+      const el = ref.current;
+      if (!el) return;
+      const value = Math.min(max, Math.max(min, next));
+      const top = (value - min) * rowHeight;
+      // Already there: no scroll event will come to settle and clear it.
+      target.current = el.scrollTop === top ? null : value;
+      el.scrollTo({ top, behavior: "smooth" });
     },
     [min, max, rowHeight]
   );
+
+  // A step taken mid-scroll starts from where the wheel is heading: `centered`
+  // still holds the old value until the smooth scroll passes halfway.
+  const stepBy = (delta: number) =>
+    scrollToValue((target.current ?? centered) + delta);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step =
@@ -114,7 +124,7 @@ export function WheelPicker({
         : 0;
     if (step === 0) return;
     e.preventDefault();
-    scrollToValue(centered + step);
+    stepBy(step);
   };
 
   const values = [...Array(max - min + 1).keys()].map((i) => min + i);
@@ -183,7 +193,7 @@ export function WheelPicker({
         <div className="flex shrink-0 flex-col">
           <button
             type="button"
-            onClick={() => scrollToValue(centered + 1)}
+            onClick={() => stepBy(1)}
             disabled={centered >= max}
             className="flex h-5 w-6 items-center justify-center rounded text-white hover:bg-white/15 disabled:opacity-30"
             aria-label={stepLabels.next}
@@ -192,7 +202,7 @@ export function WheelPicker({
           </button>
           <button
             type="button"
-            onClick={() => scrollToValue(centered - 1)}
+            onClick={() => stepBy(-1)}
             disabled={centered <= min}
             className="flex h-5 w-6 items-center justify-center rounded text-white hover:bg-white/15 disabled:opacity-30"
             aria-label={stepLabels.previous}

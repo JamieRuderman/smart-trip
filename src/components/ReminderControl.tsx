@@ -66,8 +66,16 @@ export function ReminderControl({
   const [error, setError] = useState<ReminderError>(null);
 
   const commit = useCallback(
-    async (lead: number | null) => {
+    async (pickedLead: number | null) => {
       if (departureAt == null) return;
+      // The minute clock can be ~60s stale, which would put the max lead's alarm at "now".
+      const lead =
+        pickedLead == null
+          ? null
+          : Math.min(
+              pickedLead,
+              reminderLeadRange(departureAt, Date.now()).maxLeadMinutes
+            );
       const text = buildReminderText(t, i18n.language, {
         leadMinutes: lead ?? 0,
         departureAt,
@@ -103,7 +111,6 @@ export function ReminderControl({
     !tooLate &&
     (isFutureService || minutesUntil >= 2);
 
-  // The alarm went off and the train hasn't left yet.
   const timeToGo = reminderFired &&
     !isCanceledOrSkipped &&
     !isFutureService &&
@@ -119,7 +126,7 @@ export function ReminderControl({
   }
 
   const isSet = storedLead != null;
-  const lead = Math.min(isSet ? storedLead : draftLead, maxLeadMinutes);
+  const lead = isSet ? storedLead : Math.min(draftLead, maxLeadMinutes);
   const alarmAt = departureAt - lead * 60_000;
   const minutes = (count: number) =>
     t("departureReminder.minutesValue", { count });

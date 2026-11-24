@@ -265,7 +265,12 @@ function StationArrivals({ station }: { station: Station }) {
           arrival={a}
           isFocused={isFocusedTrainToday(focusedTrip, a.tripNumber, a.isSouthbound, currentTime)}
           onClick={() =>
-            openTrainPage({ ...a.trip, fromStation: station, toStation: a.terminus })
+            openTrainPage({
+              ...a.trip,
+              // A leg from the terminus to itself has no trips, so the trip page can't open it.
+              fromStation: station === a.terminus ? a.trip.fromStation : station,
+              toStation: a.terminus,
+            })
           }
         />
       ))}

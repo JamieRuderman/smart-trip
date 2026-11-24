@@ -9,6 +9,7 @@ import {
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { isFerryLeg, placeStation } from "@/lib/places";
+import { validStation } from "@/lib/stationUtils";
 import { futureServiceDate, getFilteredTrips } from "@/lib/scheduleUtils";
 import { buildDepartureTimestamp, toLocalDateKey } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
@@ -94,14 +95,17 @@ function usePreviewRun(currentTime: Date): FocusedTrip | null {
     const fromStation = placeStation(from);
     const toStation = placeStation(to);
     const viaFerry = isFerryLeg(from, to);
-    const trip = getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).find(
-      (candidate) => candidate.trip === tripNumber,
-    );
+    const trip = getFilteredTrips(
+      fromStation,
+      toStation,
+      scheduleType,
+      viaFerry
+    ).find((candidate) => candidate.trip === tripNumber);
     if (!trip) return null;
     const serviceDate =
       serviceDay ??
       toLocalDateKey(
-        new Date(buildDepartureTimestamp(new Date(), trip.departureTime)),
+        new Date(buildDepartureTimestamp(new Date(), trip.departureTime))
       );
     return {
       source: "user",
@@ -126,7 +130,12 @@ function MyTripView({
   onBack: () => void;
 }) {
   const { t } = useTranslation();
-  const { clearFocusedTrip, setPreviewTrip } = useStationSelection();
+  const {
+    clearFocusedTrip,
+    setPreviewTrip,
+    fromStation: homeFrom,
+    toStation: homeTo,
+  } = useStationSelection();
 
   const stopTracking = () => {
     const { from, to } = focusedPlaces(focusedTrip);
@@ -161,7 +170,7 @@ function MyTripView({
       <div
         className={cn(
           "sticky top-0 z-20 text-white transition-colors",
-          accentBg,
+          accentBg
         )}
         style={{ paddingTop: "calc(8px + var(--safe-area-top))" }}
       >
@@ -256,24 +265,29 @@ function MyTripView({
 
           <div className="mt-3 empty:hidden">
             {isPreview ? (
-              <DepartureReminder
-                tripNumber={trip.trip}
-                fromStation={fromStation}
-                toStation={toStation}
-                viaFerry={trip.inboundFerry != null || trip.outboundFerry != null}
-                departureTime={trip.departureTime}
-                liveDepartureTime={live?.liveDepartureTime ?? null}
-                arrivalTime={trip.arrivalTime}
-                realtimeArrivalTime={live?.liveArrivalTime ?? null}
-                liveStopDepartures={live?.allStopLiveDepartures}
-                currentTime={clockTime}
-                timeFormat={TIME_FORMAT}
-                scheduleType={focusedTrip.scheduleType}
-                isFocused={false}
-                sheetOpen
-                onClose={onBack}
-                variant="page"
-              />
+              !progress.isEnded &&
+              !model.isCanceledOrSkipped && (
+                <DepartureReminder
+                  tripNumber={trip.trip}
+                  fromStation={fromStation}
+                  toStation={toStation}
+                  viaFerry={
+                    trip.inboundFerry != null || trip.outboundFerry != null
+                  }
+                  departureTime={trip.departureTime}
+                  liveDepartureTime={live?.liveDepartureTime ?? null}
+                  arrivalTime={trip.arrivalTime}
+                  realtimeArrivalTime={live?.liveArrivalTime ?? null}
+                  liveStopDepartures={live?.allStopLiveDepartures}
+                  currentTime={clockTime}
+                  timeFormat={TIME_FORMAT}
+                  scheduleType={focusedTrip.scheduleType}
+                  isFocused={false}
+                  sheetOpen
+                  onClose={onBack}
+                  variant="page"
+                />
+              )
             ) : (
               <ReminderControl
                 focusedTrip={focusedTrip}
@@ -302,10 +316,10 @@ function MyTripView({
             progress={progress}
             model={model}
             accentColor={accentColor}
+            isPreview={isPreview}
             timeFormat={TIME_FORMAT}
           />
         )}
-
 
         {trip.inboundFerry && (
           <SectionCard className="p-4 md:p-5">
@@ -350,6 +364,8 @@ function MyTripView({
             isEnded={progress.isEnded}
             atDestination={model.isAtDestination}
             stopInference={progress.stopInference}
+            userFromStation={isPreview ? validStation(homeFrom) : null}
+            userToStation={isPreview ? validStation(homeTo) : null}
             isFocused={!isPreview}
           />
         </SectionCard>
@@ -383,4 +399,3 @@ function MyTripView({
     </div>
   );
 }
-

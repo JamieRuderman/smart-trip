@@ -35,7 +35,7 @@ export function ActiveTripBar({ currentTime }: { currentTime: Date }) {
           >
             <button
               type="button"
-              onClick={openTripView}
+              onClick={() => openTripView()}
               className={cn(
                 "pointer-events-auto mx-auto flex w-full max-w-xl items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-white",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70",

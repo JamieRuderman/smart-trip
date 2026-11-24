@@ -153,7 +153,6 @@ export function DepartureReminder({
     focusedTrip,
     focusTrip,
     rescheduleReminder,
-    setPreviewTrip,
     setFromStation,
     setToStation,
     openStationsUpdated,
@@ -307,11 +306,10 @@ export function DepartureReminder({
   );
 
   // Land on the full-page My Trip view: from a sheet, close it and navigate;
-  // on the trip page, dropping the previewed train turns it into My Trip.
-  const openMyTrip = () => {
-    setPreviewTrip(null);
-    if (variant === "sheet") openTripView();
-  };
+  // on the trip page, dropping the previewed train turns it into My Trip. The
+  // page replaces its own entry so the URL loses ?trip= in the same render, or
+  // MyTrip briefly reads it as a train still being restored and renders nothing.
+  const openMyTrip = () => openTripView(null, { replace: variant === "page" });
 
   // Focus `run` as the rider's trip. focusTrip commits the new focus
   // synchronously, so My Trip renders the new trip, not the previous one.

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useStationSelection } from "@/contexts/stationSelection";
+import { useStationSelection, type PreviewTrip } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import {
   findFullCorridorTrip,
@@ -15,14 +15,31 @@ import stations from "@/data/stations";
 import type { MapTrain } from "@/hooks/useMapTrains";
 import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
 
-/** Open the full-page My Trip view, keeping the current query params (the
- *  selected leg) like the other in-app links. */
-export function useOpenTripView(): () => void {
+/** Open the trip page — My Trip, or `preview`'s train — keeping the current
+ *  query params (the selected leg) like the other in-app links. The train goes
+ *  into the URL too, so the history entry can bring it back. */
+export function useOpenTripView(): (
+  preview?: PreviewTrip | null,
+  options?: { replace?: boolean },
+) => void {
   const navigate = useNavigate();
   const location = useLocation();
-  return useCallback(() => {
-    navigate({ pathname: TRIP_VIEW_PATH, search: location.search });
-  }, [navigate, location.search]);
+  const { setPreviewTrip } = useStationSelection();
+  return useCallback(
+    (preview: PreviewTrip | null = null, options?: { replace?: boolean }) => {
+      setPreviewTrip(preview);
+      const params = new URLSearchParams(location.search);
+      for (const key of ["trip", "type", "tripFrom", "tripTo"]) params.delete(key);
+      if (preview) {
+        params.set("trip", String(preview.tripNumber));
+        params.set("type", preview.scheduleType);
+        if (preview.from !== params.get("from")) params.set("tripFrom", preview.from);
+        if (preview.to !== params.get("to")) params.set("tripTo", preview.to);
+      }
+      navigate({ pathname: TRIP_VIEW_PATH, search: `?${params}` }, options);
+    },
+    [navigate, location.search, setPreviewTrip],
+  );
 }
 
 /**
@@ -59,7 +76,6 @@ export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
     toStation,
     viaFerry,
     focusedTrip,
-    setPreviewTrip,
   } = useStationSelection();
   const openTripView = useOpenTripView();
   return useCallback(
@@ -68,7 +84,7 @@ export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
       const scheduleType = getTodayScheduleType(now);
       const southbound = isSouthbound(trip.fromStation, trip.toStation);
       if (isFocusedTrainToday(focusedTrip, trip.trip, southbound, now)) {
-        setPreviewTrip(null);
+        openTripView();
       } else if (
         fromPlace &&
         toPlace &&
@@ -79,18 +95,17 @@ export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
           ? stationIndexMap[trip.fromStation] <= stationIndexMap[fromStation]
           : stationIndexMap[trip.fromStation] >= stationIndexMap[fromStation])
       ) {
-        setPreviewTrip({ tripNumber: trip.trip, from: fromPlace, to: toPlace, scheduleType });
+        openTripView({ tripNumber: trip.trip, from: fromPlace, to: toPlace, scheduleType });
       } else {
-        setPreviewTrip({
+        openTripView({
           tripNumber: trip.trip,
           from: trip.inboundFerry ? SAN_FRANCISCO : trip.fromStation,
           to: trip.outboundFerry ? SAN_FRANCISCO : trip.toStation,
           scheduleType,
         });
       }
-      openTripView();
     },
-    [focusedTrip, fromPlace, toPlace, fromStation, toStation, viaFerry, setPreviewTrip, openTripView],
+    [focusedTrip, fromPlace, toPlace, fromStation, toStation, viaFerry, openTripView],
   );
 }
 

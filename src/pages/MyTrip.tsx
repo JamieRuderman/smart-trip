@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Calendar, ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
@@ -43,12 +44,17 @@ const TIME_FORMAT = "12h" as const;
  * train is right now and every stop on the leg.
  *
  * A launch with a trip running today opens here. Backing out returns to the
- * schedule, which keeps an in-progress bar linking here. "Stop tracking" turns
- * it back to green; it leaves on its own when nothing is left to show (the
+ * schedule, which keeps an in-progress bar linking here. "End trip" turns it
+ * back to green; it leaves on its own when nothing is left to show (the
  * auto-clear shortly after arrival).
  */
 export default function MyTrip() {
-  const { focusedTrip } = useStationSelection();
+  const { focusedTrip, previewTrip } = useStationSelection();
+  const location = useLocation();
+  // Back/Forward onto a train's entry: the provider restores its train from
+  // the URL in an effect that runs after this page's.
+  const restoring =
+    previewTrip == null && new URLSearchParams(location.search).has("trip");
   const leaveTripView = useLeaveTripView();
   const currentTime = useMinuteClock();
   const previewRun = usePreviewRun(currentTime);
@@ -64,12 +70,12 @@ export default function MyTrip() {
 
   const leftRef = useRef(false);
   useEffect(() => {
-    if (shown || leftRef.current) return;
+    if (shown || restoring || leftRef.current) return;
     leftRef.current = true;
     leaveTripView();
-  }, [shown, leaveTripView]);
+  }, [shown, restoring, leaveTripView]);
 
-  if (!shown) return null;
+  if (!shown || restoring) return null;
   return (
     <MyTripGate
       focusedTrip={shown}

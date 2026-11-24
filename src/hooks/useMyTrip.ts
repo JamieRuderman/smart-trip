@@ -42,7 +42,7 @@ export interface MyTripInput {
   lastUpdated: Date | null;
   currentTime: Date;
   /** A train the rider is looking at but hasn't taken: `focusedTrip` is built
-   *  from the selected schedule row and never stored. */
+   *  from the previewed train and never stored. */
   isPreview?: boolean;
 }
 

@@ -1,4 +1,5 @@
 import { isSharedTripPath } from "@/lib/sharedTrip";
+import { TRIP_VIEW_PATH } from "@/lib/tripView";
 import {
   useCallback,
   useEffect,
@@ -96,6 +97,39 @@ const MANAGED_PARAMS = new Set(["from", "to", "trip", "type", "tripFrom", "tripT
 const todayScheduleType = (): "weekday" | "weekend" =>
   getTodayScheduleType();
 
+/** The train a URL links to (?trip=N, its schedule in ?type and, when they
+ *  differ from the selected leg, its own ends in ?tripFrom / ?tripTo). */
+function previewFromParams(
+  params: URLSearchParams,
+  fromPlace: Place | "",
+  toPlace: Place | "",
+): PreviewTrip | null {
+  const tripNumber = parseInt(params.get("trip") ?? "", 10);
+  const from =
+    (params.get("tripFrom") as Place) || (params.get("from") as Place) || fromPlace;
+  const to = (params.get("tripTo") as Place) || (params.get("to") as Place) || toPlace;
+  if (isNaN(tripNumber) || !from || !to) return null;
+  const type = params.get("type");
+  return {
+    tripNumber,
+    from,
+    to,
+    scheduleType: type === "weekday" || type === "weekend" ? type : todayScheduleType(),
+  };
+}
+
+function samePreview(a: PreviewTrip | null, b: PreviewTrip | null): boolean {
+  return (
+    a === b ||
+    (a != null &&
+      b != null &&
+      a.tripNumber === b.tripNumber &&
+      a.from === b.from &&
+      a.to === b.to &&
+      a.scheduleType === b.scheduleType)
+  );
+}
+
 interface ProviderState {
   fromPlace: Place | "";
   toPlace: Place | "";
@@ -109,13 +143,6 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   const location = useLocation();
   const isTripPreview = isSharedTripPath(location.pathname);
   const searchParams = isTripPreview ? new URLSearchParams() : urlParams;
-
-  // A linked train (?trip=N, with its schedule in ?type and, when they differ
-  // from the selected leg, its own ends in ?tripFrom / ?tripTo).
-  const initialUrlTrip = searchParams.get("trip");
-  const initialUrlTripNumber =
-    initialUrlTrip !== null ? parseInt(initialUrlTrip, 10) : NaN;
-  const initialUrlType = searchParams.get("type");
 
   const [state, setState] = useState<ProviderState>(() => {
     // Source precedence for the selected leg: URL params (shared/bookmarked
@@ -134,8 +161,6 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       (searchParams.get("to") as Place) ||
       (persisted ? persisted.toStation : "") ||
       (focusedOnMountPlaces ? focusedOnMountPlaces.to : "");
-    const previewFrom = (searchParams.get("tripFrom") as Place) || fromPlace;
-    const previewTo = (searchParams.get("tripTo") as Place) || toPlace;
     return {
       fromPlace,
       toPlace,
@@ -148,18 +173,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       // its own schedule type in previewTrip instead.
       scheduleType: todayScheduleType(),
       scheduleCheckedOn: toLocalDateKey(new Date()),
-      previewTrip:
-        !isNaN(initialUrlTripNumber) && previewFrom && previewTo
-          ? {
-              tripNumber: initialUrlTripNumber,
-              from: previewFrom,
-              to: previewTo,
-              scheduleType:
-                initialUrlType === "weekday" || initialUrlType === "weekend"
-                  ? initialUrlType
-                  : todayScheduleType(),
-            }
-          : null,
+      previewTrip: previewFromParams(searchParams, fromPlace, toPlace),
     };
   });
 
@@ -178,8 +192,24 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   // `setSearchParams` triggers a new `searchParams` identity).
   const searchParamsRef = useRef(searchParams);
   searchParamsRef.current = searchParams;
+  const lastLocationKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (isTripPreview) return;
+    // A navigation onto the trip page (Back/Forward included) shows the train
+    // its URL names; only state changes made on the page write the URL.
+    const navigated = lastLocationKeyRef.current !== location.key;
+    lastLocationKeyRef.current = location.key;
+    if (navigated && location.pathname === TRIP_VIEW_PATH) {
+      const linked = previewFromParams(
+        searchParamsRef.current,
+        state.fromPlace,
+        state.toPlace,
+      );
+      if (!samePreview(linked, state.previewTrip)) {
+        setState((prev) => ({ ...prev, previewTrip: linked }));
+        return;
+      }
+    }
     const params: Record<string, string> = {};
     searchParamsRef.current.forEach((value, key) => {
       if (!MANAGED_PARAMS.has(key)) params[key] = value;
@@ -193,12 +223,16 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       if (preview.from !== state.fromPlace) params.tripFrom = preview.from;
       if (preview.to !== state.toPlace) params.tripTo = preview.to;
     }
-    setSearchParams(params, { replace: true });
+    const next = new URLSearchParams(params).toString();
+    if (next !== searchParamsRef.current.toString()) {
+      setSearchParams(params, { replace: true });
+    }
   }, [
     state.fromPlace,
     state.toPlace,
     state.previewTrip,
     location.pathname,
+    location.key,
     isTripPreview,
     setSearchParams,
   ]);

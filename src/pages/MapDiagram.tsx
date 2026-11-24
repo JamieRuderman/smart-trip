@@ -12,6 +12,7 @@ import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { useOpenMapTrain } from "@/hooks/useTripViewNavigation";
 import { ZoneKey } from "@/components/SmartLineDiagram/ZoneKey";
 import { useNow } from "@/hooks/useNow";
+import { importPlace } from "./lazyPages";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import type { Station } from "@/types/smartSchedule";
 
@@ -71,6 +72,12 @@ export default function MapDiagram() {
   useEffect(() => {
     const id = requestAnimationFrame(() => setDiagramShown(true));
     return () => cancelAnimationFrame(id);
+  }, []);
+
+  // The station page's route has no Suspense fallback of its own, so a tap
+  // before its chunk lands blanks the whole screen.
+  useEffect(() => {
+    void importPlace().catch(() => {});
   }, []);
 
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);

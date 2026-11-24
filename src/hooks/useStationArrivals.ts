@@ -120,7 +120,10 @@ export function useStationArrivals(
             const destIdx = stationIndexMap[destinationStation];
             const destStatic = destIdx != null ? trip.times[destIdx] : null;
             if (destStatic && destStatic !== "~~") {
-              const destLive = rt?.allStopLiveDepartures?.[destinationStation];
+              const destLive =
+                destinationStation === terminus
+                  ? (rt?.liveArrivalTime ?? rt?.allStopLiveDepartures?.[destinationStation])
+                  : rt?.allStopLiveDepartures?.[destinationStation];
               destinationTime = destLive ?? destStatic;
             }
           }

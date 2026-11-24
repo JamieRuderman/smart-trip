@@ -184,14 +184,13 @@ export function TrainScheduleApp() {
 
   const openTrip = useCallback(
     (tripNumber: number) => {
-      setPreviewTrip(
+      openTripView(
         tripNumber === focusedTripNumber || !fromPlace || !toPlace
           ? null
           : { tripNumber, from: fromPlace, to: toPlace, scheduleType },
       );
-      openTripView();
     },
-    [focusedTripNumber, fromPlace, toPlace, scheduleType, openTripView, setPreviewTrip],
+    [focusedTripNumber, fromPlace, toPlace, scheduleType, openTripView],
   );
 
   return (
@@ -249,7 +248,10 @@ export function TrainScheduleApp() {
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (
-          <NoTripsFound />
+          <NoTripsFound
+            scheduleType={scheduleType}
+            onScheduleTypeChange={setScheduleType}
+          />
         )}
 
         {/* Fare Section */}

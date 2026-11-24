@@ -196,6 +196,7 @@ export const TripCard = memo(function TripCard({
               {...transfer}
               timeFormat={timeFormat}
               currentTime={ferryClock}
+              isPast={isPastTrip}
               isMobile
             />
           )}
@@ -265,6 +266,7 @@ export const TripCard = memo(function TripCard({
               {...transfer}
               timeFormat={timeFormat}
               currentTime={ferryClock}
+              isPast={isPastTrip}
             />
           )}
         </div>

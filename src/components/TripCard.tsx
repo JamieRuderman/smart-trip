@@ -10,7 +10,7 @@ import { FerryConnection } from "./FerryConnection";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTripStatus } from "@/hooks/useTripStatus";
-import { stateText, stateCardStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
+import { stateText, stateRowStyle, myTripCardStyle, cardTripState } from "@/lib/tripTheme";
 import { useTranslation } from "react-i18next";
 import { isQuickConnection } from "@/lib/timeUtils";
 import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
@@ -173,12 +173,12 @@ export const TripCard = memo(function TripCard({
       <div
         ref={cardRef}
         className={cn(
-          "relative flex items-center px-4 py-2 rounded-lg border transition-all",
+          "relative flex items-center px-4 py-2 rounded-lg transition-all",
           "touch-manipulation cursor-pointer",
           "outline-none",
           // Blue == "you're taking this train" and overrides the semantic
           // state colour (green/gold/red) for the user-focused ("Go") trip.
-          isFocused ? myTripCardStyle : stateCardStyle[cardState],
+          isFocused ? myTripCardStyle : stateRowStyle[cardState],
         )}
         role="listitem"
         aria-label={ariaParts.join(", ")}
@@ -204,7 +204,7 @@ export const TripCard = memo(function TripCard({
           isDelayed={isDelayed}
         />
         {isMobile ? (
-          <div className="flex flex-col items-start ml-4 w-full">
+          <div className="flex flex-col items-start ml-3 w-full">
             <div className="flex flex-row gap-2 items-start text-lg whitespace-nowrap">
               <div className="flex flex-col">
                 <TimeDisplay

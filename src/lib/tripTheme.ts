@@ -77,6 +77,14 @@ export const stateCardStyle: Record<TripState, string> = {
   future:   "bg-gradient-card border-border hover:bg-muted/50 focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
 };
 
+/** Schedule-list rows: like {@link stateCardStyle}, but an ordinary row has no
+ *  fill so only highlighted rows stand out. */
+export const stateRowStyle: Record<TripState, string> = {
+  ...stateCardStyle,
+  past: "hover:bg-muted/50 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+  future: "hover:bg-muted/50 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+};
+
 /**
  * Blue "you're taking this train" card style. Blue == "my trip" throughout
  * the app, so this OVERRIDES the semantic state style (green/gold/red) for

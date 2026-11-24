@@ -43,28 +43,16 @@ export function FerryConnection({
   return (
     <div
       className={cn(
-        "flex-grow flex items-center justify-end text-muted-foreground",
-        isMobile ? "flex-row-reverse items-start gap-2 pt-2" : "gap-3"
+        "flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground",
+        isMobile ? "pt-1" : "flex-grow justify-end",
       )}
     >
-      <div className={cn("flex flex-col gap-1", isMobile ? "items-start" : "items-end")}>
-        <div className="flex items-baseline gap-1 text-sm">
-          <span className="text-muted-foreground">{compactLabel}</span>
-          <TimeDisplay time={compactTime} format={timeFormat} />
-        </div>
-        <FerryTransfer minutes={minutes} className="gap-2 leading-none" />
-      </div>
-      <div
-        className={cn(
-          "flex flex-col justify-center items-center gap-1",
-          isMobile ? "border-r pr-3 mr-1" : "border-l pl-4 ml-1"
-        )}
-      >
-        <Ship className="h-5 w-5" />
-        <span className="text-[10px] uppercase">
-          {inbound ? t("ferry.inbound") : t("ferry.outbound")}
-        </span>
-      </div>
+      <span className="flex items-center gap-1 whitespace-nowrap">
+        <Ship className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {compactLabel}
+        <TimeDisplay time={compactTime} format={timeFormat} />
+      </span>
+      <FerryTransfer minutes={minutes} className="gap-1 whitespace-nowrap" />
     </div>
   );
 }

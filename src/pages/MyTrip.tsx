@@ -137,6 +137,7 @@ function MyTripView({
       scheduleType: focusedTrip.scheduleType,
     });
     void clearFocusedTrip();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const {
     focusedTrip,

@@ -76,23 +76,16 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
                   aria-expanded={alert.message ? isExpanded : undefined}
                   className="flex-1 min-w-0 break-words text-left"
                 >
-                  <div className={cn("font-semibold text-sm", !isExpanded && "line-clamp-2")}>
+                  <div className="font-semibold text-sm">
                     {alert.title ?? t("serviceAlert.sectionTitle")}
                   </div>
-                  {alert.message && (
-                    <p
-                      className={cn(
-                        "text-xs mt-1 pr-1",
-                        isExpanded
-                          ? "max-h-64 overflow-y-auto overscroll-contain"
-                          : "line-clamp-1",
-                      )}
-                    >
+                  {alert.message && isExpanded && (
+                    <p className="text-xs mt-1 pr-1 max-h-64 overflow-y-auto overscroll-contain">
                       {alert.message}
                     </p>
                   )}
                   {alert.message && (
-                    <span className="mt-1 inline-flex items-center gap-0.5 text-xs font-semibold">
+                    <span className="mt-1 inline-flex items-center gap-0.5 text-xs">
                       {t(isExpanded ? "serviceAlert.showLess" : "serviceAlert.showMore")}
                       <ChevronDown
                         className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}

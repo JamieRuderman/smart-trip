@@ -150,7 +150,7 @@ export function ReminderControl({
             })}
           </p>
         </div>
-        {canSetReminder && !isSet ? (
+        {!isSet ? (
           <WheelPicker
             min={MIN_LEAD_MINUTES}
             max={maxLeadMinutes}
@@ -192,7 +192,7 @@ export function ReminderControl({
         )}
       </div>
       {lead <= CLOSE_TO_DEPARTURE_MINUTES && (
-        <p className="mt-1.5 text-xs text-white/90">
+        <p className="text-xs text-white/90">
           {t(
             byFerry
               ? "departureReminder.ferryWarningBody"
@@ -204,7 +204,7 @@ export function ReminderControl({
         </p>
       )}
       {errorMessage && (
-        <p className="mt-1.5 text-xs text-white/90" role="alert">
+        <p className="text-xs text-white/90" role="alert">
           {errorMessage}
         </p>
       )}

@@ -77,16 +77,16 @@ export const stateCardStyle: Record<TripState, string> = {
   future:   "bg-background border-border hover:bg-muted focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
 };
 
+/** Ring for the next train's row, matching the my-trip row's. */
+export const nextTripRingStyle =
+  "ring-2 ring-smart-train-green ring-offset-2 ring-offset-background";
+
 /**
  * Blue "you're taking this train" card style. Blue == "my trip" throughout
  * the app, so this OVERRIDES the semantic state style (green/gold/red) for
  * the user-focused trip ("Go"). Includes the ring so the row pops out of the
  * list at a glance.
  */
-/** Ring for the next train's row, matching the my-trip row's. */
-export const nextTripRingStyle =
-  "ring-2 ring-smart-train-green ring-offset-2 ring-offset-background";
-
 export const myTripCardStyle =
   "bg-my-trip/5 border-my-trip/40 hover:bg-my-trip/10 " +
   "ring-2 ring-my-trip ring-offset-2 ring-offset-background " +

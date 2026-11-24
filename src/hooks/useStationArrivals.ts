@@ -7,7 +7,7 @@ import {
 } from "@/lib/scheduleUtils";
 import { useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import { minutesOfDay, parseTimeToMinutes } from "@/lib/timeUtils";
-import { stationIndexMap } from "@/lib/stationUtils";
+import { getTripDirection, stationIndexMap } from "@/lib/stationUtils";
 import { DELAY_MINUTES_THRESHOLD } from "@/lib/realtimeConstants";
 import { placeStation, type Place } from "@/lib/places";
 import type { Station } from "@/types/smartSchedule";
@@ -65,13 +65,10 @@ export function useStationArrivals(
   const sbStatus = useTripRealtimeStatusMap(WINDSOR, LARKSPUR, southboundTrips);
   const nbStatus = useTripRealtimeStatusMap(LARKSPUR, WINDSOR, northboundTrips);
 
-  const directionFilter = useMemo<"southbound" | "northbound" | null>(() => {
-    if (!fromStation || !toStation) return null;
-    const a = stationIndexMap[placeStation(fromStation)];
-    const b = stationIndexMap[placeStation(toStation)];
-    if (a == null || b == null) return null;
-    return a < b ? "southbound" : "northbound";
-  }, [fromStation, toStation]);
+  const directionFilter =
+    fromStation && toStation
+      ? getTripDirection(placeStation(fromStation), placeStation(toStation))
+      : null;
 
   return useMemo<Arrival[]>(() => {
     const stationIdx = stationIndexMap[station];

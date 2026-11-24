@@ -84,103 +84,99 @@ export function FareSection({ from, to }: FareSectionProps) {
       <CardContent className="space-y-2 p-3 md:p-6">
         {/* Selected Fare Display */}
         {!picking ? (
-          <div>
-            <div className="status-box-primary">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <p className="font-medium">
-                    {getFareDescription(selectedFareType)}
-                  </p>
+          <div className="status-box-primary">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className="font-medium">
+                  {getFareDescription(selectedFareType)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {currentFare.zones}{" "}
+                  {currentFare.zones === 1
+                    ? t("common.zone")
+                    : t("common.zones")}{" "}
+                  • {from} → {to}
+                </p>
+                {currentFare.ferryPrice != null && (
                   <p className="text-sm text-muted-foreground">
-                    {currentFare.zones}{" "}
-                    {currentFare.zones === 1
-                      ? t("common.zone")
-                      : t("common.zones")}{" "}
-                    • {from} → {to}
+                    {t("fare.trainPlusFerry", {
+                      train: formatPrice(currentFare.trainPrice),
+                      ferry: formatPrice(currentFare.ferryPrice),
+                    })}
                   </p>
-                  {currentFare.ferryPrice != null && (
-                    <p className="text-sm text-muted-foreground">
-                      {t("fare.trainPlusFerry", {
-                        train: formatPrice(currentFare.trainPrice),
-                        ferry: formatPrice(currentFare.ferryPrice),
-                      })}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">
-                    {formatPrice(currentFare.price)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("common.oneWay")}
-                  </p>
-                </div>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-primary">
+                  {formatPrice(currentFare.price)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("common.oneWay")}
+                </p>
               </div>
             </div>
           </div>
         ) : (
-          /* All Fare Options - Clickable Cards */
-          <div className="grid gap-2">
-            {fareOptions.map((option) => (
-              <Button
-                key={option.fareType}
-                variant="outline"
-                onClick={() => handleFareSelect(option.fareType)}
-                className="flex justify-between items-center p-4 h-auto rounded-lg border border-border hover:border-primary hover:bg-primary/10 hover:shadow-sm transition-all duration-200 text-left w-full group"
-              >
-                <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                  {getFareDescription(option.fareType)}
-                </span>
-                <span className="font-semibold text-lg group-hover:text-primary transition-colors">
-                  {formatPrice(option.price)}
-                </span>
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {picking && (
-          <div className="text-xs text-muted-foreground py-2">
-            <p>
-              •{" "}
-              {t("fare.faresZoneBased", {
-                price: FARE_CONSTANTS.ADULT_FARE_PER_ZONE.toFixed(2),
-              })}
-            </p>
-            <p>• {t("fare.youthSeniorsFree")}</p>
-            <p>• {t("fare.discountsAvailable")}</p>
-            {viaFerry && (
-              <>
-                <p>• {t("fare.ferryFares", FERRY_FARE_PARAMS)}</p>
-                <p>• {t("fare.transferDiscount")}</p>
-              </>
-            )}
-            <p>
-              • {t("fare.paymentOptions")}{" "}
-              <a
-                href="https://sonomamarintrain.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={linkClass}
-              >
-                sonomamarintrain.org
-              </a>
+          <>
+            <div className="grid gap-2">
+              {fareOptions.map((option) => (
+                <Button
+                  key={option.fareType}
+                  variant="outline"
+                  onClick={() => handleFareSelect(option.fareType)}
+                  className="flex justify-between items-center p-4 h-auto rounded-lg border border-border hover:border-primary hover:bg-primary/10 hover:shadow-sm transition-all duration-200 text-left w-full group"
+                >
+                  <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                    {getFareDescription(option.fareType)}
+                  </span>
+                  <span className="font-semibold text-lg group-hover:text-primary transition-colors">
+                    {formatPrice(option.price)}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground py-2">
+              <p>
+                •{" "}
+                {t("fare.faresZoneBased", {
+                  price: FARE_CONSTANTS.ADULT_FARE_PER_ZONE.toFixed(2),
+                })}
+              </p>
+              <p>• {t("fare.youthSeniorsFree")}</p>
+              <p>• {t("fare.discountsAvailable")}</p>
               {viaFerry && (
                 <>
-                  {" "}
-                  {t("fare.and")}{" "}
-                  <a
-                    href={FERRY_CONSTANTS.FARES_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={linkClass}
-                  >
-                    goldengate.org
-                  </a>
+                  <p>• {t("fare.ferryFares", FERRY_FARE_PARAMS)}</p>
+                  <p>• {t("fare.transferDiscount")}</p>
                 </>
               )}
-            </p>
-          </div>
+              <p>
+                • {t("fare.paymentOptions")}{" "}
+                <a
+                  href="https://sonomamarintrain.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={linkClass}
+                >
+                  sonomamarintrain.org
+                </a>
+                {viaFerry && (
+                  <>
+                    {" "}
+                    {t("fare.and")}{" "}
+                    <a
+                      href={FERRY_CONSTANTS.FARES_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={linkClass}
+                    >
+                      goldengate.org
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          </>
         )}
       </CardContent>
     </SectionCard>

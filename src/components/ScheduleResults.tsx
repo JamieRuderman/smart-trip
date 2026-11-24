@@ -95,7 +95,6 @@ export function ScheduleResults({
 
   const displayedTrips = filteredTrips.slice(sliceStart);
 
-  const visibleTrips = displayedTrips;
 
   // The "Next" row: the not-yet-departed trip with the EARLIEST live-aware
   // departure — not simply the first in schedule order, because a delayed
@@ -104,7 +103,7 @@ export function ScheduleResults({
   let nextVisibleIndex = -1;
   if (!isFutureSchedule) {
     let nextVisibleMinutes = Infinity;
-    visibleTrips.forEach((trip, i) => {
+    displayedTrips.forEach((trip, i) => {
       const departureTime = tripEnds(trip, realtimeStatusMap.get(trip.departureTime)).start;
       if (isTimeInPast(currentTime, departureTime)) return;
       const minutes = parseTimeToMinutes(departureTime);
@@ -150,7 +149,7 @@ export function ScheduleResults({
           role="list"
           aria-label="Train schedule results"
         >
-          {visibleTrips.map((trip, index) => {
+          {displayedTrips.map((trip, index) => {
             // Live-aware: a delayed train past its scheduled slot but before
             // its live departure hasn't departed (keeps the aria "Departed"
             // announcement and badge flags consistent with the Next logic).

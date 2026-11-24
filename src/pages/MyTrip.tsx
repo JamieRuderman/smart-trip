@@ -5,12 +5,13 @@ import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
 import {
   focusedPlaces,
+  reconstructFocusedTrip,
   sameFocusIdentity,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { isFerryLeg, placeStation } from "@/lib/places";
 import { validStation } from "@/lib/stationUtils";
-import { futureServiceDate, getFilteredTrips } from "@/lib/scheduleUtils";
+import { futureServiceDate } from "@/lib/scheduleUtils";
 import { buildDepartureTimestamp, toLocalDateKey } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
@@ -85,41 +86,25 @@ export default function MyTrip() {
 /** The previewed train as an unsaved run, for the green page. */
 function usePreviewRun(currentTime: Date): FocusedTrip | null {
   const { previewTrip } = useStationSelection();
-  const serviceDay = previewTrip
-    ? futureServiceDate(currentTime, previewTrip.scheduleType)
-    : null;
-  const today = toLocalDateKey(currentTime);
   return useMemo(() => {
     if (!previewTrip) return null;
     const { tripNumber, from, to, scheduleType } = previewTrip;
-    const fromStation = placeStation(from);
-    const toStation = placeStation(to);
-    const viaFerry = isFerryLeg(from, to);
-    const trip = getFilteredTrips(
-      fromStation,
-      toStation,
+    const run = {
+      tripNumber,
+      fromStation: placeStation(from),
+      toStation: placeStation(to),
+      ...(isFerryLeg(from, to) ? { viaFerry: true as const } : {}),
       scheduleType,
-      viaFerry
-    ).find((candidate) => candidate.trip === tripNumber);
+    };
+    const trip = reconstructFocusedTrip({ ...run, serviceDate: "" });
     if (!trip) return null;
     const serviceDate =
-      serviceDay ??
+      futureServiceDate(currentTime, scheduleType) ??
       toLocalDateKey(
-        new Date(buildDepartureTimestamp(new Date(), trip.departureTime))
+        new Date(buildDepartureTimestamp(currentTime, trip.departureTime))
       );
-    return {
-      source: "user",
-      tripNumber,
-      fromStation,
-      toStation,
-      ...(viaFerry ? { viaFerry: true as const } : {}),
-      scheduleType,
-      serviceDate,
-      reminder: null,
-    };
-    // `today` re-derives the service date across midnight.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewTrip, serviceDay, today]);
+    return { source: "user", ...run, serviceDate, reminder: null };
+  }, [previewTrip, currentTime]);
 }
 
 function MyTripView({

@@ -24,6 +24,15 @@ const ACCENT_COLOR: Record<Accent, string> = {
   preview: "hsl(var(--smart-train-green))",
 };
 
+/** Each accent as a solid background for the white-on-colour chrome. */
+const ACCENT_BG: Record<Accent, string> = {
+  past: stateBg.past,
+  canceled: stateBg.canceled,
+  delayed: stateBg.delayed,
+  onTrip: "bg-my-trip-background",
+  preview: stateBg.ontime,
+};
+
 export interface MyTripInput {
   focusedTrip: FocusedTrip;
   /** The focused trip reconstructed from the schedule. */
@@ -121,12 +130,7 @@ export function useMyTripState({
         : isPreview
           ? "preview"
           : "onTrip";
-  const accentBg =
-    accent === "onTrip"
-      ? "bg-my-trip-background"
-      : accent === "preview"
-        ? stateBg.ontime
-        : stateBg[accent];
+  const accentBg = ACCENT_BG[accent];
 
   return {
     focusedTrip,

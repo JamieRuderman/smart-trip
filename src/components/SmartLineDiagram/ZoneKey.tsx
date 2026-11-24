@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { ZONE_TRACK_COLORS } from "@/data/smartLineLayout";
 
-const ZONES = [1, 2, 3, 4, 5];
+const ZONES = Object.keys(ZONE_TRACK_COLORS).map(Number);
 
 /** Fare-zone key for the zone-coloured track, floating over the map's corner:
  *  a short run of track in each zone's colour, north at the top. */

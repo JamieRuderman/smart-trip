@@ -132,6 +132,7 @@ export function TripPositionCard({
   isPreview = false,
 }: TripPositionCardProps) {
   const { t } = useTranslation();
+  const context = isPreview ? "preview" : undefined;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -168,18 +169,12 @@ export function TripPositionCard({
       headline = t("myTrip.arrivedAt", { station: toStation });
       break;
     case "atOrigin":
-      headline = t(isPreview ? "myTrip.thisTrainAt" : "myTrip.trainAt", {
-        station: fromStation,
-      });
+      headline = t("myTrip.trainAt", { context, station: fromStation });
       break;
     case "approaching":
       headline = position.stopped
-        ? t(isPreview ? "myTrip.thisTrainAt" : "myTrip.trainAt", {
-            station: position.station,
-          })
-        : t(isPreview ? "myTrip.thisTrainHeadingTo" : "myTrip.trainHeadingTo", {
-            station: position.station,
-          });
+        ? t("myTrip.trainAt", { context, station: position.station })
+        : t("myTrip.trainHeadingTo", { context, station: position.station });
       details = [t("myTrip.stopsAway", { count: position.stopsAway })];
       if (position.distanceMi != null) details.push(miles(position.distanceMi));
       break;
@@ -199,9 +194,7 @@ export function TripPositionCard({
       break;
     }
     case "waiting":
-      headline = t(
-        isPreview ? "myTrip.thisPositionWaiting" : "myTrip.positionWaiting"
-      );
+      headline = t("myTrip.positionWaiting", { context });
       break;
   }
 

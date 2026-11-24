@@ -50,12 +50,12 @@ export function ReminderControl({
 
   const departureAt = useMemo(
     () => focusedBoardingInstant(focusedTrip, live?.liveDepartureTime),
-    [focusedTrip, live?.liveDepartureTime],
+    [focusedTrip, live?.liveDepartureTime]
   );
   const byFerry = trip.inboundFerry != null;
   const { maxLeadMinutes, tooLate } = reminderLeadRange(
     departureAt ?? 0,
-    currentTime.getTime(),
+    currentTime.getTime()
   );
 
   const reminder = focusedTrip.reminder;
@@ -78,12 +78,22 @@ export function ReminderControl({
       });
       const result = await setReminder(lead, departureAt, text);
       if (result.ok === false && result.reason !== "no-focus") {
-        setError(result.reason === "permission" ? "permission" : "schedule-failed");
+        setError(
+          result.reason === "permission" ? "permission" : "schedule-failed"
+        );
       } else {
         setError(null);
       }
     },
-    [byFerry, departureAt, focusedTrip, i18n.language, setReminder, t, timeFormat],
+    [
+      byFerry,
+      departureAt,
+      focusedTrip,
+      i18n.language,
+      setReminder,
+      t,
+      timeFormat,
+    ]
   );
 
   const canSetReminder =
@@ -94,16 +104,19 @@ export function ReminderControl({
     (isFutureService || minutesUntil >= 2);
 
   // The alarm went off and the train hasn't left yet.
-  if (reminderFired && !isCanceledOrSkipped && !isFutureService && minutesUntil >= 0) {
-    return (
+  const timeToGo = reminderFired &&
+    !isCanceledOrSkipped &&
+    !isFutureService &&
+    minutesUntil >= 0 && (
       <div className="flex h-10 items-center gap-2 rounded-lg bg-white/25 px-3 text-sm font-semibold text-white">
         <WalkIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="truncate">{t("departureReminder.timeToLeave")}</span>
       </div>
     );
-  }
 
-  if (departureAt == null || (storedLead == null && !canSetReminder)) return null;
+  if (departureAt == null || (storedLead == null && !canSetReminder)) {
+    return timeToGo || null;
+  }
 
   const isSet = storedLead != null;
   const lead = Math.min(isSet ? storedLead : draftLead, maxLeadMinutes);
@@ -115,16 +128,21 @@ export function ReminderControl({
     error === "permission"
       ? t("departureReminder.permissionDenied")
       : error === "schedule-failed"
-        ? t("departureReminder.scheduleFailed")
-        : null;
+      ? t("departureReminder.scheduleFailed")
+      : null;
 
   return (
-    <div>
+    <div className="space-y-2">
+      {timeToGo}
       <div className="flex h-[52px] items-center gap-3 overflow-hidden rounded-lg bg-white/15 pl-3 pr-1.5 text-white">
         <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-sm font-semibold">
-            {t(isSet ? "departureReminder.reminderOn" : "departureReminder.remindMe")}
+            {t(
+              isSet
+                ? "departureReminder.reminderOn"
+                : "departureReminder.remindMe"
+            )}
           </p>
           <p className="truncate text-xs text-white/80 tabular-nums">
             {t("departureReminder.atTime", {
@@ -175,9 +193,14 @@ export function ReminderControl({
       </div>
       {lead <= CLOSE_TO_DEPARTURE_MINUTES && (
         <p className="mt-1.5 text-xs text-white/90">
-          {t(byFerry ? "departureReminder.ferryWarningBody" : "departureReminder.warningBody", {
-            count: lead,
-          })}
+          {t(
+            byFerry
+              ? "departureReminder.ferryWarningBody"
+              : "departureReminder.warningBody",
+            {
+              count: lead,
+            }
+          )}
         </p>
       )}
       {errorMessage && (

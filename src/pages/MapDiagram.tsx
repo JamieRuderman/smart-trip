@@ -12,6 +12,7 @@ import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
 import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
+import { ZoneKey } from "@/components/SmartLineDiagram/ZoneKey";
 import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
@@ -184,6 +185,7 @@ export default function MapDiagram() {
       <MapDiagramFrame
         trainsCount={trains.length}
         onBackground={() => setSelectedTrainKey(null)}
+        overlay={<ZoneKey />}
       >
         {/* h-full (not min-h-full): SmartLineDiagram's root and SVG are
             height:100%, which only resolves against a parent with a DEFINITE

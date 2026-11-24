@@ -184,7 +184,6 @@
     "zones": "Zones",
     "toggleZones": "Toggle fare zones",
     "closeMap": "Close map",
-    "zoneLabel": "Zone {{zone}}",
     "sanFrancisco": "San Francisco",
     "ferryBadgeLabel": "FERRY · {{minutes}} MIN",
     "nextFerryBadge": "NEXT FERRY · {{minutes}} MIN",

@@ -8,6 +8,8 @@ interface MapDiagramFrameProps {
   /** Background-tap handler for the scroll container (clears train selection).
    *  Absent on the shell, which has nothing to deselect. */
   onBackground?: () => void;
+  /** Pinned over the map, outside its scroll area. */
+  overlay?: ReactNode;
   children?: ReactNode;
 }
 
@@ -23,6 +25,7 @@ interface MapDiagramFrameProps {
 export function MapDiagramFrame({
   trainsCount = null,
   onBackground,
+  overlay,
   children,
 }: MapDiagramFrameProps) {
   return (
@@ -32,11 +35,14 @@ export function MapDiagramFrame({
       {/* Background tap clears the train selection; inner station/train clicks
           stopPropagation so they don't also clear it. pb-safe reserves the iOS
           home-indicator space so the diagram's bottom (ferry label) clears it. */}
-      <div
-        className="flex-1 min-h-0 overflow-auto pb-safe"
-        onClick={onBackground}
-      >
-        {children}
+      <div className="relative flex-1 min-h-0">
+        <div
+          className="h-full overflow-auto pb-safe"
+          onClick={onBackground}
+        >
+          {children}
+        </div>
+        {overlay}
       </div>
     </div>
   );

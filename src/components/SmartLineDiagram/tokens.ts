@@ -31,14 +31,12 @@ export const TOKEN = {
   // Typography — target CSS px (divided by screenScale at render time).
   labelSize: 14,
   terminalSize: 17,
-  zoneLabelSize: 18,
   ferryEtaSize: 11,
   /** Train number text lives inside the marker group, which scales with zoom,
    *  so this stays in viewBox units (no screenScale division). */
   trainNumberSize: 18,
   labelWeight: 500,
   terminalWeight: 700,
-  zoneLabelWeight: 700,
   trainNumberWeight: 900,
   ferryEtaWeight: 600,
   labelTracking: "0.01em",
@@ -116,14 +114,3 @@ export const MOTION_TICK_MS = 1000;
 export const MULTILINE_LABELS: Partial<Record<Station, [string, string]>> = {
   "Sonoma County Airport": ["Sonoma County", "Airport"],
 };
-
-/** Left-margin zone headings, colored per zone. Positioned at each zone's
- *  vertical midpoint; x is the right edge of the text (rendered with
- *  textAnchor="end") so the labels track the line's curve from the left. */
-export const ZONE_LABEL_POSITIONS: { zone: number; x: number; y: number }[] = [
-  { zone: 1, x: 140, y: 120 },
-  { zone: 2, x: 235, y: 280 },
-  { zone: 3, x: 265, y: 560 },
-  { zone: 4, x: 425, y: 950 },
-  { zone: 5, x: 460, y: 1200 },
-];

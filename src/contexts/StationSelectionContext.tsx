@@ -159,9 +159,7 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       scheduleCheckedOn: toLocalDateKey(new Date()),
       selectedTripNumber: !isNaN(initialUrlTripNumber)
         ? initialUrlTripNumber
-        : persisted
-          ? persisted.tripNumber
-          : null,
+        : null,
     };
   });
 
@@ -287,16 +285,6 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
-  // Lead-time reminder modal open state. Lives here (not in the picker) so the
-  // in-sheet "Take this train" control can open it as it closes its own sheet,
-  // and the modal (hosted at the app root by ReminderDialogHost) survives that
-  // unmount and the route change to My Trip.
-  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
-  const openReminderDialog = useCallback(() => setReminderDialogOpen(true), []);
-  const closeReminderDialog = useCallback(
-    () => setReminderDialogOpen(false),
-    [],
-  );
 
   // The "stations updated" notice — likewise hosted at the app root (by
   // StationsUpdatedHost) so it outlives the sheet that opened it.
@@ -367,9 +355,6 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
-      reminderDialogOpen,
-      openReminderDialog,
-      closeReminderDialog,
       stationsUpdatedOpen,
       openStationsUpdated,
       closeStationsUpdated,
@@ -392,9 +377,6 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       swapStations,
       setScheduleType,
       setSelectedTrip,
-      reminderDialogOpen,
-      openReminderDialog,
-      closeReminderDialog,
       stationsUpdatedOpen,
       openStationsUpdated,
       closeStationsUpdated,

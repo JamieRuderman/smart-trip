@@ -29,6 +29,7 @@ import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { ScheduleDaySwitchPrompt } from "./ScheduleDaySwitchPrompt";
 import { getDevFixture } from "@/lib/devFixtures";
+import { useOpenTripView } from "@/hooks/useTripViewNavigation";
 
 export function TrainScheduleApp() {
   const { version: scheduleDataVersion } = useScheduleData();
@@ -46,7 +47,6 @@ export function TrainScheduleApp() {
     toStation,
     viaFerry,
     scheduleType,
-    selectedTripNumber,
     setFromStation,
     setToStation,
     setScheduleType,
@@ -56,6 +56,7 @@ export function TrainScheduleApp() {
   } = useStationSelection();
 
   const currentTime = useMinuteClock();
+  const openTripView = useOpenTripView();
 
   const [showAllTrips, setShowAllTrips] = useState(false);
   const toggleShowAllTrips = useCallback(() => {
@@ -170,6 +171,14 @@ export function TrainScheduleApp() {
       ? focusedTrip.tripNumber
       : null;
 
+  const openTrip = useCallback(
+    (tripNumber: number) => {
+      setSelectedTrip(tripNumber === focusedTripNumber ? null : tripNumber);
+      openTripView();
+    },
+    [focusedTripNumber, openTripView, setSelectedTrip],
+  );
+
   return (
     <div
       className="min-h-[100dvh] bg-card md:bg-background relative"
@@ -220,8 +229,7 @@ export function TrainScheduleApp() {
             timeFormat="12h"
             scheduleType={scheduleType}
             onScheduleTypeChange={setScheduleType}
-            selectedTripNumber={selectedTripNumber}
-            onSelectTrip={setSelectedTrip}
+            onSelectTrip={openTrip}
             focusedTripNumber={focusedTripNumber}
           />
         )}

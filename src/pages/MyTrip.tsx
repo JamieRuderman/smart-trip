@@ -1,9 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { Calendar, ChevronLeft, Clock, MapPin, Ticket } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Calendar, ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useStationSelection } from "@/contexts/stationSelection";
-import { focusedPlaces } from "@/lib/focusedTrip";
+import {
+  focusedPlaces,
+  sameFocusIdentity,
+  type FocusedTrip,
+} from "@/lib/focusedTrip";
+import { futureServiceDate, getFilteredTrips } from "@/lib/scheduleUtils";
+import { buildDepartureTimestamp, toLocalDateKey } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { MyTripState } from "@/hooks/useMyTrip";
@@ -13,7 +19,8 @@ import {
   AlarmStatusLabel,
 } from "@/components/AlarmStatusLabel";
 import { FerryLeg } from "@/components/FerryLeg";
-import { FocusedTripReminderRow } from "@/components/FocusedTripReminderRow";
+import { DepartureReminder } from "@/components/DepartureReminder";
+import { ReminderControl } from "@/components/ReminderControl";
 import { LiveTimePair } from "@/components/LiveTimePair";
 import { MyTripGate } from "@/components/MyTripGate";
 import { QuickConnectionWarning } from "@/components/QuickConnectionWarning";
@@ -24,8 +31,10 @@ import { TripPositionCard } from "@/components/TripPositionCard";
 const TIME_FORMAT = "12h" as const;
 
 /**
- * Full-page "My Trip" view of the focused ("Take this train") trip — the
- * riding screen. The coloured band up top carries the train, its live times and
+ * Full-page trip view. Tapping a schedule row opens it for that train in green,
+ * with "Take this train"; taking it turns the same page into My Trip (blue).
+ *
+ * As My Trip it's the focused ("Take this train") trip — the riding screen. The coloured band up top carries the train, its live times and
  * the leave → departs → arrives headline (plus the reminder control); below it,
  * where the train is right now, the trip facts and every stop on the leg.
  *
@@ -35,9 +44,15 @@ const TIME_FORMAT = "12h" as const;
  * (Cancel, or the auto-clear shortly after arrival).
  */
 export default function MyTrip() {
-  const { focusedTrip } = useStationSelection();
+  const { focusedTrip, setSelectedTrip } = useStationSelection();
   const leaveTripView = useLeaveTripView();
   const currentTime = useMinuteClock();
+  const previewRun = usePreviewRun(currentTime);
+  const isPreview =
+    previewRun != null && !sameFocusIdentity(focusedTrip, previewRun);
+  const shown = isPreview ? previewRun : focusedTrip;
+
+  useEffect(() => () => setSelectedTrip(null), [setSelectedTrip]);
 
   // Open at the top — an in-app navigation otherwise keeps the scroll offset
   // of the page we came from (e.g. a trip card far down the schedule).
@@ -47,17 +62,53 @@ export default function MyTrip() {
 
   const leftRef = useRef(false);
   useEffect(() => {
-    if (focusedTrip || leftRef.current) return;
+    if (shown || leftRef.current) return;
     leftRef.current = true;
     leaveTripView();
-  }, [focusedTrip, leaveTripView]);
+  }, [shown, leaveTripView]);
 
-  if (!focusedTrip) return null;
+  if (!shown) return null;
   return (
-    <MyTripGate focusedTrip={focusedTrip} currentTime={currentTime}>
+    <MyTripGate
+      focusedTrip={shown}
+      currentTime={currentTime}
+      isPreview={isPreview}
+    >
       {(state) => <MyTripView state={state} onBack={leaveTripView} />}
     </MyTripGate>
   );
+}
+
+/** The selected schedule row as an unsaved run, for the green preview. */
+function usePreviewRun(currentTime: Date): FocusedTrip | null {
+  const { selectedTripNumber, fromStation, toStation, viaFerry, scheduleType } =
+    useStationSelection();
+  const serviceDay = futureServiceDate(currentTime, scheduleType);
+  const today = toLocalDateKey(currentTime);
+  return useMemo(() => {
+    if (selectedTripNumber == null || !fromStation || !toStation) return null;
+    const trip = getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).find(
+      (candidate) => candidate.trip === selectedTripNumber,
+    );
+    if (!trip) return null;
+    const serviceDate =
+      serviceDay ??
+      toLocalDateKey(
+        new Date(buildDepartureTimestamp(new Date(), trip.departureTime)),
+      );
+    return {
+      source: "user",
+      tripNumber: trip.trip,
+      fromStation,
+      toStation,
+      ...(viaFerry ? { viaFerry: true as const } : {}),
+      scheduleType,
+      serviceDate,
+      reminder: null,
+    };
+    // `today` re-derives the service date across midnight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTripNumber, fromStation, toStation, viaFerry, scheduleType, serviceDay, today]);
 }
 
 function MyTripView({
@@ -71,6 +122,7 @@ function MyTripView({
   const { clearFocusedTrip } = useStationSelection();
   const {
     focusedTrip,
+    isPreview,
     trip,
     live,
     isFutureService,
@@ -104,7 +156,9 @@ function MyTripView({
             <ChevronLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
-            {t("focusedTrip.myTrip")}
+            {isPreview
+              ? t("myTrip.trainNumber", { trip: trip.trip })
+              : t("focusedTrip.myTrip")}
           </h1>
           <ShareTripButton
             trip={trip}
@@ -183,15 +237,38 @@ function MyTripView({
             )}
           </div>
 
-          {/* Reminder control — renders nothing when none applies. */}
-          <div className="mt-2 empty:hidden">
-            <FocusedTripReminderRow
-              focusedTrip={focusedTrip}
-              minutesUntil={model.minutesUntil}
-              isCanceledOrSkipped={model.isCanceledOrSkipped}
-              isFutureService={isFutureService}
-              timeFormat={TIME_FORMAT}
-            />
+          <div className="mt-3 empty:hidden">
+            {isPreview ? (
+              <DepartureReminder
+                tripNumber={trip.trip}
+                fromStation={fromStation}
+                toStation={toStation}
+                viaFerry={trip.inboundFerry != null || trip.outboundFerry != null}
+                departureTime={trip.departureTime}
+                liveDepartureTime={live?.liveDepartureTime ?? null}
+                arrivalTime={trip.arrivalTime}
+                realtimeArrivalTime={live?.liveArrivalTime ?? null}
+                liveStopDepartures={live?.allStopLiveDepartures}
+                currentTime={clockTime}
+                timeFormat={TIME_FORMAT}
+                scheduleType={focusedTrip.scheduleType}
+                isFocused={false}
+                sheetOpen
+                onClose={onBack}
+                variant="page"
+              />
+            ) : (
+              <ReminderControl
+                focusedTrip={focusedTrip}
+                trip={trip}
+                live={live}
+                minutesUntil={model.minutesUntil}
+                isCanceledOrSkipped={model.isCanceledOrSkipped}
+                isFutureService={isFutureService}
+                currentTime={clockTime}
+                timeFormat={TIME_FORMAT}
+              />
+            )}
           </div>
         </div>
       </header>
@@ -212,35 +289,6 @@ function MyTripView({
           />
         )}
 
-        {/* Trip facts */}
-        <SectionCard
-          className={cn(
-            "grid divide-x divide-border p-0",
-            model.fareInfo ? "grid-cols-3" : "grid-cols-2",
-          )}
-        >
-          <TripFact
-            icon={<Clock className="h-4 w-4" aria-hidden="true" />}
-            label={t("myTrip.duration")}
-            value={model.tripDurationLabel}
-          />
-          <TripFact
-            icon={<MapPin className="h-4 w-4" aria-hidden="true" />}
-            label={t("myTrip.stops")}
-            value={model.stopsLabel}
-          />
-          {model.fareInfo && (
-            <TripFact
-              icon={<Ticket className="h-4 w-4" aria-hidden="true" />}
-              label={t("myTrip.fare")}
-              value={
-                model.fareInfo.price > 0
-                  ? `$${model.fareInfo.price.toFixed(2)}`
-                  : t("common.free")
-              }
-            />
-          )}
-        </SectionCard>
 
         {trip.inboundFerry && (
           <SectionCard className="p-4 md:p-5">
@@ -259,9 +307,23 @@ function MyTripView({
 
         {/* Every stop on the leg, with the train's current stop highlighted. */}
         <SectionCard className="p-4 md:p-5">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t("myTrip.stops")}
-          </h2>
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("myTrip.stops")}
+            </h2>
+            <p className="truncate text-sm font-medium text-muted-foreground">
+              {[
+                model.stopsLabel,
+                model.tripDurationLabel,
+                model.fareInfo &&
+                  (model.fareInfo.price > 0
+                    ? `$${model.fareInfo.price.toFixed(2)}`
+                    : t("common.free")),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
           <StopTimeline
             trip={trip}
             fromStation={fromStation}
@@ -271,7 +333,7 @@ function MyTripView({
             isEnded={progress.isEnded}
             atDestination={model.isAtDestination}
             stopInference={progress.stopInference}
-            isFocused
+            isFocused={!isPreview}
           />
         </SectionCard>
 
@@ -289,13 +351,15 @@ function MyTripView({
           </SectionCard>
         )}
 
-        <button
-          type="button"
-          onClick={() => void clearFocusedTrip()}
-          className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
-        >
-          {t("myTrip.cancelTrip")}
-        </button>
+        {!isPreview && (
+          <button
+            type="button"
+            onClick={() => void clearFocusedTrip()}
+            className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
+          >
+            {t("myTrip.stopTracking")}
+          </button>
+        )}
 
         <div className="h-4" aria-hidden="true" />
       </main>
@@ -303,22 +367,3 @@ function MyTripView({
   );
 }
 
-function TripFact({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0 px-3 py-3 text-center">
-      <p className="flex items-center justify-center gap-1 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
-      </p>
-      <p className="mt-1 truncate text-sm font-semibold">{value}</p>
-    </div>
-  );
-}

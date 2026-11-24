@@ -32,8 +32,7 @@ interface ScheduleResultsProps {
    *  row's trip sheet so the reminder/focus control uses it instead of today. */
   scheduleType: "weekday" | "weekend";
   onScheduleTypeChange: (type: "weekday" | "weekend") => void;
-  selectedTripNumber: number | null;
-  onSelectTrip: (tripNumber: number | null) => void;
+  onSelectTrip: (tripNumber: number) => void;
   /** The user's focused ("Go") trip number when it belongs to the displayed
    *  leg — that row is highlighted blue (the trip bar also links to it; we
    *  intentionally keep it in the list rather than hiding it). */
@@ -50,7 +49,6 @@ export function ScheduleResults({
   timeFormat,
   scheduleType,
   onScheduleTypeChange,
-  selectedTripNumber,
   onSelectTrip,
   focusedTripNumber = null,
 }: ScheduleResultsProps) {
@@ -97,15 +95,7 @@ export function ScheduleResults({
 
   const displayedTrips = filteredTrips.slice(sliceStart);
 
-  const visibleTrips =
-    selectedTripNumber != null &&
-    !showAllTrips &&
-    !displayedTrips.some((trip) => trip.trip === selectedTripNumber)
-      ? filteredTrips.filter(
-          (trip) =>
-            trip.trip === selectedTripNumber || displayedTrips.includes(trip),
-        )
-      : displayedTrips;
+  const visibleTrips = displayedTrips;
 
   // The "Next" row: the not-yet-departed trip with the EARLIEST live-aware
   // departure — not simply the first in schedule order, because a delayed
@@ -186,12 +176,10 @@ export function ScheduleResults({
                 isFocused={isFocused}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
-                lastUpdated={lastUpdated}
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}
                 scheduleType={scheduleType}
-                selectedTripNumber={selectedTripNumber}
                 onSelectTrip={onSelectTrip}
               />
             );

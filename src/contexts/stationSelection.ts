@@ -33,9 +33,6 @@ export interface StationSelection {
   /** Whether the lead-time reminder modal is open. Lifted to context so the
    *  in-sheet "Take this train" control can pop it after closing its own sheet,
    *  and so the modal survives that sheet unmounting. */
-  reminderDialogOpen: boolean;
-  openReminderDialog: () => void;
-  closeReminderDialog: () => void;
   /** Whether the "stations updated, pick a time" notice is open — at the app
    *  root, like the reminder modal, so it outlives the trip sheet whose
    *  location fix switched the stations. */

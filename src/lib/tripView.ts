@@ -8,21 +8,21 @@ import {
 export const TRIP_VIEW_PATH = "/trip";
 
 /**
- * Whether a launch should open straight into the My Trip view instead of the
- * schedule: the user has a focused trip running today, and the launch isn't a
- * link to something else (a shared `?trip=` sheet, a dev fixture). A focus on a
- * later day (e.g. Saturday's train picked on Thursday) stays on the schedule,
- * where the in-progress bar still links to it.
+ * Whether a launch should open straight into the trip view instead of the
+ * schedule: a link to one train (`?trip=`), or a focused trip running today
+ * when the launch isn't a dev fixture. A focus on a later day (e.g. Saturday's
+ * train picked on Thursday) stays on the schedule, where the in-progress bar
+ * still links to it.
  */
 export function shouldOpenTripViewOnLaunch(
   focused: FocusedTrip | null,
   search: string,
   now: Date,
 ): boolean {
-  if (!focused) return false;
-  if (!isFocusedTripToday(focused, now)) return false;
   const params = new URLSearchParams(search);
-  return !params.has("trip") && !params.has("devTrip");
+  if (params.has("devTrip")) return false;
+  if (params.has("trip")) return true;
+  return focused != null && isFocusedTripToday(focused, now);
 }
 
 let launchedIntoTripView = false;

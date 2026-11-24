@@ -25,11 +25,10 @@ import {
   type FocusedRun,
 } from "@/lib/focusedTrip";
 import { SAN_FRANCISCO, legPlaces } from "@/lib/places";
-import { canOfferReminder } from "@/lib/reminderLead";
 import { buildReminderText } from "@/lib/reminderText";
 import {
+  buildDepartureTimestamp,
   parseServiceDate,
-  parseTimeToMinutes,
   toLocalDateKey,
 } from "@/lib/timeUtils";
 import type { Station } from "@/types/smartSchedule";
@@ -78,6 +77,9 @@ interface DepartureReminderProps {
   /** Close the detail sheet this control sits in. The sheet's own close —
    *  the line map's sheets aren't driven by the selected trip. */
   onClose: () => void;
+  /** "page": the control sits on the trip page's colored band, which turns
+   *  into My Trip in place once the train is taken. */
+  variant?: "sheet" | "page";
 }
 
 /** A run to take as the rider's trip, leaving its boarding station at
@@ -85,31 +87,9 @@ interface DepartureReminderProps {
  *  to along with it. */
 interface Take {
   run: FocusedRun;
-  departureAt: number;
   leg?: Leg;
 }
 
-/** Hours of past-ness before we assume a HH:MM refers to tomorrow's run. */
-const NEXT_DAY_ROLLOVER_HOURS = 4;
-
-/**
- * Build an epoch timestamp for a train's HH:MM departure. If the HH:MM lies
- * many hours in the past, assume it refers to the next day's run (e.g. a
- * 00:15 train viewed at 23:55). Within a few hours of now, treat it as
- * today so a just-departed train is correctly flagged as in the past rather
- * than silently treated as tomorrow's same trip.
- */
-function buildDepartureTimestamp(currentTime: Date, hhmm: string): number {
-  const minutes = parseTimeToMinutes(hhmm);
-  const d = new Date(currentTime);
-  d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-  const rolloverCutoff =
-    currentTime.getTime() - NEXT_DAY_ROLLOVER_HOURS * 60 * 60 * 1000;
-  if (d.getTime() < rolloverCutoff) {
-    d.setDate(d.getDate() + 1);
-  }
-  return d.getTime();
-}
 
 
 export function DepartureReminder({
@@ -128,6 +108,7 @@ export function DepartureReminder({
   isFocused,
   sheetOpen,
   onClose,
+  variant = "sheet",
 }: DepartureReminderProps) {
   const { t, i18n } = useTranslation();
   const openTripView = useOpenTripView();
@@ -176,7 +157,6 @@ export function DepartureReminder({
     setSelectedTrip,
     setFromStation,
     setToStation,
-    openReminderDialog,
     openStationsUpdated,
   } = useStationSelection();
 
@@ -324,27 +304,18 @@ export function DepartureReminder({
     focusRun.serviceDate.replace(/-/g, ""),
   );
 
-  // Close the detail sheet we're inside and land on the full-page My Trip
-  // view.
+  // Land on the full-page My Trip view: from a sheet, close it and navigate;
+  // on the trip page, dropping the previewed train turns it into My Trip.
   const openMyTrip = () => {
     setSelectedTrip(null);
-    openTripView();
+    if (variant === "sheet") openTripView();
   };
 
-  // Focus `run` (leaving at `runDepartureAt`) as the rider's trip.
-  const focusAndOpen = (run: FocusedRun, runDepartureAt: number) => {
-    // focusTrip commits the new focus synchronously, so My Trip renders the
-    // new trip, not the previous one.
+  // Focus `run` as the rider's trip. focusTrip commits the new focus
+  // synchronously, so My Trip renders the new trip, not the previous one.
+  const focusAndOpen = (run: FocusedRun) => {
     void focusTrip(run);
     openMyTrip();
-    // Then pop the reminder modal (hosted at the app root, so it survives this
-    // sheet unmounting and the route change). Skip where notifications aren't
-    // supported, or when there's too little lead left to schedule a useful
-    // reminder — there's nothing worth configuring in either case. Focusing
-    // itself is still allowed right up to arrival.
-    if (canOfferReminder(runDepartureAt, currentTime.getTime())) {
-      openReminderDialog();
-    }
   };
 
   const switchStations = ({ from, to }: Leg) => {
@@ -354,9 +325,9 @@ export function DepartureReminder({
   };
 
   // Commit to `next`: switch to its stations, if any, then focus it.
-  const commit = ({ run, departureAt, leg }: Take) => {
+  const commit = ({ run, leg }: Take) => {
     if (leg) switchStations(leg);
-    focusAndOpen(run, departureAt);
+    focusAndOpen(run);
   };
 
   // Take `next` as the rider's trip. Already their trip → just open My Trip
@@ -372,11 +343,9 @@ export function DepartureReminder({
     else commit(next);
   };
 
-  // "Take this train". Gates the reminder modal on the departure of the run
-  // being focused (its boarding station), the same instant the modal itself
-  // counts down to.
+  // "Take this train".
   const proceedWithGo = () =>
-    take({ run: focusRun, departureAt: focusRunDepartureAt ?? departureAt });
+    take({ run: focusRun });
 
   // "Swap stations" / "Leave from …" on the location warning: take the
   // matching train on the corrected leg (the same one when it serves it, else
@@ -499,13 +468,18 @@ export function DepartureReminder({
   // re-focus a train shortly before departure (e.g. after tapping Stop).
   if (arrivalAt <= Date.now()) return null;
   const goLabel = t(focusRun.viaFerry ? "focusedTrip.goViaFerry" : "focusedTrip.go");
+  const Wrapper = variant === "page" ? "div" : GutterRow;
   return (
-    <GutterRow>
+    <Wrapper>
       <Button
         onClick={() => void boardingCheck.guard(proceedWithGo)}
         aria-label={goLabel}
         aria-busy={boardingCheck.checking}
-        className="flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-[hsl(220_13%_18%)] text-white shadow-sm hover:bg-[hsl(220_13%_18%)]/90 active:bg-[hsl(220_13%_18%)]/90"
+        className={
+          variant === "page"
+            ? "w-full h-12 gap-2 rounded-xl text-base font-semibold bg-white text-smart-train-green shadow-sm hover:bg-white/90 active:bg-white/90"
+            : "flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-[hsl(220_13%_18%)] text-white shadow-sm hover:bg-[hsl(220_13%_18%)]/90 active:bg-[hsl(220_13%_18%)]/90"
+        }
       >
         {boardingCheck.checking ? (
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -528,6 +502,6 @@ export function DepartureReminder({
           onCancel={boardingCheck.dismiss}
         />
       )}
-    </GutterRow>
+    </Wrapper>
   );
 }

@@ -12,7 +12,6 @@ import { bootFocusedTrip, FOCUSED_TRIP_CHANGED_EVENT } from "@/lib/focusedTrip";
 import { reconcileTripActivities } from "@/lib/liveActivityController";
 import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
-import { ReminderDialogHost } from "@/components/ReminderDialogHost";
 import { StationsUpdatedHost } from "@/components/StationsUpdatedNotice";
 import { ReminderDriftSync } from "@/components/ReminderDriftSync";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
@@ -74,10 +73,6 @@ const RoutedApp = () => {
             after (live-aware) arrival — the My Trip view exists on
             web/Android too, where LiveActivitySync doesn't run. */}
         <FocusedTripAutoClear />
-        {/* App-level reminder modal host — lives here (like LiveActivitySync)
-            so "Take this train" can pop it from any surface and it survives
-            the triggering sheet/route change. */}
-        <ReminderDialogHost />
         {/* Likewise for the location fix's "stations updated" notice. */}
         <StationsUpdatedHost />
         {/* Keeps an armed leave-reminder's fire time tracking live departure

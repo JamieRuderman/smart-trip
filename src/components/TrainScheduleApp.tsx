@@ -58,6 +58,10 @@ export function TrainScheduleApp() {
   const currentTime = useMinuteClock();
   const openTripView = useOpenTripView();
 
+  // The previewed train lives until the rider is back on the schedule, so a
+  // trip page reached again through history still shows it.
+  useEffect(() => setPreviewTrip(null), [setPreviewTrip]);
+
   const [showAllTrips, setShowAllTrips] = useState(false);
   const toggleShowAllTrips = useCallback(() => {
     setShowAllTrips((prev) => !prev);

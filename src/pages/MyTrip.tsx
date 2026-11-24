@@ -48,15 +48,13 @@ const TIME_FORMAT = "12h" as const;
  * auto-clear shortly after arrival).
  */
 export default function MyTrip() {
-  const { focusedTrip, setPreviewTrip } = useStationSelection();
+  const { focusedTrip } = useStationSelection();
   const leaveTripView = useLeaveTripView();
   const currentTime = useMinuteClock();
   const previewRun = usePreviewRun(currentTime);
   const isPreview =
     previewRun != null && !sameFocusIdentity(focusedTrip, previewRun);
   const shown = isPreview ? previewRun : focusedTrip;
-
-  useEffect(() => () => setPreviewTrip(null), [setPreviewTrip]);
 
   // Open at the top — an in-app navigation otherwise keeps the scroll offset
   // of the page we came from (e.g. a trip card far down the schedule).

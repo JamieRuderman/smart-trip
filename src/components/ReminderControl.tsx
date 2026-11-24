@@ -141,6 +141,8 @@ export function ReminderControl({
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
             className="w-20"
+            rowHeight={26}
+            height={44}
           />
         ) : (
           <span className="text-sm font-semibold tabular-nums">{minutes(lead)}</span>

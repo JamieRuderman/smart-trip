@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 
-const ROW_PX = 30;
 const SETTLE_MS = 120;
 
 interface WheelPickerProps {
@@ -14,6 +13,10 @@ interface WheelPickerProps {
   ariaLabel: string;
   ariaValueText?: string;
   className?: string;
+  /** Height of one row. */
+  rowHeight?: number;
+  /** Visible height; the rows above and below the value show in what's left. */
+  height?: number;
 }
 
 /**
@@ -30,22 +33,25 @@ export function WheelPicker({
   ariaLabel,
   ariaValueText,
   className,
+  rowHeight = 30,
+  height = rowHeight * 3,
 }: WheelPickerProps) {
+  const spacer = (height - rowHeight) / 2;
   const ref = useRef<HTMLDivElement>(null);
   const settleTimer = useRef<number | null>(null);
   const clamped = Math.min(max, Math.max(min, value));
   const [centered, setCentered] = useState(clamped);
 
   const indexAt = (el: HTMLDivElement) =>
-    Math.min(max - min, Math.max(0, Math.round(el.scrollTop / ROW_PX)));
+    Math.min(max - min, Math.max(0, Math.round(el.scrollTop / rowHeight)));
 
   useEffect(() => {
     const el = ref.current;
     if (!el || settleTimer.current != null) return;
-    if (indexAt(el) !== clamped - min) el.scrollTop = (clamped - min) * ROW_PX;
+    if (indexAt(el) !== clamped - min) el.scrollTop = (clamped - min) * rowHeight;
     setCentered(clamped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clamped, min, max]);
+  }, [clamped, min, max, rowHeight]);
 
   useEffect(
     () => () => {
@@ -69,11 +75,11 @@ export function WheelPicker({
   const scrollToValue = useCallback(
     (next: number) => {
       ref.current?.scrollTo({
-        top: (Math.min(max, Math.max(min, next)) - min) * ROW_PX,
+        top: (Math.min(max, Math.max(min, next)) - min) * rowHeight,
         behavior: "smooth",
       });
     },
-    [min, max],
+    [min, max, rowHeight],
   );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -87,10 +93,10 @@ export function WheelPicker({
   const values = [...Array(max - min + 1).keys()].map((i) => min + i);
 
   return (
-    <div className={cn("relative shrink-0", className)} style={{ height: ROW_PX * 3 }}>
+    <div className={cn("relative shrink-0", className)} style={{ height: height }}>
       <div
         className="pointer-events-none absolute inset-x-0 rounded-md bg-white/20"
-        style={{ top: ROW_PX, height: ROW_PX }}
+        style={{ top: spacer, height: rowHeight }}
         aria-hidden="true"
       />
       <div
@@ -112,7 +118,7 @@ export function WheelPicker({
             "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
         }}
       >
-        <div style={{ height: ROW_PX }} aria-hidden="true" />
+        <div style={{ height: spacer }} aria-hidden="true" />
         {values.map((v) => (
           <div
             key={v}
@@ -123,13 +129,13 @@ export function WheelPicker({
                 ? "text-base font-semibold"
                 : "cursor-pointer text-sm opacity-60",
             )}
-            style={{ height: ROW_PX }}
+            style={{ height: rowHeight }}
             aria-hidden="true"
           >
             {format(v)}
           </div>
         ))}
-        <div style={{ height: ROW_PX }} aria-hidden="true" />
+        <div style={{ height: spacer }} aria-hidden="true" />
       </div>
     </div>
   );

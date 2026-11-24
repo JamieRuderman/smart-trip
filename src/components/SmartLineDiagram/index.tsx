@@ -83,7 +83,7 @@ export interface SmartLineDiagramProps {
 // small fit scales they occupy more viewBox units and reach ~y1464, hence the
 // bottom sits at 1470 (≈30 units below) while the top sits ~30 units above
 // the content, keeping the two margins close across viewports.
-const VIEW_BOX = { x: -50, y: 20, width: 900, height: 1450 } as const;
+const VIEW_BOX = { x: 110, y: 20, width: 770, height: 1450 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────
 

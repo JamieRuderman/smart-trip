@@ -301,7 +301,7 @@
     "arrivedAt": "Arrived at {{station}}",
     "viewOnLineMap": "See it on the live line map",
     "stops": "Stops",
-    "stopTracking": "Stop tracking"
+    "stopTracking": "End trip"
   },
   "boardingCheck": {
     "reversedTitle": "Heading the other way?",

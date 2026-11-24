@@ -301,7 +301,7 @@
     "arrivedAt": "Llegaste a {{station}}",
     "viewOnLineMap": "Verlo en el mapa de la línea en vivo",
     "stops": "Paradas",
-    "stopTracking": "Dejar de seguir"
+    "stopTracking": "Terminar viaje"
   },
   "boardingCheck": {
     "reversedTitle": "¿Vas en sentido contrario?",

@@ -4,11 +4,11 @@ import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { logger } from "@/lib/logger";
 
 export interface UserPreferences {
-  selectedFareType: FareType | "none";
+  selectedFareType: FareType;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  selectedFareType: "none",
+  selectedFareType: "adult",
 };
 
 const STORAGE_KEY = APP_CONSTANTS.PREFERENCES_STORAGE_KEY;
@@ -25,8 +25,11 @@ export function useUserPreferences() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as Partial<UserPreferences>;
-        setPreferences((prev) => ({ ...prev, ...parsed }));
+        const parsed = JSON.parse(stored) as { selectedFareType?: string };
+        // "none" was stored by the old "Show all fares" button.
+        if (parsed.selectedFareType && parsed.selectedFareType !== "none") {
+          setPreferences({ selectedFareType: parsed.selectedFareType as FareType });
+        }
       }
     } catch (error) {
       logger.warn("Failed to load user preferences", error);
@@ -49,7 +52,7 @@ export function useUserPreferences() {
 
   // Update selected fare type
   const updateSelectedFareType = useCallback(
-    (fareType: FareType | "none") => {
+    (fareType: FareType) => {
       savePreferences({
         selectedFareType: fareType,
       });

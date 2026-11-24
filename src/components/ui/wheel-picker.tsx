@@ -133,9 +133,9 @@ export function WheelPicker({
           className="relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-white [&::-webkit-scrollbar]:hidden"
           style={{
             maskImage:
-              "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
+              "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
             WebkitMaskImage:
-              "linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)",
+              "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
           }}
         >
           <div style={{ height: spacer }} aria-hidden="true" />

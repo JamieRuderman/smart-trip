@@ -141,7 +141,7 @@ export function ReminderControl({
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
             className="w-[6.5rem]"
-            rowHeight={17}
+            rowHeight={20}
             height={44}
             stepLabels={{
               previous: t("departureReminder.lessLead"),

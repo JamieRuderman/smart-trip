@@ -51,7 +51,7 @@ export function TrainScheduleApp() {
     setToStation,
     setScheduleType,
     swapStations,
-    setSelectedTrip,
+    setPreviewTrip,
     focusedTrip,
   } = useStationSelection();
 
@@ -173,10 +173,14 @@ export function TrainScheduleApp() {
 
   const openTrip = useCallback(
     (tripNumber: number) => {
-      setSelectedTrip(tripNumber === focusedTripNumber ? null : tripNumber);
+      setPreviewTrip(
+        tripNumber === focusedTripNumber || !fromPlace || !toPlace
+          ? null
+          : { tripNumber, from: fromPlace, to: toPlace, scheduleType },
+      );
       openTripView();
     },
-    [focusedTripNumber, openTripView, setSelectedTrip],
+    [focusedTripNumber, fromPlace, toPlace, scheduleType, openTripView, setPreviewTrip],
   );
 
   return (

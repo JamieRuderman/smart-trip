@@ -21,6 +21,7 @@ import {
 } from "@/lib/focusedTrip";
 import {
   StationSelectionContext,
+  type PreviewTrip,
   type StationSelection,
 } from "./stationSelection";
 
@@ -30,7 +31,6 @@ interface PersistedState {
   fromStation: Place;
   toStation: Place;
   scheduleType: "weekday" | "weekend";
-  tripNumber: number | null;
   savedAt: number;
 }
 
@@ -69,14 +69,12 @@ function savePersistedState(
   fromStation: Place,
   toStation: Place,
   scheduleType: "weekday" | "weekend",
-  tripNumber: number | null,
 ): void {
   try {
     const data: PersistedState = {
       fromStation,
       toStation,
       scheduleType,
-      tripNumber,
       savedAt: Date.now(),
     };
     localStorage.setItem(
@@ -93,7 +91,7 @@ function sameStation(a: Place | "", b: Place | ""): boolean {
 }
 
 /** Params owned by this context — all others are preserved verbatim. */
-const MANAGED_PARAMS = new Set(["from", "to", "trip", "type"]);
+const MANAGED_PARAMS = new Set(["from", "to", "trip", "type", "tripFrom", "tripTo"]);
 
 const todayScheduleType = (): "weekday" | "weekend" =>
   getTodayScheduleType();
@@ -103,7 +101,7 @@ interface ProviderState {
   toPlace: Place | "";
   scheduleType: "weekday" | "weekend";
   scheduleCheckedOn: string;
-  selectedTripNumber: number | null;
+  previewTrip: PreviewTrip | null;
 }
 
 export function StationSelectionProvider({ children }: { children: ReactNode }) {
@@ -112,20 +110,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
   const isTripPreview = isSharedTripPath(location.pathname);
   const searchParams = isTripPreview ? new URLSearchParams() : urlParams;
 
-  // Detect shared-link mode on init: URL has both ?trip=N and ?type=T.
-  // In shared mode we honour the URL type so the recipient sees the same
-  // schedule as the sender, even if it doesn't match their current day.
-  // When the user closes the shared trip, we revert to today's type.
+  // A linked train (?trip=N, with its schedule in ?type and, when they differ
+  // from the selected leg, its own ends in ?tripFrom / ?tripTo).
   const initialUrlTrip = searchParams.get("trip");
   const initialUrlTripNumber =
     initialUrlTrip !== null ? parseInt(initialUrlTrip, 10) : NaN;
-  const initialUrlType = searchParams.get("type") as
-    | "weekday"
-    | "weekend"
-    | null;
-  const isSharedLinkOnMount =
-    !isNaN(initialUrlTripNumber) && initialUrlType !== null;
-  const isSharedLinkRef = useRef(isSharedLinkOnMount);
+  const initialUrlType = searchParams.get("type");
 
   const [state, setState] = useState<ProviderState>(() => {
     // Source precedence for the selected leg: URL params (shared/bookmarked
@@ -136,30 +126,40 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     const persisted = loadPersistedState();
     const focusedOnMount = loadFocusedTrip();
     const focusedOnMountPlaces = focusedOnMount ? focusedPlaces(focusedOnMount) : null;
+    const fromPlace: Place | "" =
+      (searchParams.get("from") as Place) ||
+      (persisted ? persisted.fromStation : "") ||
+      (focusedOnMountPlaces ? focusedOnMountPlaces.from : "");
+    const toPlace: Place | "" =
+      (searchParams.get("to") as Place) ||
+      (persisted ? persisted.toStation : "") ||
+      (focusedOnMountPlaces ? focusedOnMountPlaces.to : "");
+    const previewFrom = (searchParams.get("tripFrom") as Place) || fromPlace;
+    const previewTo = (searchParams.get("tripTo") as Place) || toPlace;
     return {
-      fromPlace:
-        (searchParams.get("from") as Place) ||
-        (persisted ? persisted.fromStation : "") ||
-        (focusedOnMountPlaces ? focusedOnMountPlaces.from : ""),
-      toPlace:
-        (searchParams.get("to") as Place) ||
-        (persisted ? persisted.toStation : "") ||
-        (focusedOnMountPlaces ? focusedOnMountPlaces.to : ""),
+      fromPlace,
+      toPlace,
       // Schedule type is derived from the calendar day, never restored from
       // persistence: a leg saved on a weekday must not force the weekday
       // schedule when reopened on a weekend (and vice-versa). Restoring it
       // desynced the schedule list from "today", which — because train numbers
       // repeat across weekday/weekend — made the focused trip reconstruct a
-      // different run than the one shown in the list. Shared links still honor
-      // their explicit ?type so the recipient sees the sender's day.
-      scheduleType:
-        isSharedLinkOnMount && initialUrlType
-          ? initialUrlType
-          : todayScheduleType(),
+      // different run than the one shown in the list. A linked train carries
+      // its own schedule type in previewTrip instead.
+      scheduleType: todayScheduleType(),
       scheduleCheckedOn: toLocalDateKey(new Date()),
-      selectedTripNumber: !isNaN(initialUrlTripNumber)
-        ? initialUrlTripNumber
-        : null,
+      previewTrip:
+        !isNaN(initialUrlTripNumber) && previewFrom && previewTo
+          ? {
+              tripNumber: initialUrlTripNumber,
+              from: previewFrom,
+              to: previewTo,
+              scheduleType:
+                initialUrlType === "weekday" || initialUrlType === "weekend"
+                  ? initialUrlType
+                  : todayScheduleType(),
+            }
+          : null,
     };
   });
 
@@ -186,16 +186,18 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     });
     if (state.fromPlace) params.from = state.fromPlace;
     if (state.toPlace) params.to = state.toPlace;
-    if (state.selectedTripNumber != null) {
-      params.trip = String(state.selectedTripNumber);
-      params.type = state.scheduleType;
+    const preview = state.previewTrip;
+    if (preview) {
+      params.trip = String(preview.tripNumber);
+      params.type = preview.scheduleType;
+      if (preview.from !== state.fromPlace) params.tripFrom = preview.from;
+      if (preview.to !== state.toPlace) params.tripTo = preview.to;
     }
     setSearchParams(params, { replace: true });
   }, [
     state.fromPlace,
     state.toPlace,
-    state.selectedTripNumber,
-    state.scheduleType,
+    state.previewTrip,
     location.pathname,
     isTripPreview,
     setSearchParams,
@@ -211,18 +213,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       return;
     }
     if (!state.fromPlace || !state.toPlace) return;
-    savePersistedState(
-      state.fromPlace,
-      state.toPlace,
-      state.scheduleType,
-      state.selectedTripNumber,
-    );
-  }, [
-    state.fromPlace,
-    state.toPlace,
-    state.scheduleType,
-    state.selectedTripNumber,
-  ]);
+    savePersistedState(state.fromPlace, state.toPlace, state.scheduleType);
+  }, [state.fromPlace, state.toPlace, state.scheduleType]);
 
   // Setters. When one end is set to a place on the same station as the other
   // (San Francisco shares Larkspur's), drop the other so we never produce a
@@ -266,23 +258,8 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
     );
   }, []);
 
-  const setSelectedTrip = useCallback((tripNumber: number | null) => {
-    setState((prev) => {
-      // When closing a shared-link trip, exit shared mode by reverting
-      // scheduleType to today's auto-detected value.
-      const exitingSharedLink = tripNumber === null && isSharedLinkRef.current;
-      if (exitingSharedLink) isSharedLinkRef.current = false;
-      return {
-        ...prev,
-        selectedTripNumber: tripNumber,
-        ...(exitingSharedLink
-          ? {
-              scheduleType: todayScheduleType(),
-              scheduleCheckedOn: toLocalDateKey(new Date()),
-            }
-          : {}),
-      };
-    });
+  const setPreviewTrip = useCallback((previewTrip: PreviewTrip | null) => {
+    setState((prev) => ({ ...prev, previewTrip }));
   }, []);
 
 
@@ -349,12 +326,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       scheduleType: state.scheduleType,
       scheduleCheckedOn: state.scheduleCheckedOn,
       confirmScheduleCheckedOn,
-      selectedTripNumber: state.selectedTripNumber,
+      previewTrip: state.previewTrip,
       setFromStation,
       setToStation,
       swapStations,
       setScheduleType,
-      setSelectedTrip,
+      setPreviewTrip,
       stationsUpdatedOpen,
       openStationsUpdated,
       closeStationsUpdated,
@@ -371,12 +348,12 @@ export function StationSelectionProvider({ children }: { children: ReactNode }) 
       state.scheduleType,
       state.scheduleCheckedOn,
       confirmScheduleCheckedOn,
-      state.selectedTripNumber,
+      state.previewTrip,
       setFromStation,
       setToStation,
       swapStations,
       setScheduleType,
-      setSelectedTrip,
+      setPreviewTrip,
       stationsUpdatedOpen,
       openStationsUpdated,
       closeStationsUpdated,

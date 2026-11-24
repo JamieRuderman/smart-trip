@@ -8,6 +8,7 @@ import {
   sameFocusIdentity,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
+import { isFerryLeg, placeStation } from "@/lib/places";
 import { futureServiceDate, getFilteredTrips } from "@/lib/scheduleUtils";
 import { buildDepartureTimestamp, toLocalDateKey } from "@/lib/timeUtils";
 import { useLeaveTripView } from "@/hooks/useTripViewNavigation";
@@ -34,17 +35,18 @@ const TIME_FORMAT = "12h" as const;
  * Full-page trip view. Tapping a schedule row opens it for that train in green,
  * with "Take this train"; taking it turns the same page into My Trip (blue).
  *
- * As My Trip it's the focused ("Take this train") trip — the riding screen. The coloured band up top carries the train, its live times and
- * the leave → departs → arrives headline (plus the reminder control); below it,
- * where the train is right now, the trip facts and every stop on the leg.
+ * As My Trip it's the focused ("Take this train") trip — the riding screen. The
+ * coloured band up top carries the train, its live times and the leave →
+ * departs → arrives headline (plus the reminder control); below it, where the
+ * train is right now and every stop on the leg.
  *
- * It's where "Take this train" lands and what a launch with a trip running
- * today opens to. Backing out returns to the schedule, which keeps an
- * in-progress bar linking here. Leaves on its own once the focus is cleared
- * (Cancel, or the auto-clear shortly after arrival).
+ * A launch with a trip running today opens here. Backing out returns to the
+ * schedule, which keeps an in-progress bar linking here. "Stop tracking" turns
+ * it back to green; it leaves on its own when nothing is left to show (the
+ * auto-clear shortly after arrival).
  */
 export default function MyTrip() {
-  const { focusedTrip, setSelectedTrip } = useStationSelection();
+  const { focusedTrip, setPreviewTrip } = useStationSelection();
   const leaveTripView = useLeaveTripView();
   const currentTime = useMinuteClock();
   const previewRun = usePreviewRun(currentTime);
@@ -52,7 +54,7 @@ export default function MyTrip() {
     previewRun != null && !sameFocusIdentity(focusedTrip, previewRun);
   const shown = isPreview ? previewRun : focusedTrip;
 
-  useEffect(() => () => setSelectedTrip(null), [setSelectedTrip]);
+  useEffect(() => () => setPreviewTrip(null), [setPreviewTrip]);
 
   // Open at the top — an in-app navigation otherwise keeps the scroll offset
   // of the page we came from (e.g. a trip card far down the schedule).
@@ -79,16 +81,21 @@ export default function MyTrip() {
   );
 }
 
-/** The selected schedule row as an unsaved run, for the green preview. */
+/** The previewed train as an unsaved run, for the green page. */
 function usePreviewRun(currentTime: Date): FocusedTrip | null {
-  const { selectedTripNumber, fromStation, toStation, viaFerry, scheduleType } =
-    useStationSelection();
-  const serviceDay = futureServiceDate(currentTime, scheduleType);
+  const { previewTrip } = useStationSelection();
+  const serviceDay = previewTrip
+    ? futureServiceDate(currentTime, previewTrip.scheduleType)
+    : null;
   const today = toLocalDateKey(currentTime);
   return useMemo(() => {
-    if (selectedTripNumber == null || !fromStation || !toStation) return null;
+    if (!previewTrip) return null;
+    const { tripNumber, from, to, scheduleType } = previewTrip;
+    const fromStation = placeStation(from);
+    const toStation = placeStation(to);
+    const viaFerry = isFerryLeg(from, to);
     const trip = getFilteredTrips(fromStation, toStation, scheduleType, viaFerry).find(
-      (candidate) => candidate.trip === selectedTripNumber,
+      (candidate) => candidate.trip === tripNumber,
     );
     if (!trip) return null;
     const serviceDate =
@@ -98,7 +105,7 @@ function usePreviewRun(currentTime: Date): FocusedTrip | null {
       );
     return {
       source: "user",
-      tripNumber: trip.trip,
+      tripNumber,
       fromStation,
       toStation,
       ...(viaFerry ? { viaFerry: true as const } : {}),
@@ -108,7 +115,7 @@ function usePreviewRun(currentTime: Date): FocusedTrip | null {
     };
     // `today` re-derives the service date across midnight.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTripNumber, fromStation, toStation, viaFerry, scheduleType, serviceDay, today]);
+  }, [previewTrip, serviceDay, today]);
 }
 
 function MyTripView({
@@ -119,7 +126,18 @@ function MyTripView({
   onBack: () => void;
 }) {
   const { t } = useTranslation();
-  const { clearFocusedTrip } = useStationSelection();
+  const { clearFocusedTrip, setPreviewTrip } = useStationSelection();
+
+  const stopTracking = () => {
+    const { from, to } = focusedPlaces(focusedTrip);
+    setPreviewTrip({
+      tripNumber: focusedTrip.tripNumber,
+      from,
+      to,
+      scheduleType: focusedTrip.scheduleType,
+    });
+    void clearFocusedTrip();
+  };
   const {
     focusedTrip,
     isPreview,
@@ -156,9 +174,7 @@ function MyTripView({
             <ChevronLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
-            {isPreview
-              ? t("myTrip.trainNumber", { trip: trip.trip })
-              : t("focusedTrip.myTrip")}
+            {!isPreview && t("focusedTrip.myTrip")}
           </h1>
           <ShareTripButton
             trip={trip}
@@ -354,7 +370,7 @@ function MyTripView({
         {!isPreview && (
           <button
             type="button"
-            onClick={() => void clearFocusedTrip()}
+            onClick={stopTracking}
             className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
           >
             {t("myTrip.stopTracking")}

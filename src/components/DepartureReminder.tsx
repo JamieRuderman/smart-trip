@@ -154,7 +154,7 @@ export function DepartureReminder({
     focusedTrip,
     focusTrip,
     rescheduleReminder,
-    setSelectedTrip,
+    setPreviewTrip,
     setFromStation,
     setToStation,
     openStationsUpdated,
@@ -307,7 +307,7 @@ export function DepartureReminder({
   // Land on the full-page My Trip view: from a sheet, close it and navigate;
   // on the trip page, dropping the previewed train turns it into My Trip.
   const openMyTrip = () => {
-    setSelectedTrip(null);
+    setPreviewTrip(null);
     if (variant === "sheet") openTripView();
   };
 

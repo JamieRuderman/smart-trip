@@ -1,5 +1,13 @@
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useStationSelection } from "@/contexts/stationSelection";
+import { isFocusedTrainToday } from "@/lib/focusedTrip";
+import {
+  getTodayScheduleType,
+  tripServesLeg,
+  type ProcessedTrip,
+} from "@/lib/scheduleUtils";
+import { isSouthbound } from "@/lib/stationUtils";
 import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
 
 /** Open the full-page My Trip view, keeping the current query params (the
@@ -28,4 +36,47 @@ export function useLeaveTripView(): () => void {
       navigate({ pathname: "/", search: location.search }, { replace: true });
     }
   }, [navigate, location.search]);
+}
+
+/** Open the trip page for a train tapped on a map: My Trip when it's the
+ *  rider's focused train, else a preview on their selected leg when the train
+ *  serves it, else on the run the map shows. */
+export function useOpenTrainPage(): (trip: ProcessedTrip) => void {
+  const {
+    fromPlace,
+    toPlace,
+    fromStation,
+    toStation,
+    viaFerry,
+    focusedTrip,
+    setPreviewTrip,
+  } = useStationSelection();
+  const openTripView = useOpenTripView();
+  return useCallback(
+    (trip: ProcessedTrip) => {
+      const now = new Date();
+      const scheduleType = getTodayScheduleType(now);
+      const southbound = isSouthbound(trip.fromStation, trip.toStation);
+      if (isFocusedTrainToday(focusedTrip, trip.trip, southbound, now)) {
+        setPreviewTrip(null);
+      } else if (
+        fromPlace &&
+        toPlace &&
+        fromStation &&
+        toStation &&
+        tripServesLeg(trip.trip, fromStation, toStation, scheduleType, viaFerry)
+      ) {
+        setPreviewTrip({ tripNumber: trip.trip, from: fromPlace, to: toPlace, scheduleType });
+      } else {
+        setPreviewTrip({
+          tripNumber: trip.trip,
+          from: trip.fromStation,
+          to: trip.toStation,
+          scheduleType,
+        });
+      }
+      openTripView();
+    },
+    [focusedTrip, fromPlace, toPlace, fromStation, toStation, viaFerry, setPreviewTrip, openTripView],
+  );
 }

@@ -79,7 +79,7 @@ function SharedItinerary({ shared, trip, onBack }: {
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { focusedTrip, focusTrip, setSelectedTrip } = useStationSelection();
+  const { focusedTrip, focusTrip, setPreviewTrip } = useStationSelection();
   const [confirmSwitch, setConfirmSwitch] = useState(false);
   const now = useMinuteClock();
   const { run, from, to } = shared;
@@ -131,7 +131,7 @@ function SharedItinerary({ shared, trip, onBack }: {
   const take = () => {
     if (!canTake) return;
     if (!alreadyTaking) void focusTrip(run);
-    setSelectedTrip(null);
+    setPreviewTrip(null);
     navigate(TRIP_VIEW_PATH, { replace: true });
   };
 

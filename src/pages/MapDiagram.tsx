@@ -11,16 +11,12 @@ import { SAN_FRANCISCO, validPlace, type Place } from "@/lib/places";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
-import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
+import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
 import {
   SHEET_ENTER_DELAY_MS,
   SHEET_TRANSITION_MS,
 } from "@/lib/animationConstants";
 import { useNow } from "@/hooks/useNow";
-import {
-  MapTripDetailSheet,
-  type MapTripDetail,
-} from "@/components/MapTripDetailSheet";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
 import { StationInfoSheet } from "@/components/StationInfoSheet";
 import { FerryTerminalSheet } from "@/components/FerryTerminalSheet";
@@ -32,7 +28,6 @@ const LARKSPUR = stations[stations.length - 1];
 
 export default function MapDiagram() {
   const { trains } = useMapTrains();
-  const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
 
   const {
     fromPlace: fromSelection,
@@ -91,8 +86,7 @@ export default function MapDiagram() {
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
   const [stationSheet, setStationSheet] = useState<Place | null>(null);
   const [stationSheetOpen, setStationSheetOpen] = useState(false);
-  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const openTrainPage = useOpenTrainPage();
 
   const handleTrainClick = useCallback((train: MapTrain) => {
     setSelectedTrainKey(train.key);
@@ -120,34 +114,9 @@ export default function MapDiagram() {
       fromStation: displayFrom,
       toStation: terminus,
     };
-    // Pull live delay/cancellation state for this run. The status map is
-    // keyed by scheduled departure at the full-corridor origin, which is
-    // exactly match.departureTime here.
-    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-    const realtimeStatus =
-      statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({ trip: displayTrip, realtimeStatus });
-  }, [sbStatusMaps, nbStatusMaps]);
+    openTrainPage(displayTrip);
+  }, [openTrainPage]);
 
-  useEffect(() => {
-    if (detailTrip) {
-      const id = window.setTimeout(
-        () => setDetailOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setDetailOpen(false);
-    }
-  }, [detailTrip]);
-
-  const closeDetail = useCallback(() => {
-    setDetailOpen(false);
-    setTimeout(() => {
-      setDetailTrip(null);
-      setSelectedTrainKey(null);
-    }, SHEET_TRANSITION_MS);
-  }, []);
 
   const handleStationClick = useCallback((place: Place) => {
     setStationSheet(place);
@@ -177,19 +146,9 @@ export default function MapDiagram() {
   const handleArrivalClick = useCallback(
     (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
       closeStationSheet();
-      // Direction is determined by the terminus passed in: southbound trips
-      // arrive at Larkspur, northbound at Windsor. The status map is keyed
-      // by departure at the full-corridor origin (trip.departureTime).
-      const isSouthbound = toStation === LARKSPUR;
-      const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-      const realtimeStatus =
-        statusMaps.statusMap.get(trip.departureTime) ?? null;
-      setDetailTrip({
-        trip: { ...trip, fromStation, toStation },
-        realtimeStatus,
-      });
+      openTrainPage({ ...trip, fromStation, toStation });
     },
-    [closeStationSheet, sbStatusMaps, nbStatusMaps],
+    [closeStationSheet, openTrainPage],
   );
 
   // The context setters already drop the other endpoint when the new one
@@ -284,15 +243,6 @@ export default function MapDiagram() {
         />
       )}
 
-      {detailTrip && (
-        <MapTripDetailSheet
-          detail={detailTrip}
-          isOpen={detailOpen}
-          onClose={closeDetail}
-          currentTime={currentTime}
-          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-        />
-      )}
     </>
   );
 }

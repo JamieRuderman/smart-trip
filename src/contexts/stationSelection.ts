@@ -9,6 +9,15 @@ import type {
   SetReminderResult,
 } from "@/hooks/useFocusedTrip";
 
+/** A train the trip page shows before (or without) it being taken: its run
+ *  between two places on one schedule. */
+export interface PreviewTrip {
+  tripNumber: number;
+  from: Place;
+  to: Place;
+  scheduleType: "weekday" | "weekend";
+}
+
 export interface StationSelection {
   /** The ends the rider picked, San Francisco included. */
   fromPlace: Place | "";
@@ -24,18 +33,15 @@ export interface StationSelection {
    *  confirmed, so the switch prompt asks at most once a day. */
   scheduleCheckedOn: string;
   confirmScheduleCheckedOn: (date: string) => void;
-  selectedTripNumber: number | null;
+  previewTrip: PreviewTrip | null;
   setFromStation: (place: Place | "") => void;
   setToStation: (place: Place | "") => void;
   swapStations: () => void;
   setScheduleType: (type: "weekday" | "weekend") => void;
-  setSelectedTrip: (tripNumber: number | null) => void;
-  /** Whether the lead-time reminder modal is open. Lifted to context so the
-   *  in-sheet "Take this train" control can pop it after closing its own sheet,
-   *  and so the modal survives that sheet unmounting. */
+  setPreviewTrip: (trip: PreviewTrip | null) => void;
   /** Whether the "stations updated, pick a time" notice is open — at the app
-   *  root, like the reminder modal, so it outlives the trip sheet whose
-   *  location fix switched the stations. */
+   *  root, so it outlives the trip view whose location fix switched the
+   *  stations. */
   stationsUpdatedOpen: boolean;
   openStationsUpdated: () => void;
   closeStationsUpdated: () => void;

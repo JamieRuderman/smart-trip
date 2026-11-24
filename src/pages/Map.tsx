@@ -20,14 +20,9 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { MapLiveDataChip } from "@/components/MapLiveDataChip";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
-import {
-  MapTripDetailSheet,
-  type MapTripDetail,
-} from "@/components/MapTripDetailSheet";
+import { useOpenTrainPage } from "@/hooks/useTripViewNavigation";
 import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
-import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
 import {
   MARKER_COLOR,
   createStationElement,
@@ -108,10 +103,7 @@ function MapContents() {
     autoRequestOnWeb: true,
   });
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-
-  const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
+  const openTrainPage = useOpenTrainPage();
 
   const handleTrainClick = useCallback((train: MapTrain) => {
     setSelectedTrainKey(train.key);
@@ -143,49 +135,9 @@ function MapContents() {
       fromStation: displayFrom,
       toStation: terminus,
     };
-    // Pull live delay/cancellation state for this specific run. The status
-    // map is keyed by scheduled departure at the full-corridor origin, which
-    // is exactly match.departureTime here.
-    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-    const realtimeStatus =
-      statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({ trip: displayTrip, realtimeStatus });
-  }, [sbStatusMaps, nbStatusMaps]);
+    openTrainPage(displayTrip);
+  }, [openTrainPage]);
 
-  useEffect(() => {
-    if (detailTrip) {
-      const id = window.setTimeout(
-        () => setDetailOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setDetailOpen(false);
-    }
-  }, [detailTrip]);
-
-  // Tracked so we can cancel the deferred unmount if the sheet re-opens
-  // mid-transition or the page unmounts.
-  const closeTimerRef = useRef<number | null>(null);
-  const closeDetail = useCallback(() => {
-    setDetailOpen(false);
-    if (closeTimerRef.current != null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setDetailTrip(null);
-      setSelectedTrainKey(null);
-      closeTimerRef.current = null;
-    }, SHEET_TRANSITION_MS);
-  }, []);
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current != null) {
-        window.clearTimeout(closeTimerRef.current);
-      }
-    },
-    [],
-  );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -502,17 +454,6 @@ function MapContents() {
         </div>
       )}
 
-      {/* Trip detail sheet — opens over the map when a marker is tapped.
-          Renders nothing until a trip has been resolved. */}
-      {detailTrip && (
-        <MapTripDetailSheet
-          detail={detailTrip}
-          isOpen={detailOpen}
-          onClose={closeDetail}
-          currentTime={new Date()}
-          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-        />
-      )}
     </div>
   );
 }

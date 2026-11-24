@@ -32,8 +32,8 @@ type ReminderError = null | "permission" | "schedule-failed";
 
 /**
  * The focused trip's leave reminder, inline on the My Trip band (white on
- * blue/gold): a minute wheel with "Set", then the armed alarm, which the wheel
- * keeps adjusting. Renders nothing when no reminder applies.
+ * blue/gold): a minute wheel with "Set", then the armed alarm with × to remove
+ * it. Renders nothing when no reminder applies.
  */
 export function ReminderControl({
   focusedTrip,
@@ -132,12 +132,12 @@ export function ReminderControl({
             })}
           </p>
         </div>
-        {canSetReminder ? (
+        {canSetReminder && !isSet ? (
           <WheelPicker
             min={MIN_LEAD_MINUTES}
             max={maxLeadMinutes}
             value={lead}
-            onChange={(next) => (isSet ? void commit(next) : setDraftLead(next))}
+            onChange={setDraftLead}
             format={minutes}
             ariaLabel={t("departureReminder.minutesBeforeDeparture")}
             className="w-[7rem]"
@@ -150,7 +150,9 @@ export function ReminderControl({
             }}
           />
         ) : (
-          <span className="text-sm font-semibold tabular-nums">{minutes(lead)}</span>
+          <span className="rounded-md bg-white/20 px-3 py-1 text-base font-semibold tabular-nums">
+            {minutes(lead)}
+          </span>
         )}
         {isSet ? (
           <button

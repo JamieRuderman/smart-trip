@@ -6,7 +6,11 @@ import {
   type TripDetailModel,
 } from "@/hooks/useTripDetailModel";
 import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
-import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
+import {
+  agencyDateKey,
+  parseServiceDate,
+  serviceDateWeekdayLabel,
+} from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
 import { TOKEN, TRAIN_COLORS } from "@/components/SmartLineDiagram/tokens";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
@@ -41,9 +45,8 @@ export interface MyTripInput {
   live: TripRealtimeStatus | null;
   lastUpdated: Date | null;
   currentTime: Date;
-  /** A shared trip's real arrival (epoch ms), for when `currentTime` only
-   *  carries Pacific clock fields: it decides whether the trip has ended and
-   *  how long ago, across days. Read against `realtimeClock`. */
+  /** A shared trip's real arrival (epoch ms), read against `realtimeClock`:
+   *  decides whether it has ended, and how long ago, across days. */
   itineraryArrivalAt?: number;
   /** The actual time, when `currentTime` only carries Pacific clock fields. */
   realtimeClock?: Date;
@@ -60,6 +63,8 @@ export interface MyTripState {
   /** The run is on a later calendar day than today (e.g. a weekend train
    *  picked on a weekday) — its live countdowns and position don't apply yet. */
   isFutureService: boolean;
+  /** A shared run on an earlier day: no live position applies to it. */
+  isPastService: boolean;
   /** Localized weekday of a future-service run ("Saturday"), else null. */
   serviceDayLabel: string | null;
   /** The clock the trip is evaluated against: now, or the start of its service
@@ -94,6 +99,8 @@ export function useMyTripState({
 }: MyTripInput): MyTripState {
   const { i18n } = useTranslation();
   const isFutureService = !isFocusedTripToday(focusedTrip, currentTime);
+  const isPastService =
+    realtimeClock != null && focusedTrip.serviceDate < agencyDateKey(realtimeClock);
   const serviceDayLabel = isFutureService
     ? serviceDateWeekdayLabel(focusedTrip.serviceDate, i18n.language)
     : null;
@@ -120,7 +127,7 @@ export function useMyTripState({
     realtimeStatus: live,
     isNextTrip: false,
     isFocused: !isPreview,
-    trackVehicle: !isFutureService,
+    trackVehicle: !isFutureService && !isPastService,
     minutesAfterArrival:
       itineraryMinutesUntilArrival == null ? undefined : -itineraryMinutesUntilArrival,
   });
@@ -155,6 +162,7 @@ export function useMyTripState({
     trip,
     live,
     isFutureService,
+    isPastService,
     serviceDayLabel,
     clockTime,
     progress,

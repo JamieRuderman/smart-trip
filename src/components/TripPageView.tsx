@@ -19,16 +19,14 @@ import { TripPositionCard } from "@/components/TripPositionCard";
 
 const TIME_FORMAT = "12h" as const;
 
-/**
- * The trip page's view of one run, shared by My Trip, a train's green page and
- * a shared-trip link: the coloured band (train, live times, the leave → departs
- * → arrives headline and its action), where the train is, and every stop.
- */
+/** One run's trip page — My Trip, a train's green page or a shared-trip link:
+ *  the coloured band, where the train is, and every stop. */
 export function TripPageView({
   state,
   onBack,
   actions,
   dateLine,
+  markHomeStops = true,
 }: {
   state: MyTripState;
   onBack: () => void;
@@ -36,6 +34,8 @@ export function TripPageView({
   actions?: ReactNode;
   /** Shown under the stations, e.g. a shared trip's date. */
   dateLine?: string;
+  /** Mark the rider's own selected stations on a previewed run's stop list. */
+  markHomeStops?: boolean;
 }) {
   const { t } = useTranslation();
   const {
@@ -62,6 +62,7 @@ export function TripPageView({
     trip,
     live,
     isFutureService,
+    isPastService,
     serviceDayLabel,
     clockTime,
     progress,
@@ -71,6 +72,7 @@ export function TripPageView({
   } = state;
   const { fromStation, toStation } = focusedTrip;
   const places = focusedPlaces(focusedTrip);
+  const showHomeStops = isPreview && markHomeStops;
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -92,7 +94,11 @@ export function TripPageView({
             <ChevronLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           {isPreview ? (
-            <div className="min-w-0 flex-1" />
+            <div className="min-w-0 flex-1">
+              <h1 className="sr-only">
+                {places.from} → {places.to}
+              </h1>
+            </div>
           ) : (
             <h1 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wider text-white/90">
               {t("focusedTrip.myTrip")}
@@ -221,7 +227,7 @@ export function TripPageView({
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4 pb-safe">
         {/* Where the train is — only meaningful for today's, running trip. */}
-        {!isFutureService && !model.isCanceledOrSkipped && (
+        {!isFutureService && !isPastService && !model.isCanceledOrSkipped && (
           <TripPositionCard
             trip={trip}
             fromStation={fromStation}
@@ -279,8 +285,8 @@ export function TripPageView({
             isEnded={progress.isEnded}
             atDestination={model.isAtDestination}
             stopInference={progress.stopInference}
-            userFromStation={isPreview ? validStation(homeFrom) : null}
-            userToStation={isPreview ? validStation(homeTo) : null}
+            userFromStation={showHomeStops ? validStation(homeFrom) : null}
+            userToStation={showHomeStops ? validStation(homeTo) : null}
             isFocused={!isPreview}
           />
         </SectionCard>

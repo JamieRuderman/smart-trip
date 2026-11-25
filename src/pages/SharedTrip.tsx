@@ -27,13 +27,13 @@ import {
   type SharedTrip as SharedTripData,
 } from "@/lib/sharedTrip";
 import { agencyClockHHMM, agencyDateKey, parseServiceDate } from "@/lib/timeUtils";
-import { TRIP_VIEW_PATH } from "@/lib/tripView";
+import { hasInAppHistory, TRIP_VIEW_PATH } from "@/lib/tripView";
 import { bandPrimaryButtonStyle } from "@/lib/tripTheme";
-import { useGoBack } from "@/hooks/useTripViewNavigation";
 
 export default function SharedTrip() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   useScheduleData();
   const scheduleRefreshing = useScheduleRefreshing();
   const shared = parseSharedTrip(location.search);
@@ -43,7 +43,11 @@ export default function SharedTrip() {
     window.scrollTo(0, 0);
   }, [location.search]);
 
-  const goBack = useGoBack("/");
+  // useGoBack's fallback keeps the query, which here is the shared link's.
+  const goBack = () => {
+    if (hasInAppHistory()) navigate(-1);
+    else navigate("/", { replace: true });
+  };
 
   if (shared && trip && matchesSharedDeparture(shared, trip)) {
     return <SharedItinerary key={location.search} shared={shared} trip={trip} onBack={goBack} />;
@@ -92,10 +96,8 @@ function SharedItinerary({ shared, trip, onBack }: {
   const alreadyTaking = sameFocusIdentity(focusedTrip, run);
   const android = !Capacitor.isNativePlatform() && /Android/i.test(navigator.userAgent);
 
-  // The trip page reads wall time from the clock. Give it Pacific clock fields
-  // even if the recipient is outside the service area: Pacific time on today's
-  // run, the end of a past run's day, or Pacific today for a later run (which
-  // the page then reads as a later day's).
+  // Pacific clock fields even outside the service area: now on today's run, the
+  // end of a past run's day, or Pacific today (read as a later day) for a later run.
   const clock = parseServiceDate(future ? pacificToday : run.serviceDate);
   if (today) {
     const [hours, minutes] = agencyClockHHMM(now.getTime() / 1000).split(":").map(Number);
@@ -156,6 +158,7 @@ function SharedItinerary({ shared, trip, onBack }: {
         state={state}
         onBack={onBack}
         actions={actions}
+        markHomeStops={false}
         dateLine={t("shareTrip.pacificDate", {
           date: formatSharedServiceDate(run.serviceDate, i18n.language),
         })}

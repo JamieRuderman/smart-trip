@@ -202,10 +202,10 @@ function FromToColumn({
         aria-pressed={isCurrent}
         aria-label={ariaLabel}
         className={cn(
-          "flex h-11 items-center gap-2 rounded-xl border-2 px-3 text-left transition-colors",
+          "flex h-11 items-center gap-2 rounded-xl px-3 text-left transition-colors",
           isCurrent
-            ? "border-primary bg-primary/10 text-primary hover:bg-primary/20"
-            : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
+            ? "bg-primary/10 text-primary hover:bg-primary/20"
+            : "bg-background text-foreground hover:bg-muted",
         )}
       >
         <span

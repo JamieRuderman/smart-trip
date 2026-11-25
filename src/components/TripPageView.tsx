@@ -303,7 +303,7 @@ export function TripPageView({
           <button
             type="button"
             onClick={stopTracking}
-            className="h-12 w-full rounded-xl border border-border bg-card text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
+            className="h-12 w-full rounded-xl bg-card text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
           >
             {t("myTrip.stopTracking")}
           </button>

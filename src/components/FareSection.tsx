@@ -124,7 +124,7 @@ export function FareSection({ from, to }: FareSectionProps) {
                   key={option.fareType}
                   variant="outline"
                   onClick={() => handleFareSelect(option.fareType)}
-                  className="flex justify-between items-center p-4 h-auto rounded-lg border border-border hover:border-primary hover:bg-primary/10 hover:shadow-sm transition-all duration-200 text-left w-full group"
+                  className="flex justify-between items-center p-4 h-auto rounded-lg hover:bg-primary/10 transition-all duration-200 text-left w-full group"
                 >
                   <span className="text-sm font-medium group-hover:text-primary transition-colors">
                     {getFareDescription(option.fareType)}

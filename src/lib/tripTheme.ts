@@ -77,6 +77,10 @@ export const stateCardStyle: Record<TripState, string> = {
   future:   "bg-background border-border hover:bg-muted focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
 };
 
+/** The main action on a trip page's coloured band ("Take this train"). */
+export const bandPrimaryButtonStyle =
+  "w-full h-12 gap-2 rounded-xl text-base font-semibold bg-white text-smart-train-green shadow-sm hover:bg-white/90 active:bg-white/90";
+
 /** Ring for the next train's row, matching the my-trip row's. */
 export const nextTripRingStyle =
   "ring-2 ring-smart-train-green ring-offset-2 ring-offset-background";

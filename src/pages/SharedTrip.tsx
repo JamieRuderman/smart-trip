@@ -28,6 +28,7 @@ import {
 } from "@/lib/sharedTrip";
 import { agencyClockHHMM, agencyDateKey, parseServiceDate } from "@/lib/timeUtils";
 import { TRIP_VIEW_PATH } from "@/lib/tripView";
+import { bandPrimaryButtonStyle } from "@/lib/tripTheme";
 import { useGoBack } from "@/hooks/useTripViewNavigation";
 
 export default function SharedTrip() {
@@ -92,20 +93,16 @@ function SharedItinerary({ shared, trip, onBack }: {
   const android = !Capacitor.isNativePlatform() && /Android/i.test(navigator.userAgent);
 
   // The trip page reads wall time from the clock. Give it Pacific clock fields
-  // even if the recipient is outside the service area: today's Pacific time on
-  // the run's own day, the end of a past run's day, or now on Pacific today for
-  // a later run (so it reads as a later day's).
-  const pacificNow = (dateKey: string) => {
-    const clock = parseServiceDate(dateKey);
+  // even if the recipient is outside the service area: Pacific time on today's
+  // run, the end of a past run's day, or Pacific today for a later run (which
+  // the page then reads as a later day's).
+  const clock = parseServiceDate(future ? pacificToday : run.serviceDate);
+  if (today) {
     const [hours, minutes] = agencyClockHHMM(now.getTime() / 1000).split(":").map(Number);
     clock.setHours(hours, minutes);
-    return clock;
-  };
-  const clock = today || future ? pacificNow(today ? run.serviceDate : pacificToday) : (() => {
-    const endOfDay = parseServiceDate(run.serviceDate);
-    endOfDay.setHours(23, 59);
-    return endOfDay;
-  })();
+  } else if (!future) {
+    clock.setHours(23, 59);
+  }
 
   const state = useMyTripState({
     focusedTrip: { source: "user", ...run, reminder: null },
@@ -115,6 +112,7 @@ function SharedItinerary({ shared, trip, onBack }: {
     currentTime: clock,
     isPreview: true,
     itineraryArrivalAt: arrivalAt,
+    realtimeClock: now,
   });
   const canTake = !state.progress.isEnded && !state.model.isCanceledOrSkipped;
 
@@ -129,7 +127,7 @@ function SharedItinerary({ shared, trip, onBack }: {
     <div className="flex w-full min-w-0 flex-col gap-2">
       {canTake && (
         <Button
-          className="h-12 gap-2 rounded-xl bg-white text-base font-semibold text-smart-train-green shadow-sm hover:bg-white/90"
+          className={bandPrimaryButtonStyle}
           onClick={() => {
             if (focusedTrip && !alreadyTaking) setConfirmSwitch(true);
             else take();

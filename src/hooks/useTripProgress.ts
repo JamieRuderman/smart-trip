@@ -53,6 +53,7 @@ export function useTripProgress({
   isFocused = false,
   trackVehicle = true,
   vehiclePositionOverride,
+  minutesAfterArrival: knownMinutesAfterArrival,
 }: {
   trip: ProcessedTrip;
   fromStation: Station;
@@ -70,6 +71,9 @@ export function useTripProgress({
   trackVehicle?: boolean;
   /** Dev-only: override the live vehicle position hook result. */
   vehiclePositionOverride?: VehiclePositionMatch | null;
+  /** Minutes since the leg arrived, when the caller knows the real arrival
+   *  instant (a shared trip on another day); otherwise read from the clock. */
+  minutesAfterArrival?: number;
 }): TripProgressResult {
   // ── Vehicle position matching ─────────────────────────────────────────────
   const southbound = isSouthbound(fromStation, toStation);
@@ -97,7 +101,8 @@ export function useTripProgress({
   // updates feed must not be declared "ended" while the positions feed shows
   // it demonstrably still en route.
   const arrivalTime = realtimeStatus?.liveArrivalTime ?? trip.arrivalTime;
-  const minutesAfterArrival = -(computeMinutesUntil(currentTime, arrivalTime));
+  const minutesAfterArrival =
+    knownMinutesAfterArrival ?? -computeMinutesUntil(currentTime, arrivalTime);
   const isEnded =
     minutesAfterArrival > TRIP_ENDED_THRESHOLD_MIN &&
     !isVehicleShortOfDestination(vehiclePosition, toStation, southbound);

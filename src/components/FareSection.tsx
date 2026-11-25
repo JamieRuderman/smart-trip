@@ -84,7 +84,7 @@ export function FareSection({ from, to }: FareSectionProps) {
       <CardContent className="space-y-2 p-3 md:p-6">
         {/* Selected Fare Display */}
         {!picking ? (
-          <div className="status-box-primary">
+          <div className="rounded-lg bg-primary/5 p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <p className="font-medium">

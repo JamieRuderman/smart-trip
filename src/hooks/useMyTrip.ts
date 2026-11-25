@@ -8,6 +8,8 @@ import {
 import { isFocusedTripToday, type FocusedTrip } from "@/lib/focusedTrip";
 import { parseServiceDate, serviceDateWeekdayLabel } from "@/lib/timeUtils";
 import { stateBg } from "@/lib/tripTheme";
+import { isSouthbound } from "@/lib/stationUtils";
+import { isVehicleShortOfDestination } from "@/lib/tripProgress";
 import { TOKEN, TRAIN_COLORS } from "@/components/SmartLineDiagram/tokens";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -41,6 +43,10 @@ export interface MyTripInput {
   live: TripRealtimeStatus | null;
   lastUpdated: Date | null;
   currentTime: Date;
+  /** A shared trip's real arrival (epoch ms), for when `currentTime` only
+   *  carries Pacific clock fields: it decides whether the trip has ended and
+   *  how long ago, across days. */
+  itineraryArrivalAt?: number;
   /** A train the rider is looking at but hasn't taken: `focusedTrip` is built
    *  from the previewed train and never stored. */
   isPreview?: boolean;
@@ -83,6 +89,7 @@ export function useMyTripState({
   lastUpdated,
   currentTime,
   isPreview = false,
+  itineraryArrivalAt,
 }: MyTripInput): MyTripState {
   const { i18n } = useTranslation();
   const isFutureService = !isFocusedTripToday(focusedTrip, currentTime);
@@ -99,7 +106,7 @@ export function useMyTripState({
     [isFutureService, focusedTrip.serviceDate, currentTime],
   );
 
-  const progress = useTripProgress({
+  const tripProgress = useTripProgress({
     trip,
     fromStation: focusedTrip.fromStation,
     toStation: focusedTrip.toStation,
@@ -109,12 +116,36 @@ export function useMyTripState({
     isFocused: !isPreview,
     trackVehicle: !isFutureService,
   });
+  const realtimeClock = new Date();
+  const itineraryMinutesUntilArrival =
+    itineraryArrivalAt == null
+      ? undefined
+      : Math.ceil((itineraryArrivalAt - realtimeClock.getTime()) / 60_000);
+  const progress =
+    itineraryMinutesUntilArrival == null
+      ? tripProgress
+      : (() => {
+          const ended =
+            itineraryMinutesUntilArrival <= 0 &&
+            !isVehicleShortOfDestination(
+              tripProgress.vehiclePosition,
+              focusedTrip.toStation,
+              isSouthbound(focusedTrip.fromStation, focusedTrip.toStation),
+            );
+          return {
+            ...tripProgress,
+            isEnded: ended,
+            minutesAfterArrival: -itineraryMinutesUntilArrival,
+            minutesUntilArrival: ended ? null : tripProgress.minutesUntilArrival,
+          };
+        })();
 
   const model = useTripDetailModel({
     trip,
     fromStation: focusedTrip.fromStation,
     toStation: focusedTrip.toStation,
     currentTime: clockTime,
+    ...(itineraryArrivalAt == null ? {} : { realtimeClock, itineraryMinutesUntilArrival }),
     lastUpdated,
     realtimeStatus: live,
     progress,

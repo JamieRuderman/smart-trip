@@ -34,6 +34,7 @@ import {
 import type { Station } from "@/types/smartSchedule";
 import { useTranslation } from "react-i18next";
 import { GutterRow } from "./GutterRow";
+import { bandPrimaryButtonStyle } from "@/lib/tripTheme";
 import { BoardingLocationDialog } from "./BoardingLocationDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -475,7 +476,7 @@ export function DepartureReminder({
         aria-busy={boardingCheck.checking}
         className={
           variant === "page"
-            ? "w-full h-12 gap-2 rounded-xl text-base font-semibold bg-white text-smart-train-green shadow-sm hover:bg-white/90 active:bg-white/90"
+            ? bandPrimaryButtonStyle
             : "flex-1 h-12 gap-2 rounded-xl text-base font-semibold bg-[hsl(220_13%_18%)] text-white shadow-sm hover:bg-[hsl(220_13%_18%)]/90 active:bg-[hsl(220_13%_18%)]/90"
         }
       >

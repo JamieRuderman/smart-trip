@@ -13,8 +13,8 @@
     "selectDepartureStation": "Estación de salida",
     "selectArrivalStation": "Estación de llegada",
     "swapStations": "Intercambiar estaciones",
-    "weekdaySchedule": "Horario de día laboral",
-    "weekendSchedule": "Fin de semana y festivos",
+    "weekdaySchedule": "Días laborables",
+    "weekendSchedule": "Fines de semana y festivos",
     "availableStations": "Estaciones disponibles",
     "startStation": "Salida",
     "endStation": "Llegada",
@@ -38,6 +38,7 @@
     "noTrainsFound": "No se encontraron trenes para esta ruta."
   },
   "serviceAlert": {
+    "since": "Desde {{date}}",
     "showMore": "Más",
     "showLess": "Menos",
     "sectionTitle": "Alertas de servicio",

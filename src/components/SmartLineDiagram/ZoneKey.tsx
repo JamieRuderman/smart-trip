@@ -10,8 +10,11 @@ export function ZoneKey() {
   const { t } = useTranslation();
   return (
     <div
-      className="pointer-events-none absolute left-3 rounded-lg bg-background/90 px-2.5 py-2 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm"
-      style={{ bottom: "calc(12px + var(--safe-area-bottom))" }}
+      className="pointer-events-none absolute left-4 rounded-lg bg-background/90 px-2.5 py-2 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm"
+      style={{
+        bottom:
+          "calc(20px + max(var(--safe-area-bottom), env(safe-area-inset-bottom, 0px)))",
+      }}
     >
       <p className="mb-1">{t("mapDiagram.zones")}</p>
       <ul>

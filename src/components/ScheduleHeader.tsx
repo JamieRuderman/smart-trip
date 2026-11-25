@@ -79,22 +79,24 @@ export function ScheduleHeader({
           </div>
         )}
       </CardTitle>
-      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span>
+      <div className="flex items-baseline gap-3 text-sm">
+        <p className="min-w-0 flex-1 text-muted-foreground">
+          <Calendar
+            className="mr-1.5 inline-block h-3.5 w-3.5 align-[-2px]"
+            aria-hidden="true"
+          />
           {t(
             scheduleType === "weekday"
               ? "header.weekdaySchedule"
               : "header.weekendSchedule",
           )}
-        </span>
-        <span aria-hidden="true">·</span>
+        </p>
         <button
           type="button"
           onClick={() =>
             onScheduleTypeChange(scheduleType === "weekday" ? "weekend" : "weekday")
           }
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="shrink-0 whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline"
         >
           {t(
             scheduleType === "weekday"
@@ -102,7 +104,7 @@ export function ScheduleHeader({
               : "schedule.showWeekday",
           )}
         </button>
-      </p>
+      </div>
       {earlierTrainsToggle === "show" && (
         <Button
           variant="outline"

@@ -1,8 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   X,
-  ChevronLeft,
   Calendar,
   Clock,
   MapPin,
@@ -22,7 +21,7 @@ import { LiveTimePair } from "./LiveTimePair";
 import { QuickConnectionWarning } from "./QuickConnectionWarning";
 import { AlarmStatusIcon, AlarmStatusLabel } from "./AlarmStatusLabel";
 import { ShareTripButton } from "./ShareTripButton";
-import { formatSharedServiceDate, sharedTripServiceDate } from "@/lib/sharedTrip";
+import { sharedTripServiceDate } from "@/lib/sharedTrip";
 import { DepartureReminder } from "./DepartureReminder";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
@@ -62,15 +61,6 @@ interface TripDetailContentProps {
   /** The later day ("YYYY-MM-DD") the trip runs when its schedule isn't
    *  today's, else null — decided once by TripDetailSheet. */
   futureServiceDate: string | null;
-  /** Full-page layout with an explicit itinerary and its own trip actions. */
-  shared?: {
-    from: string;
-    to: string;
-    serviceDate: string;
-    now: Date;
-    minutesUntilArrival: number;
-    actions: ReactNode;
-  };
 }
 
 
@@ -91,7 +81,6 @@ export function TripDetailContent({
   scheduleType,
   isFocused = false,
   futureServiceDate,
-  shared,
 }: TripDetailContentProps) {
   const { t, i18n } = useTranslation();
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -140,8 +129,6 @@ export function TripDetailContent({
     fromStation,
     toStation,
     currentTime,
-    realtimeClock: shared?.now,
-    itineraryMinutesUntilArrival: shared?.minutesUntilArrival,
     lastUpdated,
     realtimeStatus,
     progress,
@@ -152,12 +139,11 @@ export function TripDetailContent({
   // whose arrival time already passed today would read "at destination" and
   // grey out its whole timeline.
   const isAtDestination = !isOtherDay && alarmAtDestination;
-  const contentWidth = shared ? "mx-auto w-full max-w-2xl" : undefined;
 
   const shareButton = (
     <ShareTripButton
       trip={trip}
-      serviceDate={shared?.serviceDate ?? futureServiceDate ?? sharedTripServiceDate(currentTime, scheduleType)}
+      serviceDate={futureServiceDate ?? sharedTripServiceDate(currentTime, scheduleType)}
       scheduleType={scheduleType}
       timeFormat={timeFormat}
       className={headerActionClass}
@@ -165,29 +151,10 @@ export function TripDetailContent({
   );
 
   return (
-    <div className={cn("flex flex-col flex-1 min-h-0", !shared && "overflow-hidden")}>
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Header band */}
       <div className={cn("shrink-0", headerBg)}>
-        {shared && (
-          <div
-            className={cn("flex items-center gap-3 px-4 text-white", contentWidth)}
-            style={{ paddingTop: "var(--safe-area-top)" }}
-          >
-            <div className="flex w-[5rem] shrink-0 justify-end pr-1">
-              <button type="button" onClick={onClose} className={headerActionClass} aria-label={t("myTrip.back")}>
-                <ChevronLeft className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold leading-tight">{shared.from} → {shared.to}</h1>
-              <p className="mt-1 text-xs text-white/80">
-                {t("shareTrip.pacificDate", { date: formatSharedServiceDate(shared.serviceDate, i18n.language) })}
-              </p>
-            </div>
-            {shareButton}
-          </div>
-        )}
-        <div className={cn("flex items-start gap-3 px-4 pt-4 pb-3", contentWidth)}>
+        <div className="flex items-start gap-3 px-4 pt-4 pb-3">
           {/* Trip number — w-[5rem] aligns with the stop timeline icon gutter */}
           <div className="flex flex-col items-end shrink-0 w-[5rem] pr-3">
             <p className="text-xs text-white/80 font-medium mb-0.5">
@@ -218,21 +185,19 @@ export function TripDetailContent({
             />
           </div>
 
-          {!shared && (
-            <div className="-mr-px -mt-3.5 flex shrink-0 items-center gap-1">
-              {shareButton}
-              {showCloseButton && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className={headerActionClass}
-                  aria-label={t("tracker.closeTripDetails")}
-                >
-                  <X className="size-5" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          )}
+          <div className="-mr-px -mt-3.5 flex shrink-0 items-center gap-1">
+            {shareButton}
+            {showCloseButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                className={headerActionClass}
+                aria-label={t("tracker.closeTripDetails")}
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -245,7 +210,7 @@ export function TripDetailContent({
       */}
 
       {/* Countdown / Ended for today's run; the service day for another day. */}
-      <div className={cn("px-4 pt-4 pb-1 shrink-0 flex items-center gap-3", contentWidth)}>
+      <div className="px-4 pt-4 pb-1 shrink-0 flex items-center gap-3">
         <div className="w-[5rem] shrink-0 flex justify-end pr-3">
           {isOtherDay ? (
             <Calendar
@@ -269,7 +234,7 @@ export function TripDetailContent({
       </div>
 
       {/* Metadata: duration · stops · fare · [debug toggle] */}
-      <div className={cn("px-4 pt-2 pb-3 shrink-0 space-y-0.5", contentWidth)}>
+      <div className="px-4 pt-2 pb-3 shrink-0 space-y-0.5">
         <GutterRow className="text-sm text-muted-foreground">
           <span className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
             {/* Total trip duration — hidden while en route, where the headline
@@ -405,13 +370,7 @@ export function TripDetailContent({
 
       {/* Departure reminder — own section so it reads as an action area
           rather than just another row of trip metadata. */}
-      {shared ? (
-        shared.actions && (
-          <div className={cn("shrink-0 px-4 pb-2", contentWidth)}>
-            <GutterRow>{shared.actions}</GutterRow>
-          </div>
-        )
-      ) : !isEnded && !isCanceledOrSkipped && (
+      {!isEnded && !isCanceledOrSkipped && (
         <div className="px-4 pb-2 shrink-0">
           <DepartureReminder
             tripNumber={trip.trip}
@@ -438,7 +397,7 @@ export function TripDetailContent({
           bottom gap. */}
       <div
         data-sheet-scroll-area="true"
-        className={cn("flex-1 px-4 pt-1 pb-6", contentWidth, !shared && "overflow-y-auto overscroll-contain")}
+        className="flex-1 px-4 pt-1 pb-6 overflow-y-auto overscroll-contain"
       >
         {trip.inboundFerry && (
           <div className="mb-3 pb-3 border-b border-border">

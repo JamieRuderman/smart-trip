@@ -1,46 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 
-import stations from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
 import { getClosestStation } from "@/lib/stationUtils";
-import { SAN_FRANCISCO, validPlace, type Place } from "@/lib/places";
-import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
+import { placePath, validPlace, type Place } from "@/lib/places";
 import { useStationSelection } from "@/contexts/stationSelection";
 import { isFocusedTrainToday } from "@/lib/focusedTrip";
-import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
-import {
-  SHEET_ENTER_DELAY_MS,
-  SHEET_TRANSITION_MS,
-} from "@/lib/animationConstants";
+import { useOpenMapTrain } from "@/hooks/useTripViewNavigation";
+import { ZoneKey } from "@/components/SmartLineDiagram/ZoneKey";
 import { useNow } from "@/hooks/useNow";
-import {
-  MapTripDetailSheet,
-  type MapTripDetail,
-} from "@/components/MapTripDetailSheet";
+import { importPlace } from "./lazyPages";
 import { SmartLineDiagram } from "@/components/SmartLineDiagram";
-import { StationInfoSheet } from "@/components/StationInfoSheet";
-import { FerryTerminalSheet } from "@/components/FerryTerminalSheet";
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { Station } from "@/types/smartSchedule";
 
-const WINDSOR = stations[0];
-const LARKSPUR = stations[stations.length - 1];
 
 export default function MapDiagram() {
   const { trains } = useMapTrains();
-  const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
 
   const {
     fromPlace: fromSelection,
     toPlace: toSelection,
-    setFromStation,
-    setToStation,
     focusedTrip,
   } = useStationSelection();
+  const navigate = useNavigate();
+  const location = useLocation();
   const fromStation = validPlace(fromSelection);
   const toStation = validPlace(toSelection);
 
@@ -88,143 +74,32 @@ export default function MapDiagram() {
     return () => cancelAnimationFrame(id);
   }, []);
 
+  // The station page's route has no Suspense fallback of its own, so a tap
+  // before its chunk lands blanks the whole screen.
+  useEffect(() => {
+    void importPlace().catch(() => {});
+  }, []);
+
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [stationSheet, setStationSheet] = useState<Place | null>(null);
-  const [stationSheetOpen, setStationSheetOpen] = useState(false);
-  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const openMapTrain = useOpenMapTrain();
 
-  const handleTrainClick = useCallback((train: MapTrain) => {
-    setSelectedTrainKey(train.key);
-
-    if (
-      train.tripNumber == null ||
-      train.directionId == null ||
-      train.startTime == null
-    ) {
-      return;
-    }
-
-    const isSouthbound = train.directionId === 0;
-    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-    const match = findFullCorridorTrip(
-      train.directionId,
-      train.startTime,
-      train.tripNumber,
-    );
-    if (!match) return;
-
-    const displayFrom = pickDisplayFromStation(train, isSouthbound);
-    const displayTrip: ProcessedTrip = {
-      ...match,
-      fromStation: displayFrom,
-      toStation: terminus,
-    };
-    // Pull live delay/cancellation state for this run. The status map is
-    // keyed by scheduled departure at the full-corridor origin, which is
-    // exactly match.departureTime here.
-    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-    const realtimeStatus =
-      statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({ trip: displayTrip, realtimeStatus });
-  }, [sbStatusMaps, nbStatusMaps]);
-
-  useEffect(() => {
-    if (detailTrip) {
-      const id = window.setTimeout(
-        () => setDetailOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setDetailOpen(false);
-    }
-  }, [detailTrip]);
-
-  const closeDetail = useCallback(() => {
-    setDetailOpen(false);
-    setTimeout(() => {
-      setDetailTrip(null);
-      setSelectedTrainKey(null);
-    }, SHEET_TRANSITION_MS);
-  }, []);
-
-  const handleStationClick = useCallback((place: Place) => {
-    setStationSheet(place);
-  }, []);
-
-  useEffect(() => {
-    if (stationSheet) {
-      const id = window.setTimeout(
-        () => setStationSheetOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setStationSheetOpen(false);
-    }
-  }, [stationSheet]);
-
-  const closeStationSheet = useCallback(() => {
-    setStationSheetOpen(false);
-    setTimeout(() => setStationSheet(null), SHEET_TRANSITION_MS);
-  }, []);
-
-  // Tap an arrival row in a station sheet, or a ferry in San Francisco's →
-  // close that sheet and open the trip detail sheet for the train, with the
-  // tapped station (Larkspur for a ferry) as the displayed origin so only the
-  // upcoming portion of the trip shows.
-  const handleArrivalClick = useCallback(
-    (trip: ProcessedTrip, fromStation: Station, toStation: Station) => {
-      closeStationSheet();
-      // Direction is determined by the terminus passed in: southbound trips
-      // arrive at Larkspur, northbound at Windsor. The status map is keyed
-      // by departure at the full-corridor origin (trip.departureTime).
-      const isSouthbound = toStation === LARKSPUR;
-      const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-      const realtimeStatus =
-        statusMaps.statusMap.get(trip.departureTime) ?? null;
-      setDetailTrip({
-        trip: { ...trip, fromStation, toStation },
-        realtimeStatus,
-      });
+  const handleTrainClick = useCallback(
+    (train: MapTrain) => {
+      setSelectedTrainKey(train.key);
+      openMapTrain(train);
     },
-    [closeStationSheet, sbStatusMaps, nbStatusMaps],
+    [openMapTrain],
   );
-
-  // The context setters already drop the other endpoint when the new one
-  // collides — see StationSelectionContext.
-  const handleSetFrom = useCallback(
-    (s: Place) => {
-      setFromStation(s);
-      closeStationSheet();
-    },
-    [setFromStation, closeStationSheet],
+  const handleStationClick = useCallback(
+    (place: Place) => navigate({ pathname: placePath(place), search: location.search }),
+    [navigate, location.search],
   );
-
-  const handleSetTo = useCallback(
-    (s: Place) => {
-      setToStation(s);
-      closeStationSheet();
-    },
-    [setToStation, closeStationSheet],
-  );
-
-  const handleClearFrom = useCallback(() => {
-    setFromStation("");
-    closeStationSheet();
-  }, [setFromStation, closeStationSheet]);
-
-  const handleClearTo = useCallback(() => {
-    setToStation("");
-    closeStationSheet();
-  }, [setToStation, closeStationSheet]);
 
   return (
-    <>
-      <MapDiagramFrame
+    <MapDiagramFrame
         trainsCount={trains.length}
         onBackground={() => setSelectedTrainKey(null)}
+        overlay={<ZoneKey />}
       >
         {/* h-full (not min-h-full): SmartLineDiagram's root and SVG are
             height:100%, which only resolves against a parent with a DEFINITE
@@ -251,48 +126,6 @@ export default function MapDiagram() {
             className="min-h-full"
           />
         </div>
-      </MapDiagramFrame>
-
-      {stationSheet === SAN_FRANCISCO && (
-        <FerryTerminalSheet
-          isOpen={stationSheetOpen}
-          onClose={closeStationSheet}
-          currentTime={currentTime}
-          fromStation={fromStation}
-          toStation={toStation}
-          onSetFrom={handleSetFrom}
-          onSetTo={handleSetTo}
-          onClearFrom={handleClearFrom}
-          onClearTo={handleClearTo}
-          onFerryClick={(trip) => handleArrivalClick(trip, trip.fromStation, trip.toStation)}
-        />
-      )}
-
-      {stationSheet && stationSheet !== SAN_FRANCISCO && (
-        <StationInfoSheet
-          isOpen={stationSheetOpen}
-          onClose={closeStationSheet}
-          station={stationSheet}
-          currentTime={currentTime}
-          fromStation={fromStation}
-          toStation={toStation}
-          onSetFrom={handleSetFrom}
-          onSetTo={handleSetTo}
-          onClearFrom={handleClearFrom}
-          onClearTo={handleClearTo}
-          onArrivalClick={handleArrivalClick}
-        />
-      )}
-
-      {detailTrip && (
-        <MapTripDetailSheet
-          detail={detailTrip}
-          isOpen={detailOpen}
-          onClose={closeDetail}
-          currentTime={currentTime}
-          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
-        />
-      )}
-    </>
+    </MapDiagramFrame>
   );
 }

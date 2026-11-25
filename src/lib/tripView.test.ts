@@ -34,10 +34,14 @@ describe("shouldOpenTripViewOnLaunch", () => {
     expect(shouldOpenTripViewOnLaunch(focus("2026-10-10"), "", NOW)).toBe(false);
   });
 
-  it("lets a shared trip link or dev fixture win", () => {
+  it("opens a linked train, with or without a focus", () => {
     expect(
       shouldOpenTripViewOnLaunch(focus("2026-10-06"), "?trip=7&type=weekday", NOW),
-    ).toBe(false);
+    ).toBe(true);
+    expect(shouldOpenTripViewOnLaunch(null, "?trip=7&type=weekday", NOW)).toBe(true);
+  });
+
+  it("lets a dev fixture win", () => {
     expect(
       shouldOpenTripViewOnLaunch(focus("2026-10-06"), "?devTrip=delayed", NOW),
     ).toBe(false);

@@ -8,19 +8,16 @@ export const HEADER_HEIGHTS = {
     small: 88,
     large: 130,
   },
-  tabs: 56, // Height of Weekday/Weekend tabs
   fixed: 150, // Height of fixed elements
 };
 export const HEADER_MAX_HEIGHTS = {
   small:
     HEADER_HEIGHTS.title +
     HEADER_HEIGHTS.logo.small +
-    HEADER_HEIGHTS.tabs +
     HEADER_HEIGHTS.fixed,
   large:
     HEADER_HEIGHTS.title +
     HEADER_HEIGHTS.logo.large +
-    HEADER_HEIGHTS.tabs +
     HEADER_HEIGHTS.fixed,
 };
 
@@ -29,7 +26,6 @@ const SCROLL_START = 0; // Start shrinking immediately
 export type HeaderHeights = {
   title: number;
   logo: number;
-  tabs: number;
   total: number;
 };
 
@@ -38,22 +34,15 @@ const setHeaderHeights = (
   heights: HeaderHeights,
   scrolledPixels: number
 ) => {
-  // Sequential shrinking: Title → Logo → Tabs
+  // Sequential shrinking: Title → Logo
   const titleHeight = Math.max(0, Math.round(heights.title - scrolledPixels));
   const logoHeight = Math.max(
     0,
     Math.round(heights.logo - Math.max(0, scrolledPixels - heights.title))
   );
-  const tabsHeight = Math.max(
-    0,
-    Math.round(
-      heights.tabs - Math.max(0, scrolledPixels - heights.title - heights.logo)
-    )
-  );
 
   container.style.setProperty("--header-title-height", `${titleHeight}px`);
   container.style.setProperty("--header-logo-height", `${logoHeight}px`);
-  container.style.setProperty("--header-tabs-height", `${tabsHeight}px`);
 };
 
 export function useResponsiveHeaderHeights(): HeaderHeights {
@@ -75,12 +64,11 @@ export function useResponsiveHeaderHeights(): HeaderHeights {
     const logo = isLargeLogo
       ? HEADER_HEIGHTS.logo.large
       : HEADER_HEIGHTS.logo.small;
-    const total = HEADER_HEIGHTS.title + logo + HEADER_HEIGHTS.tabs;
+    const total = HEADER_HEIGHTS.title + logo;
 
     return {
       title: HEADER_HEIGHTS.title,
       logo,
-      tabs: HEADER_HEIGHTS.tabs,
       total,
     };
   }, [isLargeLogo]);

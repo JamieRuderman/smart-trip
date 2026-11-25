@@ -73,9 +73,13 @@ export const stateCardStyle: Record<TripState, string> = {
   ontime:   "bg-smart-train-green/5 border-smart-train-green/30 hover:bg-smart-train-green/10 focus-visible:border-smart-train-green/80 focus-visible:shadow-[0_0_0_1px_hsl(var(--smart-train-green)/0.8)]",
   delayed:  "bg-smart-gold/5 border-smart-gold/30 hover:bg-smart-gold/10 focus-visible:border-smart-gold/80 focus-visible:shadow-[0_0_0_1px_hsl(var(--smart-gold)/0.8)]",
   canceled: "bg-destructive/5 border-destructive/30 hover:bg-destructive/10 focus-visible:border-destructive/75 focus-visible:shadow-[0_0_0_1px_hsl(var(--destructive)/0.75)]",
-  past:     "bg-gradient-card border-border hover:bg-muted/50 focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
-  future:   "bg-gradient-card border-border hover:bg-muted/50 focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+  past:     "bg-background border-border hover:bg-muted focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
+  future:   "bg-background border-border hover:bg-muted focus-visible:border-foreground/45 focus-visible:shadow-[0_0_0_1px_hsl(var(--foreground)/0.45)]",
 };
+
+/** Ring for the next train's row, matching the my-trip row's. */
+export const nextTripRingStyle =
+  "ring-2 ring-smart-train-green ring-offset-2 ring-offset-background";
 
 /**
  * Blue "you're taking this train" card style. Blue == "my trip" throughout

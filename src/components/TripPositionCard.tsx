@@ -89,7 +89,9 @@ function LiveAgo({ timestamp }: { timestamp: number }) {
         className="inline-flex h-2 w-2 rounded-full bg-smart-train-green"
         aria-hidden="true"
       />
-      {ageSec >= 5 ? t("myTrip.liveAgo", { seconds: ageSec }) : t("myTrip.live")}
+      {ageSec >= 5
+        ? t("myTrip.liveAgo", { seconds: ageSec })
+        : t("myTrip.live")}
     </span>
   );
 }
@@ -106,6 +108,8 @@ interface TripPositionCardProps {
   /** The My Trip accent as a color (see useMyTripState) — the train's. */
   accentColor: string;
   timeFormat: "12h" | "24h";
+  /** A train the rider hasn't taken: "this train", not "your train". */
+  isPreview?: boolean;
 }
 
 /**
@@ -125,8 +129,10 @@ export function TripPositionCard({
   model,
   accentColor,
   timeFormat,
+  isPreview = false,
 }: TripPositionCardProps) {
   const { t } = useTranslation();
+  const context = isPreview ? "preview" : undefined;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -141,7 +147,7 @@ export function TripPositionCard({
       trip,
       isSouthbound(fromStation, toStation) ? "S" : "N",
       minutesOfDay(clockTime),
-      effectiveDelayMinutes(realtimeStatus) ?? 0,
+      effectiveDelayMinutes(realtimeStatus) ?? 0
     ),
     departed: hasStarted,
     arrived: progress.isEnded || model.isAtDestination,
@@ -163,12 +169,12 @@ export function TripPositionCard({
       headline = t("myTrip.arrivedAt", { station: toStation });
       break;
     case "atOrigin":
-      headline = t("myTrip.trainAt", { station: fromStation });
+      headline = t("myTrip.trainAt", { context, station: fromStation });
       break;
     case "approaching":
       headline = position.stopped
-        ? t("myTrip.trainAt", { station: position.station })
-        : t("myTrip.trainHeadingTo", { station: position.station });
+        ? t("myTrip.trainAt", { context, station: position.station })
+        : t("myTrip.trainHeadingTo", { context, station: position.station });
       details = [t("myTrip.stopsAway", { count: position.stopsAway })];
       if (position.distanceMi != null) details.push(miles(position.distanceMi));
       break;
@@ -179,8 +185,8 @@ export function TripPositionCard({
       headline = !stop
         ? t("tracker.onTheWay")
         : atStop
-          ? t("tracker.atStop", { stop })
-          : t("myTrip.nextStop", { station: stop });
+        ? t("tracker.atStop", { stop })
+        : t("myTrip.nextStop", { station: stop });
       if (!atStop && distanceMi != null) details.push(miles(distanceMi));
       if (model.speedMph != null) {
         details.push(t("tracker.speedMph", { speed: model.speedMph }));
@@ -188,15 +194,12 @@ export function TripPositionCard({
       break;
     }
     case "waiting":
-      headline = t("myTrip.positionWaiting");
+      headline = t("myTrip.positionWaiting", { context });
       break;
   }
 
   return (
-    <SectionCard
-      className="p-4 md:p-5"
-      aria-label={t("myTrip.positionTitle")}
-    >
+    <SectionCard className="p-4 md:p-5" aria-label={t("myTrip.positionTitle")}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {t("myTrip.positionTitle")}
@@ -210,7 +213,16 @@ export function TripPositionCard({
         ) : null}
       </div>
 
-      <p className="mt-2 text-lg font-semibold leading-snug">{headline}</p>
+      <p
+        className={cn(
+          "mt-2 leading-snug",
+          position.phase === "waiting"
+            ? "text-sm text-muted-foreground"
+            : "text-lg font-semibold"
+        )}
+      >
+        {headline}
+      </p>
       {details.length > 0 && (
         <p className="text-sm text-muted-foreground">{details.join(" · ")}</p>
       )}
@@ -313,11 +325,13 @@ export function TripPositionCard({
               <svg
                 className={cn(
                   "absolute inset-0 overflow-visible",
-                  isEstimate && "opacity-75",
+                  isEstimate && "opacity-75"
                 )}
                 width={MARKER_BOX_PX}
                 height={MARKER_BOX_PX}
-                viewBox={`${-MARKER_BOX_R} ${-MARKER_BOX_R} ${2 * MARKER_BOX_R} ${2 * MARKER_BOX_R}`}
+                viewBox={`${-MARKER_BOX_R} ${-MARKER_BOX_R} ${
+                  2 * MARKER_BOX_R
+                } ${2 * MARKER_BOX_R}`}
               >
                 <TrainGlyph
                   accent={accentColor}
@@ -336,7 +350,9 @@ export function TripPositionCard({
           {/* Start the origin label at its dot's left edge. */}
           <div
             className="min-w-0"
-            style={{ paddingLeft: `calc(${LEAD_IN_PCT}% - ${ENDPOINT_DOT_PX / 2}px)` }}
+            style={{
+              paddingLeft: `calc(${LEAD_IN_PCT}% - ${ENDPOINT_DOT_PX / 2}px)`,
+            }}
           >
             <p className="truncate font-medium">{fromStation}</p>
             <TimeDisplay

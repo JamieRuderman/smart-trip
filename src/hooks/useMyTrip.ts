@@ -12,7 +12,7 @@ import { TOKEN, TRAIN_COLORS } from "@/components/SmartLineDiagram/tokens";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 
-type Accent = "past" | "canceled" | "delayed" | "onTrip";
+type Accent = "past" | "canceled" | "delayed" | "onTrip" | "preview";
 
 /** Each accent as a solid color, for drawing — the train marker takes the line
  *  map's my-trip blue and running-late gold, so the two stay in step. */
@@ -21,6 +21,16 @@ const ACCENT_COLOR: Record<Accent, string> = {
   canceled: "hsl(var(--destructive))",
   delayed: TRAIN_COLORS.delayed,
   onTrip: TOKEN.myTrip,
+  preview: "hsl(var(--smart-train-green))",
+};
+
+/** Each accent as a solid background for the white-on-colour chrome. */
+const ACCENT_BG: Record<Accent, string> = {
+  past: stateBg.past,
+  canceled: stateBg.canceled,
+  delayed: stateBg.delayed,
+  onTrip: "bg-my-trip-background",
+  preview: stateBg.ontime,
 };
 
 export interface MyTripInput {
@@ -31,10 +41,14 @@ export interface MyTripInput {
   live: TripRealtimeStatus | null;
   lastUpdated: Date | null;
   currentTime: Date;
+  /** A train the rider is looking at but hasn't taken: `focusedTrip` is built
+   *  from the previewed train and never stored. */
+  isPreview?: boolean;
 }
 
 export interface MyTripState {
   focusedTrip: FocusedTrip;
+  isPreview: boolean;
   trip: ProcessedTrip;
   live: TripRealtimeStatus | null;
   /** The run is on a later calendar day than today (e.g. a weekend train
@@ -68,6 +82,7 @@ export function useMyTripState({
   live,
   lastUpdated,
   currentTime,
+  isPreview = false,
 }: MyTripInput): MyTripState {
   const { i18n } = useTranslation();
   const isFutureService = !isFocusedTripToday(focusedTrip, currentTime);
@@ -91,7 +106,7 @@ export function useMyTripState({
     currentTime: clockTime,
     realtimeStatus: live,
     isNextTrip: false,
-    isFocused: true,
+    isFocused: !isPreview,
     trackVehicle: !isFutureService,
   });
 
@@ -103,7 +118,7 @@ export function useMyTripState({
     lastUpdated,
     realtimeStatus: live,
     progress,
-    isFocused: true,
+    isFocused: !isPreview,
   });
 
   const accent: Accent = progress.isEnded
@@ -112,12 +127,14 @@ export function useMyTripState({
       ? "canceled"
       : model.isDelayed
         ? "delayed"
-        : "onTrip";
-  const accentBg =
-    accent === "onTrip" ? "bg-my-trip-background" : stateBg[accent];
+        : isPreview
+          ? "preview"
+          : "onTrip";
+  const accentBg = ACCENT_BG[accent];
 
   return {
     focusedTrip,
+    isPreview,
     trip,
     live,
     isFutureService,

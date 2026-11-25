@@ -153,15 +153,12 @@ export function useTripDetailModel({
 
   const transfer = ferryTransfer(trip, realtimeStatus);
 
-  const fareInfo =
-    preferences.selectedFareType !== "none"
-      ? calculateFare(
-          fromStation,
-          toStation,
-          preferences.selectedFareType,
-          transfer != null,
-        )
-      : null;
+  const fareInfo = calculateFare(
+    fromStation,
+    toStation,
+    preferences.selectedFareType,
+    transfer != null,
+  );
 
   const fromIdx = stationIndexMap[fromStation];
   const toIdx = stationIndexMap[toStation];

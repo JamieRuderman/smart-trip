@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Hand } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { MapHeader } from "./MapHeader";
 
 interface MapDiagramFrameProps {
   /** Live train count for the header badge. Omit/null for the loading shell so
@@ -10,6 +8,8 @@ interface MapDiagramFrameProps {
   /** Background-tap handler for the scroll container (clears train selection).
    *  Absent on the shell, which has nothing to deselect. */
   onBackground?: () => void;
+  /** Pinned over the map, outside its scroll area. */
+  overlay?: ReactNode;
   children?: ReactNode;
 }
 
@@ -25,53 +25,24 @@ interface MapDiagramFrameProps {
 export function MapDiagramFrame({
   trainsCount = null,
   onBackground,
+  overlay,
   children,
 }: MapDiagramFrameProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { t } = useTranslation();
-
-  const backToSchedule = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  };
-
   return (
     <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
-      <header
-        className="shrink-0 bg-smart-train-green px-3 pb-2 flex items-center gap-2"
-        style={{ paddingTop: "calc(12px + var(--safe-area-top))" }}
-      >
-        <button
-          type="button"
-          onClick={backToSchedule}
-          className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/15 text-white hover:bg-white/25"
-          aria-label={t("mapDiagram.closeMap")}
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-1.5 text-xs text-white/90 flex-1 min-w-0">
-          <Hand className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t("mapDiagram.tapHint")}</span>
-        </div>
-        {trainsCount != null && (
-          <span className="text-xs font-semibold bg-white/15 text-white rounded-full px-2.5 py-1 whitespace-nowrap">
-            {t("mapDiagram.trainsCount", { count: trainsCount })}
-          </span>
-        )}
-      </header>
+      <MapHeader view="line" trainsCount={trainsCount} />
 
       {/* Background tap clears the train selection; inner station/train clicks
           stopPropagation so they don't also clear it. pb-safe reserves the iOS
           home-indicator space so the diagram's bottom (ferry label) clears it. */}
-      <div
-        className="flex-1 min-h-0 overflow-auto pb-safe"
-        onClick={onBackground}
-      >
-        {children}
+      <div className="relative flex-1 min-h-0">
+        <div
+          className="h-full overflow-auto pb-safe"
+          onClick={onBackground}
+        >
+          {children}
+        </div>
+        {overlay}
       </div>
     </div>
   );

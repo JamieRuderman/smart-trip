@@ -2,8 +2,7 @@ import { memo } from "react";
 import smartLogo from "@/assets/smart-logo.svg";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, HeartHandshake } from "lucide-react";
+import { HeartHandshake } from "lucide-react";
 import type { Station } from "@/types/smartSchedule";
 import type { Place } from "@/lib/places";
 import { type HeaderHeights } from "@/hooks/useHeaderHeights";
@@ -14,11 +13,9 @@ import { useTranslation } from "react-i18next";
 export type StickyHeaderProps = {
   fromStation: Place | "";
   toStation: Place | "";
-  scheduleType: "weekday" | "weekend";
   headerHeights: HeaderHeights;
   onFromStationChange: (place: Place) => void;
   onToStationChange: (place: Place) => void;
-  onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   onSwapStations: () => void;
   closestStation?: Station | null;
   locationLoading?: boolean;
@@ -28,11 +25,9 @@ export type StickyHeaderProps = {
 export const StickyHeader = memo(function StickyHeader({
   fromStation,
   toStation,
-  scheduleType,
   headerHeights,
   onFromStationChange,
   onToStationChange,
-  onScheduleTypeChange,
   onSwapStations,
   closestStation,
   locationLoading,
@@ -112,40 +107,6 @@ export const StickyHeader = memo(function StickyHeader({
               locationLoading={locationLoading}
               onRequestLocation={onRequestLocation}
             />
-
-            {/* Schedule Type Tabs */}
-            <ShrinkingContainer
-              heightVar="--header-tabs-height"
-              maxHeight={headerHeights.tabs}
-            >
-              <Tabs
-                value={scheduleType}
-                onValueChange={(value) =>
-                  onScheduleTypeChange(value as "weekday" | "weekend")
-                }
-                aria-label={t("header.selectScheduleType")}
-                className="py-2"
-              >
-                <TabsList className="grid grid-cols-2 w-full" role="tablist">
-                  <TabsTrigger
-                    value="weekday"
-                    className="flex items-center gap-2"
-                    aria-label={t("header.weekdaySchedule")}
-                  >
-                    <Calendar className="h-4 w-4" aria-hidden="true" />
-                    {t("header.weekday")}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="weekend"
-                    className="flex items-center gap-2"
-                    aria-label={t("header.weekendSchedule")}
-                  >
-                    <Calendar className="h-4 w-4" aria-hidden="true" />
-                    {t("header.weekend")}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </ShrinkingContainer>
           </CardContent>
         </Card>
       </div>

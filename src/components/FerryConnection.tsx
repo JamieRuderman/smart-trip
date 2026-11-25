@@ -3,6 +3,7 @@ import { TimeDisplay } from "./TimeDisplay";
 import { APP_CONSTANTS } from "@/lib/fareConstants";
 import { Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { stateText } from "@/lib/tripTheme";
 import { isTimeInPast } from "@/lib/scheduleUtils";
 import { FerryTransfer } from "./FerryLeg";
 import { useTranslation } from "react-i18next";
@@ -15,6 +16,8 @@ interface FerryConnectionProps {
   timeFormat?: "12h" | "24h";
   inbound?: boolean; // when true, show ferry arrival then train departure
   currentTime?: Date;
+  /** The train has left: fade the line with the rest of the row. */
+  isPast?: boolean;
 }
 
 export function FerryConnection({
@@ -24,6 +27,7 @@ export function FerryConnection({
   timeFormat = APP_CONSTANTS.DEFAULT_TIME_FORMAT,
   inbound = false,
   currentTime,
+  isPast = false,
 }: FerryConnectionProps) {
   const { t } = useTranslation();
 
@@ -43,28 +47,20 @@ export function FerryConnection({
   return (
     <div
       className={cn(
-        "flex-grow flex items-center justify-end text-muted-foreground",
-        isMobile ? "flex-row-reverse items-start gap-2 pt-2" : "gap-3"
+        "flex flex-wrap items-center gap-x-2 gap-y-1 text-xs",
+        isPast ? stateText.past : "text-muted-foreground",
+        isMobile ? "pt-1" : "flex-grow justify-end",
       )}
     >
-      <div className={cn("flex flex-col gap-1", isMobile ? "items-start" : "items-end")}>
-        <div className="flex items-baseline gap-1 text-sm">
-          <span className="text-muted-foreground">{compactLabel}</span>
-          <TimeDisplay time={compactTime} format={timeFormat} />
-        </div>
-        <FerryTransfer minutes={minutes} className="gap-2 leading-none" />
-      </div>
-      <div
-        className={cn(
-          "flex flex-col justify-center items-center gap-1",
-          isMobile ? "border-r pr-3 mr-1" : "border-l pl-4 ml-1"
-        )}
-      >
-        <Ship className="h-5 w-5" />
-        <span className="text-[10px] uppercase">
-          {inbound ? t("ferry.inbound") : t("ferry.outbound")}
-        </span>
-      </div>
+      <span className="flex items-center gap-1 whitespace-nowrap">
+        <Ship className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {compactLabel}
+        <TimeDisplay time={compactTime} format={timeFormat} />
+      </span>
+      <FerryTransfer
+        minutes={minutes}
+        className={cn("gap-1 whitespace-nowrap", isPast && stateText.past)}
+      />
     </div>
   );
 }

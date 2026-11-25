@@ -6,7 +6,7 @@
  *   1. Zoomable group — wraps the path, zone segments, station dots, train
  *      markers, my-trip dot, and ferry glyph. Pan/zoom transform on
  *      this `<g>` makes everything inside scale together.
- *   2. Label layer — station labels, zone labels, and ferry text. Lives
+ *   2. Label layer — station labels and ferry text. Lives
  *      outside the zoomable group so its font sizes can stay at constant
  *      CSS pixel targets regardless of zoom; each label hand-applies the
  *      pan/zoom transform to its anchor coords.
@@ -39,7 +39,6 @@ import { StationDot } from "./StationDot";
 import { StationLabel } from "./StationLabel";
 import { UserLocationMarker } from "./UserLocationMarker";
 import { TrainMarker } from "./TrainMarker";
-import { ZoneLabels } from "./ZoneLabels";
 import { ZoneSegments } from "./ZoneSegments";
 import { DoubleTrackSegments } from "./DoubleTrackSegments";
 import { FerryTerminus } from "./FerryTerminus";
@@ -75,9 +74,8 @@ export interface SmartLineDiagramProps {
 }
 
 // Render window — extends past both edges of the track so wide station
-// labels ("Marin Civic Center", "Novato Downtown") fit on the right and
-// zone headings ("Zone 1") fit on the left at phone widths. The track
-// itself runs roughly x=180–560 in viewBox space.
+// labels ("Marin Civic Center", "Novato Downtown") fit on the right at
+// phone widths. The track itself runs roughly x=180–560 in viewBox space.
 // Vertically CENTER the content (Windsor at y≈49 down through the ferry
 // labels) with balanced padding top and bottom, rather than padding only the
 // bottom (which left the diagram bottom-heavy). The bottom must clear the
@@ -85,7 +83,7 @@ export interface SmartLineDiagramProps {
 // small fit scales they occupy more viewBox units and reach ~y1464, hence the
 // bottom sits at 1470 (≈30 units below) while the top sits ~30 units above
 // the content, keeping the two margins close across viewports.
-const VIEW_BOX = { x: -50, y: 20, width: 900, height: 1450 } as const;
+const VIEW_BOX = { x: 110, y: 20, width: 770, height: 1450 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -310,15 +308,6 @@ export function SmartLineDiagram({
 
         {/* Label layer — constant CSS-pixel font sizes, hand-affined
             positions. Render above the zoomed group so labels paint on top. */}
-        {colorTrackByZone && (
-          <ZoneLabels
-            screenScale={screenScale}
-            tx={tx}
-            ty={ty}
-            scale={scale}
-          />
-        )}
-
         {stationList.map((st, i, arr) => {
           const isEnlarged = enlargedStations
             ? enlargedStations.has(st.station)

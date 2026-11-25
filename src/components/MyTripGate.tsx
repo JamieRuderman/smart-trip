@@ -10,6 +10,7 @@ import {
 interface MyTripGateProps {
   focusedTrip: FocusedTrip;
   currentTime: Date;
+  isPreview?: boolean;
   children: (state: MyTripState) => ReactNode;
 }
 
@@ -24,7 +25,7 @@ export function MyTripGate(props: MyTripGateProps) {
   return <LiveGate key={focusedTripKey(props.focusedTrip)} {...props} />;
 }
 
-function LiveGate({ focusedTrip, currentTime, children }: MyTripGateProps) {
+function LiveGate({ focusedTrip, currentTime, isPreview, children }: MyTripGateProps) {
   const { trip, live, lastUpdated } = useFocusedTripLive(
     focusedTrip,
     currentTime.getTime(),
@@ -32,7 +33,7 @@ function LiveGate({ focusedTrip, currentTime, children }: MyTripGateProps) {
   if (!trip) return null;
   return (
     <StateGate
-      input={{ focusedTrip, trip, live, lastUpdated, currentTime }}
+      input={{ focusedTrip, trip, live, lastUpdated, currentTime, isPreview }}
       render={children}
     />
   );

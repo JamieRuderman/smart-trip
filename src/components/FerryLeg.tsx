@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   ChevronDown,
   Circle,
-  Clock,
   ExternalLink,
   Ship,
 } from "lucide-react";
@@ -277,7 +276,7 @@ export function FerryTransfer({
       {tight ? (
         <AlertTriangle className="h-3 w-3" aria-hidden="true" />
       ) : (
-        <Clock className="h-3 w-3" aria-hidden="true" />
+        <WalkIcon className="h-3.5 w-3.5" aria-hidden="true" />
       )}
       {minutes} {t("ferry.minTransfer")}
     </span>

@@ -23,13 +23,17 @@ import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
 import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
-import { MapPreviewCard } from "./MapPreviewCard";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
 import { ActiveTripBar } from "./ActiveTripBar";
 import { EmptyState } from "./EmptyState";
 import { TripDetailSheet } from "./TripDetailSheet";
 import { ScheduleDaySwitchPrompt } from "./ScheduleDaySwitchPrompt";
 import { getDevFixture } from "@/lib/devFixtures";
+import { useOpenTripView } from "@/hooks/useTripViewNavigation";
+
+// Opening a train leaves this page, so component state would collapse the
+// earlier trains the rider expanded by the time they come back.
+let showAllTripsOnReturn = false;
 
 export function TrainScheduleApp() {
   const { version: scheduleDataVersion } = useScheduleData();
@@ -47,18 +51,25 @@ export function TrainScheduleApp() {
     toStation,
     viaFerry,
     scheduleType,
-    selectedTripNumber,
     setFromStation,
     setToStation,
     setScheduleType,
     swapStations,
-    setSelectedTrip,
+    setPreviewTrip,
     focusedTrip,
   } = useStationSelection();
 
   const currentTime = useMinuteClock();
+  const openTripView = useOpenTripView();
 
-  const [showAllTrips, setShowAllTrips] = useState(false);
+  // The previewed train lives until the rider is back on the schedule, so a
+  // trip page reached again through history still shows it.
+  useEffect(() => setPreviewTrip(null), [setPreviewTrip]);
+
+  const [showAllTrips, setShowAllTrips] = useState(() => showAllTripsOnReturn);
+  useEffect(() => {
+    showAllTripsOnReturn = showAllTrips;
+  }, [showAllTrips]);
   const toggleShowAllTrips = useCallback(() => {
     setShowAllTrips((prev) => !prev);
   }, []);
@@ -171,6 +182,17 @@ export function TrainScheduleApp() {
       ? focusedTrip.tripNumber
       : null;
 
+  const openTrip = useCallback(
+    (tripNumber: number) => {
+      openTripView(
+        tripNumber === focusedTripNumber || !fromPlace || !toPlace
+          ? null
+          : { tripNumber, from: fromPlace, to: toPlace, scheduleType },
+      );
+    },
+    [focusedTripNumber, fromPlace, toPlace, scheduleType, openTripView],
+  );
+
   return (
     <div
       className="min-h-[100dvh] bg-card md:bg-background relative"
@@ -179,11 +201,9 @@ export function TrainScheduleApp() {
       <StickyHeader
         fromStation={fromPlace}
         toStation={toPlace}
-        scheduleType={scheduleType}
         headerHeights={headerHeights}
         onFromStationChange={setFromStation}
         onToStationChange={setToStation}
-        onScheduleTypeChange={setScheduleType}
         onSwapStations={swapStations}
         closestStation={closestStation}
         locationLoading={locationLoading}
@@ -222,22 +242,20 @@ export function TrainScheduleApp() {
             onToggleShowAllTrips={toggleShowAllTrips}
             timeFormat="12h"
             scheduleType={scheduleType}
-            selectedTripNumber={selectedTripNumber}
-            onSelectTrip={setSelectedTrip}
+            onScheduleTypeChange={setScheduleType}
+            onSelectTrip={openTrip}
             focusedTripNumber={focusedTripNumber}
           />
         )}
         {fromStation && toStation && filteredTrips.length === 0 && (
-          <NoTripsFound />
+          <NoTripsFound
+            scheduleType={scheduleType}
+            onScheduleTypeChange={setScheduleType}
+          />
         )}
 
         {/* Fare Section */}
         {fromPlace && toPlace && <FareSection from={fromPlace} to={toPlace} />}
-
-        {/* Geographic map — secondary; lives below the trip-planning content
-            since regulars rarely need it but newcomers may want geographic
-            context after they've picked a route. */}
-        <MapPreviewCard />
 
         {/* Bottom bar */}
         <BottomInfoBar />

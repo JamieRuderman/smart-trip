@@ -1,7 +1,8 @@
 import type { ServiceAlertData } from "@/types/smartSchedule";
 import { useDismissedAlerts } from "@/hooks/useDismissedAlerts";
-import { AlertTriangle, X } from "lucide-react";
-import { useEffect } from "react";
+import { AlertTriangle, ChevronDown, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
 import { formatStartedLabel, parseDateOrInstant } from "@/lib/timeUtils";
@@ -17,6 +18,13 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
     useDismissedAlerts();
 
   const activeAlerts = alerts;
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggleExpanded = (fingerprint: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(fingerprint)) next.add(fingerprint);
+      return next;
+    });
 
   useEffect(() => {
     pruneExpired();
@@ -52,6 +60,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
     <>
       {visibleAlerts.map((alert) => {
         const startedAt = alert.startsAt ? parseDateOrInstant(alert.startsAt) : NaN;
+        const isExpanded = expanded.has(alert.fingerprint);
         return (
           <SectionCard
             key={alert.fingerprint}
@@ -60,16 +69,31 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
             <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between gap-3 text-smart-gold-foreground">
               <div className="flex items-start gap-2.5 flex-1 min-w-0">
                 <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0 break-words">
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(alert.fingerprint)}
+                  disabled={!alert.message}
+                  aria-expanded={alert.message ? isExpanded : undefined}
+                  className="flex-1 min-w-0 break-words text-left"
+                >
                   <div className="font-semibold text-sm">
                     {alert.title ?? t("serviceAlert.sectionTitle")}
                   </div>
-                  {alert.message && (
-                    <p className="text-xs mt-1 max-h-32 overflow-y-auto overscroll-contain pr-1">
+                  {alert.message && isExpanded && (
+                    <p className="text-xs mt-1 pr-1 max-h-64 overflow-y-auto overscroll-contain">
                       {alert.message}
                     </p>
                   )}
-                </div>
+                  {alert.message && (
+                    <span className="mt-1 inline-flex items-center gap-0.5 text-xs">
+                      {t(isExpanded ? "serviceAlert.showLess" : "serviceAlert.showMore")}
+                      <ChevronDown
+                        className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  )}
+                </button>
               </div>
               <div className="flex flex-col items-end shrink-0 -mr-2 -mt-2">
                 <button

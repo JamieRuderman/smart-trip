@@ -31,8 +31,8 @@ interface ScheduleResultsProps {
   /** Schedule (weekday/weekend) these results belong to — forwarded to each
    *  row's trip sheet so the reminder/focus control uses it instead of today. */
   scheduleType: "weekday" | "weekend";
-  selectedTripNumber: number | null;
-  onSelectTrip: (tripNumber: number | null) => void;
+  onScheduleTypeChange: (type: "weekday" | "weekend") => void;
+  onSelectTrip: (tripNumber: number) => void;
   /** The user's focused ("Go") trip number when it belongs to the displayed
    *  leg — that row is highlighted blue (the trip bar also links to it; we
    *  intentionally keep it in the list rather than hiding it). */
@@ -48,7 +48,7 @@ export function ScheduleResults({
   onToggleShowAllTrips,
   timeFormat,
   scheduleType,
-  selectedTripNumber,
+  onScheduleTypeChange,
   onSelectTrip,
   focusedTripNumber = null,
 }: ScheduleResultsProps) {
@@ -95,15 +95,6 @@ export function ScheduleResults({
 
   const displayedTrips = filteredTrips.slice(sliceStart);
 
-  const visibleTrips =
-    selectedTripNumber != null &&
-    !showAllTrips &&
-    !displayedTrips.some((trip) => trip.trip === selectedTripNumber)
-      ? filteredTrips.filter(
-          (trip) =>
-            trip.trip === selectedTripNumber || displayedTrips.includes(trip),
-        )
-      : displayedTrips;
 
   // The "Next" row: the not-yet-departed trip with the EARLIEST live-aware
   // departure — not simply the first in schedule order, because a delayed
@@ -112,7 +103,7 @@ export function ScheduleResults({
   let nextVisibleIndex = -1;
   if (!isFutureSchedule) {
     let nextVisibleMinutes = Infinity;
-    visibleTrips.forEach((trip, i) => {
+    displayedTrips.forEach((trip, i) => {
       const departureTime = tripEnds(trip, realtimeStatusMap.get(trip.departureTime)).start;
       if (isTimeInPast(currentTime, departureTime)) return;
       const minutes = parseTimeToMinutes(departureTime);
@@ -135,6 +126,8 @@ export function ScheduleResults({
     <SectionCard>
       <ScheduleHeader
         direction={direction.direction}
+        scheduleType={scheduleType}
+        onScheduleTypeChange={onScheduleTypeChange}
         currentTime={currentTime}
         earlierTrainsToggle={earlierTrainsToggle}
         onToggleShowAllTrips={onToggleShowAllTrips}
@@ -152,11 +145,11 @@ export function ScheduleResults({
           nextTripIndex === -1 && !showAllTrips && <NoMoreTrainsAlert />
         )}
         <div
-          className="space-y-3"
+          className="space-y-2"
           role="list"
           aria-label="Train schedule results"
         >
-          {visibleTrips.map((trip, index) => {
+          {displayedTrips.map((trip, index) => {
             // Live-aware: a delayed train past its scheduled slot but before
             // its live departure hasn't departed (keeps the aria "Departed"
             // announcement and badge flags consistent with the Next logic).
@@ -182,12 +175,10 @@ export function ScheduleResults({
                 isFocused={isFocused}
                 timeFormat={timeFormat}
                 realtimeStatus={realtimeStatus}
-                lastUpdated={lastUpdated}
                 fromStation={fromStation}
                 toStation={toStation}
                 currentTime={currentTime}
                 scheduleType={scheduleType}
-                selectedTripNumber={selectedTripNumber}
                 onSelectTrip={onSelectTrip}
               />
             );

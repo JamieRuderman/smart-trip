@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Calendar, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { computeRealtimeAgeLabel } from "@/lib/realtimeAgeLabel";
@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 interface ScheduleHeaderProps {
   direction: "southbound" | "northbound";
+  scheduleType: "weekday" | "weekend";
+  onScheduleTypeChange: (type: "weekday" | "weekend") => void;
   currentTime: Date;
   /** Which earlier-trains button to offer, if any: "show" while departed rows
    *  are hidden above the list, "hide" once they're expanded. */
@@ -24,6 +26,8 @@ interface ScheduleHeaderProps {
 
 export function ScheduleHeader({
   direction,
+  scheduleType,
+  onScheduleTypeChange,
   currentTime,
   earlierTrainsToggle,
   onToggleShowAllTrips,
@@ -75,6 +79,30 @@ export function ScheduleHeader({
           </div>
         )}
       </CardTitle>
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          {t(
+            scheduleType === "weekday"
+              ? "header.weekdaySchedule"
+              : "header.weekendSchedule",
+          )}
+        </span>
+        <span aria-hidden="true">·</span>
+        <button
+          type="button"
+          onClick={() =>
+            onScheduleTypeChange(scheduleType === "weekday" ? "weekend" : "weekday")
+          }
+          className="font-medium text-primary underline-offset-2 hover:underline"
+        >
+          {t(
+            scheduleType === "weekday"
+              ? "schedule.showWeekend"
+              : "schedule.showWeekday",
+          )}
+        </button>
+      </p>
       {earlierTrainsToggle === "show" && (
         <Button
           variant="outline"

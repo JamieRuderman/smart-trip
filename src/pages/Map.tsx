@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ChevronLeft } from "lucide-react";
 import { mapboxToken } from "@/lib/env";
 import {
   STATION_ORDER,
@@ -12,21 +10,15 @@ import {
   MAPBOX_STYLE_DARK,
   MAP_FIT_PADDING,
 } from "@/lib/mapConstants";
-import stations, { STATION_COORDINATES } from "@/data/stations";
+import { STATION_COORDINATES } from "@/data/stations";
 import { useMapTrains, type MapTrain } from "@/hooks/useMapTrains";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MapLiveDataChip } from "@/components/MapLiveDataChip";
+import { MapHeader } from "@/components/MapHeader";
 import { useTheme } from "@/components/theme-context";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { useAllRealtimeStatusMaps } from "@/hooks/useAllRealtimeStatusMaps";
-import {
-  MapTripDetailSheet,
-  type MapTripDetail,
-} from "@/components/MapTripDetailSheet";
-import { findFullCorridorTrip } from "@/lib/scheduleUtils";
-import { pickDisplayFromStation } from "@/lib/pickDisplayFromStation";
-import { SHEET_ENTER_DELAY_MS, SHEET_TRANSITION_MS } from "@/lib/animationConstants";
+import { useGoBack, useOpenMapTrain } from "@/hooks/useTripViewNavigation";
 import {
   MARKER_COLOR,
   createStationElement,
@@ -34,10 +26,7 @@ import {
   createUserLocationElement,
   trainMarkerSignature,
 } from "@/lib/mapMarkers";
-import type { ProcessedTrip } from "@/lib/scheduleUtils";
 
-const WINDSOR = stations[0];
-const LARKSPUR = stations[stations.length - 1];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,25 +39,10 @@ function resolveTheme(theme: "dark" | "light" | "system"): "dark" | "light" {
 
 // ─── Map page component ───────────────────────────────────────────────────────
 
-/** Navigate back to the schedule, preferring history-back so query params
- *  and scroll position are preserved. Falls back to a direct navigate when
- *  the user landed on /map via a direct link. */
-function useBackToSchedule(): () => void {
-  const navigate = useNavigate();
-  const location = useLocation();
-  return useCallback(() => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate({ pathname: "/", search: location.search });
-    }
-  }, [navigate, location.search]);
-}
-
 /** Thin wrapper that swaps in a configuration-help screen when the Mapbox
  *  token is missing. Keeps MapContents' hooks out of a conditional branch. */
 export default function Map() {
-  const backToSchedule = useBackToSchedule();
+  const backToSchedule = useGoBack("/");
   if (!mapboxToken) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-6">
@@ -92,7 +66,6 @@ export default function Map() {
 }
 
 function MapContents() {
-  const backToSchedule = useBackToSchedule();
   const { theme } = useTheme();
   const { trains, lastUpdated, isUpstreamDown } = useMapTrains();
   const isOnline = useOnlineStatus();
@@ -102,85 +75,15 @@ function MapContents() {
     autoRequestOnWeb: true,
   });
   const [selectedTrainKey, setSelectedTrainKey] = useState<string | null>(null);
-  const [detailTrip, setDetailTrip] = useState<MapTripDetail | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const openMapTrain = useOpenMapTrain();
 
-  const { sb: sbStatusMaps, nb: nbStatusMaps } = useAllRealtimeStatusMaps();
-
-  const handleTrainClick = useCallback((train: MapTrain) => {
-    setSelectedTrainKey(train.key);
-
-    if (
-      train.tripNumber == null ||
-      train.directionId == null ||
-      train.startTime == null
-    ) {
-      return;
-    }
-
-    const isSouthbound = train.directionId === 0;
-    const terminus = isSouthbound ? LARKSPUR : WINDSOR;
-    const match = findFullCorridorTrip(
-      train.directionId,
-      train.startTime,
-      train.tripNumber,
-    );
-    if (!match) return;
-
-    const displayFrom = pickDisplayFromStation(train, isSouthbound);
-    // Override from/to so StopTimeline slices `times` to only upcoming stops;
-    // keep match's full-corridor departure/arrival times so the header still
-    // reads as the trip's origin → terminus (e.g. "11:31 AM → 12:55 PM"
-    // rather than a narrowed leg's times).
-    const displayTrip: ProcessedTrip = {
-      ...match,
-      fromStation: displayFrom,
-      toStation: terminus,
-    };
-    // Pull live delay/cancellation state for this specific run. The status
-    // map is keyed by scheduled departure at the full-corridor origin, which
-    // is exactly match.departureTime here.
-    const statusMaps = isSouthbound ? sbStatusMaps : nbStatusMaps;
-    const realtimeStatus =
-      statusMaps.statusMap.get(match.departureTime) ?? null;
-    setDetailTrip({ trip: displayTrip, realtimeStatus });
-  }, [sbStatusMaps, nbStatusMaps]);
-
-  useEffect(() => {
-    if (detailTrip) {
-      const id = window.setTimeout(
-        () => setDetailOpen(true),
-        SHEET_ENTER_DELAY_MS,
-      );
-      return () => window.clearTimeout(id);
-    } else {
-      setDetailOpen(false);
-    }
-  }, [detailTrip]);
-
-  // Tracked so we can cancel the deferred unmount if the sheet re-opens
-  // mid-transition or the page unmounts.
-  const closeTimerRef = useRef<number | null>(null);
-  const closeDetail = useCallback(() => {
-    setDetailOpen(false);
-    if (closeTimerRef.current != null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setDetailTrip(null);
-      setSelectedTrainKey(null);
-      closeTimerRef.current = null;
-    }, SHEET_TRANSITION_MS);
-  }, []);
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current != null) {
-        window.clearTimeout(closeTimerRef.current);
-      }
+  const handleTrainClick = useCallback(
+    (train: MapTrain) => {
+      setSelectedTrainKey(train.key);
+      openMapTrain(train);
     },
-    [],
+    [openMapTrain],
   );
-
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -424,78 +327,42 @@ function MapContents() {
         };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
-      {/* Map container — leave room for the Android nav bar so the map and
-          Mapbox attribution don't render behind it. --safe-area-bottom is 0
-          on iOS so the map still reaches the screen edge there. */}
-      <div
-        ref={mapContainerRef}
-        className="absolute inset-x-0 top-0"
-        style={{
-          ...(cssVars as React.CSSProperties),
-          // mapbox-gl.css's `.mapboxgl-map { position: relative }` is injected
-          // after Tailwind (the lazy /map chunk loads it last) and, at equal
-          // specificity, wins on source order — overriding the `absolute` class
-          // above and collapsing this container to 0 height. Pin position inline
-          // so the inset offsets apply and the map fills the screen.
-          position: "absolute",
-          bottom: "var(--safe-area-bottom)",
-        }}
-      />
-
-      {/* Back button – top-left */}
-      <button
-        type="button"
-        onClick={backToSchedule}
-        className="absolute left-3 flex items-center gap-1 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
-        style={{ top: "calc(12px + var(--safe-area-top))" }}
-        aria-label="Back"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Back
-      </button>
-
-      {/* Train count pill – top-right */}
-      <button
-        type="button"
-        onClick={handleFitTrains}
-        className="absolute right-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-background/95 backdrop-blur-sm shadow-md border border-border text-sm font-medium"
-        style={{ top: "calc(12px + var(--safe-area-top))" }}
-        aria-label="Fit trains"
-      >
-        <span
-          className="inline-block w-2 h-2 rounded-full bg-smart-train-green"
-          aria-hidden="true"
-        />
-        {trains.length} {trains.length === 1 ? "train" : "trains"}
-      </button>
-
-      {/* Live-data freshness chip — beneath the train-count pill. Color and
-          copy mirror ScheduleHeader so the same "stale" mental model carries
-          over to the map. Only renders when we have a feed timestamp. */}
-      <MapLiveDataChip lastUpdated={lastUpdated} isUpstreamDown={isUpstreamDown} />
-
-      {/* Offline banner overlay — only renders when offline */}
-      {!isOnline && (
+    <div className="w-full h-screen overflow-hidden flex flex-col">
+      <MapHeader view="geo" trainsCount={trains.length} onTrainsCountClick={handleFitTrains} />
+      <div className="relative flex-1 min-h-0">
+        {/* Map container — leave room for the Android nav bar so the map and
+            Mapbox attribution don't render behind it. --safe-area-bottom is 0
+            on iOS so the map still reaches the screen edge there. */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
-          style={{ top: "calc(60px + var(--safe-area-top))" }}
-        >
-          <OfflineBanner />
-        </div>
-      )}
-
-      {/* Trip detail sheet — opens over the map when a marker is tapped.
-          Renders nothing until a trip has been resolved. */}
-      {detailTrip && (
-        <MapTripDetailSheet
-          detail={detailTrip}
-          isOpen={detailOpen}
-          onClose={closeDetail}
-          currentTime={new Date()}
-          lastUpdated={sbStatusMaps.lastUpdated ?? nbStatusMaps.lastUpdated}
+          ref={mapContainerRef}
+          className="absolute inset-x-0 top-0"
+          style={{
+            ...(cssVars as React.CSSProperties),
+            // mapbox-gl.css's `.mapboxgl-map { position: relative }` is injected
+            // after Tailwind (the lazy /map chunk loads it last) and, at equal
+            // specificity, wins on source order — overriding the `absolute` class
+            // above and collapsing this container to 0 height. Pin position inline
+            // so the inset offsets apply and the map fills the screen.
+            position: "absolute",
+            bottom: "var(--safe-area-bottom)",
+          }}
         />
-      )}
+
+        {/* Live-data freshness chip. Color and
+            copy mirror ScheduleHeader so the same "stale" mental model carries
+            over to the map. Only renders when we have a feed timestamp. */}
+        <MapLiveDataChip lastUpdated={lastUpdated} isUpstreamDown={isUpstreamDown} />
+
+        {/* Offline banner overlay — only renders when offline */}
+        {!isOnline && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-1.5rem)] px-3"
+            style={{ top: 52 }}
+          >
+            <OfflineBanner />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

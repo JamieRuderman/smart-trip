@@ -13,11 +13,9 @@ import { useTripProgress } from "@/hooks/useTripProgress";
 import { useTripStatus } from "@/hooks/useTripStatus";
 import { findRealtimeStatus, useTripRealtimeStatusMap } from "@/hooks/useTripUpdates";
 import {
-  focusedBoardingInstant,
   reconstructFocusedTrip,
   sameFocusIdentity,
 } from "@/lib/focusedTrip";
-import { canOfferReminder } from "@/lib/reminderLead";
 import { tripEnds, type ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { isVehicleShortOfDestination } from "@/lib/tripProgress";
@@ -81,7 +79,7 @@ function SharedItinerary({ shared, trip, onBack }: {
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { focusedTrip, focusTrip, setSelectedTrip, openReminderDialog } = useStationSelection();
+  const { focusedTrip, focusTrip, setPreviewTrip } = useStationSelection();
   const [confirmSwitch, setConfirmSwitch] = useState(false);
   const now = useMinuteClock();
   const { run, from, to } = shared;
@@ -133,12 +131,8 @@ function SharedItinerary({ shared, trip, onBack }: {
   const take = () => {
     if (!canTake) return;
     if (!alreadyTaking) void focusTrip(run);
-    setSelectedTrip(null);
+    setPreviewTrip(null);
     navigate(TRIP_VIEW_PATH, { replace: true });
-    const departureAt = focusedBoardingInstant(run, live?.liveDepartureTime);
-    if (!alreadyTaking && departureAt != null && canOfferReminder(departureAt, now.getTime())) {
-      openReminderDialog();
-    }
   };
 
   const actions = (canTake || android) ? (

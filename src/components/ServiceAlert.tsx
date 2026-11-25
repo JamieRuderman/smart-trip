@@ -73,7 +73,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
             key={alert.fingerprint}
             className="overflow-hidden bg-smart-gold/5 md:border-smart-gold/30"
           >
-            <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between gap-3 text-smart-gold-foreground">
+            <div className="w-full px-5 py-4 md:px-6 flex items-start justify-between text-smart-gold-foreground">
               <div className="flex items-start gap-2.5 flex-1 min-w-0">
                 <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <button

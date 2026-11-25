@@ -38,6 +38,7 @@
     "noTrainsFound": "No trains found for this route."
   },
   "serviceAlert": {
+    "since": "Since {{date}}",
     "showMore": "More",
     "showLess": "Less",
     "sectionTitle": "Service Alerts",

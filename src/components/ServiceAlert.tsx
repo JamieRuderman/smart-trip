@@ -40,7 +40,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
   // All dismissed — show a subtle neutral restore hint
   if (visibleAlerts.length === 0) {
     return (
-      <div className="flex items-center gap-1.5 px-4 py-0.5 pt-4 md:pt-1 text-xs text-muted-foreground max-w-4xl mx-auto w-full">
+      <div className="flex items-center gap-1.5 px-4 py-0.5 text-xs text-muted-foreground max-w-4xl mx-auto w-full">
         <AlertTriangle className="h-3 w-3 shrink-0" />
         <span>
           {t("serviceAlert.dismissedNotice", { count: dismissedActiveCount })}{" "}
@@ -61,6 +61,13 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
       {visibleAlerts.map((alert) => {
         const startedAt = alert.startsAt ? parseDateOrInstant(alert.startsAt) : NaN;
         const isExpanded = expanded.has(alert.fingerprint);
+        const since = Number.isFinite(startedAt) && (
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide opacity-70">
+            {t("serviceAlert.since", {
+              date: formatStartedLabel(startedAt, Date.now(), "12h", i18n.language),
+            })}
+          </p>
+        );
         return (
           <SectionCard
             key={alert.fingerprint}
@@ -79,6 +86,7 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
                   <div className="font-semibold text-sm">
                     {alert.title ?? t("serviceAlert.sectionTitle")}
                   </div>
+                  {(!alert.message || isExpanded) && since}
                   {alert.message && isExpanded && (
                     <p className="text-xs mt-1 pr-1 max-h-64 overflow-y-auto overscroll-contain">
                       {alert.message}
@@ -95,21 +103,14 @@ export function ServiceAlert({ alerts }: ServiceAlertProps) {
                   )}
                 </button>
               </div>
-              <div className="flex flex-col items-end shrink-0 -mr-2 -mt-2">
-                <button
-                  type="button"
-                  aria-label={t("serviceAlert.dismiss")}
-                  onClick={() => dismissAlert(alert)}
-                  className="p-3 rounded-lg hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-                {Number.isFinite(startedAt) && (
-                  <p className="text-xs pr-3 -mt-0.5">
-                    {formatStartedLabel(startedAt, Date.now(), "12h", i18n.language)}
-                  </p>
-                )}
-              </div>
+              <button
+                type="button"
+                aria-label={t("serviceAlert.dismiss")}
+                onClick={() => dismissAlert(alert)}
+                className="shrink-0 -mr-2 -mt-2 p-3 rounded-lg hover:bg-smart-gold/10 active:bg-smart-gold/20 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           </SectionCard>
         );

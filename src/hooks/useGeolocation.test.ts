@@ -121,13 +121,20 @@ describe("fetchNativeLocation", () => {
     expect(geo.getCurrentPosition).not.toHaveBeenCalled();
   });
 
-  it("retries at low accuracy when a high-accuracy fix times out", async () => {
+  it("retries at low accuracy when a high-accuracy fix times out, then skips the wait", async () => {
     const timeout = Object.assign(new Error("timeout"), { code: "OS-PLUG-GLOC-0010" });
     geo.requestPermissions.mockResolvedValue({});
     geo.getCurrentPosition.mockRejectedValueOnce(timeout).mockResolvedValueOnce(position());
     const fetchNativeLocation = await loadFetch();
     await expect(fetchNativeLocation()).resolves.toMatchObject({ lat: 38.2 });
     expect(geo.getCurrentPosition).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enableHighAccuracy: false }),
+    );
+
+    geo.getCurrentPosition.mockClear();
+    await fetchNativeLocation();
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(geo.getCurrentPosition).toHaveBeenCalledWith(
       expect.objectContaining({ enableHighAccuracy: false }),
     );
   });

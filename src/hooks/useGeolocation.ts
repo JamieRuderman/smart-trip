@@ -111,6 +111,15 @@ function errorCode(err: unknown): string | undefined {
   return (err as { code?: string } | null)?.code;
 }
 
+/** When a high-accuracy request last timed out, so later requests skip the
+ *  wait until GPS might be back. */
+let highAccuracyTimedOutAt = 0;
+const HIGH_ACCURACY_RETRY_MS = 5 * 60_000;
+
+function highAccuracyRecentlyTimedOut(): boolean {
+  return Date.now() - highAccuracyTimedOutAt < HIGH_ACCURACY_RETRY_MS;
+}
+
 export async function fetchNativeLocation(
   options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
   { prompt = true, askToEnable = false } = {},
@@ -125,15 +134,18 @@ export async function fetchNativeLocation(
       if (!askToEnable || errorCode(err) !== LOCATION_SERVICES_OFF) throw err;
     }
   }
+  const highAccuracy = !!options.enableHighAccuracy && !highAccuracyRecentlyTimedOut();
+  let pos;
   try {
-    return normalizeCoordinates(await Geolocation.getCurrentPosition(options), null);
+    pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: highAccuracy });
   } catch (err) {
     // With GPS off (Android's network-only location mode) a high-accuracy
     // request never resolves, while a low-accuracy one answers at once.
-    if (!options.enableHighAccuracy || errorCode(err) !== GET_LOCATION_TIMEOUT) throw err;
-    const pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: false });
-    return normalizeCoordinates(pos, null);
+    if (!highAccuracy || errorCode(err) !== GET_LOCATION_TIMEOUT) throw err;
+    highAccuracyTimedOutAt = Date.now();
+    pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: false });
   }
+  return normalizeCoordinates(pos, null);
 }
 
 function fetchWebLocation(
@@ -270,11 +282,11 @@ export function useGeolocation({
     if (autoRequestOnWeb) {
       grantedLocationAccess()
         .then((access) => {
-          if (access) void requestLocation();
+          if (access) void fetchLocation(false);
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }
-  }, [autoRequestOnNative, autoRequestOnWeb, fetchLocation, requestLocation]);
+  }, [autoRequestOnNative, autoRequestOnWeb, fetchLocation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -295,7 +307,7 @@ export function useGeolocation({
       }
     };
 
-    const startWatching = async (highAccuracy = true) => {
+    const startWatching = async (highAccuracy = !highAccuracyRecentlyTimedOut()) => {
       if (!watch) return;
 
       if (Capacitor.isNativePlatform()) {
@@ -313,7 +325,11 @@ export function useGeolocation({
             // The plugin drops a watch once it times out, and with GPS off a
             // high-accuracy watch always does; a low-accuracy one still works.
             if (highAccuracy && errorCode(watchError) === GET_LOCATION_TIMEOUT) {
+              highAccuracyTimedOutAt = Date.now();
+              const staleId = nativeWatchIdRef.current;
               nativeWatchIdRef.current = null;
+              // The plugin holds the dead watch's call until clearWatch releases it.
+              if (staleId) void Geolocation.clearWatch({ id: staleId }).catch(() => {});
               void startWatching(false);
               return;
             }

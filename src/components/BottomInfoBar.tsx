@@ -1,13 +1,28 @@
+import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
 import { APP_STORE_URL } from "@/seo/constants";
 import { cn } from "@/lib/utils";
+import { openFeedbackEmail } from "@/lib/feedback";
+
+function useNativeAppVersion(): string | null {
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    App.getInfo()
+      .then((info) => setVersion(`${info.version} (${info.build})`))
+      .catch(() => undefined);
+  }, []);
+  return version;
+}
 
 export function BottomInfoBar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const appVersion = useNativeAppVersion();
 
   // Web-only prompt: inside the native app there's nothing to download.
   const showAppPrompt = !Capacitor.isNativePlatform();
@@ -52,6 +67,14 @@ export function BottomInfoBar() {
         <ScheduleFreshnessLabel className="mt-2" />
         <p className="mt-2 text-xs">
           {t("bottomInfo.linksIntro")}{" "}
+          <button
+            type="button"
+            onClick={() => void openFeedbackEmail(i18n.language)}
+            className="text-foreground underline-offset-2 hover:underline"
+          >
+            {t("bottomInfo.feedbackLink")}
+          </button>{" "}
+          ·{" "}
           <a
             href="/support.html"
             target="_blank"
@@ -70,6 +93,9 @@ export function BottomInfoBar() {
             {t("bottomInfo.privacyHostedLink")}
           </a>
         </p>
+        {appVersion && (
+          <p className="mt-2 text-xs">{t("bottomInfo.appVersion", { version: appVersion })}</p>
+        )}
       </div>
     </div>
   );

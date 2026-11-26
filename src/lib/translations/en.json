@@ -96,7 +96,9 @@
     "scheduleUpdatedDaysAgo_other": "Schedule updated {{count}} days ago",
     "scheduleUpdatedUnknown": "Schedule timestamp unavailable",
     "scheduleStaleSuffix": "Service may have changed.",
-    "scheduleBundledHint": "Showing the version that shipped with the app — connect to a network for the latest."
+    "scheduleBundledHint": "Showing the version that shipped with the app — connect to a network for the latest.",
+    "feedbackLink": "Send feedback",
+    "appVersion": "Version {{version}}"
   },
   "freshness": {
     "offlineBannerTitle": "Offline",
@@ -505,5 +507,14 @@
       "relatedHeading": "Related Pages",
       "larkspurLink": "Larkspur SMART station schedule"
     }
+  },
+  "androidBeta": {
+    "testerTitle": "You're testing SMART trip for Android",
+    "testerBody": "Thanks for helping. Tell us what works, what's confusing and what's broken. Every report helps get the app onto Google Play.",
+    "recruitTitle": "Help test SMART trip for Android",
+    "recruitBody": "Get the Android app early and help us get it onto Google Play. You don't need to ride a train to test it.",
+    "sendFeedback": "Send feedback",
+    "joinBeta": "Join the Android beta",
+    "dismiss": "Dismiss"
   }
 }

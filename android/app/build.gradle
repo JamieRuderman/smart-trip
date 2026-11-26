@@ -16,8 +16,28 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    def uploadProps = ['SMART_TRIP_UPLOAD_STORE_FILE', 'SMART_TRIP_UPLOAD_STORE_PASSWORD',
+                       'SMART_TRIP_UPLOAD_KEY_ALIAS', 'SMART_TRIP_UPLOAD_KEY_PASSWORD']
+    def hasUploadKey = uploadProps.every { project.findProperty(it) } &&
+            file(project.property('SMART_TRIP_UPLOAD_STORE_FILE')).exists()
+    if (!hasUploadKey) {
+        logger.warn("SMART trip upload key not configured or keystore missing; release builds will be unsigned.")
+    }
+    signingConfigs {
+        if (hasUploadKey) {
+            release {
+                storeFile file(project.property('SMART_TRIP_UPLOAD_STORE_FILE'))
+                storePassword project.property('SMART_TRIP_UPLOAD_STORE_PASSWORD')
+                keyAlias project.property('SMART_TRIP_UPLOAD_KEY_ALIAS')
+                keyPassword project.property('SMART_TRIP_UPLOAD_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasUploadKey) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

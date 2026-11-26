@@ -104,12 +104,24 @@ function normalizeCoordinates(
   };
 }
 
-async function fetchNativeLocation(
+const LOCATION_SERVICES_OFF = "OS-PLUG-GLOC-0007";
+
+export async function fetchNativeLocation(
   options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-  { prompt = true } = {},
+  { prompt = true, askToEnable = false } = {},
 ): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
-  if (prompt) await Geolocation.requestPermissions();
+  if (prompt) {
+    try {
+      await Geolocation.requestPermissions();
+    } catch (err) {
+      // requestPermissions rejects outright while device location is off;
+      // only getCurrentPosition shows Android's "Turn on location" dialog.
+      if (!askToEnable || (err as { code?: string })?.code !== LOCATION_SERVICES_OFF) {
+        throw err;
+      }
+    }
+  }
   const pos = await Geolocation.getCurrentPosition(options);
   return normalizeCoordinates(pos, null);
 }
@@ -221,12 +233,12 @@ export function useGeolocation({
   const webWatchIdRef = useRef<number | null>(null);
   const lastCoordsRef = useRef<Coordinates | null>(null);
 
-  const requestLocation = useCallback(async () => {
+  const fetchLocation = useCallback(async (askToEnable: boolean) => {
     setLoading(true);
     setError(null);
     try {
       const result = Capacitor.isNativePlatform()
-        ? await fetchNativeLocation()
+        ? await fetchNativeLocation(undefined, { askToEnable })
         : await fetchWebLocation();
       lastCoordsRef.current = result;
       setCoords(rememberFix(result));
@@ -237,9 +249,11 @@ export function useGeolocation({
     }
   }, []);
 
+  const requestLocation = useCallback(() => fetchLocation(true), [fetchLocation]);
+
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      if (autoRequestOnNative) void requestLocation();
+      if (autoRequestOnNative) void fetchLocation(false);
       return;
     }
     // Web: only auto-request if permission is already granted (no prompt shown).
@@ -250,7 +264,7 @@ export function useGeolocation({
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }
-  }, [autoRequestOnNative, autoRequestOnWeb, requestLocation]);
+  }, [autoRequestOnNative, autoRequestOnWeb, fetchLocation, requestLocation]);
 
   useEffect(() => {
     let cancelled = false;

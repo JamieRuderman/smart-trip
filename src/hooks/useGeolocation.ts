@@ -312,42 +312,54 @@ export function useGeolocation({
 
       if (Capacitor.isNativePlatform()) {
         const { Geolocation } = await import("@capacitor/geolocation");
-        await Geolocation.requestPermissions();
-        const watchId = await Geolocation.watchPosition(
-          {
-            enableHighAccuracy: highAccuracy,
-            timeout: 10000,
-            maximumAge: 0,
-            minimumUpdateInterval: 1000,
-          },
-          (position, watchError) => {
-            if (cancelled) return;
-            // The plugin drops a watch once it times out, and with GPS off a
-            // high-accuracy watch always does; a low-accuracy one still works.
-            if (highAccuracy && errorCode(watchError) === GET_LOCATION_TIMEOUT) {
-              highAccuracyTimedOutAt = Date.now();
-              const staleId = nativeWatchIdRef.current;
-              nativeWatchIdRef.current = null;
-              // The plugin holds the dead watch's call until clearWatch releases it.
-              if (staleId) void Geolocation.clearWatch({ id: staleId }).catch(() => {});
-              void startWatching(false);
-              return;
+        let watchId: string | null = null;
+        try {
+          await Geolocation.requestPermissions();
+          watchId = await Geolocation.watchPosition(
+            {
+              enableHighAccuracy: highAccuracy,
+              timeout: 10000,
+              maximumAge: 0,
+              minimumUpdateInterval: 1000,
+            },
+            (position, watchError) => {
+              if (cancelled) return;
+              // The plugin drops a watch once it times out, and with GPS off a
+              // high-accuracy watch always does; a low-accuracy one still works.
+              if (highAccuracy && errorCode(watchError) === GET_LOCATION_TIMEOUT) {
+                highAccuracyTimedOutAt = Date.now();
+                if (watchId) {
+                  if (nativeWatchIdRef.current === watchId) nativeWatchIdRef.current = null;
+                  // The plugin holds the dead watch's call until clearWatch releases it.
+                  void Geolocation.clearWatch({ id: watchId }).catch(() => {});
+                }
+                void startWatching(false);
+                return;
+              }
+              if (watchError) {
+                setError(watchError.message ?? "Location unavailable");
+                return;
+              }
+              if (position?.coords) {
+                const normalized = normalizeCoordinates(
+                  position,
+                  lastCoordsRef.current,
+                );
+                lastCoordsRef.current = normalized;
+                setCoords(rememberFix(normalized));
+                setError(null);
+              }
             }
-            if (watchError) {
-              setError(watchError.message ?? "Location unavailable");
-              return;
-            }
-            if (position?.coords) {
-              const normalized = normalizeCoordinates(
-                position,
-                lastCoordsRef.current,
-              );
-              lastCoordsRef.current = normalized;
-              setCoords(rememberFix(normalized));
-              setError(null);
-            }
-          }
-        );
+          );
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Location unavailable");
+          return;
+        }
+        // Cleanup or a hide during the awaits above found no id to clear.
+        if (cancelled || document.hidden) {
+          void Geolocation.clearWatch({ id: watchId }).catch(() => {});
+          return;
+        }
         nativeWatchIdRef.current = watchId;
         return;
       }

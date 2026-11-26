@@ -6,12 +6,14 @@ vi.mock("@capacitor/core", () => ({
   registerPlugin: () => ({}),
 }));
 const notifyChange = vi.fn();
-vi.mock("@/lib/liveActivityController", () => ({ notifyChange: () => notifyChange() }));
+vi.mock("@/lib/liveActivityController", () => ({
+  notifyChange: () => notifyChange(),
+}));
 const scheduleLeaveAlarm = vi.fn(
   async (): Promise<{ scheduled: boolean; alarmId?: string }> => ({
     scheduled: true,
     alarmId: "alarm-new",
-  }),
+  })
 );
 const cancelLeaveAlarm = vi.fn(async (id: string) => {
   void id;
@@ -99,19 +101,23 @@ describe("stopBefore", () => {
 
   it("walks the other way northbound", () => {
     const trip = syntheticTrip({ 4: "8:00", 3: "8:05", 1: "8:15" });
-    expect(stopBefore(trip, stations[4], stations[1])?.station).toBe(stations[3]);
+    expect(stopBefore(trip, stations[4], stations[1])?.station).toBe(
+      stations[3]
+    );
   });
 
   it("passes over a stop the live feed says the train skips", () => {
     const trip = syntheticTrip({ 0: "8:00", 1: "8:05", 2: "8:10", 3: "8:15" });
-    expect(stopBefore(trip, stations[0], stations[3], [stations[2]])?.station).toBe(
-      stations[1],
-    );
+    expect(
+      stopBefore(trip, stations[0], stations[3], [stations[2]])?.station
+    ).toBe(stations[1]);
   });
 
   it("falls back to the boarding station on a one-stop ride", () => {
     const trip = syntheticTrip({ 0: "8:00", 1: "8:05" });
-    expect(stopBefore(trip, stations[0], stations[1])?.station).toBe(stations[0]);
+    expect(stopBefore(trip, stations[0], stations[1])?.station).toBe(
+      stations[0]
+    );
   });
 });
 
@@ -131,7 +137,10 @@ describe("getOffAlarmTiming", () => {
     const late = new Date(scheduled.arrivalAt + 7 * 60_000);
     const live = {
       isCanceled: false,
-      liveArrivalTime: `${late.getHours()}:${String(late.getMinutes()).padStart(2, "0")}`,
+      liveArrivalTime: `${late.getHours()}:${String(late.getMinutes()).padStart(
+        2,
+        "0"
+      )}`,
     } satisfies TripRealtimeStatus;
     const timing = getOffAlarmTiming(focused, live)!;
     expect(timing.fireAt - scheduled.fireAt).toBe(7 * 60_000);
@@ -140,19 +149,27 @@ describe("getOffAlarmTiming", () => {
 
 describe("get-off alarm storage", () => {
   it("never shares a notification id with the leave reminder", () => {
-    expect(getOffAlarmIdFor(123, "2026-11-25")).not.toBe(reminderIdFor(123, "2026-11-25"));
+    expect(getOffAlarmIdFor(123, "2026-11-25")).not.toBe(
+      reminderIdFor(123, "2026-11-25")
+    );
   });
 
   it("round-trips an armed alarm and rejects a malformed one", () => {
     const armed = makeFocused({
-      getOffAlarm: { reminderAt: 1, notificationId: 2, title: "t", body: "b", alarmId: "a" },
+      getOffAlarm: {
+        reminderAt: 1,
+        notificationId: 2,
+        title: "t",
+        body: "b",
+        alarmId: "a",
+      },
     });
     saveFocusedTrip(armed);
     expect(loadFocusedTrip()).toEqual(armed);
 
     localStorage.setItem(
       FOCUSED_TRIP_STORAGE_KEY,
-      JSON.stringify({ ...armed, getOffAlarm: { reminderAt: "soon" } }),
+      JSON.stringify({ ...armed, getOffAlarm: { reminderAt: "soon" } })
     );
     expect(loadFocusedTrip()).toBeNull();
   });
@@ -163,7 +180,9 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
 
   it("arms the alarm and stores it on the focused trip", async () => {
     saveFocusedTrip(makeFocused());
-    expect(await setGetOffAlarm(FIRE_AT, TEXT)).toEqual({ ok: true });
+    expect(await setGetOffAlarm(makeFocused(), FIRE_AT, TEXT)).toEqual({
+      ok: true,
+    });
     expect(loadFocusedTrip()?.getOffAlarm).toEqual({
       reminderAt: FIRE_AT,
       notificationId: getOffAlarmIdFor(SAMPLE.trip, "2099-01-01"),
@@ -177,7 +196,10 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
     saveFocusedTrip(makeFocused());
     scheduleLeaveAlarm.mockResolvedValueOnce({ scheduled: false });
     ensureNotificationPermission.mockResolvedValueOnce(false);
-    expect(await setGetOffAlarm(FIRE_AT, TEXT)).toEqual({ ok: false, reason: "permission" });
+    expect(await setGetOffAlarm(makeFocused(), FIRE_AT, TEXT)).toEqual({
+      ok: false,
+      reason: "permission",
+    });
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
 
@@ -187,15 +209,43 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
       saveFocusedTrip(makeFocused({ serviceDate: "2099-01-02" }));
       return { scheduled: true, alarmId: "alarm-new" };
     });
-    expect(await setGetOffAlarm(FIRE_AT, TEXT)).toEqual({ ok: false, reason: "schedule-failed" });
+    expect(await setGetOffAlarm(makeFocused(), FIRE_AT, TEXT)).toEqual({
+      ok: false,
+      reason: "schedule-failed",
+    });
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("alarm-new");
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
 
+  it("drops a queued request once the rider has switched trains", async () => {
+    saveFocusedTrip(makeFocused());
+    let release!: () => void;
+    scheduleLeaveAlarm.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ scheduled: true, alarmId: "first" });
+        })
+    );
+    const first = setGetOffAlarm(makeFocused(), FIRE_AT, TEXT);
+    const queued = setGetOffAlarm(makeFocused(), FIRE_AT + 60_000, TEXT);
+    await vi.waitFor(() => expect(scheduleLeaveAlarm).toHaveBeenCalledTimes(1));
+    saveFocusedTrip(makeFocused({ serviceDate: "2099-01-02" }));
+    release();
+    await first;
+    expect(await queued).toEqual({ ok: false, reason: "no-focus" });
+    expect(scheduleLeaveAlarm).toHaveBeenCalledTimes(1);
+    expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
+  });
+
   it("cancels and forgets the alarm when turned off", async () => {
-    const armed = { reminderAt: FIRE_AT, notificationId: 5, ...TEXT, alarmId: "a1" };
+    const armed = {
+      reminderAt: FIRE_AT,
+      notificationId: 5,
+      ...TEXT,
+      alarmId: "a1",
+    };
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
-    await clearGetOffAlarm();
+    await clearGetOffAlarm(makeFocused());
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("a1");
     expect(cancelNotification).toHaveBeenCalledWith(5);
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
@@ -204,17 +254,22 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
 
 describe("rescheduleGetOffAlarm", () => {
   const FIRE_AT = new Date(2099, 0, 1, 9, 0).getTime();
-  const armed = { reminderAt: FIRE_AT, notificationId: 5, ...TEXT, alarmId: "old" };
+  const armed = {
+    reminderAt: FIRE_AT,
+    notificationId: 5,
+    ...TEXT,
+    alarmId: "old",
+  };
 
   it("does nothing when the time and text are unchanged", async () => {
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
-    await rescheduleGetOffAlarm(FIRE_AT, TEXT);
+    await rescheduleGetOffAlarm(makeFocused(), FIRE_AT, TEXT);
     expect(scheduleLeaveAlarm).not.toHaveBeenCalled();
   });
 
   it("moves the alarm and retires the old one when the train runs late", async () => {
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
-    await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
+    await rescheduleGetOffAlarm(makeFocused(), FIRE_AT + 4 * 60_000, TEXT);
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("old");
     expect(loadFocusedTrip()?.getOffAlarm).toMatchObject({
       reminderAt: FIRE_AT + 4 * 60_000,
@@ -226,7 +281,7 @@ describe("rescheduleGetOffAlarm", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FIRE_AT + 60_000);
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
-    await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
+    await rescheduleGetOffAlarm(makeFocused(), FIRE_AT + 4 * 60_000, TEXT);
     expect(scheduleLeaveAlarm).not.toHaveBeenCalled();
   });
 
@@ -236,7 +291,7 @@ describe("rescheduleGetOffAlarm", () => {
       saveFocusedTrip(makeFocused());
       return { scheduled: true, alarmId: "alarm-new" };
     });
-    await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
+    await rescheduleGetOffAlarm(makeFocused(), FIRE_AT + 4 * 60_000, TEXT);
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("alarm-new");
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
@@ -247,8 +302,8 @@ describe("rescheduleGetOffAlarm", () => {
       .mockResolvedValueOnce({ scheduled: true, alarmId: "a1" })
       .mockResolvedValueOnce({ scheduled: true, alarmId: "a2" });
     await Promise.all([
-      rescheduleGetOffAlarm(FIRE_AT + 2 * 60_000, TEXT),
-      rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT),
+      rescheduleGetOffAlarm(makeFocused(), FIRE_AT + 2 * 60_000, TEXT),
+      rescheduleGetOffAlarm(makeFocused(), FIRE_AT + 4 * 60_000, TEXT),
     ]);
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("old");
     expect(cancelLeaveAlarm).toHaveBeenCalledWith("a1");

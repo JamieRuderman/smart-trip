@@ -50,6 +50,7 @@ export function GetOffAlarmControl({
     if (!timing || !canScheduleGetOffAlarm(timing.fireAt, Date.now())) return;
     setBusy(true);
     const result = await setGetOffAlarm(
+      focusedTrip,
       timing.fireAt,
       buildGetOffAlarmText(t, i18n.language, {
         toStation: focusedTrip.toStation,
@@ -63,7 +64,7 @@ export function GetOffAlarmControl({
 
   const disarm = async () => {
     setBusy(true);
-    await clearGetOffAlarm();
+    await clearGetOffAlarm(focusedTrip);
     setBusy(false);
     setError(null);
   };

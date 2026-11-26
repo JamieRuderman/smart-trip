@@ -11,6 +11,7 @@ import {
   REMINDER_FIRE_BUFFER_MS,
   sameFocusIdentity,
   saveFocusedTrip,
+  type FocusedRun,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { notifyChange } from "@/lib/liveActivityController";
@@ -148,22 +149,30 @@ async function armGetOffAlarm(
   return { ok: true };
 }
 
-/** Arm the focused trip's get-off alarm at `fireAt`. */
+/** The stored trip, if it's still `target` once the queue reaches the request —
+ *  so a train switch in between can't inherit it. */
+function stillTargeted(target: FocusedRun): FocusedTrip | null {
+  const current = loadFocusedTrip();
+  return sameFocusIdentity(current, target) ? current : null;
+}
+
+/** Arm `target`'s get-off alarm at `fireAt`. */
 export function setGetOffAlarm(
+  target: FocusedRun,
   fireAt: number,
   text: { title: string; body: string },
 ): Promise<GetOffAlarmResult> {
   return serialized(async () => {
-    const current = loadFocusedTrip();
+    const current = stillTargeted(target);
     if (!current) return { ok: false, reason: "no-focus" };
     return armGetOffAlarm(current, fireAt, text);
   });
 }
 
-/** Turn the focused trip's get-off alarm off. */
-export function clearGetOffAlarm(): Promise<void> {
+/** Turn `target`'s get-off alarm off. */
+export function clearGetOffAlarm(target: FocusedRun): Promise<void> {
   return serialized(async () => {
-    const current = loadFocusedTrip();
+    const current = stillTargeted(target);
     if (!current?.getOffAlarm) return;
     await cancelAlertChannels(current.getOffAlarm);
     const latest = loadFocusedTrip();
@@ -177,11 +186,12 @@ export function clearGetOffAlarm(): Promise<void> {
 /** Move an armed, not-yet-fired alarm to a drifted fire time. No-op when the
  *  time and text are unchanged, or the new time is too close to schedule. */
 export function rescheduleGetOffAlarm(
+  target: FocusedRun,
   fireAt: number,
   text: { title: string; body: string },
 ): Promise<void> {
   return serialized(async () => {
-    const current = loadFocusedTrip();
+    const current = stillTargeted(target);
     const armed = current?.getOffAlarm;
     if (!current || !armed) return;
     const now = Date.now();

@@ -20,16 +20,17 @@ export function GetOffAlarmSync() {
 function GetOffAlarmSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const { t, i18n } = useTranslation();
   const now = useNow(30_000) * 1000;
-  const { live, lastUpdated } = useFocusedTripLive(focusedTrip, now);
-  // Before the feed's first load `live` is null even for a late train, which
-  // would pull the alarm back to the on-time arrival.
-  const timing = lastUpdated ? getOffAlarmTiming(focusedTrip, live) : null;
+  const { live } = useFocusedTripLive(focusedTrip, now);
+  // Only a live prediction moves the alarm: before the feed loads, or while a
+  // late train drops out of it, falling back to the timetable would ring early.
+  const timing = live?.liveArrivalTime ? getOffAlarmTiming(focusedTrip, live) : null;
   const fireAt = timing?.fireAt ?? null;
   const arrivalAt = timing?.arrivalAt ?? null;
 
   useEffect(() => {
     if (fireAt == null || arrivalAt == null) return;
     void rescheduleGetOffAlarm(
+      focusedTrip,
       fireAt,
       buildGetOffAlarmText(t, i18n.language, {
         toStation: focusedTrip.toStation,
@@ -37,7 +38,7 @@ function GetOffAlarmSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
         arrivalAt,
       }),
     );
-  }, [fireAt, arrivalAt, focusedTrip.toStation, focusedTrip.tripNumber, t, i18n.language]);
+  }, [focusedTrip, fireAt, arrivalAt, t, i18n.language]);
 
   return null;
 }

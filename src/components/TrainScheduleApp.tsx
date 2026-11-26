@@ -21,6 +21,7 @@ import { ScheduleResults } from "./ScheduleResults";
 import { FareSection } from "./FareSection";
 import BottomInfoBar from "./BottomInfoBar";
 import { ServiceAlert } from "./ServiceAlert";
+import { AndroidBetaCard } from "./AndroidBetaCard";
 import { OfflineBanner } from "./OfflineBanner";
 import { NoTripsFound } from "./NoTripsFound";
 import { MapDiagramPreviewCard } from "./MapDiagramPreviewCard";
@@ -224,6 +225,8 @@ export function TrainScheduleApp() {
 
         {/* Service Alerts */}
         <ServiceAlert alerts={alerts} />
+
+        <AndroidBetaCard />
 
         {/* Live Train Map */}
         <MapDiagramPreviewCard />

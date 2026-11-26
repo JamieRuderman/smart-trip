@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
@@ -5,12 +6,23 @@ import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
 import { APP_STORE_URL } from "@/seo/constants";
 import { cn } from "@/lib/utils";
+import { getAppVersionLabel, openFeedbackEmail } from "@/lib/feedback";
+
+function useAppVersionLabel(): string | undefined {
+  const [label, setLabel] = useState<string>();
+  useEffect(() => {
+    void getAppVersionLabel().then(setLabel);
+  }, []);
+  return label;
+}
 
 export function BottomInfoBar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const appVersion = useAppVersionLabel();
 
   // Web-only prompt: inside the native app there's nothing to download.
-  const showAppPrompt = !Capacitor.isNativePlatform();
+  const isNative = Capacitor.isNativePlatform();
+  const showAppPrompt = !isNative;
 
   return (
     <div className="container max-w-4xl mx-auto px-3 md:px-0 pb-safe space-y-3">
@@ -52,6 +64,18 @@ export function BottomInfoBar() {
         <ScheduleFreshnessLabel className="mt-2" />
         <p className="mt-2 text-xs">
           {t("bottomInfo.linksIntro")}{" "}
+          {isNative && (
+            <>
+              <button
+                type="button"
+                onClick={() => void openFeedbackEmail(i18n.language)}
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                {t("bottomInfo.feedbackLink")}
+              </button>{" "}
+              ·{" "}
+            </>
+          )}
           <a
             href="/support.html"
             target="_blank"
@@ -70,6 +94,9 @@ export function BottomInfoBar() {
             {t("bottomInfo.privacyHostedLink")}
           </a>
         </p>
+        {appVersion && (
+          <p className="mt-2 text-xs">{t("bottomInfo.appVersion", { version: appVersion })}</p>
+        )}
       </div>
     </div>
   );

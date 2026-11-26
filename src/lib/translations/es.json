@@ -96,7 +96,9 @@
     "scheduleUpdatedDaysAgo_other": "Horario actualizado hace {{count}} días",
     "scheduleUpdatedUnknown": "Fecha del horario no disponible",
     "scheduleStaleSuffix": "El servicio puede haber cambiado.",
-    "scheduleBundledHint": "Mostrando la versión que vino con la app — conéctate a internet para obtener la más reciente."
+    "scheduleBundledHint": "Mostrando la versión que vino con la app — conéctate a internet para obtener la más reciente.",
+    "feedbackLink": "Enviar comentarios",
+    "appVersion": "Versión {{version}}"
   },
   "freshness": {
     "offlineBannerTitle": "Sin conexión",
@@ -505,5 +507,14 @@
       "relatedHeading": "Páginas Relacionadas",
       "larkspurLink": "Horario de la estación SMART de Larkspur"
     }
+  },
+  "androidBeta": {
+    "testerTitle": "Estás probando SMART trip para Android",
+    "testerBody": "Gracias por ayudar. Cuéntanos qué funciona, qué es confuso y qué falla. Cada comentario nos ayuda a publicar la app en Google Play.",
+    "recruitTitle": "Ayuda a probar SMART trip para Android",
+    "recruitBody": "Obtén la app de Android antes que nadie y ayúdanos a publicarla en Google Play. No necesitas viajar en tren para probarla.",
+    "sendFeedback": "Enviar comentarios",
+    "joinBeta": "Únete a la beta de Android",
+    "dismiss": "Descartar"
   }
 }

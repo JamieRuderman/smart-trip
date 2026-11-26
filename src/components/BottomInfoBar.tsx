@@ -1,28 +1,24 @@
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { App } from "@capacitor/app";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { ScheduleFreshnessLabel } from "./ScheduleFreshnessLabel";
 import { useTranslation } from "react-i18next";
 import { APP_STORE_URL } from "@/seo/constants";
 import { cn } from "@/lib/utils";
-import { openFeedbackEmail } from "@/lib/feedback";
+import { getAppVersionLabel, openFeedbackEmail } from "@/lib/feedback";
 
-function useNativeAppVersion(): string | null {
-  const [version, setVersion] = useState<string | null>(null);
+function useAppVersionLabel(): string | undefined {
+  const [label, setLabel] = useState<string>();
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    App.getInfo()
-      .then((info) => setVersion(`${info.version} (${info.build})`))
-      .catch(() => undefined);
+    void getAppVersionLabel().then(setLabel);
   }, []);
-  return version;
+  return label;
 }
 
 export function BottomInfoBar() {
   const { t, i18n } = useTranslation();
-  const appVersion = useNativeAppVersion();
+  const appVersion = useAppVersionLabel();
 
   // Web-only prompt: inside the native app there's nothing to download.
   const showAppPrompt = !Capacitor.isNativePlatform();

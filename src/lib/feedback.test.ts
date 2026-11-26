@@ -15,8 +15,7 @@ describe("buildFeedbackMailto", () => {
     const { to, subject, body } = parse(
       buildFeedbackMailto({
         platform: "Android",
-        appVersion: "1.14.1",
-        appBuild: "34",
+        appVersion: "1.14.1 (34)",
         osVersion: "16",
         model: "Google Pixel 9",
         language: "en",

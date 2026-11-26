@@ -1,38 +1,31 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { FlaskConical, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/ui/section-card";
 import { openFeedbackEmail } from "@/lib/feedback";
 
-export const ANDROID_APP_IN_CLOSED_TESTING = true;
-export const ANDROID_BETA_PAGE = "/android-beta.html";
-
 type Variant = "tester" | "recruit";
 
-const DISMISS_KEY: Record<Variant, string> = {
-  tester: "androidBetaCard.testerDismissed",
-  recruit: "androidBetaCard.recruitDismissed",
-};
+const DISMISS_KEY = "smart-train-android-beta-dismissed";
 
 function detectVariant(): Variant | null {
-  if (!ANDROID_APP_IN_CLOSED_TESTING) return null;
   if (Capacitor.getPlatform() === "android") return "tester";
   if (!Capacitor.isNativePlatform() && /Android/i.test(navigator.userAgent)) return "recruit";
   return null;
 }
 
-function isDismissed(variant: Variant): boolean {
+function isDismissed(): boolean {
   try {
-    return localStorage.getItem(DISMISS_KEY[variant]) === "1";
+    return localStorage.getItem(DISMISS_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-function rememberDismissed(variant: Variant) {
+function rememberDismissed() {
   try {
-    localStorage.setItem(DISMISS_KEY[variant], "1");
+    localStorage.setItem(DISMISS_KEY, "1");
   } catch {
     // Storage can be unavailable (private mode); the card just reappears next visit.
   }
@@ -40,17 +33,14 @@ function rememberDismissed(variant: Variant) {
 
 export function AndroidBetaCard() {
   const { t, i18n } = useTranslation();
-  const [variant, setVariant] = useState<Variant | null>(null);
-
-  useEffect(() => {
-    const detected = detectVariant();
-    if (detected && !isDismissed(detected)) setVariant(detected);
-  }, []);
+  const [variant, setVariant] = useState<Variant | null>(() =>
+    isDismissed() ? null : detectVariant(),
+  );
 
   if (!variant) return null;
 
   const dismiss = () => {
-    rememberDismissed(variant);
+    rememberDismissed();
     setVariant(null);
   };
 
@@ -72,7 +62,7 @@ export function AndroidBetaCard() {
               </button>
             ) : (
               <a
-                href={ANDROID_BETA_PAGE}
+                href="/android-beta.html"
                 className="mt-2 inline-block text-sm font-semibold underline underline-offset-2"
               >
                 {t("androidBeta.joinBeta")}

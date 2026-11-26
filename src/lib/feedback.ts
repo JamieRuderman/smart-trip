@@ -7,20 +7,16 @@ export const FEEDBACK_EMAIL = "smart-train@proton.me";
 export interface FeedbackContext {
   platform: string;
   appVersion?: string;
-  appBuild?: string;
   osVersion?: string;
   model?: string;
   language?: string;
 }
 
 export function buildFeedbackMailto(ctx: FeedbackContext): string {
-  const version = ctx.appVersion
-    ? `${ctx.appVersion}${ctx.appBuild ? ` (${ctx.appBuild})` : ""}`
-    : undefined;
-  const subject = `SMART trip feedback (${[ctx.platform, version].filter(Boolean).join(" ")})`;
+  const subject = `SMART trip feedback (${[ctx.platform, ctx.appVersion].filter(Boolean).join(" ")})`;
   const details = [
     `Platform: ${ctx.platform}`,
-    version && `App version: ${version}`,
+    ctx.appVersion && `App version: ${ctx.appVersion}`,
     ctx.osVersion && `OS version: ${ctx.osVersion}`,
     ctx.model && `Device: ${ctx.model}`,
     ctx.language && `Language: ${ctx.language}`,
@@ -35,27 +31,33 @@ const PLATFORM_LABELS: Record<string, string> = {
   web: "Web",
 };
 
-export async function getFeedbackContext(language?: string): Promise<FeedbackContext> {
-  const platform = PLATFORM_LABELS[Capacitor.getPlatform()] ?? Capacitor.getPlatform();
-  if (!Capacitor.isNativePlatform()) {
-    return { platform, language };
-  }
-  const [app, device] = await Promise.allSettled([App.getInfo(), Device.getInfo()]);
-  const appInfo = app.status === "fulfilled" ? app.value : undefined;
-  const deviceInfo = device.status === "fulfilled" ? device.value : undefined;
+let appVersionLabel: Promise<string | undefined> | undefined;
+
+/** "1.14.1 (34)" in the native apps; undefined on the web. Fetched once per session. */
+export function getAppVersionLabel(): Promise<string | undefined> {
+  if (!Capacitor.isNativePlatform()) return Promise.resolve(undefined);
+  appVersionLabel ??= App.getInfo()
+    .then((info) => `${info.version} (${info.build})`)
+    .catch(() => undefined);
+  return appVersionLabel;
+}
+
+async function getFeedbackContext(language?: string): Promise<FeedbackContext> {
+  const platform = PLATFORM_LABELS[Capacitor.getPlatform()];
+  if (!Capacitor.isNativePlatform()) return { platform, language };
+  const [appVersion, device] = await Promise.all([
+    getAppVersionLabel(),
+    Device.getInfo().catch(() => undefined),
+  ]);
   return {
     platform,
-    appVersion: appInfo?.version,
-    appBuild: appInfo?.build,
-    osVersion: deviceInfo?.osVersion,
-    model: deviceInfo
-      ? [deviceInfo.manufacturer, deviceInfo.model].filter(Boolean).join(" ")
-      : undefined,
+    appVersion,
+    osVersion: device?.osVersion,
+    model: device ? [device.manufacturer, device.model].filter(Boolean).join(" ") : undefined,
     language,
   };
 }
 
 export async function openFeedbackEmail(language?: string): Promise<void> {
-  const ctx = await getFeedbackContext(language);
-  window.location.href = buildFeedbackMailto(ctx);
+  window.location.href = buildFeedbackMailto(await getFeedbackContext(language));
 }

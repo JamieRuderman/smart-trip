@@ -52,7 +52,7 @@ describe("useGeolocation watch (native)", () => {
     vi.clearAllMocks();
   });
 
-  it("restarts at low accuracy after a high-accuracy watch times out", async () => {
+  it("restarts at low accuracy whenever the watch times out", async () => {
     expect(geo.watchPosition).toHaveBeenLastCalledWith(
       expect.objectContaining({ enableHighAccuracy: true }),
       expect.any(Function),
@@ -64,12 +64,21 @@ describe("useGeolocation watch (native)", () => {
     expect(geo.clearWatch).toHaveBeenCalledWith({ id: "watch-1" });
     expect(geo.watchPosition).toHaveBeenCalledTimes(2);
     expect(geo.watchPosition).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enableHighAccuracy: false, maximumAge: 5 * 60_000 }),
+      expect.any(Function),
+    );
+
+    await act(async () => geo.callbacks[1](null, { code: "OS-PLUG-GLOC-0010" }));
+    await flush();
+    expect(geo.clearWatch).toHaveBeenCalledWith({ id: "watch-2" });
+    expect(geo.watchPosition).toHaveBeenCalledTimes(3);
+    expect(geo.watchPosition).toHaveBeenLastCalledWith(
       expect.objectContaining({ enableHighAccuracy: false }),
       expect.any(Function),
     );
 
     await act(async () =>
-      geo.callbacks[1]({ coords: { latitude: 38.45, longitude: -122.75, accuracy: 100 }, timestamp: Date.now() }),
+      geo.callbacks[2]({ coords: { latitude: 38.45, longitude: -122.75, accuracy: 100 }, timestamp: Date.now() }),
     );
     expect(state.lat).toBe(38.45);
     expect(state.error).toBeNull();

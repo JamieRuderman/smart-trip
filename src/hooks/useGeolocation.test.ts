@@ -128,7 +128,7 @@ describe("fetchNativeLocation", () => {
     const fetchNativeLocation = await loadFetch();
     await expect(fetchNativeLocation()).resolves.toMatchObject({ lat: 38.2 });
     expect(geo.getCurrentPosition).toHaveBeenLastCalledWith(
-      expect.objectContaining({ enableHighAccuracy: false }),
+      expect.objectContaining({ enableHighAccuracy: false, maximumAge: 5 * 60_000 }),
     );
 
     geo.getCurrentPosition.mockClear();

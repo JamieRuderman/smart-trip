@@ -120,6 +120,22 @@ function highAccuracyRecentlyTimedOut(): boolean {
   return Date.now() - highAccuracyTimedOutAt < HIGH_ACCURACY_RETRY_MS;
 }
 
+/** How old the latest fix can be and still count as where the rider is now —
+ *  long enough that a sheet left open a while doesn't make a tap wait on the
+ *  GPS again, short enough that it's still roughly where they are. */
+const REUSE_FIX_MS = 5 * 60_000;
+
+/** Fresh network-only fixes on Android arrive erratically (from 0.1 s to past
+ *  the timeout), while a recent cached one comes back at once and is just as
+ *  coarse. */
+function lowAccuracyOptions<T extends { maximumAge?: number }>(options: T) {
+  return {
+    ...options,
+    enableHighAccuracy: false,
+    maximumAge: Math.max(options.maximumAge ?? 0, REUSE_FIX_MS),
+  };
+}
+
 export async function fetchNativeLocation(
   options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
   { prompt = true, askToEnable = false } = {},
@@ -137,13 +153,15 @@ export async function fetchNativeLocation(
   const highAccuracy = !!options.enableHighAccuracy && !highAccuracyRecentlyTimedOut();
   let pos;
   try {
-    pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: highAccuracy });
+    pos = await Geolocation.getCurrentPosition(
+      highAccuracy ? options : lowAccuracyOptions(options),
+    );
   } catch (err) {
     // With GPS off (Android's network-only location mode) a high-accuracy
-    // request never resolves, while a low-accuracy one answers at once.
+    // request never resolves.
     if (!highAccuracy || errorCode(err) !== GET_LOCATION_TIMEOUT) throw err;
     highAccuracyTimedOutAt = Date.now();
-    pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: false });
+    pos = await Geolocation.getCurrentPosition(lowAccuracyOptions(options));
   }
   return normalizeCoordinates(pos, null);
 }
@@ -194,10 +212,6 @@ function rememberFix(fix: Coordinates): Coordinates {
   return fix;
 }
 
-/** How old the latest fix can be and still count as where the rider is now —
- *  long enough that a sheet left open a while doesn't make a tap wait on the
- *  GPS again, short enough that it's still roughly where they are. */
-const REUSE_FIX_MS = 5 * 60_000;
 
 /**
  * Where the rider is right now, without ever prompting for permission: while
@@ -315,19 +329,17 @@ export function useGeolocation({
         let watchId: string | null = null;
         try {
           await Geolocation.requestPermissions();
+          const watchOptions = { timeout: 10000, maximumAge: 0, minimumUpdateInterval: 1000 };
           watchId = await Geolocation.watchPosition(
-            {
-              enableHighAccuracy: highAccuracy,
-              timeout: 10000,
-              maximumAge: 0,
-              minimumUpdateInterval: 1000,
-            },
+            highAccuracy
+              ? { ...watchOptions, enableHighAccuracy: true }
+              : lowAccuracyOptions(watchOptions),
             (position, watchError) => {
               if (cancelled) return;
-              // The plugin drops a watch once it times out, and with GPS off a
-              // high-accuracy watch always does; a low-accuracy one still works.
-              if (highAccuracy && errorCode(watchError) === GET_LOCATION_TIMEOUT) {
-                highAccuracyTimedOutAt = Date.now();
+              // The plugin drops a watch once it times out, as a high-accuracy
+              // one always does with GPS off.
+              if (errorCode(watchError) === GET_LOCATION_TIMEOUT) {
+                if (highAccuracy) highAccuracyTimedOutAt = Date.now();
                 if (watchId) {
                   if (nativeWatchIdRef.current === watchId) nativeWatchIdRef.current = null;
                   // The plugin holds the dead watch's call until clearWatch releases it.

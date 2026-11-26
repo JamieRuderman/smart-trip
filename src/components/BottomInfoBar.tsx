@@ -21,7 +21,8 @@ export function BottomInfoBar() {
   const appVersion = useAppVersionLabel();
 
   // Web-only prompt: inside the native app there's nothing to download.
-  const showAppPrompt = !Capacitor.isNativePlatform();
+  const isNative = Capacitor.isNativePlatform();
+  const showAppPrompt = !isNative;
 
   return (
     <div className="container max-w-4xl mx-auto px-3 md:px-0 pb-safe space-y-3">
@@ -63,14 +64,18 @@ export function BottomInfoBar() {
         <ScheduleFreshnessLabel className="mt-2" />
         <p className="mt-2 text-xs">
           {t("bottomInfo.linksIntro")}{" "}
-          <button
-            type="button"
-            onClick={() => void openFeedbackEmail(i18n.language)}
-            className="text-foreground underline-offset-2 hover:underline"
-          >
-            {t("bottomInfo.feedbackLink")}
-          </button>{" "}
-          ·{" "}
+          {isNative && (
+            <>
+              <button
+                type="button"
+                onClick={() => void openFeedbackEmail(i18n.language)}
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                {t("bottomInfo.feedbackLink")}
+              </button>{" "}
+              ·{" "}
+            </>
+          )}
           <a
             href="/support.html"
             target="_blank"

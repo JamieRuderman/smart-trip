@@ -33,7 +33,6 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 let appVersionLabel: Promise<string | undefined> | undefined;
 
-/** "1.14.1 (34)" in the native apps; undefined on the web. Fetched once per session. */
 export function getAppVersionLabel(): Promise<string | undefined> {
   if (!Capacitor.isNativePlatform()) return Promise.resolve(undefined);
   appVersionLabel ??= App.getInfo()

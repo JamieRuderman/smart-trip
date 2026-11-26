@@ -15,7 +15,8 @@ export const scheduleOverrides: Record<string, ScheduleType> = {
   "2026-11-27": "weekend",
   "2026-12-24": "weekend",
   "2026-12-25": "weekend",
-  "2026-12-31": "weekend"
+  "2026-12-31": "weekend",
+  "2027-01-01": "weekend"
 };
 
 export default scheduleOverrides;

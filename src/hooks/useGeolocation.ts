@@ -104,13 +104,65 @@ function normalizeCoordinates(
   };
 }
 
-async function fetchNativeLocation(
+const LOCATION_SERVICES_OFF = "OS-PLUG-GLOC-0007";
+const GET_LOCATION_TIMEOUT = "OS-PLUG-GLOC-0010";
+
+function errorCode(err: unknown): string | undefined {
+  return (err as { code?: string } | null)?.code;
+}
+
+/** When a high-accuracy request last timed out, so later requests skip the
+ *  wait until GPS might be back. */
+let highAccuracyTimedOutAt = 0;
+const HIGH_ACCURACY_RETRY_MS = 5 * 60_000;
+
+function highAccuracyRecentlyTimedOut(): boolean {
+  return Date.now() - highAccuracyTimedOutAt < HIGH_ACCURACY_RETRY_MS;
+}
+
+/** How old the latest fix can be and still count as where the rider is now —
+ *  long enough that a sheet left open a while doesn't make a tap wait on the
+ *  GPS again, short enough that it's still roughly where they are. */
+const REUSE_FIX_MS = 5 * 60_000;
+
+/** Fresh network-only fixes on Android arrive erratically (from 0.1 s to past
+ *  the timeout), while a recent cached one comes back at once and is just as
+ *  coarse. */
+function lowAccuracyOptions<T extends { maximumAge?: number }>(options: T) {
+  return {
+    ...options,
+    enableHighAccuracy: false,
+    maximumAge: Math.max(options.maximumAge ?? 0, REUSE_FIX_MS),
+  };
+}
+
+export async function fetchNativeLocation(
   options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-  { prompt = true } = {},
+  { prompt = true, askToEnable = false } = {},
 ): Promise<Coordinates> {
   const { Geolocation } = await import("@capacitor/geolocation");
-  if (prompt) await Geolocation.requestPermissions();
-  const pos = await Geolocation.getCurrentPosition(options);
+  if (prompt) {
+    try {
+      await Geolocation.requestPermissions();
+    } catch (err) {
+      // requestPermissions rejects outright while device location is off;
+      // only getCurrentPosition shows Android's "Turn on location" dialog.
+      if (!askToEnable || errorCode(err) !== LOCATION_SERVICES_OFF) throw err;
+    }
+  }
+  const highAccuracy = !!options.enableHighAccuracy && !highAccuracyRecentlyTimedOut();
+  let pos;
+  try {
+    pos = await Geolocation.getCurrentPosition(
+      highAccuracy ? options : lowAccuracyOptions(options),
+    );
+  } catch (err) {
+    // With GPS off (Android's network-only location mode) a high-accuracy
+    // request never resolves.
+    if (!highAccuracy || errorCode(err) !== GET_LOCATION_TIMEOUT) throw err;
+    highAccuracyTimedOutAt = Date.now();
+    pos = await Geolocation.getCurrentPosition(lowAccuracyOptions(options));
+  }
   return normalizeCoordinates(pos, null);
 }
 
@@ -160,10 +212,6 @@ function rememberFix(fix: Coordinates): Coordinates {
   return fix;
 }
 
-/** How old the latest fix can be and still count as where the rider is now —
- *  long enough that a sheet left open a while doesn't make a tap wait on the
- *  GPS again, short enough that it's still roughly where they are. */
-const REUSE_FIX_MS = 5 * 60_000;
 
 /**
  * Where the rider is right now, without ever prompting for permission: while
@@ -221,12 +269,12 @@ export function useGeolocation({
   const webWatchIdRef = useRef<number | null>(null);
   const lastCoordsRef = useRef<Coordinates | null>(null);
 
-  const requestLocation = useCallback(async () => {
+  const fetchLocation = useCallback(async (askToEnable: boolean) => {
     setLoading(true);
     setError(null);
     try {
       const result = Capacitor.isNativePlatform()
-        ? await fetchNativeLocation()
+        ? await fetchNativeLocation(undefined, { askToEnable })
         : await fetchWebLocation();
       lastCoordsRef.current = result;
       setCoords(rememberFix(result));
@@ -237,20 +285,22 @@ export function useGeolocation({
     }
   }, []);
 
+  const requestLocation = useCallback(() => fetchLocation(true), [fetchLocation]);
+
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      if (autoRequestOnNative) void requestLocation();
+      if (autoRequestOnNative) void fetchLocation(false);
       return;
     }
     // Web: only auto-request if permission is already granted (no prompt shown).
     if (autoRequestOnWeb) {
       grantedLocationAccess()
         .then((access) => {
-          if (access) void requestLocation();
+          if (access) void fetchLocation(false);
         })
         .catch(() => {/* permissions API unavailable — skip */});
     }
-  }, [autoRequestOnNative, autoRequestOnWeb, requestLocation]);
+  }, [autoRequestOnNative, autoRequestOnWeb, fetchLocation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -271,36 +321,57 @@ export function useGeolocation({
       }
     };
 
-    const startWatching = async () => {
+    const startWatching = async (highAccuracy = !highAccuracyRecentlyTimedOut()) => {
       if (!watch) return;
 
       if (Capacitor.isNativePlatform()) {
         const { Geolocation } = await import("@capacitor/geolocation");
-        await Geolocation.requestPermissions();
-        const watchId = await Geolocation.watchPosition(
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-            minimumUpdateInterval: 1000,
-          },
-          (position, watchError) => {
-            if (cancelled) return;
-            if (watchError) {
-              setError(watchError.message ?? "Location unavailable");
-              return;
+        let watchId: string | null = null;
+        try {
+          await Geolocation.requestPermissions();
+          const watchOptions = { timeout: 10000, maximumAge: 0, minimumUpdateInterval: 1000 };
+          watchId = await Geolocation.watchPosition(
+            highAccuracy
+              ? { ...watchOptions, enableHighAccuracy: true }
+              : lowAccuracyOptions(watchOptions),
+            (position, watchError) => {
+              if (cancelled) return;
+              // The plugin drops a watch once it times out, as a high-accuracy
+              // one always does with GPS off.
+              if (errorCode(watchError) === GET_LOCATION_TIMEOUT) {
+                if (highAccuracy) highAccuracyTimedOutAt = Date.now();
+                if (watchId) {
+                  if (nativeWatchIdRef.current === watchId) nativeWatchIdRef.current = null;
+                  // The plugin holds the dead watch's call until clearWatch releases it.
+                  void Geolocation.clearWatch({ id: watchId }).catch(() => {});
+                }
+                void startWatching(false);
+                return;
+              }
+              if (watchError) {
+                setError(watchError.message ?? "Location unavailable");
+                return;
+              }
+              if (position?.coords) {
+                const normalized = normalizeCoordinates(
+                  position,
+                  lastCoordsRef.current,
+                );
+                lastCoordsRef.current = normalized;
+                setCoords(rememberFix(normalized));
+                setError(null);
+              }
             }
-            if (position?.coords) {
-              const normalized = normalizeCoordinates(
-                position,
-                lastCoordsRef.current,
-              );
-              lastCoordsRef.current = normalized;
-              setCoords(rememberFix(normalized));
-              setError(null);
-            }
-          }
-        );
+          );
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Location unavailable");
+          return;
+        }
+        // Cleanup or a hide during the awaits above found no id to clear.
+        if (cancelled || document.hidden) {
+          void Geolocation.clearWatch({ id: watchId }).catch(() => {});
+          return;
+        }
         nativeWatchIdRef.current = watchId;
         return;
       }

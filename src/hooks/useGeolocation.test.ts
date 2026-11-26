@@ -87,3 +87,63 @@ describe("getRecentLocationFix (native)", () => {
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("fetchNativeLocation", () => {
+  const servicesOff = Object.assign(new Error("Location services are not enabled."), {
+    code: "OS-PLUG-GLOC-0007",
+  });
+
+  beforeEach(() => {
+    geo.getCurrentPosition.mockResolvedValue(position());
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function loadFetch() {
+    vi.resetModules();
+    return (await import("./useGeolocation")).fetchNativeLocation;
+  }
+
+  it("goes on to getCurrentPosition when asked to enable location services", async () => {
+    geo.requestPermissions.mockRejectedValue(servicesOff);
+    const fetchNativeLocation = await loadFetch();
+    await expect(fetchNativeLocation(undefined, { askToEnable: true })).resolves.toMatchObject({
+      lat: 38.2,
+    });
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails quietly while location services are off unless asked to enable them", async () => {
+    geo.requestPermissions.mockRejectedValue(servicesOff);
+    const fetchNativeLocation = await loadFetch();
+    await expect(fetchNativeLocation()).rejects.toBe(servicesOff);
+    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  it("retries at low accuracy when a high-accuracy fix times out, then skips the wait", async () => {
+    const timeout = Object.assign(new Error("timeout"), { code: "OS-PLUG-GLOC-0010" });
+    geo.requestPermissions.mockResolvedValue({});
+    geo.getCurrentPosition.mockRejectedValueOnce(timeout).mockResolvedValueOnce(position());
+    const fetchNativeLocation = await loadFetch();
+    await expect(fetchNativeLocation()).resolves.toMatchObject({ lat: 38.2 });
+    expect(geo.getCurrentPosition).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enableHighAccuracy: false, maximumAge: 5 * 60_000 }),
+    );
+
+    geo.getCurrentPosition.mockClear();
+    await fetchNativeLocation();
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(geo.getCurrentPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ enableHighAccuracy: false }),
+    );
+  });
+
+  it("still fails on other permission errors when asked to enable", async () => {
+    const denied = Object.assign(new Error("denied"), { code: "OS-PLUG-GLOC-0003" });
+    geo.requestPermissions.mockRejectedValue(denied);
+    const fetchNativeLocation = await loadFetch();
+    await expect(fetchNativeLocation(undefined, { askToEnable: true })).rejects.toBe(denied);
+    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+  });
+});

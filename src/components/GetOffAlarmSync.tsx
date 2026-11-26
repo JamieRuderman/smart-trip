@@ -20,8 +20,10 @@ export function GetOffAlarmSync() {
 function GetOffAlarmSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
   const { t, i18n } = useTranslation();
   const now = useNow(30_000) * 1000;
-  const { live } = useFocusedTripLive(focusedTrip, now);
-  const timing = getOffAlarmTiming(focusedTrip, live);
+  const { live, lastUpdated } = useFocusedTripLive(focusedTrip, now);
+  // Before the feed's first load `live` is null even for a late train, which
+  // would pull the alarm back to the on-time arrival.
+  const timing = lastUpdated ? getOffAlarmTiming(focusedTrip, live) : null;
   const fireAt = timing?.fireAt ?? null;
   const arrivalAt = timing?.arrivalAt ?? null;
 

@@ -110,6 +110,15 @@ export type GetOffAlarmResult =
   | { ok: true }
   | { ok: false; reason: "permission" | "schedule-failed" | "no-focus" };
 
+// Set, clear and the drift re-arm each read the stored alarm and retire it; run
+// overlapping, two re-arms both retire the same old id and orphan one new alarm.
+let queue: Promise<unknown> = Promise.resolve();
+function serialized<R>(task: () => Promise<R>): Promise<R> {
+  const run = queue.then(task, task);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
 async function armGetOffAlarm(
   current: FocusedTrip,
   fireAt: number,
@@ -122,58 +131,65 @@ async function armGetOffAlarm(
     prev?.alarmId,
     notifyChange,
     "Failed to schedule get-off alarm",
-    () => {
+    (alarmId) => {
       const latest = loadFocusedTrip();
       if (latest == null || !sameFocusIdentity(latest, current)) return null;
-      return prev != null && latest.getOffAlarm == null ? null : latest;
+      if (prev != null && latest.getOffAlarm == null) return null;
+      const saved: FocusedTrip = {
+        ...latest,
+        getOffAlarm: { reminderAt: fireAt, notificationId, title: text.title, body: text.body, alarmId },
+      };
+      saveFocusedTrip(saved);
+      return saved;
     },
   );
   if (!armed.ok) return armed;
-  const { alarmId, latest } = armed;
-  saveFocusedTrip({
-    ...latest,
-    getOffAlarm: { reminderAt: fireAt, notificationId, title: text.title, body: text.body, alarmId },
-  });
   notifyChange();
   return { ok: true };
 }
 
 /** Arm the focused trip's get-off alarm at `fireAt`. */
-export async function setGetOffAlarm(
+export function setGetOffAlarm(
   fireAt: number,
   text: { title: string; body: string },
 ): Promise<GetOffAlarmResult> {
-  const current = loadFocusedTrip();
-  if (!current) return { ok: false, reason: "no-focus" };
-  return armGetOffAlarm(current, fireAt, text);
+  return serialized(async () => {
+    const current = loadFocusedTrip();
+    if (!current) return { ok: false, reason: "no-focus" };
+    return armGetOffAlarm(current, fireAt, text);
+  });
 }
 
 /** Turn the focused trip's get-off alarm off. */
-export async function clearGetOffAlarm(): Promise<void> {
-  const current = loadFocusedTrip();
-  if (!current?.getOffAlarm) return;
-  await cancelAlertChannels(current.getOffAlarm);
-  const latest = loadFocusedTrip();
-  if (latest && sameFocusIdentity(latest, current) && latest.getOffAlarm) {
-    saveFocusedTrip({ ...latest, getOffAlarm: undefined });
-    notifyChange();
-  }
+export function clearGetOffAlarm(): Promise<void> {
+  return serialized(async () => {
+    const current = loadFocusedTrip();
+    if (!current?.getOffAlarm) return;
+    await cancelAlertChannels(current.getOffAlarm);
+    const latest = loadFocusedTrip();
+    if (latest && sameFocusIdentity(latest, current) && latest.getOffAlarm) {
+      saveFocusedTrip({ ...latest, getOffAlarm: undefined });
+      notifyChange();
+    }
+  });
 }
 
 /** Move an armed, not-yet-fired alarm to a drifted fire time. No-op when the
  *  time and text are unchanged, or the new time is too close to schedule. */
-export async function rescheduleGetOffAlarm(
+export function rescheduleGetOffAlarm(
   fireAt: number,
   text: { title: string; body: string },
 ): Promise<void> {
-  const current = loadFocusedTrip();
-  const armed = current?.getOffAlarm;
-  if (!current || !armed) return;
-  const now = Date.now();
-  if (armed.reminderAt <= now) return;
-  if (armed.reminderAt === fireAt && armed.title === text.title && armed.body === text.body) {
-    return;
-  }
-  if (!canScheduleGetOffAlarm(fireAt, now)) return;
-  await armGetOffAlarm(current, fireAt, text);
+  return serialized(async () => {
+    const current = loadFocusedTrip();
+    const armed = current?.getOffAlarm;
+    if (!current || !armed) return;
+    const now = Date.now();
+    if (armed.reminderAt <= now) return;
+    if (armed.reminderAt === fireAt && armed.title === text.title && armed.body === text.body) {
+      return;
+    }
+    if (!canScheduleGetOffAlarm(fireAt, now)) return;
+    await armGetOffAlarm(current, fireAt, text);
+  });
 }

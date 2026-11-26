@@ -57,25 +57,25 @@ async function scheduleAlertChannel(
 }
 
 /**
- * Schedule `alert`, then re-read the trip with `recheck`. A permission prompt
- * can block long enough for the rider to switch trains or turn the alert off,
- * so when `recheck` returns null the new channel is rolled back instead of
- * resurrecting a stale alert. Otherwise the previous alarm is retired, and any
- * stale notification under this id when the new one is an alarm.
+ * Schedule `alert`, then hand the result to `commit`, which re-reads the trip
+ * and saves it synchronously, or returns null when it changed meanwhile (a
+ * permission prompt can block long enough for the rider to switch trains or
+ * turn the alert off) so the new channel is rolled back. The previous alarm is
+ * retired only after the save, so no await sits between re-read and write.
  */
 export async function armReplacingAlert<T>(
   alert: AlertRequest,
   prevAlarmId: string | undefined,
   onWebFired: () => void,
   failureMessage: string,
-  recheck: () => T | null,
-): Promise<{ ok: true; alarmId?: string; latest: T } | Extract<ScheduleAlertResult, { ok: false }>> {
+  commit: (alarmId: string | undefined) => T | null,
+): Promise<{ ok: true; saved: T } | Extract<ScheduleAlertResult, { ok: false }>> {
   const scheduled = await scheduleAlertChannel(alert, onWebFired, failureMessage);
   if (!scheduled.ok) return scheduled;
   const { alarmId } = scheduled;
 
-  const latest = recheck();
-  if (latest == null) {
+  const saved = commit(alarmId);
+  if (saved == null) {
     if (alarmId) await cancelLeaveAlarm(alarmId);
     else await cancelNotification(alert.notificationId);
     return { ok: false, reason: "schedule-failed" };
@@ -83,7 +83,7 @@ export async function armReplacingAlert<T>(
 
   if (prevAlarmId && prevAlarmId !== alarmId) await cancelLeaveAlarm(prevAlarmId);
   if (alarmId) await cancelNotification(alert.notificationId);
-  return { ok: true, alarmId, latest };
+  return { ok: true, saved };
 }
 
 /** Cancel both channels an alert might own. Both are dispatched before the

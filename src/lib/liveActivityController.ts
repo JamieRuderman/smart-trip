@@ -794,19 +794,19 @@ export async function armAndPersistReminder(
     current.reminder?.alarmId,
     onReminderFired,
     failureMessage,
-    () => {
+    (alarmId) => {
       const latest = loadFocusedTrip();
-      return latest != null && sameFocusIdentity(latest, current) ? latest : null;
+      if (latest == null || !sameFocusIdentity(latest, current)) return null;
+      // Persist from `latest` (same identity as `current`, just re-read): the
+      // Live Activity start commits `liveActivityId` concurrently with this
+      // await-heavy path, and spreading the stale `current` would clobber it.
+      const saved: FocusedTrip = { ...latest, reminder: { ...reminder, alarmId } };
+      saveFocusedTrip(saved);
+      return saved;
     },
   );
   if (!armed.ok) return armed;
-  const { alarmId, latest } = armed;
-
-  // Persist from `latest` (same identity as `current`, just re-read): the
-  // Live Activity start commits `liveActivityId` concurrently with this
-  // await-heavy path, and spreading the stale `current` would clobber it.
-  const saved: FocusedTrip = { ...latest, reminder: { ...reminder, alarmId } };
-  saveFocusedTrip(saved);
+  const saved = armed.saved;
   notifyChange();
   // Tell the push backend about the (re)armed lead so its locked-screen pushes
   // keep showing the leave-alarm countdown. Best-effort; never blocks the arm.

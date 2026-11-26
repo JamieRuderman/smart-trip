@@ -83,7 +83,10 @@ function syntheticTrip(times: Record<number, string>): ProcessedTrip {
 const TEXT = { title: "Next stop", body: "Get ready" };
 
 beforeEach(() => localStorage.clear());
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
 
 describe("stopBefore", () => {
   it("finds the last served stop before the destination, southbound", () => {
@@ -225,6 +228,33 @@ describe("rescheduleGetOffAlarm", () => {
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
     await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
     expect(scheduleLeaveAlarm).not.toHaveBeenCalled();
-    vi.useRealTimers();
+  });
+
+  it("rolls back a re-arm when the rider turned the alarm off meanwhile", async () => {
+    saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
+    scheduleLeaveAlarm.mockImplementationOnce(async () => {
+      saveFocusedTrip(makeFocused());
+      return { scheduled: true, alarmId: "alarm-new" };
+    });
+    await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
+    expect(cancelLeaveAlarm).toHaveBeenCalledWith("alarm-new");
+    expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
+  });
+
+  it("retires every superseded alarm when re-arms overlap", async () => {
+    saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
+    scheduleLeaveAlarm
+      .mockResolvedValueOnce({ scheduled: true, alarmId: "a1" })
+      .mockResolvedValueOnce({ scheduled: true, alarmId: "a2" });
+    await Promise.all([
+      rescheduleGetOffAlarm(FIRE_AT + 2 * 60_000, TEXT),
+      rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT),
+    ]);
+    expect(cancelLeaveAlarm).toHaveBeenCalledWith("old");
+    expect(cancelLeaveAlarm).toHaveBeenCalledWith("a1");
+    expect(loadFocusedTrip()?.getOffAlarm).toMatchObject({
+      reminderAt: FIRE_AT + 4 * 60_000,
+      alarmId: "a2",
+    });
   });
 });

@@ -105,6 +105,11 @@ function normalizeCoordinates(
 }
 
 const LOCATION_SERVICES_OFF = "OS-PLUG-GLOC-0007";
+const GET_LOCATION_TIMEOUT = "OS-PLUG-GLOC-0010";
+
+function errorCode(err: unknown): string | undefined {
+  return (err as { code?: string } | null)?.code;
+}
 
 export async function fetchNativeLocation(
   options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
@@ -117,13 +122,18 @@ export async function fetchNativeLocation(
     } catch (err) {
       // requestPermissions rejects outright while device location is off;
       // only getCurrentPosition shows Android's "Turn on location" dialog.
-      if (!askToEnable || (err as { code?: string })?.code !== LOCATION_SERVICES_OFF) {
-        throw err;
-      }
+      if (!askToEnable || errorCode(err) !== LOCATION_SERVICES_OFF) throw err;
     }
   }
-  const pos = await Geolocation.getCurrentPosition(options);
-  return normalizeCoordinates(pos, null);
+  try {
+    return normalizeCoordinates(await Geolocation.getCurrentPosition(options), null);
+  } catch (err) {
+    // With GPS off (Android's network-only location mode) a high-accuracy
+    // request never resolves, while a low-accuracy one answers at once.
+    if (!options.enableHighAccuracy || errorCode(err) !== GET_LOCATION_TIMEOUT) throw err;
+    const pos = await Geolocation.getCurrentPosition({ ...options, enableHighAccuracy: false });
+    return normalizeCoordinates(pos, null);
+  }
 }
 
 function fetchWebLocation(
@@ -285,7 +295,7 @@ export function useGeolocation({
       }
     };
 
-    const startWatching = async () => {
+    const startWatching = async (highAccuracy = true) => {
       if (!watch) return;
 
       if (Capacitor.isNativePlatform()) {
@@ -293,13 +303,20 @@ export function useGeolocation({
         await Geolocation.requestPermissions();
         const watchId = await Geolocation.watchPosition(
           {
-            enableHighAccuracy: true,
+            enableHighAccuracy: highAccuracy,
             timeout: 10000,
             maximumAge: 0,
             minimumUpdateInterval: 1000,
           },
           (position, watchError) => {
             if (cancelled) return;
+            // The plugin drops a watch once it times out, and with GPS off a
+            // high-accuracy watch always does; a low-accuracy one still works.
+            if (highAccuracy && errorCode(watchError) === GET_LOCATION_TIMEOUT) {
+              nativeWatchIdRef.current = null;
+              void startWatching(false);
+              return;
+            }
             if (watchError) {
               setError(watchError.message ?? "Location unavailable");
               return;

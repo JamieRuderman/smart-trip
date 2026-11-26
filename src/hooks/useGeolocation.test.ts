@@ -121,6 +121,17 @@ describe("fetchNativeLocation", () => {
     expect(geo.getCurrentPosition).not.toHaveBeenCalled();
   });
 
+  it("retries at low accuracy when a high-accuracy fix times out", async () => {
+    const timeout = Object.assign(new Error("timeout"), { code: "OS-PLUG-GLOC-0010" });
+    geo.requestPermissions.mockResolvedValue({});
+    geo.getCurrentPosition.mockRejectedValueOnce(timeout).mockResolvedValueOnce(position());
+    const fetchNativeLocation = await loadFetch();
+    await expect(fetchNativeLocation()).resolves.toMatchObject({ lat: 38.2 });
+    expect(geo.getCurrentPosition).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enableHighAccuracy: false }),
+    );
+  });
+
   it("still fails on other permission errors when asked to enable", async () => {
     const denied = Object.assign(new Error("denied"), { code: "OS-PLUG-GLOC-0003" });
     geo.requestPermissions.mockRejectedValue(denied);

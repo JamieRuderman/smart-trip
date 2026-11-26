@@ -11,6 +11,7 @@ import { AlarmStatusIcon, AlarmStatusLabel } from "@/components/AlarmStatusLabel
 import { FerryLeg } from "@/components/FerryLeg";
 import { DepartureReminder } from "@/components/DepartureReminder";
 import { ReminderControl } from "@/components/ReminderControl";
+import { GetOffAlarmControl } from "@/components/GetOffAlarmControl";
 import { LiveTimePair } from "@/components/LiveTimePair";
 import { QuickConnectionWarning } from "@/components/QuickConnectionWarning";
 import { ShareTripButton } from "@/components/ShareTripButton";
@@ -210,16 +211,27 @@ export function TripPageView({
                 />
               )
             ) : (
-              <ReminderControl
-                focusedTrip={focusedTrip}
-                trip={trip}
-                live={live}
-                minutesUntil={model.minutesUntil}
-                isCanceledOrSkipped={model.isCanceledOrSkipped}
-                isFutureService={isFutureService}
-                currentTime={clockTime}
-                timeFormat={TIME_FORMAT}
-              />
+              <>
+                <ReminderControl
+                  focusedTrip={focusedTrip}
+                  trip={trip}
+                  live={live}
+                  minutesUntil={model.minutesUntil}
+                  isCanceledOrSkipped={model.isCanceledOrSkipped}
+                  isFutureService={isFutureService}
+                  currentTime={clockTime}
+                  timeFormat={TIME_FORMAT}
+                />
+                {!progress.isEnded && (
+                  <GetOffAlarmControl
+                    focusedTrip={focusedTrip}
+                    live={live}
+                    isCanceledOrSkipped={model.isCanceledOrSkipped}
+                    currentTime={clockTime}
+                    timeFormat={TIME_FORMAT}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>

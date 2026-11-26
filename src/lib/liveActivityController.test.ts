@@ -767,6 +767,16 @@ describe("focus switching", () => {
       await replacing;
     });
 
+    it("cancels the previous focus's get-off alarm", async () => {
+      stored = {
+        ...PREV,
+        getOffAlarm: { reminderAt: NOW + 50 * 60_000, notificationId: 909, title: "t", body: "b", alarmId: "getoff-9" },
+      };
+      await replaceFocus(NEXT);
+      expect(cancelNotification).toHaveBeenCalledWith(909);
+      expect(cancelLeaveAlarm).toHaveBeenCalledWith("getoff-9");
+    });
+
     it("starts the new activity only after the previous one is ended", async () => {
       stored = PREV;
       await replaceFocus(NEXT);

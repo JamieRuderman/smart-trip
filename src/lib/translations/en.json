@@ -252,6 +252,14 @@
     "alarmStop": "Stop",
     "alarmViewTrip": "View trip"
   },
+  "getOffAlarm": {
+    "label": "Get-off alarm",
+    "on": "Get-off alarm set",
+    "ringsAt": "Rings at {{time}}, one stop before yours",
+    "cancel": "Cancel get-off alarm",
+    "notificationTitle": "Next stop: {{station}} · Remember to tap off",
+    "notificationBody": "Train {{trip}} arrives at {{station}} around {{time}}. Get ready to get off, and tap your card on the way out."
+  },
   "shareTrip": {
     "share": "Share trip",
     "title": "SMART trip itinerary",

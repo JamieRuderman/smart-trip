@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "smart.trip",
+      "sha256_cert_fingerprints": [
+        "79:D1:EF:5A:AA:10:DB:84:5A:94:0A:86:4E:B7:CB:FA:C1:FD:8D:4C:EB:3F:BD:D8:78:E2:A4:06:3E:9E:AD:C5",
+        "1D:12:9E:38:18:7F:04:DE:B5:99:6C:63:E8:22:E1:41:21:8B:A8:A8:BC:F0:64:C9:D6:36:22:82:C9:C6:2E:D5"
+      ]
+    }
+  }
+]

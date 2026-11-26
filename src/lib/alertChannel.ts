@@ -25,10 +25,9 @@ export type ScheduleAlertResult =
  * Schedule an alert as a true alarm (iOS AlarmKit / Android) when one is
  * available and authorized, else as a local notification. Notification
  * permission is requested only on that fallback, so an alarm-only user who
- * denied notifications isn't blocked. Retires nothing: callers cancel the
- * previous channel only once the new one is committed.
+ * denied notifications isn't blocked.
  */
-export async function scheduleAlertChannel(
+async function scheduleAlertChannel(
   alert: AlertRequest,
   onWebFired: () => void,
   failureMessage: string,
@@ -55,6 +54,36 @@ export async function scheduleAlertChannel(
     return { ok: false, reason: "schedule-failed" };
   }
   return { ok: true };
+}
+
+/**
+ * Schedule `alert`, then re-read the trip with `recheck`. A permission prompt
+ * can block long enough for the rider to switch trains or turn the alert off,
+ * so when `recheck` returns null the new channel is rolled back instead of
+ * resurrecting a stale alert. Otherwise the previous alarm is retired, and any
+ * stale notification under this id when the new one is an alarm.
+ */
+export async function armReplacingAlert<T>(
+  alert: AlertRequest,
+  prevAlarmId: string | undefined,
+  onWebFired: () => void,
+  failureMessage: string,
+  recheck: () => T | null,
+): Promise<{ ok: true; alarmId?: string; latest: T } | Extract<ScheduleAlertResult, { ok: false }>> {
+  const scheduled = await scheduleAlertChannel(alert, onWebFired, failureMessage);
+  if (!scheduled.ok) return scheduled;
+  const { alarmId } = scheduled;
+
+  const latest = recheck();
+  if (latest == null) {
+    if (alarmId) await cancelLeaveAlarm(alarmId);
+    else await cancelNotification(alert.notificationId);
+    return { ok: false, reason: "schedule-failed" };
+  }
+
+  if (prevAlarmId && prevAlarmId !== alarmId) await cancelLeaveAlarm(prevAlarmId);
+  if (alarmId) await cancelNotification(alert.notificationId);
+  return { ok: true, alarmId, latest };
 }
 
 /** Cancel both channels an alert might own. Both are dispatched before the

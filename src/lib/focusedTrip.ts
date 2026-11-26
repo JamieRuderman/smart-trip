@@ -179,32 +179,28 @@ export function isFocusedTrainToday(
 
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+function isAlertRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const a = value as Record<string, unknown>;
+  return (
+    typeof a.reminderAt === "number" &&
+    typeof a.notificationId === "number" &&
+    typeof a.title === "string" &&
+    typeof a.body === "string" &&
+    (a.alarmId === undefined || typeof a.alarmId === "string")
+  );
+}
+
 function isFocusedTrip(value: unknown): value is FocusedTrip {
   if (typeof value !== "object" || value === null) return false;
   const r = value as Record<string, unknown>;
+  const reminder = r.reminder as Record<string, unknown> | null;
   const reminderOk =
-    r.reminder === null ||
-    (typeof r.reminder === "object" &&
-      r.reminder !== null &&
-      typeof (r.reminder as Record<string, unknown>).leadMinutes === "number" &&
-      typeof (r.reminder as Record<string, unknown>).reminderAt === "number" &&
-      typeof (r.reminder as Record<string, unknown>).notificationId === "number" &&
-      typeof (r.reminder as Record<string, unknown>).title === "string" &&
-      typeof (r.reminder as Record<string, unknown>).body === "string" &&
-      ((r.reminder as Record<string, unknown>).alarmId === undefined ||
-        typeof (r.reminder as Record<string, unknown>).alarmId === "string") &&
-      ((r.reminder as Record<string, unknown>).firedAt === undefined ||
-        typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
-  const getOff = r.getOffAlarm as Record<string, unknown> | undefined;
-  const getOffAlarmOk =
-    getOff === undefined ||
-    (typeof getOff === "object" &&
-      getOff !== null &&
-      typeof getOff.reminderAt === "number" &&
-      typeof getOff.notificationId === "number" &&
-      typeof getOff.title === "string" &&
-      typeof getOff.body === "string" &&
-      (getOff.alarmId === undefined || typeof getOff.alarmId === "string"));
+    reminder === null ||
+    (isAlertRecord(reminder) &&
+      typeof reminder.leadMinutes === "number" &&
+      (reminder.firedAt === undefined || typeof reminder.firedAt === "number"));
+  const getOffAlarmOk = r.getOffAlarm === undefined || isAlertRecord(r.getOffAlarm);
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
   const isOptionalFiniteNumber = (v: unknown) =>

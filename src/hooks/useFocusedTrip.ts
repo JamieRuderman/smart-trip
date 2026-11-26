@@ -7,11 +7,11 @@ import {
   type FocusedRun,
   type FocusedTrip,
 } from "@/lib/focusedTrip";
+import { cancelAlertChannels } from "@/lib/alertChannel";
 import { cancelNotification } from "@/lib/notificationScheduler";
 import { reminderIdFor } from "@/lib/notificationId";
 import {
   armAndPersistReminder,
-  cancelReminderChannels,
   ensureActivityForFocus,
   notifyChange,
   reRegisterPushForFocus,
@@ -72,7 +72,7 @@ export function useFocusedTrip() {
       if (!current) return { ok: false, reason: "no-focus" };
 
       if (leadMinutes === null) {
-        if (current.reminder) await cancelReminderChannels(current.reminder);
+        await cancelAlertChannels(current.reminder);
         // Re-read: a focus switch or a start's commit can land during the cancel,
         // and saving `current` would undo it.
         const latest = loadFocusedTrip();

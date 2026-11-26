@@ -38,25 +38,23 @@ export function GetOffAlarmControl({
   const armed = focusedTrip.getOffAlarm;
   const now = currentTime.getTime();
 
-  if (armed ? armed.reminderAt <= now : !timing) return null;
   const canSet =
     timing != null &&
     !isCanceledOrSkipped &&
     isReminderSupported() &&
     canScheduleGetOffAlarm(timing.fireAt, now);
-  if (!armed && !canSet) return null;
+  if (armed ? armed.reminderAt <= now : !canSet) return null;
+  const ringsAt = armed?.reminderAt ?? timing!.fireAt;
 
   const arm = async () => {
-    const latest = getOffAlarmTiming(focusedTrip, live);
-    if (!latest || !canScheduleGetOffAlarm(latest.fireAt, Date.now())) return;
+    if (!timing || !canScheduleGetOffAlarm(timing.fireAt, Date.now())) return;
     setBusy(true);
     const result = await setGetOffAlarm(
-      latest.fireAt,
+      timing.fireAt,
       buildGetOffAlarmText(t, i18n.language, {
         toStation: focusedTrip.toStation,
         tripNumber: focusedTrip.tripNumber,
-        arrivalAt: latest.arrivalAt,
-        timeFormat,
+        arrivalAt: timing.arrivalAt,
       }),
     );
     setBusy(false);
@@ -69,8 +67,6 @@ export function GetOffAlarmControl({
     setBusy(false);
     setError(null);
   };
-
-  const ringsAt = armed ? armed.reminderAt : (timing?.fireAt ?? now);
 
   return (
     <div className="space-y-2 [&:not(:first-child)]:mt-2">

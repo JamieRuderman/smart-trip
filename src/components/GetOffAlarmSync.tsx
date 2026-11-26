@@ -33,7 +33,6 @@ function GetOffAlarmSyncInner({ focusedTrip }: { focusedTrip: FocusedTrip }) {
         toStation: focusedTrip.toStation,
         tripNumber: focusedTrip.tripNumber,
         arrivalAt,
-        timeFormat: "12h",
       }),
     );
   }, [fireAt, arrivalAt, focusedTrip.toStation, focusedTrip.tripNumber, t, i18n.language]);

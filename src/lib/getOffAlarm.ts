@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { Station } from "@/types/smartSchedule";
 import type { TripRealtimeStatus } from "@/types/gtfsRt";
 import stations from "@/data/stations";
-import { cancelAlertChannels, scheduleAlertChannel } from "@/lib/alertChannel";
+import { armReplacingAlert, cancelAlertChannels } from "@/lib/alertChannel";
 import {
   anchorLiveTime,
   focusedArrivalInstant,
@@ -14,8 +14,6 @@ import {
   type FocusedTrip,
 } from "@/lib/focusedTrip";
 import { notifyChange } from "@/lib/liveActivityController";
-import { cancelLeaveAlarm } from "@/lib/native/leaveAlarm";
-import { cancelNotification } from "@/lib/notificationScheduler";
 import { getOffAlarmIdFor } from "@/lib/notificationId";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { stationIndexMap } from "@/lib/stationUtils";
@@ -83,8 +81,8 @@ export function canScheduleGetOffAlarm(fireAt: number, now: number): boolean {
   return fireAt - now > REMINDER_FIRE_BUFFER_MS;
 }
 
-/** Every path that arms or re-arms the alarm builds its text here, because the
- *  drift re-arm compares text to stay idempotent. */
+/** Every path that arms or re-arms the alarm builds its text here, in one time
+ *  format, because the drift re-arm compares text to stay idempotent. */
 export function buildGetOffAlarmText(
   t: TFunction,
   language: string,
@@ -92,12 +90,10 @@ export function buildGetOffAlarmText(
     toStation,
     tripNumber,
     arrivalAt,
-    timeFormat,
   }: {
     toStation: Station;
     tripNumber: number;
     arrivalAt: number;
-    timeFormat: "12h" | "24h";
   },
 ): { title: string; body: string } {
   return {
@@ -105,7 +101,7 @@ export function buildGetOffAlarmText(
     body: t("getOffAlarm.notificationBody", {
       station: toStation,
       trip: tripNumber,
-      time: formatClockTime(arrivalAt, timeFormat, language),
+      time: formatClockTime(arrivalAt, "12h", language),
     }),
   };
 }
@@ -121,28 +117,19 @@ async function armGetOffAlarm(
 ): Promise<GetOffAlarmResult> {
   const prev = current.getOffAlarm;
   const notificationId = getOffAlarmIdFor(current.tripNumber, current.serviceDate);
-  const scheduled = await scheduleAlertChannel(
+  const armed = await armReplacingAlert(
     { notificationId, title: text.title, body: text.body, at: fireAt },
+    prev?.alarmId,
     notifyChange,
     "Failed to schedule get-off alarm",
+    () => {
+      const latest = loadFocusedTrip();
+      if (latest == null || !sameFocusIdentity(latest, current)) return null;
+      return prev != null && latest.getOffAlarm == null ? null : latest;
+    },
   );
-  if (!scheduled.ok) return scheduled;
-  const { alarmId } = scheduled;
-
-  // A permission prompt can block long enough for the rider to switch trains or
-  // turn this alarm off; don't resurrect either.
-  const latest = loadFocusedTrip();
-  if (
-    latest == null ||
-    !sameFocusIdentity(latest, current) ||
-    (prev != null && latest.getOffAlarm == null)
-  ) {
-    await cancelAlertChannels({ notificationId, alarmId });
-    return { ok: false, reason: "schedule-failed" };
-  }
-
-  if (prev?.alarmId && prev.alarmId !== alarmId) await cancelLeaveAlarm(prev.alarmId);
-  if (alarmId) await cancelNotification(notificationId);
+  if (!armed.ok) return armed;
+  const { alarmId, latest } = armed;
   saveFocusedTrip({
     ...latest,
     getOffAlarm: { reminderAt: fireAt, notificationId, title: text.title, body: text.body, alarmId },

@@ -7,30 +7,27 @@ vi.mock("@capacitor/core", () => ({
 }));
 const notifyChange = vi.fn();
 vi.mock("@/lib/liveActivityController", () => ({ notifyChange: () => notifyChange() }));
-const scheduleAlertChannel = vi.fn(
-  async (): Promise<{ ok: true; alarmId?: string } | { ok: false; reason: "permission" }> => ({
-    ok: true,
+const scheduleLeaveAlarm = vi.fn(
+  async (): Promise<{ scheduled: boolean; alarmId?: string }> => ({
+    scheduled: true,
     alarmId: "alarm-new",
   }),
 );
-const cancelAlertChannels = vi.fn(async (alert: unknown) => {
-  void alert;
-});
-vi.mock("@/lib/alertChannel", () => ({
-  scheduleAlertChannel: () => scheduleAlertChannel(),
-  cancelAlertChannels: (alert: unknown) => cancelAlertChannels(alert),
-}));
 const cancelLeaveAlarm = vi.fn(async (id: string) => {
   void id;
 });
 vi.mock("@/lib/native/leaveAlarm", () => ({
+  scheduleLeaveAlarm: () => scheduleLeaveAlarm(),
   cancelLeaveAlarm: (id: string) => cancelLeaveAlarm(id),
 }));
+const ensureNotificationPermission = vi.fn(async () => true);
 const cancelNotification = vi.fn(async (id: number) => {
   void id;
 });
 vi.mock("@/lib/notificationScheduler", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/notificationScheduler")>()),
+  ensureNotificationPermission: () => ensureNotificationPermission(),
+  scheduleNotification: async () => {},
   cancelNotification: (id: number) => cancelNotification(id),
 }));
 
@@ -175,21 +172,20 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
 
   it("reports a refused permission without storing anything", async () => {
     saveFocusedTrip(makeFocused());
-    scheduleAlertChannel.mockResolvedValueOnce({ ok: false, reason: "permission" });
+    scheduleLeaveAlarm.mockResolvedValueOnce({ scheduled: false });
+    ensureNotificationPermission.mockResolvedValueOnce(false);
     expect(await setGetOffAlarm(FIRE_AT, TEXT)).toEqual({ ok: false, reason: "permission" });
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
 
   it("rolls the alarm back when the rider switched trains meanwhile", async () => {
     saveFocusedTrip(makeFocused());
-    scheduleAlertChannel.mockImplementationOnce(async () => {
+    scheduleLeaveAlarm.mockImplementationOnce(async () => {
       saveFocusedTrip(makeFocused({ serviceDate: "2099-01-02" }));
-      return { ok: true, alarmId: "alarm-new" };
+      return { scheduled: true, alarmId: "alarm-new" };
     });
     expect(await setGetOffAlarm(FIRE_AT, TEXT)).toEqual({ ok: false, reason: "schedule-failed" });
-    expect(cancelAlertChannels).toHaveBeenCalledWith(
-      expect.objectContaining({ alarmId: "alarm-new" }),
-    );
+    expect(cancelLeaveAlarm).toHaveBeenCalledWith("alarm-new");
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
 
@@ -197,7 +193,8 @@ describe("setGetOffAlarm / clearGetOffAlarm", () => {
     const armed = { reminderAt: FIRE_AT, notificationId: 5, ...TEXT, alarmId: "a1" };
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
     await clearGetOffAlarm();
-    expect(cancelAlertChannels).toHaveBeenCalledWith(armed);
+    expect(cancelLeaveAlarm).toHaveBeenCalledWith("a1");
+    expect(cancelNotification).toHaveBeenCalledWith(5);
     expect(loadFocusedTrip()?.getOffAlarm).toBeUndefined();
   });
 });
@@ -209,7 +206,7 @@ describe("rescheduleGetOffAlarm", () => {
   it("does nothing when the time and text are unchanged", async () => {
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
     await rescheduleGetOffAlarm(FIRE_AT, TEXT);
-    expect(scheduleAlertChannel).not.toHaveBeenCalled();
+    expect(scheduleLeaveAlarm).not.toHaveBeenCalled();
   });
 
   it("moves the alarm and retires the old one when the train runs late", async () => {
@@ -227,7 +224,7 @@ describe("rescheduleGetOffAlarm", () => {
     vi.setSystemTime(FIRE_AT + 60_000);
     saveFocusedTrip(makeFocused({ getOffAlarm: armed }));
     await rescheduleGetOffAlarm(FIRE_AT + 4 * 60_000, TEXT);
-    expect(scheduleAlertChannel).not.toHaveBeenCalled();
+    expect(scheduleLeaveAlarm).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 });

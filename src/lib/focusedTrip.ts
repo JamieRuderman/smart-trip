@@ -36,6 +36,18 @@ export interface FocusedTripReminder {
   firedAt?: number;
 }
 
+/** The optional alarm that wakes the rider one stop before theirs. */
+export interface FocusedTripGetOffAlarm {
+  /** Epoch ms the alarm fires (rescheduled when the live arrival drifts). */
+  reminderAt: number;
+  notificationId: number;
+  title: string;
+  body: string;
+  /** Out-of-process alarm id when scheduled as a true alarm (iOS AlarmKit /
+   *  Android), absent on the notification path. */
+  alarmId?: string;
+}
+
 export interface FocusedTrip {
   source: "user";
   tripNumber: number;
@@ -49,6 +61,7 @@ export interface FocusedTrip {
    *  departure/arrival are derived from static schedule + this date. */
   serviceDate: string;
   reminder: FocusedTripReminder | null;
+  getOffAlarm?: FocusedTripGetOffAlarm;
   /** Caller-chosen id of the running iOS Live Activity (lock screen + Dynamic
    *  Island countdown) for this trip, when one was started. iOS 16.2+ only;
    *  absent on Android, web, older iOS, or when Live Activities are disabled.
@@ -166,22 +179,28 @@ export function isFocusedTrainToday(
 
 const SERVICE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+function isAlertRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const a = value as Record<string, unknown>;
+  return (
+    typeof a.reminderAt === "number" &&
+    typeof a.notificationId === "number" &&
+    typeof a.title === "string" &&
+    typeof a.body === "string" &&
+    (a.alarmId === undefined || typeof a.alarmId === "string")
+  );
+}
+
 function isFocusedTrip(value: unknown): value is FocusedTrip {
   if (typeof value !== "object" || value === null) return false;
   const r = value as Record<string, unknown>;
+  const reminder = r.reminder as Record<string, unknown> | null;
   const reminderOk =
-    r.reminder === null ||
-    (typeof r.reminder === "object" &&
-      r.reminder !== null &&
-      typeof (r.reminder as Record<string, unknown>).leadMinutes === "number" &&
-      typeof (r.reminder as Record<string, unknown>).reminderAt === "number" &&
-      typeof (r.reminder as Record<string, unknown>).notificationId === "number" &&
-      typeof (r.reminder as Record<string, unknown>).title === "string" &&
-      typeof (r.reminder as Record<string, unknown>).body === "string" &&
-      ((r.reminder as Record<string, unknown>).alarmId === undefined ||
-        typeof (r.reminder as Record<string, unknown>).alarmId === "string") &&
-      ((r.reminder as Record<string, unknown>).firedAt === undefined ||
-        typeof (r.reminder as Record<string, unknown>).firedAt === "number"));
+    reminder === null ||
+    (isAlertRecord(reminder) &&
+      typeof reminder.leadMinutes === "number" &&
+      (reminder.firedAt === undefined || typeof reminder.firedAt === "number"));
+  const getOffAlarmOk = r.getOffAlarm === undefined || isAlertRecord(r.getOffAlarm);
   const liveActivityIdOk =
     r.liveActivityId === undefined || typeof r.liveActivityId === "string";
   const isOptionalFiniteNumber = (v: unknown) =>
@@ -200,6 +219,7 @@ function isFocusedTrip(value: unknown): value is FocusedTrip {
     typeof r.serviceDate === "string" &&
     SERVICE_DATE_RE.test(r.serviceDate as string) &&
     reminderOk &&
+    getOffAlarmOk &&
     liveActivityIdOk &&
     liveActivityScheduledForOk &&
     liveActivityCommittedAtOk &&
@@ -609,6 +629,10 @@ export function bootFocusedTrip(): void {
   }
   if (Capacitor.isNativePlatform()) return;
   const focused = loadFocusedTrip();
+  if (focused?.getOffAlarm && focused.getOffAlarm.reminderAt > Date.now()) {
+    const { notificationId, title, body, reminderAt } = focused.getOffAlarm;
+    armWebTimer({ id: notificationId, title, body, at: reminderAt }, () => {});
+  }
   if (!focused?.reminder) return;
   armWebTimer(
     {

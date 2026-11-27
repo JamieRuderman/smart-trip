@@ -20,12 +20,7 @@ import {
   type FocusedTrip,
   type FocusedTripReminder,
 } from "@/lib/focusedTrip";
-import {
-  cancelNotification,
-  ensureNotificationPermission,
-  scheduleNotification,
-} from "@/lib/notificationScheduler";
-import { cancelLeaveAlarm, scheduleLeaveAlarm } from "@/lib/native/leaveAlarm";
+import { armReplacingAlert, cancelAlertChannels } from "@/lib/alertChannel";
 import {
   buildContentState,
   endTripActivity,
@@ -54,27 +49,11 @@ import type { LiveActivityRegistration } from "@/lib/liveActivityPushTypes";
 import type { ProcessedTrip } from "@/lib/scheduleUtils";
 import { isSouthbound } from "@/lib/stationUtils";
 import { cleanTimeString } from "@/lib/timeUtils";
-import { logger } from "@/lib/logger";
 import i18n from "@/lib/i18n";
 
 export function notifyChange(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(FOCUSED_TRIP_CHANGED_EVENT));
-}
-
-/** Cancel both channels a reminder might own — the local notification and, if
- *  it was scheduled as a true Leave Alarm, the AlarmKit alarm. Cancelling the
- *  channel that wasn't used is a harmless no-op. Both are dispatched before the
- *  first await: {@link replaceFocus} has already overwritten the only stored
- *  alarm id, so a suspension mid-teardown must not strand the alarm. */
-export async function cancelReminderChannels(
-  reminder: FocusedTripReminder | null,
-): Promise<void> {
-  if (!reminder) return;
-  await Promise.all([
-    cancelNotification(reminder.notificationId),
-    reminder.alarmId ? cancelLeaveAlarm(reminder.alarmId) : undefined,
-  ]);
 }
 
 /** Web-fire cleanup: stamp the reminder as fired (keeps the focus + lead so the
@@ -187,7 +166,11 @@ export async function replaceFocus(next: FocusedTrip | null): Promise<void> {
   const prev = loadFocusedTrip();
   saveFocusedTrip(next);
   notifyChange();
-  await Promise.all([cancelReminderChannels(prev?.reminder ?? null), endFocusActivity(prev)]);
+  await Promise.all([
+    cancelAlertChannels(prev?.reminder),
+    cancelAlertChannels(prev?.getOffAlarm),
+    endFocusActivity(prev),
+  ]);
   await serializeStart(async () => {
     const latest = loadFocusedTrip();
     if (latest == null || !sameFocusIdentity(latest, next) || latest.liveActivityId) {
@@ -801,60 +784,29 @@ export async function armAndPersistReminder(
   reminder: FocusedTripReminder,
   failureMessage: string,
 ): Promise<ArmResult> {
-  const prev = current.reminder;
-
-  const alarm = await scheduleLeaveAlarm({
-    label: reminder.title,
-    fireAt: reminder.reminderAt,
-    // Module code (not a component) — use the global i18n instance for the
-    // alert's button labels; the title/body already arrive localized.
-    buttons: {
-      stop: i18n.t("departureReminder.alarmStop"),
-      viewTrip: i18n.t("departureReminder.alarmViewTrip"),
+  const armed = await armReplacingAlert(
+    {
+      notificationId: reminder.notificationId,
+      title: reminder.title,
+      body: reminder.body,
+      at: reminder.reminderAt,
     },
-  });
-  const alarmId = alarm.scheduled ? alarm.alarmId : undefined;
-
-  if (!alarmId) {
-    const granted = await ensureNotificationPermission();
-    if (!granted) return { ok: false, reason: "permission" };
-    try {
-      await scheduleNotification(
-        {
-          id: reminder.notificationId,
-          title: reminder.title,
-          body: reminder.body,
-          at: reminder.reminderAt,
-        },
-        onReminderFired,
-      );
-    } catch (error) {
-      logger.warn(failureMessage, error);
-      return { ok: false, reason: "schedule-failed" };
-    }
-  }
-
-  // Commit only if the focus is still the same run we scheduled for.
-  const latest = loadFocusedTrip();
-  if (latest == null || !sameFocusIdentity(latest, current)) {
-    if (alarmId) await cancelLeaveAlarm(alarmId);
-    else await cancelNotification(reminder.notificationId);
-    return { ok: false, reason: "schedule-failed" };
-  }
-
-  // Retire the previous channel now that the replacement is committed.
-  if (alarmId) {
-    if (prev?.alarmId && prev.alarmId !== alarmId) await cancelLeaveAlarm(prev.alarmId);
-    // Drop any stale notification under this id so we don't double-alert.
-    await cancelNotification(reminder.notificationId);
-  } else if (prev?.alarmId) {
-    await cancelLeaveAlarm(prev.alarmId);
-  }
-  // Persist from `latest` (same identity as `current`, just re-read): the
-  // Live Activity start commits `liveActivityId` concurrently with this
-  // await-heavy path, and spreading the stale `current` would clobber it.
-  const saved: FocusedTrip = { ...latest, reminder: { ...reminder, alarmId } };
-  saveFocusedTrip(saved);
+    current.reminder?.alarmId,
+    onReminderFired,
+    failureMessage,
+    (alarmId) => {
+      const latest = loadFocusedTrip();
+      if (latest == null || !sameFocusIdentity(latest, current)) return null;
+      // Persist from `latest` (same identity as `current`, just re-read): the
+      // Live Activity start commits `liveActivityId` concurrently with this
+      // await-heavy path, and spreading the stale `current` would clobber it.
+      const saved: FocusedTrip = { ...latest, reminder: { ...reminder, alarmId } };
+      saveFocusedTrip(saved);
+      return saved;
+    },
+  );
+  if (!armed.ok) return armed;
+  const saved = armed.saved;
   notifyChange();
   // Tell the push backend about the (re)armed lead so its locked-screen pushes
   // keep showing the leave-alarm countdown. Best-effort; never blocks the arm.

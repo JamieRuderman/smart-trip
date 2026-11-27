@@ -254,6 +254,14 @@
     "alarmStop": "Detener",
     "alarmViewTrip": "Ver viaje"
   },
+  "getOffAlarm": {
+    "label": "Alarma de bajada",
+    "on": "Alarma de bajada activada",
+    "ringsAt": "Suena a las {{time}}, una parada antes de la tuya",
+    "cancel": "Cancelar alarma de bajada",
+    "notificationTitle": "Próxima parada: {{station}} · No olvides marcar la salida",
+    "notificationBody": "El tren {{trip}} llega a {{station}} alrededor de las {{time}}. Prepárate para bajar y marca tu tarjeta al salir."
+  },
   "shareTrip": {
     "share": "Compartir viaje",
     "title": "Itinerario de SMART trip",

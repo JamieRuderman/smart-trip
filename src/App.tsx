@@ -14,6 +14,7 @@ import { LiveActivitySync } from "@/components/LiveActivitySync";
 import { FocusedTripAutoClear } from "@/components/FocusedTripAutoClear";
 import { StationsUpdatedHost } from "@/components/StationsUpdatedNotice";
 import { ReminderDriftSync } from "@/components/ReminderDriftSync";
+import { GetOffAlarmSync } from "@/components/GetOffAlarmSync";
 import { MapDiagramFrame } from "@/components/MapDiagramFrame";
 import { StationSelectionProvider } from "@/contexts/StationSelectionContext";
 import "@/lib/i18n"; // Initialize i18n
@@ -81,6 +82,7 @@ const RoutedApp = () => {
             drift on every platform — the in-sheet reschedule only runs while
             the trip detail sheet is open. */}
         <ReminderDriftSync />
+        <GetOffAlarmSync />
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
